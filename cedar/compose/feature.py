@@ -95,6 +95,18 @@ class Feature(abc.ABC):
         self.optimizer = Optimizer()
         self._plan = None
 
+    def set_optimizer(self, optimizer: Optimizer) -> None:
+        """
+        Replace the optimizer implementation for this feature.
+
+        If the logical graph has already been constructed (i.e. sources have
+        been applied), re-initialize the provided optimizer with the current
+        logical pipes/adjacency list so it can be used immediately.
+        """
+        self.optimizer = optimizer
+        if self.logical_pipes and self.logical_adj_list:
+            self.optimizer.init(self.logical_pipes, self.logical_adj_list)
+
     @abc.abstractmethod
     def _compose(self, source_pipes: List[Pipe]) -> Pipe:
         """
@@ -1092,6 +1104,11 @@ class Feature(abc.ABC):
         # Apply the original source to the new feature
         sources = self.get_sources()
         new_feature.apply(*sources)
+
+        # Preserve optimizer choice across copies (used by sharding / MP).
+        # Replacing the optimizer after apply() is safe because it only
+        # re-initializes with the already-built logical graph.
+        new_feature.set_optimizer(self.optimizer.__class__())
 
         return new_feature
 

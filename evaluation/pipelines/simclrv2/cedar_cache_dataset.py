@@ -108,6 +108,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_fusion=not spec.disable_fusion,
                 enable_caching=not spec.disable_caching,
                 num_samples=9472,
+                use_my_optimizer=getattr(spec, "use_my_optimizer", False),
             ),
             generate_plan=spec.generate_plan,
         )

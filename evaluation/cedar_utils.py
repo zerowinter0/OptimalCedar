@@ -23,6 +23,7 @@ class CedarEvalSpec:
         disable_reorder: bool = False,
         disable_fusion: bool = False,
         disable_caching: bool = False,
+        use_my_optimizer: bool = False,
         generate_plan: bool = False,
     ):
         self.batch_size = batch_size
@@ -43,6 +44,7 @@ class CedarEvalSpec:
         self.disable_reorder = disable_reorder
         self.disable_fusion = disable_fusion
         self.disable_caching = disable_caching
+        self.use_my_optimizer = use_my_optimizer
         self.generate_plan = generate_plan
 
     def to_ray_config(self) -> Optional[RayConfig]:

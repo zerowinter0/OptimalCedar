@@ -5,9 +5,10 @@ import math
 import multiprocessing
 import psutil
 
-from typing import Tuple, Dict, Set, Optional, List, Any
+from typing import Tuple, Dict, Set, Optional, List, Any, Union
 
 from cedar.pipes import (
+    CedarPipeSpec,
     Pipe,
     PipeVariantType,
     PipeVariantContext,
@@ -48,6 +49,7 @@ class OptimizerOptions:
         enable_caching: bool = False,
         disable_physical_opt: bool = False,
         num_samples: Optional[int] = None,
+        use_my_optimizer: bool = False,
     ):
         self.enable_prefetch = enable_prefetch
 
@@ -76,6 +78,10 @@ class OptimizerOptions:
         self.disable_physical_opt = disable_physical_opt
 
         self.num_samples = num_samples
+
+        # If true, DataSet/Feature may swap in cedar.compose.my_optimizer.MyOptimizer
+        # as a drop-in replacement for the default Optimizer implementation.
+        self.use_my_optimizer = use_my_optimizer
 
 
 class PipeDesc:
@@ -280,6 +286,7 @@ class Optimizer:
             k: self._fractional_latencies[k] * total_cost
             for k, v in self.profiled_stats["baseline"]["latencies"].items()
         }
+        print("tmp base_cost_map:",self._base_cost_map)
 
         self._data_size_ratio_map = {
             k: self._calculate_data_size_ratio(k) for k in self._base_cost_map
@@ -293,10 +300,13 @@ class Optimizer:
             logger.info("Fused TF cost {}".format(self._tf_fuse_cost))
 
     def run(
-        self, profiled_data: str, options: OptimizerOptions
+        self, profiled_data: Union[str, Dict[str, Any]], options: OptimizerOptions
     ) -> PhysicalPlan:
         """
         Runs the optimizer. Returns a physical plan for the feature.
+
+        profiled_data: Path to a YAML file, or a dict of profiled stats
+            (for testing with custom pipeline data).
 
         NOTE: The caller should hold a lock to ensure that
         the pipes are thread-safe.
@@ -304,14 +314,17 @@ class Optimizer:
         if not self._initialized:
             raise RuntimeError("Must intiailize optimizer before running.")
 
-        try:
-            with open(profiled_data, "r") as f:
-                self.profiled_stats = yaml.safe_load(f)
-        except Exception as e:
-            logger.error("An error occurred {}".format(e))
-            raise RuntimeError(
-                "Failed to read profiled stats {}".format(profiled_data)
-            )
+        if isinstance(profiled_data, dict):
+            self.profiled_stats = profiled_data
+        else:
+            try:
+                with open(profiled_data, "r") as f:
+                    self.profiled_stats = yaml.safe_load(f)
+            except Exception as e:
+                logger.error("An error occurred {}".format(e))
+                raise RuntimeError(
+                    "Failed to read profiled stats {}".format(profiled_data)
+                )
         self.options = options
         self._validate_stats()
         self._init_stats()
@@ -327,7 +340,79 @@ class Optimizer:
         # if not self.options.disable_physical_opt:
         self._physical_opt()
 
+        try:
+            caching_on = self._get_cache_pid(self.physical_plan) is not None
+            fused_blocks = [
+                list(desc.fused_pipes)
+                for desc in self.physical_plan.pipe_descs.values()
+                if getattr(desc, "fused_pipes", None)
+                and len(getattr(desc, "fused_pipes", [])) > 1
+            ]
+            fused_pipes = fused_blocks if fused_blocks else None
+            if fused_pipes:
+                logger.info(
+                    "[%s] Found %d fused blocks for calculate_cost fused_pipes=%s",
+                    self.__class__.__name__,
+                    len(fused_blocks),
+                    fused_pipes,
+                )
+            optimized_cost = self.calculate_cost(
+                self.physical_plan.graph,
+                physical_specs=self.physical_plan.pipe_descs,
+                fused_pipes=fused_pipes,
+                caching_on=caching_on,
+                plan=self.physical_plan,
+            )
+            logger.info(
+                "[%s] Optimized plan cost (calculate_cost) = %s",
+                self.__class__.__name__,
+                optimized_cost,
+            )
+        except Exception as e:
+            logger.info(
+                "[%s] Failed to calculate optimized plan cost: %s",
+                self.__class__.__name__,
+                e,
+            )
+
+        self._log_optimized_pipeline(tag="Optimizer")
         return self.physical_plan
+
+    def _log_optimized_pipeline(self, *, tag: str) -> None:
+        """
+        Print the optimized physical plan in a compact, comparable format.
+        """
+        plan = getattr(self, "physical_plan", None)
+        if plan is None:
+            logger.info("[%s] No physical plan to print.", tag)
+            return
+
+        logger.info("[%s] ===== Optimized pipeline (PhysicalPlan) =====", tag)
+        logger.info("[%s] graph: %s", tag, plan.graph)
+
+        try:
+            pipe_descs = plan.pipe_descs
+        except Exception:
+            pipe_descs = None
+
+        if not pipe_descs:
+            logger.info("[%s] pipe_descs: <empty>", tag)
+            return
+
+        for p_id in sorted(pipe_descs.keys()):
+            desc = pipe_descs[p_id]
+            name = getattr(desc, "name", None)
+            vt = getattr(desc, "variant_type", None)
+            variant = vt.name if vt is not None else "None"
+            fused = getattr(desc, "fused_pipes", None)
+            logger.info(
+                "[%s] pipe_id=%s name=%r variant=%s fused_pipes=%s",
+                tag,
+                p_id,
+                name,
+                variant,
+                fused,
+            )
 
     def _logical_opt(self) -> None:
         logger.info(
@@ -513,10 +598,11 @@ class Optimizer:
         # Is the source fusable?
         source_p_id = self._get_source_p_id()
         source_pipe = self.logical_pipes[source_p_id]
+        spec = source_pipe.get_spec()
         if not (
-            source_pipe.get_spec().is_fusable_source
-            and PipeVariantType.RAY_DS
-            in source_pipe.get_spec().fusable_source_variants
+            spec.is_fusable_source
+            and spec.fusable_source_variants is not None
+            and PipeVariantType.RAY_DS in spec.fusable_source_variants
         ):
             logger.info("Source not fusable")
             return False
@@ -1286,7 +1372,7 @@ class Optimizer:
         self,
         graph: Dict[int, Set[int]],
         physical_specs: Optional[Dict[int, PipeDesc]] = None,
-        fused_pipes: Optional[List[int]] = None,
+        fused_pipes: Optional[Union[List[int], List[List[int]]]] = None,
         caching_on: Optional[bool] = False,
         plan: PhysicalPlan = None,
     ) -> float:
@@ -1305,10 +1391,16 @@ class Optimizer:
         source_p_id = self._get_source_p_id()
         output_p_id = self._get_output_p_id(graph)
 
+        # PipeDesc 来源：评估临时 plan（如插入 cache）时必须与 graph 一致，否则新 pipe id
+        # 只存在于 plan.pipe_descs 中会触发 Invalid pipe ID。
+        pipe_descs = (
+            plan.pipe_descs if plan is not None else self.physical_plan.pipe_descs
+        )
+
         # Get the critical path of this graph
         # TODO: should really be the sum of all nodes here
         critical_path, _ = self._get_critical_path(
-            graph, source_p_id, output_p_id
+            graph, source_p_id, output_p_id, plan
         )
         if len(critical_path) != len(graph):
             raise RuntimeError("Failed to extract critical path.")
@@ -1332,8 +1424,9 @@ class Optimizer:
         }
         pipe_cost_map = {critical_path[0]: curr_cost}
 
+        materialized_fused_sets: List[Set[int]] = []
         for p_id in critical_path[1:]:
-            if not self._is_optimizer_pipe(p_id):
+            if not self._is_optimizer_pipe(p_id, plan):
                 # If optimizer pipe, assume zero cost and no size change
                 if physical_specs is None:
                     new_cost = self._calculate_pipe_cost(p_id, curr_size, None)
@@ -1348,30 +1441,79 @@ class Optimizer:
                 curr_size = curr_size * self._data_size_ratio_map[p_id]
                 output_size_map[p_id] = curr_size
             else:
-                logger.warning(f"Assigning zero cost to optimizer pipe {p_id}")
+                desc = None
+                if physical_specs is not None:
+                    desc = physical_specs.get(p_id, None)
+                elif p_id in pipe_descs:
+                    desc = pipe_descs[p_id]
 
+                # If this is a materialized fused node, reconstruct historical
+                # per-op cost/size maps from desc.fused_pipes and variant.
+                if (
+                    desc is not None
+                    and desc.is_fused_pipe()
+                    and desc.fused_pipes is not None
+                    and len(desc.fused_pipes) > 1
+                ):
+                    fused_hist = list(desc.fused_pipes)
+                    fused_desc = PipeDesc(
+                        name=None,
+                        variant_type=desc.variant_type,
+                        variant_ctx=desc.variant_ctx,
+                    )
+                    for hist_p_id in fused_hist:
+                        input_size_map[hist_p_id] = curr_size
+                        hist_cost = self._calculate_pipe_cost(
+                            hist_p_id, curr_size, fused_desc
+                        )
+                        pipe_cost_map[hist_p_id] = hist_cost
+                        curr_size = curr_size * self._data_size_ratio_map[hist_p_id]
+                        output_size_map[hist_p_id] = curr_size
+
+                    fused_specs = {
+                        hist_p_id: fused_desc for hist_p_id in fused_hist
+                    }
+                    _, fused_block_cost = self._calculate_cost_fused(
+                        fused_specs,
+                        fused_hist,
+                        input_size_map,
+                        output_size_map,
+                        pipe_cost_map,
+                    )
+                    input_size_map[p_id] = input_size_map[fused_hist[0]]
+                    output_size_map[p_id] = curr_size
+                    pipe_cost_map[p_id] = fused_block_cost
+                    curr_cost += fused_block_cost
+                    materialized_fused_sets.append(set(fused_hist))
+                else:
+                    logger.warning(
+                        f"Assigning zero cost to optimizer pipe {p_id}"
+                    )
+
+        normalized_fusions: List[List[int]] = []
         if fused_pipes is not None:
-            # logger.info("Calculating cost of fusing {}".format(fused_pipes))
-            # logger.info(pipe_cost_map)
-            # logger.info(input_size_map)
-            # logger.info(f"Baseline Cost: {curr_cost}")
+            if len(fused_pipes) > 0 and isinstance(fused_pipes[0], list):
+                normalized_fusions = [list(x) for x in fused_pipes]  # type: ignore[index]
+            else:
+                normalized_fusions = [list(fused_pipes)]  # type: ignore[arg-type]
+
+        fused_block_sets: List[Set[int]] = []
+        fused_block_fused_costs: List[float] = []
+        for fused_block in normalized_fusions:
+            if any(set(fused_block) == s for s in materialized_fused_sets):
+                continue
             pipe_cost_baseline, pipe_cost_fused = self._calculate_cost_fused(
                 physical_specs,
-                fused_pipes,
+                fused_block,
                 input_size_map,
                 output_size_map,
                 pipe_cost_map,
             )
-            # logger.info(
-            #     "Pipe cost baseline: {}, fused: {}".format(
-            #         pipe_cost_baseline, pipe_cost_fused
-            #     )
-            # )
             curr_cost = curr_cost - pipe_cost_baseline + pipe_cost_fused
-            # logger.info("Final cost of fused graph: {}".format(curr_cost))
+            fused_block_sets.append(set(fused_block))
+            fused_block_fused_costs.append(pipe_cost_fused)
 
         if caching_on:
-            add_fuse = False
             # Factor in caching (i.e. reads from disk, cache)
             # NOTE: Assumes all plans have a validly placed cache
             # (i.e., cache before first non-deterministic op)
@@ -1397,18 +1539,26 @@ class Optimizer:
                 # NOTE: Can be done more efficiently,
                 # but separation of logic for better overview
                 # 1. Subtract saved cost
+                fused_to_subtract: Set[int] = set()
                 for i in range(cache_index):
                     p_id = critical_path[i]
-                    if fused_pipes is not None:
-                        if p_id not in fused_pipes:
+                    if fused_block_sets:
+                        covered = False
+                        for f_idx, fset in enumerate(fused_block_sets):
+                            if p_id in fset:
+                                fused_to_subtract.add(f_idx)
+                                covered = True
+                                break
+                        if not covered:
                             cost_to_subtract += pipe_cost_map[p_id]
-                        else:
-                            add_fuse = True
                     else:
                         cost_to_subtract += pipe_cost_map[p_id]
 
                 curr_cost -= cost_to_subtract
+                for f_idx in fused_to_subtract:
+                    curr_cost -= fused_block_fused_costs[f_idx]
 
+                print("cost after caching delete: ", curr_cost)
                 # 2. Add reading overhead
 
                 # calculate read latency for cache
@@ -1423,15 +1573,18 @@ class Optimizer:
                 read_latency = cache_size * (read_time_per_byte)
 
                 # transform latency into cost
-                cache_throughput_sample_per_second = 1 / read_latency
-                cache_throughput_sample_per_second_per_cpu = (
-                    cache_throughput_sample_per_second
-                )
-                # cache_throughput_sample_per_second_per_cpu = cache_throughput_sample_per_second / multiprocessing.cpu_count()
-                cache_cost = 1000 / cache_throughput_sample_per_second
+                if read_latency <= 0:
+                    # read_latency 为 0：profile 中 read_latency=0、或 cache 前输出大小为 0。
+                    # 此时按「无额外读盘代价」处理，避免 1/read_latency 除零。
+                    cache_cost = 0.0
+                else:
+                    cache_throughput_sample_per_second = 1 / read_latency
+                    cache_throughput_sample_per_second_per_cpu = (
+                        cache_throughput_sample_per_second
+                    )
+                    # cache_throughput_sample_per_second_per_cpu = cache_throughput_sample_per_second / multiprocessing.cpu_count()
+                    cache_cost = 1000 / cache_throughput_sample_per_second
                 curr_cost += cache_cost
-                if add_fuse:
-                    curr_cost -= pipe_cost_fused
 
         return curr_cost
 
@@ -1521,6 +1674,7 @@ class Optimizer:
     def _calculate_pipe_cost(
         self, p_id: int, input_size: float, desc: Optional[PipeDesc]
     ):
+        #input_size要注意，在dp函数调用时是初始size，所以后续dp时还需要乘以real size/initial size
         """
         Calculates the estimated cost of a pipe, given its input size and
         physical pipe desc. If no desc is provided, assume INPROCESS pipe.
@@ -1531,6 +1685,12 @@ class Optimizer:
         ) * self._base_cost_map[p_id]
         if desc is not None:
             variant_type = desc.variant_type
+            # INPROCESS uses baseline profile directly; no offload lookup needed.
+            if (
+                variant_type is None
+                or variant_type == PipeVariantType.INPROCESS
+            ):
+                return cost
             if p_id not in self.profiled_stats["offloads"][variant_type.name]:
                 raise RuntimeError(
                     f"Pipe {p_id} does not have a {variant_type.name} profile."
@@ -1643,8 +1803,39 @@ class Optimizer:
             return output_p_id
         raise RuntimeError("Could not find output pipe")
 
+    def _get_graph_entry_node(self, graph: Dict[int, Set[int]]) -> int:
+        """
+        在「出边邻接表」表示的 DAG 中，返回唯一入度为 0 的节点。
+        fusion/reorder 之后物理图可能不再包含逻辑 source id，此时应用此入口而非
+        ``_get_source_p_id()``。
+        """
+        all_nodes: Set[int] = set(graph.keys())
+        for succs in graph.values():
+            all_nodes |= succs
+        has_incoming: Set[int] = set()
+        for succs in graph.values():
+            has_incoming |= succs
+        entries = all_nodes - has_incoming
+        if len(entries) != 1:
+            raise RuntimeError(
+                "Expected exactly one entry node in graph, got "
+                f"{sorted(entries)!r} (graph keys: {sorted(graph)!r})"
+            )
+        return next(iter(entries))
+
+    def _resolve_cost_graph_source(self, graph: Dict[int, Set[int]]) -> int:
+        """用于 ``calculate_cost`` / ``_calculate_size_map`` 等与给定 graph 一致的起点。"""
+        logical = self._get_source_p_id()
+        if logical in graph:
+            return logical
+        return self._get_graph_entry_node(graph)
+
     def _get_critical_path(
-        self, graph: Dict[int, Set[int]], start: int, end: int
+        self,
+        graph: Dict[int, Set[int]],
+        start: int,
+        end: int,
+        plan: Optional[PhysicalPlan] = None,
     ) -> List[int]:
         """
         Returns the critical path through the graph, based on profiled
@@ -1658,7 +1849,7 @@ class Optimizer:
         def dfs(p_id, len, path):
             nonlocal max_len, max_path
 
-            curr_len = len + self._get_pipe_latency(p_id)
+            curr_len = len + self._get_pipe_latency(p_id, plan)
             curr_path = path.copy()
             curr_path.append(p_id)
 
@@ -1678,25 +1869,26 @@ class Optimizer:
         dfs(start, 0, [])
         return max_path, max_len
 
-    def _get_pipe_latency(self, p_id) -> float:
-        if self._is_optimizer_pipe(p_id):
+    def _get_pipe_latency(
+        self, p_id, plan: Optional[PhysicalPlan] = None
+    ) -> float:
+        if self._is_optimizer_pipe(p_id, plan):
             return 0
         else:
             return self.profiled_stats["baseline"]["latencies"][p_id]
 
-    def _is_optimizer_pipe(self, p_id: int) -> bool:
+    def _is_optimizer_pipe(
+        self, p_id: int, plan: Optional[PhysicalPlan] = None
+    ) -> bool:
         """
         Checks wehther pipe is optimizer pipe of current plan.
+        When ``plan`` is set (e.g. hypothetical graph in ``calculate_cost``),
+        use that plan's ``pipe_descs`` so newly inserted optimizer pipes resolve.
         """
-        if (
-            p_id not in self.physical_plan.pipe_descs
-            and p_id not in self.logical_pipes
-        ):
+        descs = plan.pipe_descs if plan is not None else self.physical_plan.pipe_descs
+        if p_id not in descs and p_id not in self.logical_pipes:
             raise ValueError(f"Invalid pipe ID {p_id}")
-        return (
-            p_id in self.physical_plan.pipe_descs
-            and p_id not in self.logical_pipes
-        )
+        return p_id in descs and p_id not in self.logical_pipes
 
     def _insert_prefetch(self) -> None:
         """
@@ -1759,7 +1951,7 @@ class Optimizer:
             if len(self.physical_plan.graph[input_p_id]) != 1:
                 raise RuntimeError("Cannot fuse with fanout at input")
             self.physical_plan.graph[input_p_id] = {new_p_id}
-
+        print("old graph1:",self.physical_plan.graph)
         # Update downstream pipe
         output_p_ids = self.physical_plan.graph[end_p_id]
         if len(output_p_ids) > 1:
@@ -1769,6 +1961,10 @@ class Optimizer:
         # clear the old pipes
         for p_id in p_ids:
             del self.physical_plan.graph[p_id]
+
+        
+        print("new graph1:",self.physical_plan.graph)
+        print("logical graph:",self.logical_graph)
 
         return new_p_id
 
@@ -1966,3 +2162,191 @@ class Optimizer:
         total_size = num_samples * output_size_per_sample
 
         return total_size < free_bytes
+
+
+def test_optimizer_with_custom_pipeline() -> None:
+    """
+    测试函数：使用自定义的简单 pipeline 和手工指定的 profile 数据
+    （选择率、执行代价等）运行 optimizer，并打印优化后的 pipeline 信息，
+    包括 fusion、offload、variant 等。
+
+    运行前请在 cedar 项目根目录下激活环境：
+        cd /path/to/cedar && source env/bin/activate
+    然后执行：
+        python -m cedar.compose.optimizer
+    """
+    # --- 1. 定义 Mock Pipe（仅用于 optimizer 的图结构，不实际执行）---
+    class MockPipe(Pipe):
+        """仅满足 optimizer 所需接口的占位 Pipe。"""
+
+        def __init__(
+            self,
+            name: str,
+            input_pipes: List[Pipe],
+            is_fusable: bool = True,
+            is_fusable_source: bool = False,
+        ):
+            super().__init__(name, input_pipes)
+            self.pipe_spec = CedarPipeSpec(
+                is_mutable=True,
+                mutable_variants=[
+                    PipeVariantType.INPROCESS,
+                    PipeVariantType.MULTITHREADED,
+                    PipeVariantType.SMP,
+                    PipeVariantType.RAY,
+                ],
+                is_fusable=is_fusable,
+                is_fusable_source=is_fusable_source,
+            )
+
+    # --- 2. 构建简单 DAG：Source(0) -> Map1(1) -> Map2(2) -> Map3(3) ---
+    source = MockPipe("SourcePipe", [], is_fusable_source=True)
+    map1 = MockPipe("MapperPipe_1", [source], is_fusable=True)
+    map2 = MockPipe("MapperPipe_2", [map1], is_fusable=True)
+    map3 = MockPipe("MapperPipe_3", [map2], is_fusable=True)
+
+    source.id = 0
+    map1.id = 1
+    map2.id = 2
+    map3.id = 3
+
+    logical_pipes = {0: source, 1: map1, 2: map2, 3: map3}
+    # adj_list: p_id -> 后继节点（该 pipe 输出指向的 pipe id）
+    logical_adj_list = {
+        0: {1},
+        1: {2},
+        2: {3},
+        3: set(),
+    }
+
+    # --- 3. 自定义 profile 数据（选择率、延迟、吞吐、数据大小等）---
+    # baseline: 本地执行时的延迟(μs)、每条样本的输入/输出字节、整体吞吐
+    baseline_throughput = 100.0  # samples/sec
+    profiled_stats: Dict[str, Any] = {
+        "baseline": {
+            "input_sizes": {0: 100.0, 1: 80.0, 2: 60.0, 3: 40.0},
+            "latencies": {0: 2000.0, 1: 3000.0, 2: 2500.0, 3: 2500.0},
+            "output_sizes": {0: 80.0, 1: 60.0, 2: 40.0, 3: 40.0},
+            "throughput": baseline_throughput,
+        },
+        "offloads": {
+            "RAY": {
+                0: {
+                    "input_sizes": {0: 100.0, 1: 80.0, 2: 60.0, 3: 40.0},
+                    "latencies": {0: 2000.0, 1: 3000.0, 2: 2500.0, 3: 2500.0},
+                    "output_sizes": {0: 80.0, 1: 60.0, 2: 40.0, 3: 40.0},
+                    "throughput": 120.0,
+                },
+                1: {
+                    "input_sizes": {0: 100.0, 1: 80.0, 2: 60.0, 3: 40.0},
+                    "latencies": {0: 2000.0, 1: 2800.0, 2: 2500.0, 3: 2500.0},
+                    "output_sizes": {0: 80.0, 1: 60.0, 2: 40.0, 3: 40.0},
+                    "throughput": 150.0,
+                },
+                2: {
+                    "input_sizes": {0: 100.0, 1: 80.0, 2: 60.0, 3: 40.0},
+                    "latencies": {0: 2000.0, 1: 3000.0, 2: 2200.0, 3: 2500.0},
+                    "output_sizes": {0: 80.0, 1: 60.0, 2: 40.0, 3: 40.0},
+                    "throughput": 160.0,
+                },
+                3: {
+                    "input_sizes": {0: 100.0, 1: 80.0, 2: 60.0, 3: 40.0},
+                    "latencies": {0: 2000.0, 1: 3000.0, 2: 2500.0, 3: 2300.0},
+                    "output_sizes": {0: 80.0, 1: 60.0, 2: 40.0, 3: 40.0},
+                    "throughput": 180.0,
+                },
+            },
+            "SMP": {},
+        },
+    }
+
+    # --- 4. 创建 Optimizer 并运行 ---
+    opt = Optimizer()
+    opt.init(logical_pipes, logical_adj_list)
+    options = OptimizerOptions(
+        enable_prefetch=True,
+        enable_offload=True,
+        enable_reorder=True,
+        enable_local_parallelism=True,
+        enable_fusion=True,
+        enable_caching=False,
+    )
+    plan = opt.run(profiled_stats, options)
+
+    # --- 5. 打印优化后的 pipeline（含 fusion、offload、variant）---
+    print("\n" + "=" * 60)
+    print("优化后的 Pipeline (Physical Plan)")
+    print("=" * 60)
+    print("\n[图结构] graph: pipe_id -> 后继 pipe_id 集合")
+    for p_id, succs in sorted(plan.graph.items()):
+        print(f"  {p_id} -> {succs}")
+
+    print("\n[算子与执行方式] pipe_descs:")
+    for p_id in sorted(plan.pipe_descs.keys()):
+        desc = plan.pipe_descs[p_id]
+        variant = desc.variant_type.name if desc.variant_type else "None"
+        ctx = ""
+        if desc.variant_ctx is not None:
+            ctx = desc.variant_ctx.serialize()
+        fused = ""
+        if desc.fused_pipes is not None and len(desc.fused_pipes) > 1:
+            fused = f" [FUSED: {desc.fused_pipes}]"
+        elif desc.fused_pipes is not None and len(desc.fused_pipes) == 1:
+            fused = " [单算子]"
+        print(f"  pipe_id={p_id}: name={desc.name!r} variant={variant} "
+              f"variant_ctx={ctx}{fused}")
+
+    print(f"\n[本地并行度] n_local_workers = {plan.n_local_workers}")
+
+    # 汇总 fusion / offload 信息
+    fused = [
+        (p_id, desc.fused_pipes)
+        for p_id, desc in plan.pipe_descs.items()
+        if desc.fused_pipes is not None and len(desc.fused_pipes) > 1
+    ]
+    offloaded = [
+        p_id
+        for p_id, desc in plan.pipe_descs.items()
+        if desc.variant_type is not None
+        and desc.variant_type.name in ("RAY", "TF_RAY", "SMP")
+    ]
+    print("\n[Reorder 结果校验]")
+    original_order = list(logical_adj_list.keys())
+    print(f"  原始逻辑顺序 (按 graph 拓扑): {original_order}")
+    reordered_logical = None
+    if fused:
+        for _p_id, orig_ids in fused:
+            reordered_logical = orig_ids
+            break
+    if reordered_logical is not None:
+        print(f"  Reorder 后融合段内的逻辑顺序: {reordered_logical}")
+        assert set(reordered_logical) == set(logical_pipes.keys()), (
+            "Reorder 后 fused 的 pipe id 集合应与逻辑图一致"
+        )
+        if reordered_logical != original_order:
+            print("  -> 与原始顺序不同，reorder 已生效。")
+        else:
+            print("  -> 与原始顺序相同。")
+    assert plan.validate(), "Physical plan 应通过 validate"
+
+    print("\n[Fusion 汇总] 融合后的算子:")
+    if fused:
+        for p_id, orig_ids in fused:
+            print(f"  pipe_id {p_id} 由原算子 {orig_ids} 融合")
+    else:
+        print("  (无多算子融合)")
+    print("\n[Offload 汇总] 已 offload 的算子 (RAY/SMP/TF_RAY):")
+    if offloaded:
+        print(f"  pipe_ids: {offloaded}")
+    else:
+        print("  (无)")
+
+    print("\n[完整序列化] plan.to_dict():")
+    print(yaml.dump(plan.to_dict(), default_flow_style=False, allow_unicode=True))
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    # 确保 optimizer 使用的 optimizer pipes（如 PrefetcherPipe）已注册
+    import cedar.pipes.optimize  # noqa: F401
+    test_optimizer_with_custom_pipeline()

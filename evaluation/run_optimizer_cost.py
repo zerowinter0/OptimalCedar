@@ -17,6 +17,8 @@ from cedar.pipes import (
     MapperPipe,
     BatcherPipe,
 )
+from cedar.pipes.common import CedarPipeSpec
+from cedar.pipes.context import PipeVariantType
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
@@ -33,38 +35,68 @@ def _get_text(data):
     return data
 
 
-class Wikitext103Feature(Feature):
+class Wikitext1033Feature(Feature):
     def __init__(self, batch_size: int):
         super().__init__()
-        encoder_json_path = (
-            "https://download.pytorch.org/models/text/gpt2_bpe_encoder.json"
-        )
-        vocab_bpe_path = (
-            "https://download.pytorch.org/models/text/gpt2_bpe_vocab.bpe"
-        )
-        self.tokenizer = T.GPT2BPETokenizer(encoder_json_path, vocab_bpe_path)
-        vocab_path = (
-            "https://download.pytorch.org/models/text/roberta.vocab.pt"
-        )
-        self.vocab = T.VocabTransform(load_state_dict_from_url(vocab_path))
         self.add_bos = T.AddToken(token=0, begin=True)
         self.add_bos_1 = T.AddToken(token=1, begin=True)
-        self.add_eos = T.AddToken(token=2, begin=False)
+        self.add_bos_2 = T.AddToken(token=2, begin=True)
+        self.add_bos_3 = T.AddToken(token=3, begin=True)
+        self.add_bos_4 = T.AddToken(token=4, begin=True)
+        self.add_bos_5 = T.AddToken(token=5, begin=True)
+        self.add_bos_6 = T.AddToken(token=6, begin=True)
+        self.add_bos_7 = T.AddToken(token=7, begin=True)
+        self.add_bos_8 = T.AddToken(token=8, begin=True)
+        self.add_bos_9 = T.AddToken(token=9, begin=True)
+        self.add_bos_10 = T.AddToken(token=10, begin=True)
         self.batch_size = batch_size
 
-        self.embedding = nn.Embedding(50257, 764, _freeze=True)
+    @staticmethod
+    def _disable_ray_smp(pipe: Pipe) -> Pipe:
+        """
+        为单个 pipe 实例禁止 Ray/SMP 相关变体，避免影响同类其它实例。
+        """
+        spec = pipe.get_spec()
+        blocked_variants = {
+            PipeVariantType.RAY,
+            PipeVariantType.SMP,
+            PipeVariantType.TF_RAY,
+            PipeVariantType.RAY_DS,
+        }
+        mutable_variants = [
+            v for v in spec.mutable_variants if v not in blocked_variants
+        ]
+        fusable_source_variants = (
+            [
+                v
+                for v in (spec.fusable_source_variants or [])
+                if v != PipeVariantType.RAY_DS
+            ]
+            or None
+        )
+        pipe.pipe_spec = CedarPipeSpec(
+            is_mutable=spec.mutable,
+            mutable_variants=mutable_variants,
+            is_fusable=spec.is_fusable,
+            is_shardable=spec.is_shardable,
+            is_fusable_source=spec.is_fusable_source,
+            fusable_source_variants=fusable_source_variants,
+        )
+        return pipe
 
     def _compose(self, source_pipes: List[Pipe]):
         fp = source_pipes[0]
-        fp = MapperPipe(fp, self.tokenizer).fix()
-        fp = MapperPipe(fp, T.Truncate(max_seq_len=254)).fix()
-        fp = MapperPipe(fp, self.vocab).fix()
         fp = MapperPipe(fp, self.add_bos)
         fp = MapperPipe(fp, self.add_bos_1)
-        fp = MapperPipe(fp, self.add_eos)
-        fp = MapperPipe(fp, T.ToTensor(), tag="tensor").fix()
-        fp = MapperPipe(fp, self.embedding).fix()
-        fp = BatcherPipe(fp, batch_size=self.batch_size).fix()
+        fp = MapperPipe(fp, self.add_bos_2)
+        fp = MapperPipe(fp, self.add_bos_3)
+        # fp = MapperPipe(fp, self.add_bos_4)
+        # fp = MapperPipe(fp, self.add_bos_5)
+        # fp = MapperPipe(fp, self.add_bos_6)
+        # fp = MapperPipe(fp, self.add_bos_7)
+        # fp = MapperPipe(fp, self.add_bos_8)
+        # fp = MapperPipe(fp, self.add_bos_9)
+        # fp = MapperPipe(fp, self.add_bos_10)
         return fp
 
 
@@ -78,7 +110,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
     source = LocalLineSource(str(train_filepath))
-    feature = Wikitext103Feature(batch_size=spec.batch_size)
+    feature = Wikitext1033Feature(batch_size=spec.batch_size)
     feature.apply(source)
 
     if spec.config:
@@ -103,9 +135,9 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 available_local_cpus=mp.cpu_count(),
                 enable_offload=not spec.disable_offload,
                 enable_reorder=not spec.disable_reorder,
-                enable_caching=not spec.disable_caching,
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
+                enable_caching=not spec.disable_caching,
                 use_my_optimizer=getattr(spec, "use_my_optimizer", False),
             ),
             generate_plan=spec.generate_plan,
@@ -116,25 +148,30 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
 
 def main():
     logging.basicConfig(level=logging.INFO)
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    profiled_stats_path = (
+        #repo_root / "cedar" / "compose" / "simple_five_ops_profile.yml"
+        "/cedar/evaluation/failed_profiles/profile_case_0001.yml"
+    )
     ds = get_dataset(CedarEvalSpec(1, None, 1, 
     run_profiling=False,
     use_ray=True,
-    profiled_stats="/tmp/feature_profile.yml",
-    disable_offload=True,
+    profiled_stats=str(profiled_stats_path),
+    disable_offload=False,
     use_my_optimizer=True,
     disable_prefetch=True,
     disable_fusion=False,
-    disable_caching=True,
+    disable_caching=False,
     ))
 
-    i = 0
-    for f in ds:
-        # print(f)
-        print(f)
-        print(f.size())
-        if i == 10:
-            break
-        i += 1
+    # i = 0
+    # for f in ds:
+    #     # print(f)
+    #     print(f)
+    #     print(f.size())
+    #     if i == 10:
+    #         break
+    #     i += 1
 
 
 if __name__ == "__main__":

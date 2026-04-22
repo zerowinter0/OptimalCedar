@@ -352,18 +352,29 @@ def _add_root(graph: Dict[int, Set[int]], root: int):
     graph[root] = set()
 
 
-def _replace_root(graph: Dict[int, Set[int]], root: int) -> int:
+def _replace_root(
+    graph: Dict[int, Set[int]], root: int
+) -> Tuple[int, bool]:
     """
-    Replaces the current root of graph with root. Returns the old root
+    Replaces the current root of graph with root.
+    Returns (old_root, was_append): was_append is True when the graph had
+    only one node and we only appended root (no real swap), so the caller
+    should not recurse on the result to avoid infinite recursion.
     """
     curr_root = get_output_pipe(graph)
-    # Swap shrunk root and the current root
+    if root in graph:
+        raise RuntimeError("Error swapping roots")
+
     input_adj_list = flip_adj_list(graph)
-    if (
-        (curr_root not in input_adj_list)
-        or len(input_adj_list[curr_root]) != 1
-        or root in graph
-    ):
+    num_predecessors = len(input_adj_list.get(curr_root, set()))
+
+    if num_predecessors == 0:
+        # Single-node graph: append root as new output (curr_root -> root)
+        graph[curr_root] = set([root])
+        graph[root] = set()
+        return (curr_root, True)
+
+    if num_predecessors != 1:
         raise RuntimeError("Error swapping roots")
 
     input_node = list(input_adj_list[curr_root])[0]
@@ -375,7 +386,7 @@ def _replace_root(graph: Dict[int, Set[int]], root: int) -> int:
     graph[root] = set()
     del graph[curr_root]
 
-    return curr_root
+    return (curr_root, False)
 
 
 def _remove_root(graph: Dict[int, set[int]]) -> int:
@@ -462,15 +473,16 @@ def calculate_reorderings(
                     cand.add(shrunk_root)
 
                     swapped_graph = copy.deepcopy(shrunk_reordering)
-                    _replace_root(swapped_graph, root)
+                    _, was_append = _replace_root(swapped_graph, root)
 
-                    # Now, get all possible reorderings of the swapped
-                    # graph, and append the shrunk_root
-                    swapped_reorderings = _reordering_helper(swapped_graph)
-                    for swapped_reordering in swapped_reorderings:
-                        g = copy.deepcopy(swapped_reordering)
-                        _add_root(g, shrunk_root)
-                        subgraph_reorderings.append(g)
+                    # When graph had one node we only appended; same as _add_root
+                    # above — do not recurse to avoid infinite recursion.
+                    if not was_append:
+                        swapped_reorderings = _reordering_helper(swapped_graph)
+                        for swapped_reordering in swapped_reorderings:
+                            g = copy.deepcopy(swapped_reordering)
+                            _add_root(g, shrunk_root)
+                            subgraph_reorderings.append(g)
 
         memo[dict_key] = subgraph_reorderings
         return subgraph_reorderings

@@ -19,5 +19,6 @@ tensorflow-addons[tensorflow]
 tensorflow-text==2.14.0
 keras-nlp
 librosa
+langdetect
 pyarrow==13.0.0
 numpy==1.26.0

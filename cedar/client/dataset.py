@@ -460,6 +460,17 @@ class DataSet:
         self.use_config = feature_config is not None
         self._load_config(feature_config)
 
+        # Optionally swap in MyOptimizer as a drop-in replacement for the
+        # default Optimizer, controlled via OptimizerOptions.use_my_optimizer.
+        if (
+            self.optimizer_options is not None
+            and getattr(self.optimizer_options, "use_my_optimizer", False)
+        ):
+            from cedar.compose.my_optimizer import MyOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(MyOptimizer())
+
         if len(self.features) == 0:
             raise ValueError("No features provided")
         if len(self.features) != 1 and self._iter_mode == "default":

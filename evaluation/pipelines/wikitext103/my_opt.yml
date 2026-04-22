@@ -1,0 +1,46 @@
+physical_plan:
+  graph: #4- 1-2 -3-0
+    0: ''
+    3: '0'
+    4: '5'
+    5: '3'
+  n_local_workers: 64
+  pipes:
+    0:
+      name: MapperPipe_AddToken()
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    1:
+      name: MapperPipe_AddToken()
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    2:
+      name: MapperPipe_AddToken()
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    3:
+      name: MapperPipe_AddToken()
+      variant: RAY
+      variant_ctx:
+        max_inflight: 10
+        max_prefetch: 10
+        n_actors: 1
+        submit_batch_size: 1
+        use_threads: true
+        variant_type: RAY
+    4:
+      name: LocalLinePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    5:
+      fused_pipes:
+      - 1
+      - 2
+      name: FusedPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
