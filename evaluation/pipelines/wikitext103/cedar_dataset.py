@@ -106,7 +106,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_caching=not spec.disable_caching,
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
-                use_my_optimizer=getattr(spec, "use_my_optimizer", False),
+                use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
             ),
             generate_plan=spec.generate_plan,
         )
@@ -120,11 +120,11 @@ def main():
     run_profiling=False,
     use_ray=True,
     profiled_stats="/tmp/feature_profile.yml",
-    disable_offload=True,
-    use_my_optimizer=True,
+    disable_offload=False,
+    use_my_optimizer=0,
     disable_prefetch=True,
     disable_fusion=False,
-    disable_caching=True,
+    disable_caching=False,
     ))
 
     i = 0

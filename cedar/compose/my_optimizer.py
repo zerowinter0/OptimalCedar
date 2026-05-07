@@ -95,6 +95,10 @@ class MyOptimizer(Optimizer):
         logger.info("========= Physical Pass (DP) ===========")
         self._physical_opt()
 
+        if self.options.enable_prefetch:
+            logger.info("*Prefetching Pass*")
+            self._insert_prefetch()
+
         try:
             caching_on = self._get_cache_pid(self.physical_plan) is not None
             fused_blocks = [

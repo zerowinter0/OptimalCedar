@@ -106,7 +106,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_reorder=not spec.disable_reorder,
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
-                use_my_optimizer=getattr(spec, "use_my_optimizer", False),
+                use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
             ),
             generate_plan=spec.generate_plan,
         )

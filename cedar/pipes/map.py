@@ -42,6 +42,37 @@ import tensorflow as tf
 logger = logging.getLogger(__name__)
 
 
+def _get_callable_name(fn: Callable) -> str:
+    """Return a stable callable name that is consistent across processes."""
+    try:
+        name = getattr(fn, "__qualname__", None) or getattr(
+            fn, "__name__", None
+        )
+        if name:
+            return name
+
+        inner_fn = getattr(fn, "func", None)
+        if inner_fn is not None:
+            inner_name = getattr(inner_fn, "__qualname__", None) or getattr(
+                inner_fn, "__name__", None
+            )
+            if inner_name:
+                return inner_name
+
+        # Callable objects are process-local instances; use class name
+        # instead of repr(object), which embeds a memory address.
+        cls = getattr(fn, "__class__", None)
+        if cls is not None:
+            cls_name = getattr(cls, "__qualname__", None) or getattr(
+                cls, "__name__", None
+            )
+            if cls_name:
+                return cls_name
+    except Exception:
+        pass
+    return str(fn)
+
+
 @cedar_pipe(
     CedarPipeSpec(
         is_mutable=True,
@@ -77,10 +108,7 @@ class MapperPipe(Pipe):
         is_random: bool = False,
     ):
         try:
-            try:
-                name = "MapperPipe_" + fn.__name__
-            except AttributeError:
-                name = "MapperPipe_" + fn.func.__name__
+            name = "MapperPipe_" + _get_callable_name(fn)
         except Exception:
             logger.warning("Unable to parse MapPipe func name")
             name = "MapperPipe_" + str(fn)

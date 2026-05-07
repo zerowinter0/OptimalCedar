@@ -23,7 +23,7 @@ class CedarEvalSpec:
         disable_reorder: bool = False,
         disable_fusion: bool = False,
         disable_caching: bool = False,
-        use_my_optimizer: bool = False,
+        use_my_optimizer: int = 0,
         generate_plan: bool = False,
     ):
         self.batch_size = batch_size

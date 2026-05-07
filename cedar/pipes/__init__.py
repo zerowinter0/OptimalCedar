@@ -12,6 +12,7 @@ from cedar.pipes.io import (
     ImageReaderPipe,
     WebReaderPipe,
 )
+from cedar.pipes.filter import FilterPipe
 from cedar.pipes.map import MapperPipe
 from cedar.pipes.noop import NoopPipe
 from cedar.pipes.context import (
@@ -47,6 +48,7 @@ __all__ = [
     "CedarPipeSpec",
     "DataSample",
     "FileOpenerPipe",
+    "FilterPipe",
     "ImageReaderPipe",
     "InProcessPipeVariant",
     "InProcessPipeVariantContext",

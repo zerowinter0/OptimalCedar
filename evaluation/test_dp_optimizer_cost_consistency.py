@@ -1,13 +1,13 @@
 import argparse
 import io
 import logging
+import math
 import random
 import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import matplotlib  # type: ignore[reportMissingImports]
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -17,12 +17,12 @@ if str(REPO_ROOT) not in sys.path:
 from evaluation.cedar_utils import CedarEvalSpec
 from evaluation.run_optimizer_cost import get_dataset
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # type: ignore[reportMissingImports]
 
-
-LOG_COST_PATTERN = re.compile(
-    r"Optimized plan cost \(calculate_cost\)\s*=\s*([0-9eE+\-\.]+)"
+MY_COST_PATTERN = re.compile(
+    r"\[MyOptimizer\] Optimized plan cost \(calculate_cost\)\s*=\s*([0-9eE+\-\.]+)"
+)
+DP_COST_PATTERN = re.compile(
+    r"\[DpOptimizer\] Optimized plan cost\s*=\s*([0-9eE+\-\.]+)"
 )
 PROFILE_PATH = REPO_ROOT / "cedar" / "compose" / "simple_five_ops_profile.yml"
 
@@ -32,19 +32,12 @@ def _random_size(rng: random.Random, lo: float, hi: float) -> float:
 
 
 def _random_disk_latency(rng: random.Random, lo: float, hi: float) -> float:
-    """
-    磁盘 read/write 延迟为每字节秒级极小量（~1e-9）。
-    若用 _random_size 的 round(..., 6)，凡 < 1e-6 的值都会变成 0.0。
-    """
     return round(rng.uniform(lo, hi), 12)
 
 
 def generate_fake_profile(rng: random.Random) -> Dict:
     """
-    生成合法 5-op profile，格式与 simple_five_ops_profile.yml 一致。
-    约束：
-    - input_sizes[4] = 0
-    - input_sizes[x] = output_sizes[x+1], x=0..3
+    生成合法 5-op 数值 profile，格式与 simple_five_ops_profile.yml 一致。
     """
     output_sizes = {
         0: _random_size(rng, 20.0, 300.0),
@@ -96,19 +89,16 @@ def generate_fake_profile(rng: random.Random) -> Dict:
     }
 
 
-def _extract_cost_from_logs(log_text: str, cls_name: str) -> float:
-    marker = f"[{cls_name}] Optimized plan cost (calculate_cost)"
-    lines = [line for line in log_text.splitlines() if marker in line]
-    if not lines:
-        raise RuntimeError(f"日志中未找到 {cls_name} 的 cost 行。")
-    match = LOG_COST_PATTERN.search(lines[-1])
-    if not match:
-        raise RuntimeError(f"无法从日志行解析 cost: {lines[-1]}")
-    return float(match.group(1))
+def _extract_cost_from_logs(log_text: str, optimizer_selector: int) -> float:
+    pattern = MY_COST_PATTERN if optimizer_selector == 1 else DP_COST_PATTERN
+    matches = pattern.findall(log_text)
+    if not matches:
+        optimizer_name = "MyOptimizer" if optimizer_selector == 1 else "DpOptimizer"
+        raise RuntimeError(f"日志中未找到 {optimizer_name} 的 cost 行。")
+    return float(matches[-1])
 
 
-def _run_like_run_optimizer_cost(use_my_optimizer: int) -> float:
-    # 与 evaluation/run_optimizer_cost.py 对齐，除了 use_my_optimizer
+def _run_like_run_optimizer_cost(optimizer_selector: int) -> float:
     spec = CedarEvalSpec(
         1,
         None,
@@ -117,7 +107,7 @@ def _run_like_run_optimizer_cost(use_my_optimizer: int) -> float:
         use_ray=True,
         profiled_stats=str(PROFILE_PATH),
         disable_offload=False,
-        use_my_optimizer=use_my_optimizer,
+        use_my_optimizer=optimizer_selector,
         disable_prefetch=True,
         disable_fusion=False,
         disable_caching=False,
@@ -144,49 +134,24 @@ def _run_like_run_optimizer_cost(use_my_optimizer: int) -> float:
         compose_logger.setLevel(old_level)
         compose_logger.propagate = old_propagate
 
-    cls_name = "MyOptimizer" if use_my_optimizer == 1 else "Optimizer"
-    return _extract_cost_from_logs(log_text, cls_name)
+    return _extract_cost_from_logs(log_text, optimizer_selector)
 
 
-def _save_cost_comparison_chart(
-    case_costs: List[Tuple[int, float, float]], output_path: Path
-) -> None:
-    if not case_costs:
-        return
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    case_ids = [case_idx for case_idx, _, _ in case_costs]
-    optimizer_costs = [base_cost for _, base_cost, _ in case_costs]
-    my_optimizer_costs = [my_cost for _, _, my_cost in case_costs]
-
-    x = list(range(len(case_ids)))
-    width = 0.4
-    x_optimizer = [i - width / 2 for i in x]
-    x_my_optimizer = [i + width / 2 for i in x]
-
-    fig_width = max(12, len(case_ids) * 0.5)
-    plt.figure(figsize=(fig_width, 6))
-    plt.bar(x_optimizer, optimizer_costs, width=width, label="optimizer.py")
-    plt.bar(x_my_optimizer, my_optimizer_costs, width=width, label="my_optimizer.py")
-
-    plt.xlabel("Case Index")
-    plt.ylabel("Cost (calculate_cost)")
-    plt.title("Cost Comparison: optimizer.py vs my_optimizer.py")
-    plt.xticks(x, [str(i) for i in case_ids], rotation=90, fontsize=8)
-    plt.legend()
-    plt.grid(axis="y", linestyle="--", alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=160)
-    plt.close()
+def _costs_match(a: float, b: float, rel_tol: float, abs_tol: float) -> bool:
+    return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="复用 run_optimizer_cost.py 的 pipeline，批量对比 cost。"
+        description=(
+            "在多个自动生成的数值 profile 下，检查 my_optimizer 与 "
+            "dp_optimizer 的 calculate_cost 是否始终一致。"
+        )
     )
     parser.add_argument("--num-cases", type=int, default=30)
-    parser.add_argument("--seed", type=int, default=20260331)
+    parser.add_argument("--seed", type=int, default=20260503)
+    parser.add_argument("--rel-tol", type=float, default=1e-9)
+    parser.add_argument("--abs-tol", type=float, default=1e-9)
     parser.add_argument(
         "--keep-generated-profiles",
         action="store_true",
@@ -196,14 +161,6 @@ def main() -> None:
         "--save-failed-profiles",
         action="store_true",
         help="仅保存失败 case 的 profile 到 evaluation/failed_profiles/",
-    )
-    parser.add_argument(
-        "--chart-output",
-        type=str,
-        default=str(
-            REPO_ROOT / "evaluation" / "plots" / "optimizer_cost_compare.png"
-        ),
-        help="柱状图输出路径（PNG）。",
     )
     args = parser.parse_args()
 
@@ -217,58 +174,48 @@ def main() -> None:
     if args.save_failed_profiles:
         failed_dir.mkdir(parents=True, exist_ok=True)
 
-    violations = []
-    case_costs: List[Tuple[int, float, float]] = []
+    mismatches: List[Tuple[int, float, float]] = []
     try:
         for case_idx in range(args.num_cases):
             profile = generate_fake_profile(rng)
-
-            # 覆盖 run_optimizer_cost.py 默认读取的 profile 文件
             with PROFILE_PATH.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(profile, f, sort_keys=False)
 
             if args.keep_generated_profiles:
-                with (generated_dir / f"profile_case_{case_idx:04d}.yml").open(
-                    "w", encoding="utf-8"
-                ) as f:
+                generated_path = generated_dir / f"profile_case_{case_idx:04d}.yml"
+                with generated_path.open("w", encoding="utf-8") as f:
                     yaml.safe_dump(profile, f, sort_keys=False)
 
-            base_cost = _run_like_run_optimizer_cost(use_my_optimizer=0)
-            my_cost = _run_like_run_optimizer_cost(use_my_optimizer=1)
-            case_costs.append((case_idx, base_cost, my_cost))
-
-            status = "PASS" if my_cost <= base_cost else "FAIL"
+            my_cost = _run_like_run_optimizer_cost(optimizer_selector=1)
+            dp_cost = _run_like_run_optimizer_cost(optimizer_selector=2)
+            ok = _costs_match(my_cost, dp_cost, args.rel_tol, args.abs_tol)
+            status = "PASS" if ok else "FAIL"
             print(
                 f"[case {case_idx:03d}] {status} "
-                f"optimizer={base_cost:.12f} my_optimizer={my_cost:.12f}"
+                f"my_optimizer={my_cost:.12f} dp_optimizer={dp_cost:.12f}"
             )
 
-            if my_cost > base_cost:
-                violations.append((case_idx, base_cost, my_cost))
+            if not ok:
+                mismatches.append((case_idx, my_cost, dp_cost))
                 if args.save_failed_profiles:
                     failed_path = failed_dir / f"profile_case_{case_idx:04d}.yml"
                     with failed_path.open("w", encoding="utf-8") as f:
                         yaml.safe_dump(profile, f, sort_keys=False)
                     print(f"  -> saved failed profile: {failed_path}")
     finally:
-        # 还原原始 profile，避免污染仓库默认文件
         PROFILE_PATH.write_text(profile_backup, encoding="utf-8")
 
     print("\n===== SUMMARY =====")
     print(f"total_cases={args.num_cases}")
-    print(f"not_higher_cases(my_cost<=optimizer_cost)={args.num_cases - len(violations)}")
-    print(f"violations(my_cost>optimizer_cost)={len(violations)}")
+    print(f"matched_cases={args.num_cases - len(mismatches)}")
+    print(f"mismatches={len(mismatches)}")
 
-    chart_path = Path(args.chart_output)
-    _save_cost_comparison_chart(case_costs, chart_path)
-    print(f"saved_cost_chart={chart_path}")
-
-    if violations:
-        print("\n以下 case 违背“my_optimizer cost 不高于 optimizer”：")
-        for case_idx, base_cost, my_cost in violations[:20]:
+    if mismatches:
+        print("\n以下 case 中两种 DP 优化器 cost 不一致：")
+        for case_idx, my_cost, dp_cost in mismatches[:20]:
             print(
-                f"- case={case_idx} optimizer={base_cost:.12f} "
-                f"my_optimizer={my_cost:.12f}"
+                f"- case={case_idx} my_optimizer={my_cost:.12f} "
+                f"dp_optimizer={dp_cost:.12f}"
             )
         raise SystemExit(1)
 

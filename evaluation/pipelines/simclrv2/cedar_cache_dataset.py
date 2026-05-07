@@ -1,6 +1,7 @@
 import pathlib
 import torch
 import multiprocessing as mp
+import logging
 
 from typing import List
 
@@ -108,8 +109,34 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_fusion=not spec.disable_fusion,
                 enable_caching=not spec.disable_caching,
                 num_samples=9472,
-                use_my_optimizer=getattr(spec, "use_my_optimizer", False),
+                use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
             ),
             generate_plan=spec.generate_plan,
         )
     return dataset
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    ds = get_dataset(CedarEvalSpec(1, None, 1, 
+    run_profiling=True,
+    use_ray=True,
+    profiled_stats="/tmp/sim_hash_profile.yml",
+    disable_offload=False,
+    use_my_optimizer=0,
+    disable_prefetch=True,
+    disable_fusion=False,
+    disable_caching=False,
+    ))
+
+    i = 0
+    for f in ds:
+        # print(f)
+        print(f)
+        print(f.size())
+        if i == 10:
+            break
+        i += 1
+
+
+if __name__ == "__main__":
+    main()

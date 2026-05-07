@@ -49,7 +49,7 @@ class OptimizerOptions:
         enable_caching: bool = False,
         disable_physical_opt: bool = False,
         num_samples: Optional[int] = None,
-        use_my_optimizer: bool = False,
+        use_my_optimizer: int = 0,
     ):
         self.enable_prefetch = enable_prefetch
 
@@ -79,9 +79,9 @@ class OptimizerOptions:
 
         self.num_samples = num_samples
 
-        # If true, DataSet/Feature may swap in cedar.compose.my_optimizer.MyOptimizer
-        # as a drop-in replacement for the default Optimizer implementation.
-        self.use_my_optimizer = use_my_optimizer
+        # Optimizer implementation selector used by DataSet:
+        # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer.
+        self.use_my_optimizer = int(use_my_optimizer)
 
 
 class PipeDesc:
