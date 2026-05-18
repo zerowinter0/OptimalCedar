@@ -25,6 +25,7 @@ class CedarEvalSpec:
         disable_caching: bool = False,
         use_my_optimizer: int = 0,
         generate_plan: bool = False,
+        reorder_timeout_sec: Optional[float] = None,
     ):
         self.batch_size = batch_size
         self.num_total_samples = num_total_samples
@@ -46,6 +47,7 @@ class CedarEvalSpec:
         self.disable_caching = disable_caching
         self.use_my_optimizer = use_my_optimizer
         self.generate_plan = generate_plan
+        self.reorder_timeout_sec = reorder_timeout_sec
 
     def to_ray_config(self) -> Optional[RayConfig]:
         """

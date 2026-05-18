@@ -151,6 +151,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
                 use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
+                reorder_timeout_sec=getattr(spec, "reorder_timeout_sec", None),
             ),
             generate_plan=spec.generate_plan,
         )
@@ -193,7 +194,7 @@ def main():
     parser.add_argument("--num_total_samples", type=int, default=20)
     parser.add_argument("--num_preview_samples", type=int, default=5)
     parser.add_argument("--use_ray", action="store_true")
-    parser.add_argument("--use_my_optimizer", type=int, choices=[0, 1, 2], default=0)
+    parser.add_argument("--use_my_optimizer", type=int, choices=[0, 1, 2, 3, 4], default=0)
     parser.add_argument("--disable_prefetch", action="store_true")
     parser.add_argument("--disable_offload", action="store_true")
     parser.add_argument("--disable_parallelism", action="store_true")

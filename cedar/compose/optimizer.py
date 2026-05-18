@@ -4,6 +4,7 @@ import copy
 import math
 import multiprocessing
 import psutil
+import time
 
 from typing import Tuple, Dict, Set, Optional, List, Any, Union
 
@@ -50,6 +51,7 @@ class OptimizerOptions:
         disable_physical_opt: bool = False,
         num_samples: Optional[int] = None,
         use_my_optimizer: int = 0,
+        reorder_timeout_sec: Optional[float] = None,
     ):
         self.enable_prefetch = enable_prefetch
 
@@ -80,8 +82,13 @@ class OptimizerOptions:
         self.num_samples = num_samples
 
         # Optimizer implementation selector used by DataSet:
-        # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer.
+        # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
+        # 4/DpSeperateOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
+
+        # Maximum wall-clock time allowed for the original Optimizer reorder
+        # pass. None disables the timeout.
+        self.reorder_timeout_sec = reorder_timeout_sec
 
 
 class PipeDesc:
@@ -286,7 +293,7 @@ class Optimizer:
             k: self._fractional_latencies[k] * total_cost
             for k, v in self.profiled_stats["baseline"]["latencies"].items()
         }
-        print("tmp base_cost_map:",self._base_cost_map)
+        logger.debug("Base pipe cost map: %s", self._base_cost_map)
 
         self._data_size_ratio_map = {
             k: self._calculate_data_size_ratio(k) for k in self._base_cost_map
@@ -1328,16 +1335,23 @@ class Optimizer:
 
         Returns: Optimized graph with ideal reordering
         """
+        start_time = time.perf_counter()
+        timeout_sec = getattr(self.options, "reorder_timeout_sec", None)
         candidate_plans = calculate_reorderings(
-            self.logical_pipes, self.physical_plan.graph
+            self.logical_pipes,
+            self.physical_plan.graph,
+            timeout_sec=timeout_sec,
         )
+        self._raise_if_reorder_timed_out(start_time, timeout_sec)
         logger.info(
             "[Reordering] Generated {} possible plans.".format(
                 len(candidate_plans)
             )
         )
         optimal_reordering, reordered_cost = self._find_optimal_reordering(
-            candidate_plans
+            candidate_plans,
+            reorder_start_time=start_time,
+            reorder_timeout_sec=timeout_sec,
         )
         logger.info("[Reordering] Optimal plan: {}".format(optimal_reordering))
         logger.info(
@@ -1346,19 +1360,45 @@ class Optimizer:
         return optimal_reordering
 
     def _find_optimal_reordering(
-        self, candidate_plans: List[Dict[int, Set[int]]]
+        self,
+        candidate_plans: List[Dict[int, Set[int]]],
+        reorder_start_time: Optional[float] = None,
+        reorder_timeout_sec: Optional[float] = None,
     ) -> Tuple[Dict[int, Set[int]], float]:
         # Prune plans...
         plan_costs = {}
         for idx, plan in enumerate(candidate_plans):
+            self._raise_if_reorder_timed_out(
+                reorder_start_time, reorder_timeout_sec
+            )
             cost = self.calculate_cost(plan)
             plan_costs[idx] = cost
+            self._raise_if_reorder_timed_out(
+                reorder_start_time, reorder_timeout_sec
+            )
 
         # Sort plans by cost
         ordered_plan_idxs = sorted(plan_costs, key=lambda x: plan_costs[x])
+        self._raise_if_reorder_timed_out(
+            reorder_start_time, reorder_timeout_sec
+        )
         optimal_idx = ordered_plan_idxs[0]
 
         return candidate_plans[optimal_idx], plan_costs[optimal_idx]
+
+    @staticmethod
+    def _raise_if_reorder_timed_out(
+        reorder_start_time: Optional[float],
+        reorder_timeout_sec: Optional[float],
+    ) -> None:
+        if reorder_start_time is None or reorder_timeout_sec is None:
+            return
+        elapsed = time.perf_counter() - reorder_start_time
+        if elapsed > reorder_timeout_sec:
+            raise TimeoutError(
+                "Optimizer reorder exceeded timeout of "
+                f"{reorder_timeout_sec:.6f}s after {elapsed:.6f}s."
+            )
 
     def calculate_throughput(self, graph: Dict[int, Set[int]]) -> float:
         """
@@ -1517,8 +1557,7 @@ class Optimizer:
             # Factor in caching (i.e. reads from disk, cache)
             # NOTE: Assumes all plans have a validly placed cache
             # (i.e., cache before first non-deterministic op)
-            print(f"[Caching] Pipe Cost Map Is:")
-            print(pipe_cost_map)
+            logger.debug("[Caching] Pipe cost map: %s", pipe_cost_map)
 
             if plan is None:
                 raise RuntimeError(
@@ -1558,7 +1597,7 @@ class Optimizer:
                 for f_idx in fused_to_subtract:
                     curr_cost -= fused_block_fused_costs[f_idx]
 
-                print("cost after caching delete: ", curr_cost)
+                logger.debug("[Caching] Cost after removing cached prefix: %s", curr_cost)
                 # 2. Add reading overhead
 
                 # calculate read latency for cache
@@ -1951,7 +1990,7 @@ class Optimizer:
             if len(self.physical_plan.graph[input_p_id]) != 1:
                 raise RuntimeError("Cannot fuse with fanout at input")
             self.physical_plan.graph[input_p_id] = {new_p_id}
-        print("old graph1:",self.physical_plan.graph)
+        logger.debug("Graph before fusion cleanup: %s", self.physical_plan.graph)
         # Update downstream pipe
         output_p_ids = self.physical_plan.graph[end_p_id]
         if len(output_p_ids) > 1:
@@ -1963,8 +2002,8 @@ class Optimizer:
             del self.physical_plan.graph[p_id]
 
         
-        print("new graph1:",self.physical_plan.graph)
-        print("logical graph:",self.logical_graph)
+        logger.debug("Graph after fusion cleanup: %s", self.physical_plan.graph)
+        logger.debug("Logical graph: %s", self.logical_graph)
 
         return new_p_id
 

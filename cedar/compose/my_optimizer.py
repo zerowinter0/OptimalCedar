@@ -179,6 +179,16 @@ class MyOptimizer(Optimizer):
 
         return True
 
+    def _pipe_can_materialize_fusion(
+        self, p_id: int, variant_type: PipeVariantType
+    ) -> bool:
+        pipe = self.logical_pipes.get(p_id) if self.logical_pipes is not None else None
+        return bool(
+            pipe is not None
+            and self._allowed_fusion(p_id)
+            and pipe.is_fusable(variant_type)
+        )
+
     def _clear_pending_fusions(self) -> None:
         self._pending_fusion_blocks = []
         self._pending_fusion_variants = {}
@@ -248,6 +258,16 @@ class MyOptimizer(Optimizer):
             vt = self._pending_fusion_variants.get(
                 tuple(pid_block), PipeVariantType.INPROCESS
             )
+            if any(
+                not self._pipe_can_materialize_fusion(p_id, vt)
+                for p_id in pid_block
+            ):
+                logger.warning(
+                    "[MyOptimizer] Skip fusion block %s for variant %s because at least one pipe is not fusable.",
+                    pid_block,
+                    vt,
+                )
+                continue
             variant_ctx = PipeVariantContextFactory.create_context(variant_type=vt)
             self._fuse_pipe(pid_block, vt, variant_ctx)
 
@@ -555,7 +575,11 @@ class MyOptimizer(Optimizer):
             raise RuntimeError("DP metadata not prepared (call _prepare_dp_metadata).")
         pred_indices = self._dp_pred_indices
         r_prod = self._dp_r_prod
-        print("tmp 1:",r_prod)
+        logger.debug(
+            "[MyOptimizer] Prepared r_prod for %d DP masks; first values=%s",
+            len(r_prod),
+            r_prod[: min(8, len(r_prod))],
+        )
 
         full_mask = 1 << n
         out: Dict[PipeVariantType, List[float]] = {}
@@ -860,6 +884,13 @@ class MyOptimizer(Optimizer):
 
             for vt in candidate_variants:
                 dp_by_mask = variant_final_costs[vt]
+                if mask.bit_count() > 1 and any(
+                    not self._pipe_can_materialize_fusion(inner_ops[i], vt)
+                    for i in range(n)
+                    if mask & (1 << i)
+                ):
+                    continue
+
                 block_baseline = dp_by_mask[mask]
                 if block_baseline == float("inf"):
                     continue
@@ -875,7 +906,13 @@ class MyOptimizer(Optimizer):
                     best_variant_for_mask[mask] = vt
                     # 用 Pareto frontier 的 backpointer 重建该 mask 的最优顺序（用于后续回溯/可视化/调试）
                     topo_order_cache[mask] = self._reconstruct_naive_reorder_order(vt, mask)
-                    print("man: ",mask,topo_order_cache[mask],vt,c)                 
+                    logger.debug(
+                        "[MyOptimizer] Fusion candidate mask=%s order=%s variant=%s cost=%s",
+                        mask,
+                        topo_order_cache[mask],
+                        vt,
+                        c,
+                    )
 
         def _fusion_block_valid(t_mask: int, c_mask: int) -> bool:
             return self._dp_fusion_block_valid(t_mask, c_mask)
@@ -888,7 +925,7 @@ class MyOptimizer(Optimizer):
 
         dp[0][0] = 0.0
         cache_cost = self._read_time_per_byte * 1000 * self.profiled_stats["baseline"]["output_sizes"][source_p_id]
-        print("cache cost man: ",self._read_time_per_byte)
+        logger.debug("[MyOptimizer] Cache read latency: %s", self._read_time_per_byte)
         cache_benefit = -self._base_cost_map[source_p_id]
 
         for mask in range(1, full_mask):
@@ -919,7 +956,11 @@ class MyOptimizer(Optimizer):
                         if all_non_random[mask]:
                             # 新开启 cache：忽略 cache 之前的算子代价；只计 cache 读开销
                             cand1_new_cache = cache_benefit + cache_cost * r_prod[t]
-                            print("cache man: ",cache_cost, r_prod[t])
+                            logger.debug(
+                                "[MyOptimizer] Cache transition cost=%s r_prod=%s",
+                                cache_cost,
+                                r_prod[t],
+                            )
                             if cand1_new_cache < best_cand1:
                                 best_cand1 = cand1_new_cache
                                 best_prev_flag = 0

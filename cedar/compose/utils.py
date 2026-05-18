@@ -1,9 +1,10 @@
 # import networkx as nx
 # import matplotlib.pyplot as plt
 import copy
+import time
 from collections import deque
 
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from cedar.pipes import Pipe
 
@@ -406,7 +407,9 @@ def _remove_root(graph: Dict[int, set[int]]) -> int:
 
 
 def calculate_reorderings(
-    pipes: Dict[int, Pipe], graph: Dict[int, Set[int]]
+    pipes: Dict[int, Pipe],
+    graph: Dict[int, Set[int]],
+    timeout_sec: Optional[float] = None,
 ) -> List[Dict[int, Set[int]]]:
     """
     Calculates all permissable reorderings of the dataflow specified by graph,
@@ -425,15 +428,34 @@ def calculate_reorderings(
         A list of graphs specifying all permissible reorderings of the
         input graph.
     """
+    if timeout_sec is not None and timeout_sec <= 0:
+        raise TimeoutError(
+            f"Reordering exceeded timeout of {timeout_sec:.6f}s."
+        )
+
+    start_time = time.perf_counter()
+
+    def _check_timeout() -> None:
+        if timeout_sec is None:
+            return
+        elapsed = time.perf_counter() - start_time
+        if elapsed > timeout_sec:
+            raise TimeoutError(
+                f"Reordering exceeded timeout of {timeout_sec:.6f}s."
+            )
+
     if len(bfs_order(pipes, graph)) != len(graph) or len(pipes) != len(graph):
         raise RuntimeError("Invalid graph. Graph should be fully connected")
+    _check_timeout()
 
     fixed_pipes = get_fixed_pipes(pipes)
     reachability_matrix = calculate_reachability_matrix(pipes)
+    _check_timeout()
     memo = {}
 
     # If the root is a source pipe, there are no more reorderings
     def _reordering_helper(subgraph: Dict[int, Set[int]]) -> List[Dict]:
+        _check_timeout()
         subgraph_reorderings = []
         dict_key = _get_dict_key(subgraph)
 
@@ -461,6 +483,7 @@ def calculate_reorderings(
             # root of the reordering with the current root. If so,
             # create a new reordering that reorders the two nodes.
             for shrunk_reordering in shrunk_reorderings:
+                _check_timeout()
                 shrunk_root = get_output_pipe(shrunk_reordering)
                 # Add the current root as the output
                 g = copy.deepcopy(shrunk_reordering)

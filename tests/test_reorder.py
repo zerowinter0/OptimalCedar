@@ -72,6 +72,26 @@ def test_cycle():
         derive_constraint_graph(test_feature.logical_pipes)
 
 
+def test_calculate_reorderings_timeout():
+    from cedar.compose.utils import calculate_reorderings
+
+    class TestFeature(Feature):
+        def _compose(self, source_pipes: List[Pipe]):
+            ft = source_pipes[0]
+            ft = NoopPipe(ft)
+            return ft
+
+    test_feature = TestFeature()
+    test_feature.apply(IterSource([1, 2, 3]))
+
+    with pytest.raises(TimeoutError):
+        calculate_reorderings(
+            test_feature.logical_pipes,
+            test_feature.logical_adj_list,
+            timeout_sec=0,
+        )
+
+
 def test_constraint_graph():
     from cedar.compose.utils import derive_constraint_graph
 

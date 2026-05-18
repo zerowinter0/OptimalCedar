@@ -141,6 +141,13 @@ class BlockCandidateProvider:
 
             candidates: List[BlockCandidate] = []
             for vt in candidate_variants:
+                if is_multi and any(
+                    not opt._pipe_can_materialize_fusion(self.inner_ops[i], vt)
+                    for i in range(self.n)
+                    if mask & (1 << i)
+                ):
+                    continue
+
                 block_cost = variant_cost_by_mask[vt][mask]
                 if block_cost == float("inf"):
                     continue

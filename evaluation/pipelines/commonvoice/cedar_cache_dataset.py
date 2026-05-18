@@ -86,6 +86,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_caching=not spec.disable_caching,
                 num_samples= 40571,
                 use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
+                reorder_timeout_sec=getattr(spec, "reorder_timeout_sec", None),
             ),
             generate_plan=spec.generate_plan,
         )
