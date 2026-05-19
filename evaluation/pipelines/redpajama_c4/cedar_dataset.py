@@ -634,7 +634,7 @@ def main():
     parser.add_argument("--num_total_samples", type=int, default=20)
     parser.add_argument("--num_preview_samples", type=int, default=5)
     parser.add_argument("--use_ray", action="store_true")
-    parser.add_argument("--use_my_optimizer", type=int, choices=[0, 1, 2, 3, 4], default=0)
+    parser.add_argument("--use_my_optimizer", type=int, choices=[0, 1, 2, 3, 4, 5], default=0)
     parser.add_argument("--disable_prefetch", action="store_true")
     parser.add_argument("--disable_offload", action="store_true")
     parser.add_argument("--disable_parallelism", action="store_true")

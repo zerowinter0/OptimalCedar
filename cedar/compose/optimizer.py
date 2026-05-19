@@ -83,7 +83,7 @@ class OptimizerOptions:
 
         # Optimizer implementation selector used by DataSet:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer.
+        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
 
         # Maximum wall-clock time allowed for the original Optimizer reorder

@@ -462,7 +462,7 @@ class DataSet:
 
         # Optionally swap the optimizer implementation. The selector is:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer.
+        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
@@ -488,9 +488,14 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(DpSeperateOptimizer())
+        elif optimizer_selector == 5:
+            from cedar.compose.dp_cedar_optimizer import DpCedarOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(DpCedarOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be 0, 1, 2, 3, or 4."
+                "OptimizerOptions.use_my_optimizer must be 0, 1, 2, 3, 4, or 5."
             )
 
         if len(self.features) == 0:

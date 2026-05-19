@@ -1,6 +1,6 @@
 """
 Compare runtime performance between Cedar's original Optimizer, DjOptimizer,
-DpOptimizer, and DpSeperateOptimizer.
+DpOptimizer, DpSeperateOptimizer, and DpCedarOptimizer.
 
 The workload timer starts only after the dataset has been constructed, so the
 profile/optimization/setup time is reported separately and is not included in
@@ -37,11 +37,13 @@ OPTIMIZERS = {
     "optimizer": 0,
     "dp_optimizer": 2,
     "dp_seperate_optimizer": 4,
+    "dp_cedar_optimizer": 5,
 }
 
 DEFAULT_OPTIMIZER_ORDER = [
     "dj_optimizer",
     "optimizer",
+    "dp_cedar_optimizer",
     "dp_optimizer",
     "dp_seperate_optimizer",
 ]
@@ -52,7 +54,7 @@ REQUIRED_PROFILE_KEYS = {
 }
 
 OPTIMIZER_TIME_LIMIT_SEC = 5 * 60
-OPTIMIZER_RSS_LIMIT_BYTES = 8 * 1024**3
+OPTIMIZER_RSS_LIMIT_BYTES = 405078136832
 
 
 def _object_disk_cache_dir() -> Path:
@@ -85,18 +87,23 @@ def _parse_dataset_kwargs(raw: Optional[str]) -> Dict[str, Optional[str]]:
     return extra_kwargs
 
 
-def _has_complete_profile(profiled_stats: str) -> bool:
+def _load_profile(profiled_stats: str) -> Optional[Dict[str, Any]]:
     if not profiled_stats:
-        return False
+        return None
 
     path = Path(profiled_stats)
     if not path.exists():
-        return False
+        return None
 
     with path.open("r") as f:
         profile = yaml.safe_load(f)
 
-    if not isinstance(profile, dict):
+    return profile if isinstance(profile, dict) else None
+
+
+def _has_complete_profile(profiled_stats: str) -> bool:
+    profile = _load_profile(profiled_stats)
+    if profile is None:
         return False
 
     for section, keys in REQUIRED_PROFILE_KEYS.items():
@@ -105,6 +112,14 @@ def _has_complete_profile(profiled_stats: str) -> bool:
             return False
 
     return isinstance(profile.get("offloads"), dict)
+
+
+def _profile_has_offload_variant(profiled_stats: str, variant_name: str) -> bool:
+    profile = _load_profile(profiled_stats)
+    if profile is None:
+        return False
+    offloads = profile.get("offloads")
+    return isinstance(offloads, dict) and variant_name in offloads
 
 
 def _cleanup_runtime() -> None:
@@ -202,6 +217,43 @@ def _configure_optimizer_runtime(args: argparse.Namespace) -> None:
         "Set Cedar RAY_AVAILABLE_PARALLELISM=%d for this comparison.",
         args.ray_available_parallelism,
     )
+
+
+def _normalize_ray_args(args: argparse.Namespace) -> None:
+    if args.ray_ip and not args.use_ray:
+        logger.warning("--ray_ip was provided; enabling --use_ray automatically.")
+        args.use_ray = True
+
+    if args.ray_ip:
+        logger.warning(
+            "--ray_ip=%s was provided, but this script is configured to use "
+            "local Ray only. Ignoring the remote Ray address.",
+            args.ray_ip,
+        )
+        args.ray_ip = ""
+
+    if args.use_ray and args.disable_offload:
+        logger.warning(
+            "Ray is configured, but --disable_offload is set. Optimizers will "
+            "receive the Ray address, but RAY/TF_RAY offload variants remain disabled."
+        )
+
+
+def _verify_local_ray(args: argparse.Namespace) -> Dict[str, Any]:
+    if not args.use_ray:
+        return {}
+
+    import ray
+
+    logger.info("Verifying local Ray resources.")
+    try:
+        ray.init(ignore_reinit_error=True)
+        resources = ray.cluster_resources()
+        logger.info("Local Ray resources: %s", resources)
+        return dict(resources)
+    finally:
+        if ray.is_initialized():
+            ray.shutdown()
 
 
 def _make_spec(
@@ -701,7 +753,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Run the same Cedar workload with all optimizer passes enabled "
-            "and compare dj_optimizer.py, optimizer.py, and dp_optimizer.py."
+            "and compare dj_optimizer.py, optimizer.py, dp_cedar_optimizer.py, "
+            "and dp_optimizer.py."
         )
     )
     parser.add_argument(
@@ -863,15 +916,28 @@ def main() -> None:
 
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level.upper())
+    _normalize_ray_args(args)
     if args.num_repeats < 1:
         raise ValueError("--num_repeats must be >= 1")
     profile_complete = _has_complete_profile(args.profiled_stats)
+    if args.use_ray and not args.disable_offload and not _profile_has_offload_variant(args.profiled_stats, "RAY"):
+        raise RuntimeError(
+            "Ray offload is enabled, but profiled_stats does not contain offloads.RAY. "
+            "Run profiling with --use_ray first, or pass --disable_offload."
+        )
     args.skip_workload = args.plan_only or args.calculate_plan_cost
 
     if not args.allow_torch_parallelism:
         logger.warning("Setting torch threads to 1")
         torch.set_num_threads(1)
     _configure_optimizer_runtime(args)
+    ray_cluster_resources = _verify_local_ray(args)
+
+    if args.use_ray:
+        logger.warning(
+            "Ray is enabled for all optimizer repeats (ray_ip=%s).",
+            args.ray_ip or "local",
+        )
 
     if args.plan_only:
         logger.warning(
@@ -928,6 +994,9 @@ def main() -> None:
         "controller_enabled": args.enable_controller,
         "local_parallelism_enabled": args.enable_local_parallelism,
         "offload_enabled": not args.disable_offload,
+        "ray_enabled": args.use_ray,
+        "ray_ip": args.ray_ip,
+        "ray_cluster_resources": ray_cluster_resources,
         "caching_enabled": not args.disable_caching,
         "ray_available_parallelism": args.ray_available_parallelism,
         "optimizer_time_limit_sec": OPTIMIZER_TIME_LIMIT_SEC,
