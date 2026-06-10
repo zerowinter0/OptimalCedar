@@ -7,7 +7,7 @@ pytest
 google-cloud-storage
 google-api-python-client
 pytest-mock
-transformers
+transformers==4.40.2
 pyyaml
 h5py
 pandas
