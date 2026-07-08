@@ -229,8 +229,6 @@ class CacheTransitionPolicy:
 
         if not self.enabled or prev_state.cache_active:
             return
-        if block.mask.bit_count() != 1:
-            return
         if not self.all_non_random[next_mask]:
             return
 
@@ -343,7 +341,16 @@ class ExtensibleDpSearch:
                     else:
                         candidate_cost = prev_cost + choice.extra_cost
                     old = dp[next_mask].get(choice.state, float("inf"))
-                    if candidate_cost < old:
+                    old_pointer = back[next_mask].get(choice.state)
+                    if candidate_cost < old or (
+                        candidate_cost == old
+                        and choice.cache_after_idx is not None
+                        and block.materializes_fusion
+                        and (
+                            old_pointer is None
+                            or not old_pointer.block.materializes_fusion
+                        )
+                    ):
                         dp[next_mask][choice.state] = candidate_cost
                         back[next_mask][choice.state] = BackPointer(
                             prev_mask=prev_mask,

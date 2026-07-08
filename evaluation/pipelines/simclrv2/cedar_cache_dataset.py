@@ -108,7 +108,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
                 enable_caching=not spec.disable_caching,
-                num_samples=9472,
+                num_samples=getattr(spec, "num_total_samples", None) or 9472,
                 use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
                 reorder_timeout_sec=getattr(spec, "reorder_timeout_sec", None),
             ),

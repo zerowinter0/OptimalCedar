@@ -249,6 +249,42 @@ def test_profiler(basic_noop_feature):
     assert d == {3: 10.0, 2: 5.0, 1: 20.0, 0: 2.5}
 
 
+def test_profiler_missing_traced_data_size_falls_back(basic_noop_feature):
+    basic_noop_feature.load(CedarContext())
+    profiler = FeatureProfiler(basic_noop_feature, profile_mode=True)
+
+    ds = DataSample([])
+    ds.trace_dict = {
+        -1: 10,
+        3: 20,
+        2: 30,
+        1: 40,
+        0: 50,
+    }
+    ds.trace_order = [-1, 3, 2, 1, 0]
+    ds.size_dict = {
+        -1: 1,
+        3: 1,
+        2: 1,
+        1: 1,
+        0: 1,
+    }
+    ds.data_size_dict = {
+        3: 32,
+        2: 64,
+        # Pipe 1 intentionally missing, mirroring get_sizeof_data failures.
+        0: 128,
+    }
+    ds.do_trace = True
+    ds.buffer_size_dict = {}
+
+    profiler.update_ds(ds)
+
+    input_sizes, output_sizes = profiler.calculate_avg_data_size()
+    assert input_sizes[1] == 64
+    assert output_sizes[1] == 64
+
+
 def test_buffer_sizes(monkeypatch, noop_sleep_dataset):
     monkeypatch.setattr(
         InProcessIterSourcePipeVariant, "_should_trace", lambda self: True

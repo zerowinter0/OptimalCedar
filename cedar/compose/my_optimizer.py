@@ -994,6 +994,22 @@ class MyOptimizer(Optimizer):
                                 prev_mask[mask][0] = t
                                 taken_mask[mask][0] = c
                                 prev_flag[mask][0] = 0
+                        if (
+                            use_cache
+                            and dp[t][0] < float("inf")
+                            and all_non_random[mask]
+                            and fusion_cost[c] < float("inf")
+                        ):
+                            # Open cache after this fused block. The physical
+                            # insertion uses the block's last real pipe; after
+                            # fusion materialization the cache sits after the
+                            # resulting FusedPipe.
+                            cache_candidate = cache_benefit + cache_cost * r_prod[t]
+                            if cache_candidate <= dp[mask][1]:
+                                dp[mask][1] = cache_candidate
+                                prev_mask[mask][1] = t
+                                taken_mask[mask][1] = c
+                                prev_flag[mask][1] = 0
                     if t == 0:
                         break
                     t = (t - 1) & mask
@@ -1039,15 +1055,15 @@ class MyOptimizer(Optimizer):
             tk = taken_mask[m][flag]
             pf = prev_flag[m][flag]
 
-            if (flag==1 and pf==0):
-                cache_p_id = inner_ops[tk.bit_length() - 1] #todo: 如果cache插在fusion算子后可能出错
-
             if pm == -1 or tk == 0:
                 raise RuntimeError("Offload+Cache+Fusion DP backtracking hit illegal state.")
 
             indices_in_block = topo_order_cache[tk]
             if not indices_in_block:
                 raise RuntimeError("Offload+Cache+Fusion block has no valid topo order.")
+
+            if flag == 1 and pf == 0:
+                cache_p_id = inner_ops[indices_in_block[-1]]
 
             vt = best_variant_for_mask[tk]
             for idx in indices_in_block:

@@ -24,6 +24,7 @@ from ..context import (
     TFRayPipeVariantContext,
 )
 from ..common import MutationError, CedarPipeSpec, cedar_pipe
+from ..filter import is_dropped_sample
 from cedar.service import SMPActor, RayActor
 
 import tensorflow as tf
@@ -38,6 +39,8 @@ class Compose:
     def __call__(self, data: Any):
         for fn in self.fns:
             data = fn(data)
+            if is_dropped_sample(data):
+                break
         return data
 
 
@@ -223,6 +226,8 @@ class InProcessFusedOptimizerPipeVariant(InProcessPipeVariant):
                 x = next(self._input_iter)
                 if not x.dummy:
                     x.data = self.fn(x.data)
+                    if is_dropped_sample(x.data):
+                        continue
                 yield x
             except StopIteration:
                 return
@@ -253,6 +258,12 @@ class SMPFusedOptimizerPipeVariant(SMPPipeVariant):
     def _create_actor(self) -> SMPActor:
         return SMPActorFusedOptimizerPipeVariant(self.name, self.fn)
 
+    def _get_next_result(self, timeout: float = 1.0):
+        while True:
+            sample = super()._get_next_result(timeout=timeout)
+            if not is_dropped_sample(sample.data):
+                return sample
+
 
 @ray.remote(num_cpus=0)
 class RayActorFusedOptimizerPipeVariant(RayActor):
@@ -277,6 +288,12 @@ class RayFusedOptimizerPipeVariant(RayPipeVariant):
 
     def _create_actor(self) -> ray.actor.ActorClass:
         return RayActorFusedOptimizerPipeVariant.remote(self.name, self.fn)
+
+    def _get_next_result(self, timeout: float = 1.0):
+        while True:
+            sample = super()._get_next_result(timeout=timeout)
+            if not is_dropped_sample(sample.data):
+                return sample
 
 
 class TFFusedOptimizerPipeVariant(TFPipeVariant):

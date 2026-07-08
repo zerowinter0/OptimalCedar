@@ -9,7 +9,7 @@ from typing import List
 from cedar.config import CedarContext
 from cedar.compose import Feature
 from cedar.client import DataSet
-from cedar.pipes import NoopPipe, Pipe, PipeVariantType, MapperPipe
+from cedar.pipes import NoopPipe, Pipe, PipeVariantType, MapperPipe, FilterPipe
 from cedar.sources import IterSource
 from cedar.pipes.optimize import FusedOptimizerPipe
 
@@ -448,6 +448,10 @@ def _add(x, y):
     return x + y
 
 
+def _is_even(x):
+    return x % 2 == 0
+
+
 def test_fusion_map():
     add_one = functools.partial(_add, y=1)
 
@@ -476,6 +480,36 @@ def test_fusion_map():
         res.append(x.data)
 
     assert set(res) == set(range(3, 103))
+
+
+def test_fusion_filter_between_maps():
+    add_one = functools.partial(_add, y=1)
+
+    data = range(10)
+    source = IterSource(data)
+    ctx = CedarContext()
+
+    source_pipe = source.to_pipe()
+    p1 = MapperPipe(source_pipe, add_one)
+    p2 = FilterPipe(p1, _is_even)
+    p3 = MapperPipe(p2, add_one)
+
+    source_pipe.id = 0
+    p1.id = 1
+    p2.id = 2
+    p3.id = 3
+
+    fused_pipe = FusedOptimizerPipe([p1, p2, p3])
+
+    source_pipe.mutate(ctx, PipeVariantType.INPROCESS)
+    fused_pipe.mutate(ctx, PipeVariantType.SMP)
+
+    out = fused_pipe.pipe_variant
+    res = []
+    for x in out:
+        res.append(x.data)
+
+    assert set(res) == {3, 5, 7, 9, 11}
 
 
 def test_fusion_feature(basic_map_dataset_long):

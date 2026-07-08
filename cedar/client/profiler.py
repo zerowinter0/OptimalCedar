@@ -160,11 +160,18 @@ class FeatureProfiler:
             prev_p_id = ds.trace_order[idx - 1]
 
             # Normalize to per sample
-            prev_sample_size = ds.size_dict.get(prev_p_id, 1)
-            input_size = (
-                ds.data_size_dict.get(prev_p_id, 0) / prev_sample_size
-            )  # for source pipe
-            output_size = ds.data_size_dict[p_id] / ds.size_dict[p_id]
+            prev_sample_size = ds.size_dict.get(prev_p_id, 1) or 1
+            input_size = ds.data_size_dict.get(prev_p_id, 0) / prev_sample_size
+            curr_data_size = ds.data_size_dict.get(p_id)
+            if curr_data_size is None:
+                curr_data_size = input_size * (ds.size_dict.get(p_id, 1) or 1)
+                logger.warning(
+                    "Missing traced data size for pipe %s; using input "
+                    "size %.6f as output-size fallback.",
+                    p_id,
+                    input_size,
+                )
+            output_size = curr_data_size / (ds.size_dict.get(p_id, 1) or 1)
 
             self.data_sizes[p_id].append((input_size, output_size))
 

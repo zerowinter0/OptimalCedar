@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460">
+<rect width="100%" height="100%" fill="white"/>
+<text x="380.0" y="24" text-anchor="middle" font-family="sans-serif" font-size="18">DP Optimizer Reorder Optimization Time</text>
+<line x1="78" y1="42" x2="78" y2="390" stroke="#222"/>
+<line x1="78" y1="390" x2="736" y2="390" stroke="#222"/>
+<line x1="78" y1="390.00" x2="736" y2="390.00" stroke="#ddd" stroke-dasharray="4 4"/>
+<text x="68" y="394.00" text-anchor="end" font-family="sans-serif" font-size="12">0</text>
+<line x1="78" y1="303.00" x2="736" y2="303.00" stroke="#ddd" stroke-dasharray="4 4"/>
+<text x="68" y="307.00" text-anchor="end" font-family="sans-serif" font-size="12">0.0614</text>
+<line x1="78" y1="216.00" x2="736" y2="216.00" stroke="#ddd" stroke-dasharray="4 4"/>
+<text x="68" y="220.00" text-anchor="end" font-family="sans-serif" font-size="12">0.123</text>
+<line x1="78" y1="129.00" x2="736" y2="129.00" stroke="#ddd" stroke-dasharray="4 4"/>
+<text x="68" y="133.00" text-anchor="end" font-family="sans-serif" font-size="12">0.184</text>
+<line x1="78" y1="42.00" x2="736" y2="42.00" stroke="#ddd" stroke-dasharray="4 4"/>
+<text x="68" y="46.00" text-anchor="end" font-family="sans-serif" font-size="12">0.246</text>
+<line x1="78.00" y1="390" x2="78.00" y2="395" stroke="#222"/>
+<text x="78.00" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">0</text>
+<line x1="143.80" y1="390" x2="143.80" y2="395" stroke="#222"/>
+<text x="143.80" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">1</text>
+<line x1="209.60" y1="390" x2="209.60" y2="395" stroke="#222"/>
+<text x="209.60" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">2</text>
+<line x1="275.40" y1="390" x2="275.40" y2="395" stroke="#222"/>
+<text x="275.40" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">3</text>
+<line x1="341.20" y1="390" x2="341.20" y2="395" stroke="#222"/>
+<text x="341.20" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">4</text>
+<line x1="407.00" y1="390" x2="407.00" y2="395" stroke="#222"/>
+<text x="407.00" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">5</text>
+<line x1="472.80" y1="390" x2="472.80" y2="395" stroke="#222"/>
+<text x="472.80" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">6</text>
+<line x1="538.60" y1="390" x2="538.60" y2="395" stroke="#222"/>
+<text x="538.60" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">7</text>
+<line x1="604.40" y1="390" x2="604.40" y2="395" stroke="#222"/>
+<text x="604.40" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">8</text>
+<line x1="670.20" y1="390" x2="670.20" y2="395" stroke="#222"/>
+<text x="670.20" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">9</text>
+<line x1="736.00" y1="390" x2="736.00" y2="395" stroke="#222"/>
+<text x="736.00" y="412" text-anchor="middle" font-family="sans-serif" font-size="12">10</text>
+<polyline points="78.00,389.94 143.80,389.70 209.60,389.59 275.40,388.77 341.20,388.91 407.00,387.54 472.80,383.28 538.60,373.67 604.40,347.68 670.20,279.24 736.00,42.00" fill="none" stroke="#2563eb" stroke-width="3"/>
+<circle cx="78.00" cy="389.94" r="4" fill="#2563eb"/>
+<circle cx="143.80" cy="389.70" r="4" fill="#2563eb"/>
+<circle cx="209.60" cy="389.59" r="4" fill="#2563eb"/>
+<circle cx="275.40" cy="388.77" r="4" fill="#2563eb"/>
+<circle cx="341.20" cy="388.91" r="4" fill="#2563eb"/>
+<circle cx="407.00" cy="387.54" r="4" fill="#2563eb"/>
+<circle cx="472.80" cy="383.28" r="4" fill="#2563eb"/>
+<circle cx="538.60" cy="373.67" r="4" fill="#2563eb"/>
+<circle cx="604.40" cy="347.68" r="4" fill="#2563eb"/>
+<circle cx="670.20" cy="279.24" r="4" fill="#2563eb"/>
+<circle cx="736.00" cy="42.00" r="4" fill="#2563eb"/>
+<text x="407.0" y="438" text-anchor="middle" font-family="sans-serif" font-size="14">Number of independent operators</text>
+<text x="20" y="216.0" text-anchor="middle" font-family="sans-serif" font-size="14" transform="rotate(-90 20 216.0)">Mean reorder time (s)</text>
+</svg>

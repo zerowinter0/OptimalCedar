@@ -6,4 +6,4 @@
 
 我可能会提出对代码的改进要求，论文的文字修改要求，实验运行要求。
 
-代码路径为/OptimalCedar/cedar，论文路径为/OptimalCedar/paper/OptimalReorder。此外，/OptimalCedar/paper/other_paper_examples提供了一些与本项目研究内容相近的一些论文，可以参考它们进行写作
+代码路径为/OptimalCedar/cedar，论文路径为/OptimalCedar/paper/OptimalReorder。此外，/OptimalCedar/paper/other_paper_examples提供了一些与本项目研究内容相近的一些论文，可以参考它们进行写作。这些论文中大部分论文的文本已被提取至/OptimalCedar/paper/other_paper_examples/extracted_text，无需重复使用工具阅读pdf；遇到无对应文本的论文，使用工具提取文本并放入该文件夹。

@@ -127,25 +127,27 @@ def create_spec(args: argparse.Namespace) -> CedarEvalSpec:
             extra_kwargs[key] = value
 
     return CedarEvalSpec(
-        args.batch_size,
-        args.num_total_samples,
-        args.num_epochs,
-        args.master_feature_config,
-        extra_kwargs,
-        args.use_ray,
-        args.ray_ip,
-        args.iteration_time,
-        args.profiled_stats,
-        args.run_profiling,
-        args.disable_optimizer,
-        args.disable_controller,
-        args.disable_prefetch,
-        args.disable_offload,
-        args.disable_parallelism,
-        args.disable_reorder,
-        args.disable_fusion,
-        args.disable_caching,
-        args.generate_plan,
+        batch_size=args.batch_size,
+        num_total_samples=args.num_total_samples,
+        num_epochs=args.num_epochs,
+        config=args.master_feature_config,
+        kwargs=extra_kwargs,
+        use_ray=args.use_ray,
+        ray_ip=args.ray_ip,
+        iteration_time=args.iteration_time,
+        profiled_stats=args.profiled_stats,
+        run_profiling=args.run_profiling,
+        disable_optimizer=args.disable_optimizer,
+        disable_controller=args.disable_controller,
+        disable_prefetch=args.disable_prefetch,
+        disable_offload=args.disable_offload,
+        disable_parallelism=args.disable_parallelism,
+        disable_reorder=args.disable_reorder,
+        disable_fusion=args.disable_fusion,
+        disable_caching=args.disable_caching,
+        use_my_optimizer=args.use_my_optimizer,
+        generate_plan=args.generate_plan,
+        reorder_timeout_sec=args.reorder_timeout_sec,
     )
 
 
@@ -291,6 +293,19 @@ def main():
         "--disable_caching",
         action="store_true",
         help="If optimizer is enabled, disable the ability to reorder pipes",
+    )
+    parser.add_argument(
+        "--use_my_optimizer",
+        type=int,
+        choices=[0, 1, 2, 3, 4, 5, 6],
+        default=0,
+        help="Optimizer selector: 0 original Cedar, 6 Cedar joint enumeration.",
+    )
+    parser.add_argument(
+        "--reorder_timeout_sec",
+        type=float,
+        default=None,
+        help="Maximum wall-clock seconds for reorder enumeration.",
     )
     parser.add_argument(
         "--generate_plan",

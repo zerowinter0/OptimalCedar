@@ -1,0 +1,5 @@
+strategy,cost_ms,order,fused_blocks
+unoptimized,7.803460,IterSourcePipe -> MapperPipe_decode_image -> MapperPipe_edge_enhance -> MapperPipe_color_convert -> MapperPipe_normalize_image -> MapperPipe_ToTensorPrune -> MapperPipe_detail_smooth -> MapperPipe_ToTensor,-
+reorder -> fusion/offload,1.925790,IterSourcePipe -> FusedPipe -> MapperPipe_ToTensorPrune -> MapperPipe_color_convert -> FusedPipe -> MapperPipe_ToTensor,"[6,5];[3,1]"
+fusion/offload -> reorder-units,1.640830,IterSourcePipe -> FusedPipe -> MapperPipe_ToTensorPrune -> MapperPipe_detail_smooth -> MapperPipe_ToTensor,"[6,5,4,3]"
+joint reorder + fusion/offload,1.381523,IterSourcePipe -> MapperPipe_decode_image -> MapperPipe_color_convert -> MapperPipe_edge_enhance -> MapperPipe_ToTensorPrune -> FusedPipe -> MapperPipe_ToTensor,"[3,1]"

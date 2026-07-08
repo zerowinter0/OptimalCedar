@@ -71,6 +71,14 @@ def is_dropped_sample(data: Any) -> bool:
     return isinstance(data, DroppedSample)
 
 
+class FusedFilterCallable:
+    def __init__(self, fn: Callable):
+        self.fn = fn
+
+    def __call__(self, data: Any) -> Any:
+        return data if self.fn(data) else DroppedSample()
+
+
 @cedar_pipe(
     CedarPipeSpec(
         is_mutable=True,
@@ -80,7 +88,7 @@ def is_dropped_sample(data: Any) -> bool:
             PipeVariantType.SMP,
             PipeVariantType.RAY,
         ],
-        is_fusable=False,
+        is_fusable=True,
     )
 )
 class FilterPipe(Pipe):
@@ -150,6 +158,9 @@ class FilterPipe(Pipe):
             self.fn,
             variant_ctx,
         )
+
+    def get_fused_callable(self) -> Callable:
+        return FusedFilterCallable(self.fn)
 
 
 class InProcessFilterPipeVariant(InProcessPipeVariant):

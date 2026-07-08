@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Benchmark Cedar's native reorder pass on independent linear operators.
+Benchmark reorder optimization time on independent linear operators.
 
 The script constructs a synthetic pipeline with one source and N logical
 operators. The N operators are arranged in a linear input pipeline, but they
 have no semantic dependency constraints between them, so Cedar's native
-enumeration-based reorder pass can consider every permutation.
+enumeration-based reorder pass can consider every permutation. DP-based
+optimizers use the same synthetic pipeline/profile so their reorder time can
+be compared on the same input sizes and operator costs.
 """
 
 from __future__ import annotations
@@ -16,11 +18,44 @@ import math
 import statistics
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
 from cedar.compose.optimizer import Optimizer, OptimizerOptions
 from cedar.pipes.noop import NoopPipe
 from cedar.pipes.pipe import Pipe
+
+
+OPTIMIZER_SELECTORS: Dict[str, int] = {
+    "cedar": 0,
+    "my_optimizer": 1,
+    "dp_optimizer": 2,
+    "dp_separate_optimizer": 4,
+    "dp_cedar_optimizer": 5,
+}
+
+REORDER_PASS_RUNNERS: Dict[str, str] = {
+    "cedar": "logical_reorder_pass",
+    "my_optimizer": "physical_dp_pass",
+    "dp_optimizer": "physical_dp_pass",
+    "dp_separate_optimizer": "physical_dp_pass",
+    "dp_cedar_optimizer": "logical_reorder_pass",
+}
+
+
+def optimizer_label(optimizer_name: str) -> str:
+    labels = {
+        "cedar": "Cedar Native",
+        "my_optimizer": "MyOptimizer",
+        "dp_optimizer": "DP Optimizer",
+        "dp_separate_optimizer": "DP Separate Optimizer",
+        "dp_cedar_optimizer": "DP Cedar Optimizer",
+    }
+    return labels.get(optimizer_name, optimizer_name)
+
+
+def plot_title(rows: List[Dict[str, Any]]) -> str:
+    optimizer_name = str(rows[0].get("optimizer", "cedar"))
+    return f"{optimizer_label(optimizer_name)} Reorder Optimization Time"
 
 
 class SyntheticSourcePipe(Pipe):
@@ -91,13 +126,39 @@ def build_profile(num_ops: int) -> Dict[str, Any]:
             "latencies": latencies,
             "output_sizes": output_sizes,
             "throughput": 100.0,
-        }
+        },
+        # DP optimizers read disk_info even when caching is disabled.
+        "disk_info": {"read_latency": 0.0},
     }
 
 
-def make_optimizer(num_ops: int, timeout_sec: Optional[float]) -> Optimizer:
+def get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
+    if optimizer_name == "cedar":
+        return Optimizer
+    if optimizer_name == "my_optimizer":
+        from cedar.compose.my_optimizer import MyOptimizer
+
+        return MyOptimizer
+    if optimizer_name == "dp_optimizer":
+        from cedar.compose.dp_optimizer import DpOptimizer
+
+        return DpOptimizer
+    if optimizer_name == "dp_separate_optimizer":
+        from cedar.compose.dp_seperate_optimizer import DpSeperateOptimizer
+
+        return DpSeperateOptimizer
+    if optimizer_name == "dp_cedar_optimizer":
+        from cedar.compose.dp_cedar_optimizer import DpCedarOptimizer
+
+        return DpCedarOptimizer
+    raise ValueError(f"Unsupported optimizer: {optimizer_name}")
+
+
+def make_optimizer(
+    num_ops: int, timeout_sec: Optional[float], optimizer_name: str
+) -> Optimizer:
     pipes, graph = build_pipeline(num_ops)
-    opt = Optimizer()
+    opt = get_optimizer_class(optimizer_name)()
     opt.init(pipes, graph)
     opt.profiled_stats = build_profile(num_ops)
     opt.options = OptimizerOptions(
@@ -108,6 +169,7 @@ def make_optimizer(num_ops: int, timeout_sec: Optional[float]) -> Optimizer:
         enable_fusion=False,
         enable_caching=False,
         disable_physical_opt=True,
+        use_my_optimizer=OPTIMIZER_SELECTORS[optimizer_name],
         reorder_timeout_sec=timeout_sec,
     )
     opt._validate_stats()
@@ -115,13 +177,23 @@ def make_optimizer(num_ops: int, timeout_sec: Optional[float]) -> Optimizer:
     return opt
 
 
+def get_reorder_runner(optimizer_name: str) -> Callable[[Optimizer], None]:
+    runner = REORDER_PASS_RUNNERS[optimizer_name]
+    if runner == "logical_reorder_pass":
+        return lambda opt: opt._pass_reordering()
+    if runner == "physical_dp_pass":
+        return lambda opt: opt._physical_opt()
+    raise ValueError(f"Unsupported reorder runner: {runner}")
+
+
 def time_reorder_once(
-    num_ops: int, timeout_sec: Optional[float]
+    num_ops: int, timeout_sec: Optional[float], optimizer_name: str
 ) -> Tuple[float, str]:
-    opt = make_optimizer(num_ops, timeout_sec)
+    opt = make_optimizer(num_ops, timeout_sec, optimizer_name)
+    run_reorder_pass = get_reorder_runner(optimizer_name)
     start = time.perf_counter()
     try:
-        opt._pass_reordering()
+        run_reorder_pass(opt)
     except TimeoutError:
         return time.perf_counter() - start, "timeout"
     elapsed = time.perf_counter() - start
@@ -134,7 +206,9 @@ def benchmark(args: argparse.Namespace) -> List[Dict[str, Any]]:
         times: List[float] = []
         status = "ok"
         for _ in range(args.repeats):
-            elapsed, run_status = time_reorder_once(num_ops, args.timeout_sec)
+            elapsed, run_status = time_reorder_once(
+                num_ops, args.timeout_sec, args.optimizer
+            )
             times.append(elapsed)
             status = run_status
             if run_status == "timeout":
@@ -142,8 +216,10 @@ def benchmark(args: argparse.Namespace) -> List[Dict[str, Any]]:
 
         rows.append(
             {
+                "optimizer": args.optimizer,
                 "num_independent_ops": num_ops,
                 "candidate_orders": math.factorial(num_ops),
+                "dp_states": 1 << num_ops,
                 "repeats_completed": len(times),
                 "mean_seconds": statistics.mean(times),
                 "median_seconds": statistics.median(times),
@@ -176,8 +252,8 @@ def plot_with_matplotlib(rows: List[Dict[str, Any]], figure_path: Path) -> None:
     plt.figure(figsize=(7, 4.2))
     plt.plot(x, y, marker="o", linewidth=2)
     plt.xlabel("Number of independent operators")
-    plt.ylabel("Cedar native reorder time (s)")
-    plt.title("Cedar Reorder Optimization Time")
+    plt.ylabel("Mean reorder time (s)")
+    plt.title(plot_title(rows))
     plt.xticks(x)
     plt.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
@@ -213,7 +289,7 @@ def plot_svg(rows: List[Dict[str, Any]], figure_path: Path) -> None:
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         '<rect width="100%" height="100%" fill="white"/>',
-        f'<text x="{width / 2}" y="24" text-anchor="middle" font-family="sans-serif" font-size="18">Cedar Reorder Optimization Time</text>',
+        f'<text x="{width / 2}" y="24" text-anchor="middle" font-family="sans-serif" font-size="18">{plot_title(rows)}</text>',
         f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_h}" stroke="#222"/>',
         f'<line x1="{left}" y1="{top + plot_h}" x2="{left + plot_w}" y2="{top + plot_h}" stroke="#222"/>',
     ]
@@ -244,7 +320,7 @@ def plot_svg(rows: List[Dict[str, Any]], figure_path: Path) -> None:
                 for x, y in zip(xs, ys)
             ],
             f'<text x="{left + plot_w / 2}" y="{height - 22}" text-anchor="middle" font-family="sans-serif" font-size="14">Number of independent operators</text>',
-            f'<text x="20" y="{top + plot_h / 2}" text-anchor="middle" font-family="sans-serif" font-size="14" transform="rotate(-90 20 {top + plot_h / 2})">Cedar native reorder time (s)</text>',
+            f'<text x="20" y="{top + plot_h / 2}" text-anchor="middle" font-family="sans-serif" font-size="14" transform="rotate(-90 20 {top + plot_h / 2})">Mean reorder time (s)</text>',
             "</svg>",
         ]
     )
@@ -266,12 +342,22 @@ def plot(rows: List[Dict[str, Any]], figure_path: Path) -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Measure Cedar's native reorder pass on 1-9 independent operators."
+            "Measure reorder optimization time on independent operators."
         )
     )
     parser.add_argument("--min-ops", type=int, default=1)
     parser.add_argument("--max-ops", type=int, default=9)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument(
+        "--optimizer",
+        choices=sorted(OPTIMIZER_SELECTORS.keys()),
+        default="cedar",
+        help=(
+            "Optimizer to benchmark. cedar and dp_cedar_optimizer run "
+            "_pass_reordering(); the others run the DP physical pass with "
+            "offload/cache/fusion/local parallelism disabled."
+        ),
+    )
     parser.add_argument(
         "--timeout-sec",
         type=float,
@@ -293,8 +379,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.min_ops < 1 or args.max_ops < args.min_ops:
-        raise ValueError("Require 1 <= min_ops <= max_ops.")
+    if args.min_ops < 0 or args.max_ops < args.min_ops:
+        raise ValueError("Require 0 <= min_ops <= max_ops.")
     if args.repeats < 1:
         raise ValueError("Require repeats >= 1.")
 

@@ -83,7 +83,7 @@ class OptimizerOptions:
 
         # Optimizer implementation selector used by DataSet:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer.
+        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
 
         # Maximum wall-clock time allowed for the original Optimizer reorder
@@ -1602,9 +1602,11 @@ class Optimizer:
 
                 # calculate read latency for cache
                 pre_cache_p_id = critical_path[cache_index - 1]
-                cache_size = self.profiled_stats["baseline"]["output_sizes"][
-                    pre_cache_p_id
-                ]
+                cache_size = output_size_map.get(pre_cache_p_id)
+                if cache_size is None:
+                    cache_size = self.profiled_stats["baseline"]["output_sizes"][
+                        pre_cache_p_id
+                    ]
 
                 read_time_per_byte = self.profiled_stats["disk_info"][
                     "read_latency"

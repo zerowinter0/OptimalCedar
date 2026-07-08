@@ -462,7 +462,7 @@ class DataSet:
 
         # Optionally swap the optimizer implementation. The selector is:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer.
+        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
@@ -493,9 +493,14 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(DpCedarOptimizer())
+        elif optimizer_selector == 6:
+            from cedar.compose.cedar_joint_optimizer import CedarJointOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(CedarJointOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be 0, 1, 2, 3, 4, or 5."
+                "OptimizerOptions.use_my_optimizer must be 0, 1, 2, 3, 4, 5, or 6."
             )
 
         if len(self.features) == 0:
@@ -523,10 +528,17 @@ class DataSet:
 
         if run_profiling:
             # Just run profiling and exit
+            n_profile_samples = None
+            if self.optimizer_options is not None:
+                n_profile_samples = self.optimizer_options.num_samples
             for f_name in self.feature_names:
                 if profiled_data is None or profiled_data == "":
                     profiled_data = f"/tmp/{f_name}_profile.yml"
-                self._profile(f_name, output_file=profiled_data)
+                self._profile(
+                    f_name,
+                    n_samples=n_profile_samples,
+                    output_file=profiled_data,
+                )
                 self.features[f_name].to_yaml(f"/tmp/cedar_{f_name}_plan.yml")
             exit(0)
 
