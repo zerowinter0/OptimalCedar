@@ -926,7 +926,6 @@ class MyOptimizer(Optimizer):
         dp[0][0] = 0.0
         cache_cost = self._read_time_per_byte * 1000 * self.profiled_stats["baseline"]["output_sizes"][source_p_id]
         logger.debug("[MyOptimizer] Cache read latency: %s", self._read_time_per_byte)
-        cache_benefit = -self._base_cost_map[source_p_id]
 
         for mask in range(1, full_mask):
             # 6.1 单算子追加（两种维度都可以）
@@ -955,11 +954,13 @@ class MyOptimizer(Optimizer):
                         best_prev_flag = 1
                         if all_non_random[mask]:
                             # 新开启 cache：忽略 cache 之前的算子代价；只计 cache 读开销
-                            cand1_new_cache = cache_benefit + cache_cost * r_prod[t]
+                            # cache 位于当前算子之后，因此按当前 mask 的输出尺寸计费。
+                            # DP 状态不包含 source cost，不应再减去 source cost。
+                            cand1_new_cache = cache_cost * r_prod[mask]
                             logger.debug(
                                 "[MyOptimizer] Cache transition cost=%s r_prod=%s",
                                 cache_cost,
-                                r_prod[t],
+                                r_prod[mask],
                             )
                             if cand1_new_cache < best_cand1:
                                 best_cand1 = cand1_new_cache
@@ -1004,7 +1005,7 @@ class MyOptimizer(Optimizer):
                             # insertion uses the block's last real pipe; after
                             # fusion materialization the cache sits after the
                             # resulting FusedPipe.
-                            cache_candidate = cache_benefit + cache_cost * r_prod[t]
+                            cache_candidate = cache_cost * r_prod[mask]
                             if cache_candidate <= dp[mask][1]:
                                 dp[mask][1] = cache_candidate
                                 prev_mask[mask][1] = t

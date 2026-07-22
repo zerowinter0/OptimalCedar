@@ -212,7 +212,6 @@ class CacheTransitionPolicy:
             source_p_id
         ]
         self.cache_cost_per_source_sample = read_time_per_byte * 1000 * source_output_size
-        self.cache_benefit = -optimizer._base_cost_map[source_p_id]
 
     def initial_state(self) -> DpStateSummary:
         return DpStateSummary(cache_active=False)
@@ -233,8 +232,17 @@ class CacheTransitionPolicy:
             return
 
         cache_after_idx = block.order[-1]
-        cache_cost = self.cache_benefit + (
-            self.cache_cost_per_source_sample * self.optimizer._dp_r_prod[prev_mask]
+        # The cache is materialized after the newly appended block, so its
+        # entries have the size produced by every operator in ``next_mask``.
+        # Using ``prev_mask`` prices the block's input instead and can
+        # dramatically understate the read cost of an expanding operator.
+        #
+        # The DP objective excludes the source cost.  Replacing the cached
+        # prefix therefore means starting from the cache read cost directly;
+        # subtracting the source cost here would count a benefit that was
+        # never present in the DP state.
+        cache_cost = (
+            self.cache_cost_per_source_sample * self.optimizer._dp_r_prod[next_mask]
         )
         yield TransitionChoice(
             state=DpStateSummary(cache_active=True),
