@@ -1,0 +1,64 @@
+# OptimalCedar native Data-Juicer baseline.
+# Source recipe: datajuicer/data-juicer-hub@47fc34588b5d4258c13747cea37c2b63cf4e11b0
+# refined_recipes/image/llava-pretrain-refine.yaml
+project_name: optimalcedar-llava-pretrain
+dataset_path: /tmp/llava_pretrain_cedar_fixture.jsonl
+export_path: /tmp/optimalcedar-datajuicer/llava_pretrain.jsonl
+
+# CLIP and BLIP are GPU-backed. One process preserves the same global model/GPU
+# concurrency used by the Cedar workload; CPU-only recipes use the 64-CPU budget.
+np: 1
+text_keys: text
+image_key: images
+image_special_token: <image>
+eoc_special_token: <|__dj__eoc|>
+
+executor_type: default
+auto_op_parallelism: false
+op_fusion: true
+fusion_strategy: probe
+use_cache: false
+open_tracer: false
+skip_op_error: false
+
+process:
+  - fix_unicode_mapper:
+  - punctuation_normalization_mapper:
+  - alphanumeric_filter:
+      tokenization: false
+      min_ratio: 0.60
+  - character_repetition_filter:
+      rep_len: 10
+      max_ratio: 0.09373663
+  - flagged_words_filter:
+      lang: en
+      tokenization: false
+      max_ratio: 0.0
+  - perplexity_filter:
+      lang: en
+      max_ppl: 14435.5806
+  - special_characters_filter:
+      min_ratio: 0.16534802
+      max_ratio: 0.42023757
+  - word_repetition_filter:
+      lang: en
+      tokenization: false
+      rep_len: 10
+      max_ratio: 0.03085751
+  - image_aspect_ratio_filter:
+      min_ratio: 0.333
+      max_ratio: 3.0
+      any_or_all: any
+  - image_shape_filter:
+      max_width: 727
+      max_height: 606
+      any_or_all: any
+  - image_size_filter:
+      max_size: 124KB
+      any_or_all: any
+  - image_text_similarity_filter:
+      hf_clip: openai/clip-vit-base-patch32
+      min_score: 0.20315419
+  - image_text_matching_filter:
+      hf_blip: Salesforce/blip-itm-base-coco
+      min_score: 0.44930778

@@ -1,4 +1,5 @@
 import pathlib
+import torch
 import torchvision
 from torchvision.transforms import v2
 from PIL import Image
@@ -54,8 +55,9 @@ def zoom_out(x):
 
 
 def crop(x):
+    box_tensor = torch.as_tensor(x["boxes"], dtype=torch.float32).reshape(-1, 4)
     bboxes = torchvision.datapoints.BoundingBox(
-        x["boxes"],
+        box_tensor,
         format=torchvision.datapoints.BoundingBoxFormat.XYXY,
         spatial_size=(x["image"].height, x["image"].width),
     )
@@ -66,10 +68,10 @@ def crop(x):
     return x
 
 
-def build_ds(root):
+def build_ds(root, split="val2017"):
     # Build list of imgs/annotations
-    ann_file = root + "/annotations/instances_val2017.json"
-    items = {}
+    ann_file = root + f"/annotations/instances_{split}.json"
+    annotations = {}
     ds_items = []
 
     with open(ann_file, "r") as f:
@@ -77,33 +79,21 @@ def build_ds(root):
 
     for ann in ann_json["annotations"]:
         img_id = ann["image_id"]
-        if img_id in items:
-            items[img_id]["annotations"].append(ann)
-        else:
-            items[img_id] = {}
-            items[img_id]["annotations"] = [ann]
+        annotations.setdefault(img_id, []).append(ann)
 
     for img in ann_json["images"]:
         img_id = img["id"]
-        if img_id not in items:
-            continue
-        items[img_id]["image"] = img
-
-    for img_id, item in items.items():
-        # img = PIL.Image.open(root + item["image"]["file_name"])
-        # item["image"] = img
         boxes = []
         labels = []
-        for ann in item["annotations"]:
+        for ann in annotations.get(img_id, []):
             x, y, w, h = ann["bbox"]
             boxes.append([x, y, x + w, y + h])
             labels.append(ann["category_id"])
 
-        item["image"]["file_name"] = (
-            root + "/val2017/" + item["image"]["file_name"]
-        )
+        image = dict(img)
+        image["file_name"] = root + f"/{split}/" + image["file_name"]
         sample = {
-            "image": item["image"],
+            "image": image,
             "boxes": boxes,
             "labels": labels,
             "image_id": img_id,
@@ -122,11 +112,14 @@ def build_ds(root):
     return ds
 
 
-def get_dataset():
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
-    ds = build_ds(str(data_dir))
+def get_dataset(spec=None):
+    data_dir = None if spec is None else spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
+    split = "val2017" if spec is None else spec.kwargs.get("split", "val2017")
+    ds = build_ds(str(data_dir), split)
     ray.data.DataContext.get_current().execution_options.locality_with_output = (
         True
     )

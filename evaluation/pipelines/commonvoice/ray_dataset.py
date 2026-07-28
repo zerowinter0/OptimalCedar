@@ -90,7 +90,7 @@ class Timer:
 
 
 def build_ds(root):
-    files = glob.glob(f"{str(root)}/*.mp3")
+    files = glob.glob(f"{str(root)}/**/*.mp3", recursive=True)
     # Get list of dirs
     ds = ray.data.from_items(files)
     ds = ds.map(_read)
@@ -104,10 +104,12 @@ def build_ds(root):
     return ds
 
 
-def get_dataset():
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
+def get_dataset(spec=None):
+    data_dir = None if spec is None else spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
     ds = build_ds(str(data_dir))
 
     return ds

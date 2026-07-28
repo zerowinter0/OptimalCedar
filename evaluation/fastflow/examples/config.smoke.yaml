@@ -1,0 +1,5 @@
+# Short functional validation only. Formal runs use config.yaml unchanged.
+dispatcher_addr: 127.0.0.1
+dispatcher_port: 5000
+num_profile_steps: 2
+num_initial_steps: 1

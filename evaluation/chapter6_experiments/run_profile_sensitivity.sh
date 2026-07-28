@@ -7,6 +7,9 @@ source "${SCRIPT_DIR}/common.sh"
 
 ch6_init
 
+ch6_log "Profile sample-count sensitivity is disabled: Cedar-faithful profiling uses the original 10-second window per configuration."
+exit 2
+
 sensitivity_dir="${CH6_OUT_DIR}/raw/profile_sensitivity"
 mkdir -p "${sensitivity_dir}"
 

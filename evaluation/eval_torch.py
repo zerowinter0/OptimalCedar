@@ -20,8 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 def import_module_from_path(module_path: str):
-    module_name = os.path.basename(module_path).rstrip(".py")
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module_path_obj = Path(module_path).resolve()
+    try:
+        rel_path = module_path_obj.relative_to(Path.cwd().resolve())
+        module_name = ".".join(rel_path.with_suffix("").parts)
+    except ValueError:
+        module_name = os.path.basename(module_path).removesuffix(".py")
+    spec = importlib.util.spec_from_file_location(module_name, str(module_path_obj))
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
@@ -111,6 +116,7 @@ def create_spec(args: argparse.Namespace) -> TorchEvalSpec:
         args.num_epochs,
         args.num_total_samples,
         args.iteration_time,
+        args.dataset_kwargs,
     )
 
 
@@ -180,6 +186,12 @@ def main():
         help="Number of torch dataloader workers to use. If not set, use"
         " the main process.",
         default=0,
+    )
+    parser.add_argument(
+        "--dataset_kwargs",
+        type=json.loads,
+        default={},
+        help="JSON object passed to the workload through TorchEvalSpec.kwargs.",
     )
 
     args = parser.parse_args()

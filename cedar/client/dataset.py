@@ -14,6 +14,7 @@ from queue import Queue, Empty
 from cedar.config import CedarContext
 from cedar.compose import Feature, OptimizerOptions, PhysicalPlan
 from cedar.pipes import (
+    FilterPipe,
     Pipe,
     PipeVariant,
     DataSample,
@@ -26,7 +27,12 @@ from cedar.pipes import (
 from .profiler import FeatureProfiler
 from .controller import FeatureController
 from .logger import DataSetLogger
-from .utils import multiprocess_worker_loop, Sentinel, unpack_feature_map
+from .utils import (
+    multiprocess_worker_loop,
+    multiprocess_worker_loop_from_serialized_feature,
+    Sentinel,
+    unpack_feature_map,
+)
 from .constants import (
     RAY_PROFILE_N_ACTORS,
     RAY_PROFILE_INFLIGHT,
@@ -44,6 +50,91 @@ logger = logging.getLogger(__name__)
 
 MP_QUEUE_MAX_SIZE = 100
 PROFILE_TIME_SEC = 10
+
+
+class _ProfiledFilterCallable:
+    """Count filter decisions without changing normal execution variants."""
+
+    def __init__(self, fn):
+        self.fn = fn
+        self.input_count = 0
+        self.output_count = 0
+
+    def __call__(self, value):
+        self.input_count += 1
+        keep = bool(self.fn(value))
+        if keep:
+            self.output_count += 1
+        return keep
+
+
+def _consolidate_filter_selectivity(profile: Dict[str, Any]) -> None:
+    """Keep the highest-coverage conditional-selectivity observation.
+
+    Every baseline/Ray/SMP profiling pass evaluates the same logical
+    pipeline over the same source order. Backend mutations can change how
+    many records a ten-second pass reaches, so the observation with the
+    largest input count provides the strongest evidence without adding any
+    profiling time or combining duplicated source prefixes.
+    """
+    baseline = profile.get("baseline")
+    if not isinstance(baseline, dict):
+        return
+    baseline_inputs = baseline.get("input_counts")
+    baseline_outputs = baseline.get("output_counts")
+    if not isinstance(baseline_inputs, dict) or not isinstance(
+        baseline_outputs, dict
+    ):
+        return
+
+    observations = [("baseline", baseline)]
+    offloads = profile.get("offloads", {})
+    if isinstance(offloads, dict):
+        for variant, variant_profiles in offloads.items():
+            if not isinstance(variant_profiles, dict):
+                continue
+            for profiled_pipe_id, observation in variant_profiles.items():
+                if isinstance(observation, dict):
+                    observations.append(
+                        (f"{variant}:{profiled_pipe_id}", observation)
+                    )
+
+    selected_inputs = {}
+    selected_outputs = {}
+    selected_sources = {}
+    for filter_id in baseline_inputs:
+        best_inputs = -1
+        best_outputs = 0
+        best_source = "baseline"
+        for source, observation in observations:
+            inputs = observation.get("input_counts", {}).get(filter_id)
+            outputs = observation.get("output_counts", {}).get(filter_id)
+            if (
+                isinstance(inputs, int)
+                and isinstance(outputs, int)
+                and 0 <= outputs <= inputs
+                and inputs > best_inputs
+            ):
+                best_inputs = inputs
+                best_outputs = outputs
+                best_source = source
+        if best_inputs < 0:
+            best_inputs = 0
+        selected_inputs[filter_id] = best_inputs
+        selected_outputs[filter_id] = best_outputs
+        selected_sources[filter_id] = best_source
+
+    baseline["input_counts"] = selected_inputs
+    baseline["output_counts"] = selected_outputs
+    baseline["selectivities"] = {
+        filter_id: (
+            selected_outputs[filter_id] / selected_inputs[filter_id]
+            if selected_inputs[filter_id]
+            else 1.0
+        )
+        for filter_id in selected_inputs
+    }
+    baseline["selectivity_observation_sources"] = selected_sources
 
 
 class _DataSetIter:
@@ -285,18 +376,45 @@ class _MultiprocessDataSetIter:
         enable_controller: bool,
     ):
         self._ctx = ctx
-        self._result_queue = mp.Queue(maxsize=MP_QUEUE_MAX_SIZE)
         self._plans = plans
+        # Ray and gRPC create background native threads. Forking after those
+        # libraries have been imported can copy inconsistent synchronization
+        # state into a child and crash in ray.init(). Use spawn whenever a
+        # worker can initialize Ray. Preserve the default context for strictly
+        # local plans, which may legitimately contain non-pickleable callables.
+        worker_can_use_ray = ctx.ray_config is not None and (
+            plans is None
+            or any(
+                any(
+                    plan.pipe_descs[p_id].variant_type
+                    in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+                    for p_id in plan.graph
+                )
+                for plan in plans.values()
+            )
+        )
+        self._mp_ctx = (
+            mp.get_context("spawn") if worker_can_use_ray else mp.get_context()
+        )
+        self._spawn_ray_workers = worker_can_use_ray
+        self._result_queue = self._mp_ctx.Queue(maxsize=MP_QUEUE_MAX_SIZE)
+        self._startup_queue = self._mp_ctx.Queue()
 
         self._workers = {}
         self._features = features
-        self._done = mp.Event()
+        self._done = self._mp_ctx.Event()
         self._num_done = 0
+        self._epoch_active = False
         self._enable_controller = enable_controller
 
         self._worker_epoch_start = {}
+        self._ray_init_lock = self._mp_ctx.Lock()
 
-        self._init_workers()
+        try:
+            self._init_workers()
+        except BaseException:
+            self._shutdown()
+            raise
 
     def _init_workers(self):
         idx = 0
@@ -307,65 +425,189 @@ class _MultiprocessDataSetIter:
                 plan = self._plans[f_name]
             else:
                 plan = None
-            epoch_start = mp.Event()
+            epoch_start = self._mp_ctx.Event()
             self._worker_epoch_start[idx] = epoch_start
-            worker = mp.Process(
-                target=multiprocess_worker_loop,
+            if self._spawn_ray_workers:
+                from ray import cloudpickle
+
+                worker_target = multiprocess_worker_loop_from_serialized_feature
+                worker_feature = cloudpickle.dumps(feature)
+            else:
+                worker_target = multiprocess_worker_loop
+                worker_feature = feature
+            worker = self._mp_ctx.Process(
+                target=worker_target,
                 args=(
                     idx,
                     self._ctx,
                     self._result_queue,
-                    feature,
+                    self._startup_queue,
+                    worker_feature,
                     f_name,
                     plan,
                     self._done,
                     epoch_start,
                     self._enable_controller,
                     {PipeVariantType.RAY: ray_parallelism},
+                    self._ray_init_lock,
                 ),
             )
-            idx += 1
-            worker.daemon = True
+            # Workers may load plans containing SMP operators. SMP variants
+            # start their own child processes, which Python forbids from a
+            # daemon process. Shutdown is handled explicitly by _shutdown().
+            worker.daemon = False
             worker.start()
             self._workers[idx] = worker
+            idx += 1
+
+        self._await_workers_ready()
+
+    def _await_workers_ready(self, timeout_sec: float = 180.0) -> None:
+        """Wait until every worker has constructed and verified its stages."""
+        reports = {}
+        deadline = time.monotonic() + timeout_sec
+        while len(reports) < len(self._workers):
+            failed_workers = [
+                (idx, worker.exitcode)
+                for idx, worker in self._workers.items()
+                if worker.exitcode is not None
+            ]
+            if failed_workers:
+                raise RuntimeError(
+                    "Multiprocess dataset worker exited during startup: "
+                    f"{failed_workers}"
+                )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    "Timed out waiting for multiprocess dataset workers to "
+                    "initialize their execution stages"
+                )
+            try:
+                worker_idx, actor_counts = self._startup_queue.get(
+                    timeout=min(0.1, remaining)
+                )
+            except Empty:
+                continue
+            if worker_idx in reports:
+                raise RuntimeError(
+                    f"Worker {worker_idx} sent duplicate startup reports"
+                )
+            reports[worker_idx] = actor_counts
+
+        expected = {}
+        if self._plans is not None:
+            for plan in self._plans.values():
+                for p_id in plan.graph:
+                    desc = plan.pipe_descs[p_id]
+                    if desc.variant_type in (
+                        PipeVariantType.RAY,
+                        PipeVariantType.TF_RAY,
+                    ):
+                        expected[p_id] = (
+                            expected.get(p_id, 0) + desc.variant_ctx.n_actors
+                        )
+
+        actual = {}
+        for actor_counts in reports.values():
+            for p_id, count in actor_counts.items():
+                actual[p_id] = actual.get(p_id, 0) + count
+        if actual != expected:
+            raise RuntimeError(
+                "Ray actor startup accounting mismatch: "
+                f"expected={expected}, actual={actual}"
+            )
+        if actual:
+            logger.info(
+                "Verified global Ray actor counts for all active stages: %s",
+                actual,
+            )
 
     def __iter__(self):
+        # A consumer is allowed to stop an epoch early (for example, the
+        # cache-materialization pass stops after num_total_samples).  The
+        # workers may already have queued the remaining data and their epoch
+        # sentinels.  Reusing this iterator without draining those messages
+        # makes stale sentinels count toward the next epoch and can terminate
+        # it before all of its samples are delivered.
+        if self._epoch_active:
+            logger.info("Draining unfinished MP epoch before starting a new one...")
+            self._drain_epoch()
+
         logger.info("New epoch for MP iter...")
         for _, event in self._worker_epoch_start.items():
             # Signal all workers to start next epoch
             event.set()
         self._num_done = 0
+        self._epoch_active = True
         return self
 
-    def __next__(self):
-        while (
-            self._num_done < len(self._workers)
-            or not self._result_queue.empty()
-        ):
+    def _get_result(self):
+        while self._num_done < len(self._workers):
             try:
                 data = self._result_queue.get(timeout=0.1)
                 if isinstance(data, Sentinel):
                     self._num_done += 1
                 else:
-                    return data
+                    return True, data
             except Empty:
+                failed_workers = [
+                    (idx, worker.exitcode)
+                    for idx, worker in self._workers.items()
+                    if worker.exitcode is not None
+                ]
+                if failed_workers:
+                    raise RuntimeError(
+                        "Multiprocess dataset worker exited before completing "
+                        f"its epoch: {failed_workers}"
+                    )
                 continue
-        else:
+
+        # multiprocessing.Queue.empty() is intentionally not used here: its
+        # result is not reliable across processes.  Every worker enqueues its
+        # sentinel after its data, and multiprocessing.Queue preserves each
+        # producer's order, so receiving all worker sentinels is the precise
+        # epoch boundary.
+        self._epoch_active = False
+        return False, None
+
+    def _drain_epoch(self):
+        while self._epoch_active:
+            has_data, _ = self._get_result()
+            if not has_data:
+                break
+
+    def __next__(self):
+        has_data, data = self._get_result()
+        if not has_data:
             logger.info("Finished fetching from workers...")
             raise StopIteration
+        return data
 
     def _shutdown(self):
+        if not self._workers:
+            return
+
         self._done.set()
         for _, event in self._worker_epoch_start.items():
             # Need to signal start for workers to check for done signal
             event.set()
-        # Force shutdown procs if necessary
+        # Use one shared grace period. Workers can be blocked in queue.put()
+        # after the consumer stops at num_total_samples.
+        deadline = time.monotonic() + 1.0
         for _, w in self._workers.items():
-            w.join(5)
+            w.join(max(0.0, deadline - time.monotonic()))
         for idx, w in self._workers.items():
             if w.is_alive():
                 logger.info(f"Terminating worker {idx}...")
+                w.terminate()
+        for _, w in self._workers.items():
+            w.join(5)
         self._workers.clear()
+        self._worker_epoch_start.clear()
+        self._result_queue.cancel_join_thread()
+        self._result_queue.close()
+        self._startup_queue.close()
 
     def __del__(self):
         self._shutdown()
@@ -462,7 +704,8 @@ class DataSet:
 
         # Optionally swap the optimizer implementation. The selector is:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer.
+        # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
+        # 7/ExpOptimizer, 8/PecanOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
@@ -484,10 +727,10 @@ class DataSet:
             for _, feature in self.features.items():
                 feature.set_optimizer(DjOptimizer())
         elif optimizer_selector == 4:
-            from cedar.compose.dp_seperate_optimizer import DpSeperateOptimizer
+            from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 
             for _, feature in self.features.items():
-                feature.set_optimizer(DpSeperateOptimizer())
+                feature.set_optimizer(DpTwoStageOptimizer())
         elif optimizer_selector == 5:
             from cedar.compose.dp_cedar_optimizer import DpCedarOptimizer
 
@@ -498,9 +741,19 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(CedarJointOptimizer())
+        elif optimizer_selector == 7:
+            from cedar.compose.exp_optimizer import ExpOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(ExpOptimizer())
+        elif optimizer_selector == 8:
+            from cedar.compose.pecan_optimizer import PecanOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(PecanOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be 0, 1, 2, 3, 4, 5, or 6."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 8."
             )
 
         if len(self.features) == 0:
@@ -528,17 +781,10 @@ class DataSet:
 
         if run_profiling:
             # Just run profiling and exit
-            n_profile_samples = None
-            if self.optimizer_options is not None:
-                n_profile_samples = self.optimizer_options.num_samples
             for f_name in self.feature_names:
                 if profiled_data is None or profiled_data == "":
                     profiled_data = f"/tmp/{f_name}_profile.yml"
-                self._profile(
-                    f_name,
-                    n_samples=n_profile_samples,
-                    output_file=profiled_data,
-                )
+                self._profile(f_name, output_file=profiled_data)
                 self.features[f_name].to_yaml(f"/tmp/cedar_{f_name}_plan.yml")
             exit(0)
 
@@ -948,6 +1194,23 @@ class DataSet:
 
         d = {}
 
+        # A profile is only meaningful together with the resources used to
+        # produce it. Runtime resource-matching mode consumes this signature
+        # and refuses to execute a plan whose per-stage width differs.
+        d["resource_config"] = {
+            "schema_version": 1,
+            "profile_scope": "single_local_worker",
+            "profile_local_workers": 1,
+            "actors_per_stage": (
+                RAY_PROFILE_N_ACTORS
+                if RAY_PROFILE_N_ACTORS == SMP_PROFILE_N_PROCS
+                else None
+            ),
+            "ray_actors_per_stage": RAY_PROFILE_N_ACTORS,
+            "smp_procs_per_stage": SMP_PROFILE_N_PROCS,
+        }
+        logger.info("Profile resource signature: %s", d["resource_config"])
+
         baseline_profile = self._profile_feature(
             f_name, feature_to_profile, n_samples, None
         )
@@ -961,6 +1224,9 @@ class DataSet:
         _set_cpu_affinity(SMP_TASKSET_MASK)
 
         self._profile_smp(d, feature_to_profile, f_name, n_samples)
+
+        if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
+            _consolidate_filter_selectivity(d)
 
         self._profile_tf(d, feature_to_profile, f_name, n_samples)
 
@@ -1046,6 +1312,7 @@ class DataSet:
         b_sz = feature_to_profile.get_batch_size()
 
         n_batches = 0
+        start_time = None
         for x in iter:
             # Warm up time
             if n_batches == 0:
@@ -1059,6 +1326,12 @@ class DataSet:
             elif (curr_time - start_time) >= PROFILE_TIME_SEC:
                 break
         end_time = time.time()
+        if start_time is None:
+            feature_to_profile.reset()
+            raise RuntimeError(
+                f"Profiling feature {f_name} produced no batches. "
+                "Check that the input dataset exists and is not fully filtered out."
+            )
 
         throughput_samples_per_sec = (n_batches * b_sz) / (
             end_time - start_time
@@ -1174,7 +1447,28 @@ class DataSet:
         n_samples: Optional[int],
         mutation_dict: Optional[Dict[int, PipeVariantContext]],
     ):
-        loaded_feature = feature_to_profile.profile(self.ctx, mutation_dict)
+        filter_counters = {}
+        original_filter_fns = {}
+        collect_filter_selectivity = (
+            os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1"
+        )
+        if collect_filter_selectivity:
+            for p_id, pipe in feature_to_profile.logical_pipes.items():
+                if isinstance(pipe, FilterPipe):
+                    original_filter_fns[p_id] = pipe.fn
+                    counter = _ProfiledFilterCallable(pipe.fn)
+                    filter_counters[p_id] = counter
+                    pipe.fn = counter
+        try:
+            loaded_feature = feature_to_profile.profile(
+                self.ctx, mutation_dict
+            )
+        finally:
+            # Materialized variants retain the wrapped callable. Restore the
+            # logical graph immediately so later offload profiles and formal
+            # executions use the original operator object.
+            for p_id, fn in original_filter_fns.items():
+                feature_to_profile.logical_pipes[p_id].fn = fn
         source_pipe = feature_to_profile.get_source_pipes()
 
         # Create a profiler
@@ -1215,17 +1509,51 @@ class DataSet:
         feature_to_profile.reset()
         time.sleep(5)  # Sleep in case we need some time to shutdown
 
-        return {
+        result = {
             "latencies": pipe_latencies,
             "input_sizes": input_sizes,
             "output_sizes": output_sizes,
             "throughput": throughput_samples_per_sec,
         }
+        if collect_filter_selectivity:
+            input_counts = {
+                p_id: counter.input_count
+                for p_id, counter in filter_counters.items()
+            }
+            output_counts = {
+                p_id: counter.output_count
+                for p_id, counter in filter_counters.items()
+            }
+            result["input_counts"] = input_counts
+            result["output_counts"] = output_counts
+            result["selectivities"] = {
+                p_id: (
+                    output_counts[p_id] / input_counts[p_id]
+                    if input_counts[p_id]
+                    else 1.0
+                )
+                for p_id in filter_counters
+            }
+        return result
 
-    def _exit(self):
-        # For test cases, force terminate dataset
+    def close(self):
+        """Release worker and pipe resources owned by this dataset."""
         if self._mp_iter is not None:
             self._mp_iter._shutdown()
+            self._mp_iter = None
+
+        # Ray actor handles must be released while the current Ray driver is
+        # still connected. Relying on Python destructors after ray.shutdown()
+        # can reconnect a fresh driver that does not own the old handles.
+        if self._iter_mode != "mp":
+            for feature in self.features.values():
+                if getattr(feature, "loaded", False):
+                    feature.reset()
+        self.dataset_iter = None
+
+    def _exit(self):
+        # Backwards-compatible test helper.
+        self.close()
 
 
 def _set_cpu_affinity(mask):

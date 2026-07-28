@@ -27,14 +27,18 @@ class InProcessCOCOSourcePipeVariant(
         self,
         source: str,
         rank_spec: Optional[Tuple[int, int]],
+        split: str = "val2017",
     ):
         InProcessPipeVariant.__init__(self, None)
         SourcePipeVariantMixin.__init__(self, rank_spec=rank_spec)
         self.source = source
+        if split not in ("train2017", "val2017"):
+            raise ValueError(f"Unsupported COCO split: {split}")
+        self.split = split
         self.num_yielded = 0
 
-        self.img_dir = self.source + "/val2017/"
-        self.ann_file = self.source + "/annotations/instances_val2017.json"
+        self.img_dir = self.source + f"/{self.split}/"
+        self.ann_file = self.source + f"/annotations/instances_{self.split}.json"
 
         self.imgs = {}
         self.annotations = {}
@@ -50,12 +54,7 @@ class InProcessCOCOSourcePipeVariant(
                 self.annotations[id] = [ann]
 
         for img in self.ann_json["images"]:
-            id = img["id"]
-            if id not in self.annotations:
-                continue
-            self.imgs[id] = img
-
-        assert len(self.annotations) == len(self.imgs)
+            self.imgs[img["id"]] = img
 
     def _reset_source_iterator_for_epoch(self):
         it = iter(self.imgs.values())
@@ -82,13 +81,14 @@ class InProcessCOCOSourcePipeVariant(
 
                 boxes = []
                 labels = []
-                for ann in self.annotations[img_id]:
+                for ann in self.annotations.get(img_id, []):
                     x, y, w, h = ann["bbox"]
                     boxes.append([x, y, x + w, y + h])
                     labels.append(ann["category_id"])
 
+                box_data = boxes if boxes else torch.empty((0, 4))
                 bboxes = BoundingBox(
-                    boxes,
+                    box_data,
                     format=BoundingBoxFormat.XYXY,
                     spatial_size=(img.height, img.width),
                 )
@@ -123,16 +123,20 @@ class COCOSourcePipe(Pipe):
         self,
         source: str,
         rank_spec: Optional[Tuple[int, int]] = None,
+        split: str = "val2017",
     ):
         super().__init__("COCOSourcePipe", [])  # empty inputs = source pipe
         self.source = source
         self.rank_spec = rank_spec
+        self.split = split
 
     def _to_inprocess(
         self, variant_ctx: InProcessPipeVariantContext
     ) -> InProcessPipeVariant:
         assert self.is_source()
-        variant = InProcessCOCOSourcePipeVariant(self.source, self.rank_spec)
+        variant = InProcessCOCOSourcePipeVariant(
+            self.source, self.rank_spec, self.split
+        )
         return variant
 
 
@@ -148,12 +152,14 @@ class COCOSource(Source):
         self,
         root: str,
         rank_spec: Optional[Tuple[int, int]] = None,
+        split: str = "val2017",
     ):
         self.source = root
         self.rank_spec = rank_spec
+        self.split = split
 
     def to_pipe(self) -> Pipe:
-        pipe = COCOSourcePipe(self.source, self.rank_spec)
+        pipe = COCOSourcePipe(self.source, self.rank_spec, self.split)
         pipe.fix()
         return pipe
 

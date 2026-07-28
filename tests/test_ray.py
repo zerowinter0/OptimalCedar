@@ -69,6 +69,11 @@ def test_multiple_actors(setup_ray, use_threads):
     assert set(result) == set(data)
 
 
+def _slow_identity(x):
+    time.sleep(0.002)
+    return x
+
+
 def _add(x, y):
     return x + y
 
@@ -168,6 +173,48 @@ def test_tail_batch_submit(setup_ray):
     for x in out:
         result.append(x.data)
     variant_ctx.service.shutdown()
+    assert set(result) == set(data)
+
+
+def test_partial_batch_does_not_livelock_producer(setup_ray):
+    data = range(200)
+    source = IterSource(data)
+    ctx = CedarContext()
+    variant_ctx = RayPipeVariantContext(
+        n_actors=3,
+        use_threads=True,
+        submit_batch_size=16,
+        max_prefetch=16,
+    )
+
+    source_pipe = source.to_pipe()
+    slow_map = MapperPipe(source_pipe, _slow_identity)
+    ray_noop = NoopPipe(slow_map)
+
+    source_pipe.mutate(ctx, PipeVariantType.INPROCESS)
+    slow_map.mutate(ctx, PipeVariantType.INPROCESS)
+    ray_noop.mutate(ctx, PipeVariantType.RAY, variant_ctx)
+
+    result = []
+    errors = []
+
+    def consume():
+        try:
+            result.extend(x.data for x in ray_noop.pipe_variant)
+        except BaseException as exc:
+            errors.append(exc)
+
+    consumer = threading.Thread(target=consume, daemon=True)
+    consumer.start()
+    consumer.join(timeout=15)
+
+    if consumer.is_alive():
+        variant_ctx.service.shutdown()
+        consumer.join(timeout=5)
+        pytest.fail("partial Ray batch livelocked")
+
+    variant_ctx.service.shutdown()
+    assert not errors
     assert set(result) == set(data)
 
 

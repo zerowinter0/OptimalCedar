@@ -52,7 +52,11 @@ class CedarContext:
             if ray.is_initialized():
                 ray.shutdown()
             logger.info(f"Connecting to ray cluster at {self.ray_config.ip}")
-            ray.init(f"ray://{self.ray_config.ip}:10001")
+            if ":" in self.ray_config.ip:
+                # A host:port value is a native Ray GCS address.
+                ray.init(address=self.ray_config.ip)
+            else:
+                ray.init(f"ray://{self.ray_config.ip}:10001")
         else:
             logger.info("Launching to local ray instance")
             if self.ray_config.n_cpus is not None:

@@ -268,6 +268,9 @@ python eval_cedar.py --dataset_file pipelines/wikitext103/cedar_dataset.py --mas
 ## Running Paper Experiments
 
 Refer to the README in `evaluation` for further instructions on how to run the evaluation scripts.
+The unified ten-workload comparison implementations for PyTorch, tf.data, Ray
+Data, Data-Juicer, Plumber, FastFlow, and Pecan are documented in
+`evaluation/baselines/README.md`.
 
 ## Troubleshooting
 * Connecting to the head node: Make sure that your firewall rules allows incoming connections to

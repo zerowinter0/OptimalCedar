@@ -15,5 +15,5 @@ for workload in $(ch6_workloads); do
     continue
   fi
   ch6_log "Profiling ${workload} -> ${profile_path}"
-  ch6_profile_workload "${workload}" "${profile_path}" "${CH6_PROFILE_SAMPLES}" "${log_path}"
+  ch6_profile_workload "${workload}" "${profile_path}" "${log_path}"
 done

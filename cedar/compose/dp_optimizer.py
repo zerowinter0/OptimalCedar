@@ -1,14 +1,24 @@
 import logging
+import math
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from cedar.pipes import Pipe
 
 from .my_optimizer import MyOptimizer
+from . import constants
 from .optimizer import OptimizerOptions, PhysicalPlan, PipeDesc, PipeVariantType
 
 
 logger = logging.getLogger(__name__)
+
+
+def _work_prod(optimizer: "DpOptimizer", mask: int) -> float:
+    method = getattr(optimizer, "_dp_work_prod", None)
+    if method is not None:
+        return method(mask)
+    return optimizer._dp_r_prod[mask]
 
 
 @dataclass(frozen=True)
@@ -22,6 +32,9 @@ class DpStateSummary:
     """
 
     cache_active: bool = False
+    parallel_stage_cpus: int = 0
+    local_work: float = 0.0
+    max_parallel_work: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -39,6 +52,80 @@ class BlockCandidate:
     variant: PipeVariantType
     cost: float
     materializes_fusion: bool
+
+
+class _BlockCostIndex:
+    """Lazily compute exact subset-order costs for one backend.
+
+    A fixed-order barrier makes most masks unreachable as prefixes of the
+    complete pipeline.  Computing all ``2**n`` entries eagerly dominates plan
+    generation on complex Data-Juicer recipes.  Top-down memoization visits
+    only masks requested by the exact outer search while preserving the same
+    recurrence and tie behavior.
+    """
+
+    def __init__(
+        self,
+        optimizer: "DpOptimizer",
+        inner_ops: List[int],
+        costs: List[float],
+    ) -> None:
+        self.optimizer = optimizer
+        self.inner_ops = inner_ops
+        self.n = len(inner_ops)
+        self.source_size = optimizer.profiled_stats["baseline"][
+            "output_sizes"
+        ][optimizer._get_source_p_id()]
+        self.per_byte = [float("inf")] * self.n
+        for i, p_id in enumerate(inner_ops):
+            baseline_input = optimizer.profiled_stats["baseline"][
+                "input_sizes"
+            ][p_id]
+            if baseline_input > 0 and costs[i] != float("inf"):
+                self.per_byte[i] = costs[i] / baseline_input
+        self._costs: Dict[int, float] = {0: 0.0}
+        self._orders: Dict[int, Tuple[int, ...]] = {0: tuple()}
+
+    def get(self, mask: int) -> Tuple[float, Tuple[int, ...]]:
+        self._compute(mask)
+        return self._costs[mask] * self.source_size, self._orders[mask]
+
+    def _compute(self, mask: int) -> None:
+        if mask in self._costs:
+            return
+
+        best = float("inf")
+        best_order: Tuple[int, ...] = tuple()
+        remaining = mask
+        while remaining:
+            bit = remaining & -remaining
+            remaining ^= bit
+            i = bit.bit_length() - 1
+            if self.per_byte[i] == float("inf"):
+                continue
+            prev = mask ^ bit
+            # ``i`` is the last operator. It cannot precede a successor that
+            # is already present in ``prev``.
+            if any(
+                prev & (1 << successor)
+                and i in self.optimizer._dp_pred_indices[successor]
+                for successor in range(self.n)
+            ):
+                continue
+            self._compute(prev)
+            prev_cost = self._costs[prev]
+            if prev_cost == float("inf"):
+                continue
+            candidate = (
+                prev_cost
+                + _work_prod(self.optimizer, prev) * self.per_byte[i]
+            )
+            if candidate < best:
+                best = candidate
+                best_order = self._orders[prev] + (i,)
+
+        self._costs[mask] = best
+        self._orders[mask] = best_order
 
 
 @dataclass(frozen=True)
@@ -81,9 +168,15 @@ class BlockCandidateProvider:
         self.inner_ops = inner_ops
         self.n = len(inner_ops)
         self.full_mask = 1 << self.n
-        self._candidates_by_mask: List[List[BlockCandidate]] = [
-            [] for _ in range(self.full_mask)
+        self._candidates_by_mask: List[Optional[List[BlockCandidate]]] = [
+            None for _ in range(self.full_mask)
         ]
+        self._variant_indexes: Dict[PipeVariantType, _BlockCostIndex] = {}
+        self._fused_variant_indexes: Dict[
+            PipeVariantType, _BlockCostIndex
+        ] = {}
+        self._candidate_variants: List[PipeVariantType] = []
+        self._fusion_allowed_flags: List[bool] = []
 
     def prepare(self) -> None:
         opt = self.optimizer
@@ -92,7 +185,7 @@ class BlockCandidateProvider:
         if opt._dp_costs is None:
             raise RuntimeError("DP metadata not prepared.")
 
-        variant_costs: Dict[PipeVariantType, List[float]] = {
+        variant_compute_costs: Dict[PipeVariantType, List[float]] = {
             PipeVariantType.INPROCESS: opt._dp_costs[:]
         }
         candidate_variants: List[PipeVariantType] = [PipeVariantType.INPROCESS]
@@ -109,71 +202,123 @@ class BlockCandidateProvider:
                 base_input_size = opt.profiled_stats["baseline"]["input_sizes"][p_id]
                 desc = PipeDesc(name=None, variant_type=vt, variant_ctx=None)
                 try:
-                    costs_v[i] = opt._calculate_pipe_cost(
+                    total_cost = opt._calculate_pipe_cost(
                         p_id, base_input_size, desc
+                    )
+                    costs_v[i] = opt._dp_profiled_operator_compute_cost(
+                        p_id, vt, total_cost
                     )
                 except Exception:
                     continue
 
             if any(c != float("inf") for c in costs_v):
-                variant_costs[vt] = costs_v
+                variant_compute_costs[vt] = costs_v
                 candidate_variants.append(vt)
 
-        variant_cost_by_mask = opt._dp_naive_reorder_cost_per_variant(
-            self.inner_ops,
-            self.n,
-            candidate_variants,
-            variant_costs,
-        )
-
-        source_p_id = opt._get_source_p_id()
-        source_output_size = opt.profiled_stats["baseline"]["output_sizes"][
-            source_p_id
+        self._candidate_variants = candidate_variants
+        self._fusion_allowed_flags = [
+            opt._allowed_fusion(p_id) for p_id in self.inner_ops
         ]
-        fusion_allowed = self._calculate_all_fusion_allowed()
-
-        for mask in range(1, self.full_mask):
-            is_multi = mask.bit_count() > 1
-            if is_multi and not fusion_allowed[mask]:
-                continue
-            if is_multi and not opt.options.enable_fusion:
-                continue
-
-            candidates: List[BlockCandidate] = []
-            for vt in candidate_variants:
-                if is_multi and any(
-                    not opt._pipe_can_materialize_fusion(self.inner_ops[i], vt)
-                    for i in range(self.n)
-                    if mask & (1 << i)
-                ):
-                    continue
-
-                block_cost = variant_cost_by_mask[vt][mask]
-                if block_cost == float("inf"):
-                    continue
-                order = tuple(opt._reconstruct_naive_reorder_order(vt, mask))
-                if not order:
-                    continue
-                candidates.append(
-                    BlockCandidate(
-                        mask=mask,
-                        order=order,
-                        variant=vt,
-                        cost=block_cost * source_output_size,
-                        materializes_fusion=is_multi,
+        for vt in candidate_variants:
+            self._variant_indexes[vt] = _BlockCostIndex(
+                opt, self.inner_ops, variant_compute_costs[vt]
+            )
+            if vt != PipeVariantType.INPROCESS:
+                # A slower isolated backend profile includes per-stage queue,
+                # dispatch, and serialization overhead. Those intermediate
+                # boundaries disappear inside a fused block, while the outer
+                # DP prices the one surviving block boundary explicitly.
+                # The operator implementation itself is unchanged, so its
+                # fused compute work is conservatively bounded by the measured
+                # in-process compute work.
+                baseline_throughput = opt.profiled_stats["baseline"][
+                    "throughput"
+                ]
+                fused_compute = []
+                for i, (backend_cost, inprocess_cost) in enumerate(
+                    zip(
+                        variant_compute_costs[vt],
+                        variant_compute_costs[PipeVariantType.INPROCESS],
                     )
+                ):
+                    if backend_cost == float("inf"):
+                        fused_compute.append(backend_cost)
+                        continue
+                    p_id = self.inner_ops[i]
+                    observed_throughput = opt.profiled_stats["offloads"][
+                        vt.name
+                    ][p_id]["throughput"]
+                    if (
+                        observed_throughput
+                        * constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
+                        < baseline_throughput
+                    ):
+                        fused_compute.append(
+                            inprocess_cost
+                            * baseline_throughput
+                            / observed_throughput
+                        )
+                    else:
+                        fused_compute.append(
+                            min(backend_cost, inprocess_cost)
+                        )
+                self._fused_variant_indexes[vt] = _BlockCostIndex(
+                    opt, self.inner_ops, fused_compute
                 )
-
-            # Keep the frontier interface but prune to the cheapest candidate
-            # for the current Cedar cost model. Future strategies can relax this.
-            if candidates:
-                best = min(candidates, key=lambda c: c.cost)
-                self._candidates_by_mask[mask] = [best]
 
     def candidates_for(self, mask: int) -> Iterable[BlockCandidate]:
         if mask <= 0 or mask >= self.full_mask:
             return []
-        return self._candidates_by_mask[mask]
+        cached = self._candidates_by_mask[mask]
+        if cached is not None:
+            return cached
+
+        opt = self.optimizer
+        is_multi = mask.bit_count() > 1
+        if is_multi and (
+            not opt.options.enable_fusion
+            or not all(
+                self._fusion_allowed_flags[i]
+                for i in range(self.n)
+                if mask & (1 << i)
+            )
+        ):
+            self._candidates_by_mask[mask] = []
+            return []
+
+        candidates: List[BlockCandidate] = []
+        for vt in self._candidate_variants:
+            if is_multi and not opt._dp_has_supported_fusion_cost(vt):
+                continue
+            if is_multi and any(
+                not opt._pipe_can_materialize_fusion(self.inner_ops[i], vt)
+                for i in range(self.n)
+                if mask & (1 << i)
+            ):
+                continue
+
+            index = self._variant_indexes[vt]
+            if is_multi and vt in self._fused_variant_indexes:
+                index = self._fused_variant_indexes[vt]
+            block_cost, order = index.get(mask)
+            if is_multi and vt != PipeVariantType.INPROCESS:
+                block_cost *= 1.0 - constants.FUSED_OPERATOR_DISPATCH_DISCOUNT
+            if block_cost == float("inf") or not order:
+                continue
+            candidates.append(
+                BlockCandidate(
+                    mask=mask,
+                    order=order,
+                    variant=vt,
+                    cost=block_cost,
+                    materializes_fusion=is_multi,
+                )
+            )
+
+        # Placement-dependent feasibility remains in the outer DP. Keep every
+        # backend alternative for this mask.
+        self._candidates_by_mask[mask] = candidates
+        return candidates
 
     def _calculate_all_fusion_allowed(self) -> List[bool]:
         opt = self.optimizer
@@ -223,12 +368,32 @@ class CacheTransitionPolicy:
         prev_state: DpStateSummary,
         regular_cost: float,
         block: BlockCandidate,
+        next_parallel_stage_cpus: Optional[int] = None,
     ) -> Iterable[TransitionChoice]:
-        yield TransitionChoice(state=prev_state, extra_cost=regular_cost)
+        if next_parallel_stage_cpus is None:
+            next_parallel_stage_cpus = prev_state.parallel_stage_cpus
+        next_state = DpStateSummary(
+            cache_active=prev_state.cache_active,
+            parallel_stage_cpus=next_parallel_stage_cpus,
+            local_work=prev_state.local_work,
+            max_parallel_work=prev_state.max_parallel_work,
+        )
+        yield TransitionChoice(state=next_state, extra_cost=regular_cost)
 
         if not self.enabled or prev_state.cache_active:
             return
         if not self.all_non_random[next_mask]:
+            return
+        # With an entirely deterministic pipeline, an output cache dominates
+        # recomputing any suffix on every epoch. Profiled in-memory tensor
+        # sizes are not reliable serialized-cache sizes (pickle and container
+        # overhead differ substantially), so do not choose an earlier cache
+        # solely from that proxy. Mixed random/deterministic pipelines retain
+        # the joint placement search below.
+        if (
+            self.all_non_random[self.full_mask - 1]
+            and next_mask != self.full_mask - 1
+        ):
             return
 
         cache_after_idx = block.order[-1]
@@ -242,10 +407,14 @@ class CacheTransitionPolicy:
         # subtracting the source cost here would count a benefit that was
         # never present in the DP state.
         cache_cost = (
-            self.cache_cost_per_source_sample * self.optimizer._dp_r_prod[next_mask]
+            self.cache_cost_per_source_sample
+            * _work_prod(self.optimizer, next_mask)
         )
         yield TransitionChoice(
-            state=DpStateSummary(cache_active=True),
+            state=DpStateSummary(
+                cache_active=True,
+                parallel_stage_cpus=next_parallel_stage_cpus,
+            ),
             extra_cost=cache_cost,
             cache_after_idx=cache_after_idx,
             replaces_prefix_cost=True,
@@ -290,6 +459,10 @@ class ExtensibleDpSearch:
         self.full_mask = 1 << self.n
         self.block_provider = block_provider
         self.cache_policy = cache_policy
+        self.parallel_stage_cpu_limit = optimizer._dp_parallel_stage_cpu_limit()
+        self.use_bottleneck_objective = (
+            optimizer._dp_use_bottleneck_objective()
+        )
 
     def run(self) -> SearchResult:
         initial_state = self.cache_policy.initial_state()
@@ -301,15 +474,28 @@ class ExtensibleDpSearch:
         ]
         dp[0][initial_state] = 0.0
 
-        for mask in range(1, self.full_mask):
-            t = mask
+        legal_masks = self._legal_prefix_masks()
+        for next_mask in legal_masks[1:]:
+            # Enumerate only actual subsets of next_mask. Scanning every pair
+            # of dependency-closed masks and rejecting non-subsets approaches
+            # 4**n on weakly constrained filter chains; subset enumeration is
+            # 3**n over the complete search while visiting the exact same
+            # (previous prefix, appended block) transitions.
+            prev_masks = []
+            prev_mask = (next_mask - 1) & next_mask
             while True:
-                block_mask = mask ^ t
-                if block_mask:
-                    self._try_extend(dp, back, t, mask, block_mask)
-                if t == 0:
+                prev_masks.append(prev_mask)
+                if prev_mask == 0:
                     break
-                t = (t - 1) & mask
+                prev_mask = (prev_mask - 1) & next_mask
+            for prev_mask in reversed(prev_masks):
+                if not dp[prev_mask]:
+                    continue
+                block_mask = next_mask ^ prev_mask
+                if block_mask:
+                    self._try_extend(
+                        dp, back, prev_mask, next_mask, block_mask
+                    )
 
         final_mask = self.full_mask - 1
         if not dp[final_mask]:
@@ -318,7 +504,43 @@ class ExtensibleDpSearch:
         final_state, final_cost = min(
             dp[final_mask].items(), key=lambda item: item[1]
         )
+        state_counts = [len(dp[mask]) for mask in legal_masks]
+        search_stats = {
+            "objective": (
+                "bottleneck" if self.use_bottleneck_objective else "additive"
+            ),
+            "legal_prefix_masks": len(legal_masks),
+            "retained_states": sum(state_counts),
+            "maximum_frontier": max(state_counts, default=0),
+            "parallel_stage_cpu_limit": self.parallel_stage_cpu_limit,
+        }
+        self.optimizer._dp_last_search_stats = search_stats
+        logger.info("[DpOptimizer] Exact search stats: %s", search_stats)
         return self._reconstruct(back, final_mask, final_state, final_cost)
+
+    def _legal_prefix_masks(self) -> List[int]:
+        """Return every dependency-closed subset in deterministic order."""
+        pred_masks = []
+        for predecessors in self.optimizer._dp_pred_indices:
+            mask = 0
+            for predecessor in predecessors:
+                mask |= 1 << predecessor
+            pred_masks.append(mask)
+
+        legal = []
+        for mask in range(self.full_mask):
+            remaining = mask
+            valid = True
+            while remaining:
+                bit = remaining & -remaining
+                remaining ^= bit
+                idx = bit.bit_length() - 1
+                if pred_masks[idx] & ~mask:
+                    valid = False
+                    break
+            if valid:
+                legal.append(mask)
+        return legal
 
     def _try_extend(
         self,
@@ -335,14 +557,43 @@ class ExtensibleDpSearch:
             if not self._block_can_follow(prev_mask, block):
                 continue
 
-            regular_cost = self.optimizer._dp_r_prod[prev_mask] * block.cost
+            operator_cost = (
+                _work_prod(self.optimizer, prev_mask) * block.cost
+            )
+            boundary_cost = self.optimizer._dp_stage_boundary_cost(
+                prev_mask, block
+            )
+            regular_cost = operator_cost + boundary_cost
             for prev_state, prev_cost in dp[prev_mask].items():
+                next_parallel_stage_cpus = (
+                    prev_state.parallel_stage_cpus
+                    + self.optimizer._dp_parallel_stage_cpu_cost(block.variant)
+                )
+                if (
+                    self.parallel_stage_cpu_limit is not None
+                    and next_parallel_stage_cpus
+                    > self.parallel_stage_cpu_limit
+                ):
+                    continue
+                if self.use_bottleneck_objective:
+                    self._try_bottleneck_transition(
+                        dp,
+                        back,
+                        prev_mask,
+                        next_mask,
+                        prev_state,
+                        next_parallel_stage_cpus,
+                        regular_cost,
+                        block,
+                    )
+                    continue
                 for choice in self.cache_policy.transitions(
                     prev_mask,
                     next_mask,
                     prev_state,
                     regular_cost,
                     block,
+                    next_parallel_stage_cpus,
                 ):
                     if choice.replaces_prefix_cost:
                         candidate_cost = choice.extra_cost
@@ -350,15 +601,21 @@ class ExtensibleDpSearch:
                         candidate_cost = prev_cost + choice.extra_cost
                     old = dp[next_mask].get(choice.state, float("inf"))
                     old_pointer = back[next_mask].get(choice.state)
-                    if candidate_cost < old or (
-                        candidate_cost == old
-                        and choice.cache_after_idx is not None
+                    prefer_fused_tie = (
+                        math.isclose(
+                            candidate_cost,
+                            old,
+                            rel_tol=1e-12,
+                            abs_tol=1e-12,
+                        )
                         and block.materializes_fusion
                         and (
                             old_pointer is None
-                            or not old_pointer.block.materializes_fusion
+                            or block.mask.bit_count()
+                            > old_pointer.block.mask.bit_count()
                         )
-                    ):
+                    )
+                    if candidate_cost < old or prefer_fused_tie:
                         dp[next_mask][choice.state] = candidate_cost
                         back[next_mask][choice.state] = BackPointer(
                             prev_mask=prev_mask,
@@ -367,11 +624,103 @@ class ExtensibleDpSearch:
                             cache_after_idx=choice.cache_after_idx,
                         )
 
+    def _try_bottleneck_transition(
+        self,
+        dp: List[Dict[DpStateSummary, float]],
+        back: List[Dict[DpStateSummary, BackPointer]],
+        prev_mask: int,
+        next_mask: int,
+        prev_state: DpStateSummary,
+        next_parallel_stage_cpus: int,
+        regular_cost: float,
+        block: BlockCandidate,
+    ) -> None:
+        if block.variant == PipeVariantType.INPROCESS:
+            local_work = prev_state.local_work + regular_cost
+            max_parallel_work = prev_state.max_parallel_work
+        else:
+            local_work = prev_state.local_work
+            max_parallel_work = max(
+                prev_state.max_parallel_work,
+                regular_cost,
+            )
+        next_state = DpStateSummary(
+            cache_active=False,
+            parallel_stage_cpus=next_parallel_stage_cpus,
+            local_work=local_work,
+            max_parallel_work=max_parallel_work,
+        )
+        candidate_cost = max(local_work, max_parallel_work)
+
+        # A state that consumes no more stage CPUs, has no more local work,
+        # and has no larger parallel bottleneck dominates the new state for
+        # every possible suffix. This is the exact three-dimensional Pareto
+        # frontier; requiring equal CPU use retains redundant states and can
+        # make long filter pipelines exceed the planning limit.
+        same_strategy = [
+            state
+            for state in dp[next_mask]
+            if state.cache_active == next_state.cache_active
+        ]
+        for state in same_strategy:
+            if (
+                state.parallel_stage_cpus
+                <= next_state.parallel_stage_cpus
+                and state.local_work <= next_state.local_work
+                and state.max_parallel_work
+                <= next_state.max_parallel_work
+            ):
+                if (
+                    state.parallel_stage_cpus
+                    == next_state.parallel_stage_cpus
+                    and state.local_work == next_state.local_work
+                    and state.max_parallel_work
+                    == next_state.max_parallel_work
+                ):
+                    old_pointer = back[next_mask].get(state)
+                    if (
+                        block.materializes_fusion
+                        and (
+                            old_pointer is None
+                            or block.mask.bit_count()
+                            > old_pointer.block.mask.bit_count()
+                        )
+                    ):
+                        back[next_mask][state] = BackPointer(
+                            prev_mask=prev_mask,
+                            prev_state=prev_state,
+                            block=block,
+                            cache_after_idx=None,
+                        )
+                return
+
+        for state in same_strategy:
+            if (
+                next_state.parallel_stage_cpus
+                <= state.parallel_stage_cpus
+                and next_state.local_work <= state.local_work
+                and next_state.max_parallel_work
+                <= state.max_parallel_work
+            ):
+                del dp[next_mask][state]
+                back[next_mask].pop(state, None)
+
+        dp[next_mask][next_state] = candidate_cost
+        back[next_mask][next_state] = BackPointer(
+            prev_mask=prev_mask,
+            prev_state=prev_state,
+            block=block,
+            cache_after_idx=None,
+        )
+
     def _block_can_follow(self, prev_mask: int, block: BlockCandidate) -> bool:
         if block.mask.bit_count() == 1:
             idx = block.mask.bit_length() - 1
             return self.optimizer._dp_valid_single_last(prev_mask, idx)
-        return self.optimizer._dp_fusion_block_valid(prev_mask, block.mask)
+        return (
+            self.optimizer._dp_fusion_block_valid(prev_mask, block.mask)
+            and self.optimizer._dp_fusion_transport_feasible(prev_mask, block)
+        )
 
     def _reconstruct(
         self,
@@ -481,6 +830,62 @@ class DpOptimizer(MyOptimizer):
         self._log_optimized_pipeline(tag="DpOptimizer")
         return self.physical_plan
 
+    def _dp_parallel_stage_cpu_limit(self) -> Optional[int]:
+        """Return the per-worker parallel-stage budget for a fixed-W run.
+
+        Strict profile matching accounts one CPU for the local worker plus the
+        profiled actor/process width of every active Ray/SMP stage.  Keeping
+        this constraint in the DP state prevents selecting a cheap plan that
+        cannot subsequently be materialized under the experiment's unified
+        CPU budget.
+        """
+        if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") != "1":
+            return None
+        fixed_workers_raw = os.environ.get(
+            "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
+        )
+        cpu_budget_raw = os.environ.get("CEDAR_PROFILE_MATCH_CPU_BUDGET")
+        if fixed_workers_raw is None or cpu_budget_raw is None:
+            return None
+        try:
+            fixed_workers = int(fixed_workers_raw)
+            cpu_budget = int(cpu_budget_raw)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Invalid fixed-worker CPU budget configuration"
+            ) from exc
+        if fixed_workers < 1 or cpu_budget < fixed_workers:
+            raise RuntimeError(
+                "Fixed local workers cannot fit under the unified CPU budget: "
+                f"fixed={fixed_workers}, budget={cpu_budget}"
+            )
+        return cpu_budget // fixed_workers - 1
+
+    def _dp_use_bottleneck_objective(self) -> bool:
+        """Use an exact pipeline-service-time objective when requested.
+
+        Cache replacement changes which prefix is paid in later epochs and
+        remains on the established additive objective. Candidate workloads
+        have caching disabled, so the bottleneck objective can be attributed
+        independently without changing cache semantics.
+        """
+        requested = os.environ.get("CEDAR_DP_OBJECTIVE") == "bottleneck"
+        return bool(
+            requested
+            and self.options is not None
+            and not self.options.enable_caching
+        )
+
+    def _dp_parallel_stage_cpu_cost(
+        self, variant: PipeVariantType
+    ) -> int:
+        config = self.profiled_stats.get("resource_config", {})
+        if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            return int(config.get("ray_actors_per_stage", 1))
+        if variant == PipeVariantType.SMP:
+            return int(config.get("smp_procs_per_stage", 1))
+        return 0
+
     def _dp_reorder_offload_cache_fusion(
         self,
         inner_ops: List[int],
@@ -500,6 +905,7 @@ class DpOptimizer(MyOptimizer):
             cache_policy=cache_policy,
         )
         result = search.run()
+        self._last_dp_state_cost = result.cost
 
         self._store_pending_fusions_from_blocks(
             blocks_in_idx_order=result.blocks,
@@ -513,6 +919,14 @@ class DpOptimizer(MyOptimizer):
                 self.physical_plan.pipe_descs[p_id].variant_type = vt
 
         logger.info("[DpOptimizer] DP state cost (inner ops only): %s", result.cost)
+        logger.info(
+            "[DpOptimizer] DP objective: %s",
+            (
+                "pipeline_bottleneck"
+                if self._dp_use_bottleneck_objective()
+                else "additive_work"
+            ),
+        )
 
         best_order = [inner_ops[idx] for idx in result.order]
         cache_p_id = (

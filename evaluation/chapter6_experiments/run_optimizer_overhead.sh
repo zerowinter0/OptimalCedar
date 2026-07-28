@@ -10,7 +10,7 @@ ch6_init
 : "${CH6_OVERHEAD_MIN_OPS:=0}"
 : "${CH6_OVERHEAD_MAX_OPS:=10}"
 : "${CH6_REORDER_TIMEOUT_SEC:=300}"
-: "${CH6_OVERHEAD_OPTIMIZERS:=cedar dp_cedar_optimizer dp_separate_optimizer dp_optimizer}"
+: "${CH6_OVERHEAD_OPTIMIZERS:=cedar dp_cedar_optimizer dp_two_stage_optimizer dp_optimizer}"
 
 overhead_dir="${CH6_OUT_DIR}/raw/optimizer_overhead"
 mkdir -p "${overhead_dir}"

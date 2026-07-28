@@ -1,0 +1,67 @@
+services:
+  plumber:
+    container_name: optimalcedar-plumber
+    image: optimalcedar-plumber:tf2.7-6123f5bce36e
+    network_mode: host
+    shm_size: "64gb"
+    working_dir: /workspace/OptimalCedar
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      HF_HOME: /root/.cache/huggingface
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HTTP_PROXY: http://127.0.0.1:17890
+      HTTPS_PROXY: http://127.0.0.1:17890
+      ALL_PROXY: socks5h://127.0.0.1:17890
+      NO_PROXY: localhost,127.0.0.1,::1,pypi.org,files.pythonhosted.org
+      http_proxy: http://127.0.0.1:17890
+      https_proxy: http://127.0.0.1:17890
+      all_proxy: socks5h://127.0.0.1:17890
+      no_proxy: localhost,127.0.0.1,::1,pypi.org,files.pythonhosted.org
+    volumes:
+      - .:/workspace/OptimalCedar
+      - optimalcedar-external-hf-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  fastflow:
+    container_name: optimalcedar-fastflow
+    image: optimalcedar-fastflow:tf2.7-f2e3a3363e95
+    network_mode: host
+    shm_size: "64gb"
+    working_dir: /workspace/OptimalCedar
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      HF_HOME: /root/.cache/huggingface
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HTTP_PROXY: http://127.0.0.1:17890
+      HTTPS_PROXY: http://127.0.0.1:17890
+      ALL_PROXY: socks5h://127.0.0.1:17890
+      NO_PROXY: localhost,127.0.0.1,::1,pypi.org,files.pythonhosted.org
+      http_proxy: http://127.0.0.1:17890
+      https_proxy: http://127.0.0.1:17890
+      all_proxy: socks5h://127.0.0.1:17890
+      no_proxy: localhost,127.0.0.1,::1,pypi.org,files.pythonhosted.org
+    volumes:
+      - .:/workspace/OptimalCedar
+      - optimalcedar-external-hf-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  optimalcedar-external-hf-cache:

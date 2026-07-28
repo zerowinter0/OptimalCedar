@@ -1,4 +1,6 @@
 import logging
+import math
+import os
 from collections import deque
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -9,6 +11,7 @@ from .optimizer import (
     PipeVariantType,
     PipeDesc,
 )
+from . import constants
 from .utils import (
     find_all_paths,
     derive_constraint_graph,
@@ -40,8 +43,13 @@ class MyOptimizer(Optimizer):
         self._dp_pred_indices: List[List[int]] = []
         self._dp_costs: List[float] = []
         self._dp_r_prod: List[float] = []
+        self._dp_selectivities: List[float] = []
+        self._dp_cardinality_prod: List[float] = []
+        self._dp_volume_prod: List[float] = []
         self._pending_fusion_blocks: List[List[int]] = []
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
+        self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
+        self._transport_rejection_logs: Set[Tuple[Any, ...]] = set()
 
     #复用父类的init和_init_stats
     def init(self, logical_pipes: Dict[int, Pipe], logical_adj_list: Dict[int, Set[int]]) -> None:
@@ -168,12 +176,263 @@ class MyOptimizer(Optimizer):
                 continue
             yield vt, backend_stats
 
-    def _allowed_fusion(self, p_id: int):
-        # Don't allow ToTensor maps to run in SMP
-        if (
-            "MapperPipe_ToTensor"
-            in self.logical_pipes[p_id].get_logical_name()
+    def _calculate_pipe_cost(
+        self, p_id: int, input_size: float, desc: Optional[PipeDesc]
+    ) -> float:
+        """Use a conservative fallback for an unidentifiable Amdahl inverse.
+
+        The shared Cedar estimator returns zero when an observed end-to-end
+        speedup exceeds the maximum attributable to one profiled operator.
+        Such a measurement lies at the singularity of the inverse; treating
+        it as a free operator makes the joint DP aggressively combine invalid
+        candidates, while falling all the way back to baseline reverses the
+        ranking against slower identifiable backends.  Use a finite speedup
+        cap so the strong measured signal survives without introducing zero
+        costs.
+        """
+        cost = super()._calculate_pipe_cost(p_id, input_size, desc)
+        if desc is None or desc.variant_type in (None, PipeVariantType.INPROCESS):
+            return cost
+        baseline_input = self.profiled_stats["baseline"]["input_sizes"][p_id]
+        baseline_cost = (
+            input_size / baseline_input * self._base_cost_map[p_id]
+            if baseline_input > 0
+            else self._base_cost_map[p_id]
+        )
+        regularized_cost = max(
+            baseline_cost / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
+            1e-12,
+        )
+        if cost > 0 and math.isfinite(cost):
+            # Close to Amdahl's asymptote, even a technically identifiable
+            # inverse can imply an arbitrarily large and unstable operator
+            # speedup. Apply the same finite cap on both sides of the
+            # singularity so backend rankings do not flip discontinuously.
+            return max(cost, regularized_cost)
+        warning_key = (p_id, desc.variant_type)
+        if warning_key not in self._invalid_cost_warnings:
+            self._invalid_cost_warnings.add(warning_key)
+            logger.warning(
+                "[MyOptimizer] Invalid inferred %s cost for pipe %s; "
+                "using finite capped-speedup cost (first value %s).",
+                desc.variant_type.name,
+                p_id,
+                regularized_cost,
+            )
+        return regularized_cost
+
+    def _dp_has_supported_fusion_cost(
+        self, variant_type: PipeVariantType
+    ) -> bool:
+        """Return whether the current profile supports a fused-block estimate.
+
+        The current block model estimates a serialized parallel-stage
+        boundary.  Multi-operator INPROCESS fusion has no corresponding
+        profile coefficient, so ranking it with the same IO discount is not
+        supported.
+        """
+        if variant_type == PipeVariantType.INPROCESS:
+            # Preserve local-only Cedar behavior when no offload search is in
+            # scope.  In the joint physical search, do not let an unprofiled
+            # INPROCESS discount outrank measured parallel candidates.
+            return not self.options.enable_offload
+        return variant_type in (
+            PipeVariantType.SMP,
+            PipeVariantType.RAY,
+            PipeVariantType.TF_RAY,
+        )
+
+    def _dp_fusion_transport_feasible(self, prev_mask: int, block) -> bool:
+        """Reject SMP blocks whose profiled input rate exceeds Cedar's limit.
+
+        A fused SMP stage still serializes each input from its upstream worker.
+        Its aggregate input byte rate is determined by the block placement,
+        which is only known during the outer DP transition.  Reuse Cedar's
+        existing local-serialization threshold instead of assigning every SMP
+        block the same optimistic IO discount.
+        """
+        if block.variant not in (
+            PipeVariantType.SMP,
+            PipeVariantType.RAY,
+            PipeVariantType.TF_RAY,
         ):
+            return True
+
+        # Ray has a measured stage-boundary coefficient, and operators whose
+        # Amdahl inversion is not identifiable already receive a conservative
+        # in-process compute fallback in the candidate provider.  Requiring an
+        # identifiable *exit* cost here would discard otherwise legal large
+        # Ray fusion blocks and force many resource-contending singleton
+        # stages.  SMP retains the stricter check below because its local
+        # serialization feasibility depends directly on the stage exit.
+        if block.variant != PipeVariantType.SMP:
+            return True
+
+        # The exit operator controls the stage's output service rate.  If its
+        # backend Amdahl inversion is outside the identifiable range, a fused
+        # block has no defensible parallel throughput estimate.  Interior
+        # operators may still use conservative baseline fallbacks because
+        # their boundaries are removed by fusion.
+        exit_p_id = self._dp_inner_ops[block.order[-1]]
+        exit_input = self.profiled_stats["baseline"]["input_sizes"][exit_p_id]
+        exit_desc = PipeDesc(
+            name=None,
+            variant_type=block.variant,
+            variant_ctx=None,
+        )
+        raw_exit_cost = super()._calculate_pipe_cost(
+            exit_p_id, exit_input, exit_desc
+        )
+        if raw_exit_cost <= 0 or not math.isfinite(raw_exit_cost):
+            log_key = (
+                "unidentifiable_exit",
+                block.variant,
+                exit_p_id,
+            )
+            if log_key not in self._transport_rejection_logs:
+                self._transport_rejection_logs.add(log_key)
+                logger.info(
+                    "[MyOptimizer] Rejecting %s fusion block %s: exit pipe %s "
+                    "has no identifiable backend cost.",
+                    block.variant.name,
+                    block.order,
+                    exit_p_id,
+                )
+            return False
+
+        source_size = self.profiled_stats["baseline"]["output_sizes"][
+            self._get_source_p_id()
+        ]
+        modeled_input_size = source_size * self._dp_r_prod[prev_mask]
+        first_p_id = self._dp_inner_ops[block.order[0]]
+        profiled_input_size = self.profiled_stats["baseline"]["input_sizes"][
+            first_p_id
+        ]
+        # Multiplicative size ratios can under-predict fixed-shape transforms
+        # after reordering (for example, a resize has nearly constant output
+        # bytes).  A transport feasibility check must not be optimistic, so
+        # retain the profiled input of the block's first operator as a lower
+        # bound until profiles expose an explicit size function.
+        input_size = max(modeled_input_size, profiled_input_size)
+        next_mask = prev_mask | block.mask
+        modeled_output_size = source_size * self._dp_r_prod[next_mask]
+        profiled_output_size = self.profiled_stats["baseline"]["output_sizes"][
+            exit_p_id
+        ]
+        output_size = max(modeled_output_size, profiled_output_size)
+        if max(input_size, output_size) > constants.SMP_MAX_SERIALIZED_SAMPLE_SIZE:
+            log_key = ("item_size", first_p_id, exit_p_id)
+            if log_key not in self._transport_rejection_logs:
+                self._transport_rejection_logs.add(log_key)
+                logger.info(
+                    "[MyOptimizer] Rejecting SMP fusion block %s (first "
+                    "placement mask %s): serialized boundary input=%.3f MB "
+                    "output=%.3f MB exceeds the %.3f MB per-item limit.",
+                    block.order,
+                    prev_mask,
+                    input_size / 1e6,
+                    output_size / 1e6,
+                    constants.SMP_MAX_SERIALIZED_SAMPLE_SIZE / 1e6,
+                )
+            return False
+        fixed_workers = os.environ.get("CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS")
+        if fixed_workers is not None:
+            try:
+                workers = max(1, int(fixed_workers))
+            except ValueError:
+                workers = max(1, self.physical_plan.n_local_workers)
+        else:
+            workers = max(1, self.physical_plan.n_local_workers)
+        profile_throughput = self.profiled_stats["baseline"]["throughput"]
+        aggregate_input_rate = input_size * profile_throughput * workers
+        feasible = aggregate_input_rate <= constants.LOCAL_PARALLELISM_THRESHOLD
+        if not feasible:
+            log_key = ("aggregate_rate", first_p_id)
+            if log_key not in self._transport_rejection_logs:
+                self._transport_rejection_logs.add(log_key)
+                logger.info(
+                    "[MyOptimizer] Rejecting SMP fusion block %s (first "
+                    "placement mask %s): estimated input rate %.3f MB/s "
+                    "exceeds %.3f MB/s.",
+                    block.order,
+                    prev_mask,
+                    aggregate_input_rate / 1e6,
+                    constants.LOCAL_PARALLELISM_THRESHOLD / 1e6,
+                )
+        return feasible
+
+    def _dp_boundary_throughput(self, variant: PipeVariantType) -> Optional[float]:
+        if variant == PipeVariantType.SMP:
+            return constants.LOCAL_PARALLELISM_THRESHOLD
+        if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            return constants.RAY_STAGE_BOUNDARY_THROUGHPUT
+        return None
+
+    def _dp_profiled_operator_compute_cost(
+        self,
+        p_id: int,
+        variant: PipeVariantType,
+        profiled_total_cost: float,
+    ) -> float:
+        """Remove the profiled stage boundary from backend operator work."""
+        throughput = self._dp_boundary_throughput(variant)
+        if throughput is None:
+            return profiled_total_cost
+        input_size = self.profiled_stats["baseline"]["input_sizes"][p_id]
+        output_size = self.profiled_stats["baseline"]["output_sizes"][p_id]
+        boundary_cost = (input_size + output_size) / throughput * 1000.0
+        compute_cost = profiled_total_cost - boundary_cost
+        if compute_cost >= 0:
+            return compute_cost
+        log_key = ("negative_compute", variant, p_id)
+        if log_key not in self._transport_rejection_logs:
+            self._transport_rejection_logs.add(log_key)
+            logger.warning(
+                "[MyOptimizer] Profiled %s total cost for pipe %s is below "
+                "the measured boundary cost; clamping operator work to zero.",
+                variant.name,
+                p_id,
+            )
+        return 0.0
+
+    def _dp_stage_boundary_cost(self, prev_mask: int, block) -> float:
+        """Model each parallel stage boundary separately from operator work.
+
+        The term is placement-dependent and therefore belongs in the outer DP
+        transition rather than the per-mask candidate provider.  A fused block
+        pays one input and one output boundary, while every operator's compute
+        cost remains undiscounted.
+        """
+        throughput = self._dp_boundary_throughput(block.variant)
+        if throughput is None:
+            return 0.0
+
+        source_size = self.profiled_stats["baseline"]["output_sizes"][
+            self._get_source_p_id()
+        ]
+        next_mask = prev_mask | block.mask
+        input_size = source_size * self._dp_work_prod(prev_mask)
+        output_size = source_size * self._dp_work_prod(next_mask)
+        return (input_size + output_size) / throughput * 1000.0
+
+    def _dp_work_prod(self, mask: int) -> float:
+        """Aggregate byte-volume multiplier for one source record.
+
+        Old profiles have no filter selectivity and retain the exact historical
+        size-only product. New profiles multiply per-item size by surviving
+        record cardinality.
+        """
+        volume_prod = getattr(self, "_dp_volume_prod", [])
+        if len(volume_prod) == len(self._dp_r_prod):
+            return volume_prod[mask]
+        return self._dp_r_prod[mask]
+
+    def _allowed_fusion(self, p_id: int):
+        # Tensor conversion changes representation and has backend-specific
+        # storage semantics; keep it as an explicit stage. Match both Cedar's
+        # class-style ``ToTensor`` and function-style ``to_tensor`` names.
+        logical_name = self.logical_pipes[p_id].get_logical_name().lower()
+        if "totensor" in logical_name or "to_tensor" in logical_name:
             logger.info(f"Forbidding fusion {p_id} due to ToTensor")
             return False
 
@@ -423,6 +682,46 @@ class MyOptimizer(Optimizer):
             r_prod[mask] = r_prod[prev] * ratios[i]
         self._dp_r_prod = r_prod
 
+        # Cardinality is distinct from serialized size per surviving item.
+        # Profiles predating schema v1 have no selection counts and therefore
+        # preserve the original model exactly with selectivity 1.0.
+        raw_selectivities = self.profiled_stats["baseline"].get(
+            "selectivities", {}
+        )
+        selectivities: List[float] = []
+        for p_id in inner_ops:
+            raw = raw_selectivities.get(
+                p_id, raw_selectivities.get(str(p_id), 1.0)
+            )
+            try:
+                value = float(raw)
+            except (TypeError, ValueError) as exc:
+                raise RuntimeError(
+                    f"Invalid filter selectivity for pipe {p_id}: {raw!r}"
+                ) from exc
+            if not math.isfinite(value) or value < 0.0 or value > 1.0:
+                raise RuntimeError(
+                    f"Filter selectivity for pipe {p_id} must be in [0, 1], "
+                    f"got {value!r}"
+                )
+            selectivities.append(value)
+        self._dp_selectivities = selectivities
+
+        cardinality_prod = [1.0] * full_mask
+        volume_prod = [1.0] * full_mask
+        for mask in range(1, full_mask):
+            lsb = mask & -mask
+            i = lsb.bit_length() - 1
+            prev = mask ^ lsb
+            cardinality_prod[mask] = (
+                cardinality_prod[prev] * selectivities[i]
+            )
+            volume_prod[mask] = (
+                r_prod[mask] * cardinality_prod[mask]
+            )
+        self._dp_cardinality_prod = cardinality_prod
+        self._dp_volume_prod = volume_prod
+
         # 2) inner_ops 内部依赖：edge u -> v 表示 v 依赖 u，u 必须在 v 之前
         constraint_graph = derive_constraint_graph(self.logical_pipes)
         idx_of: Dict[int, int] = {p_id: idx for idx, p_id in enumerate(inner_ops)}
@@ -555,6 +854,39 @@ class MyOptimizer(Optimizer):
 
         return len(self._dp_topo_order_in_mask(c_mask)) > 0
 
+    @staticmethod
+    def _prune_reorder_frontier(
+        states: List[tuple[float, float, int, int]],
+    ) -> List[tuple[float, float, int, int]]:
+        """Keep exact Pareto states that can minimize an IO ratio."""
+        if len(states) <= 1:
+            return states
+
+        # Lower cost and larger IO dominate. Visit the largest IO first for an
+        # equal cost so the other equal-cost states are discarded immediately.
+        pareto: List[tuple[float, float, int, int]] = []
+        best_io = float("-inf")
+        for state in sorted(states, key=lambda x: (x[0], -x[1])):
+            if state[1] > best_io:
+                pareto.append(state)
+                best_io = state[1]
+
+        # Only the lower convex hull in (IO, cost) can minimize
+        # cost - lambda * IO for lambda >= 0. Collinear interior points cannot
+        # be uniquely optimal and are safe to remove as well.
+        hull: List[tuple[float, float, int, int]] = []
+        for state in pareto:
+            while len(hull) >= 2:
+                a, b = hull[-2], hull[-1]
+                cross = (b[1] - a[1]) * (state[0] - a[0]) - (
+                    b[0] - a[0]
+                ) * (state[1] - a[1])
+                if cross > 0.0:
+                    break
+                hull.pop()
+            hull.append(state)
+        return hull
+
     def _dp_naive_reorder_cost_per_variant(
         self,
         inner_ops: List[int],
@@ -585,9 +917,8 @@ class MyOptimizer(Optimizer):
         out: Dict[PipeVariantType, List[float]] = {}
         self.fusion_track: Dict[PipeVariantType, List[int]] = {}
 
-        # 用于在外层（fusion_cost 预计算）重建每个 mask 的最优顺序：
-        # - self._naive_reorder_frontiers[vt][mask][last] 是 Pareto frontier（cost, io_base_partial, prev_last, prev_idx）
-        # - self._naive_reorder_best_end[vt][mask] = (best_last, best_state_idx)
+        # 用于在外层（fusion_cost 预计算）重建每个 mask 的最优顺序。
+        # 每个 variant 完成后立即物化最佳顺序，不跨 variant 保留庞大 frontier。
         #
         # 说明：
         # - cost 仍按原 DP 的“baseline compute cost”累计：prev_cost + r_prod[prev] * cost_i / base_input_size_i
@@ -595,11 +926,9 @@ class MyOptimizer(Optimizer):
         #   first_input + 2*sum_{non-first ops} input_size(op)
         #   最终 baseline IO = io_base_partial + r_prod[mask]
         # - fused IO 只记 first_input + final_output = 1 + r_prod[mask]
-        self._naive_reorder_frontiers: Dict[
-            PipeVariantType,
-            List[List[List[tuple[float, float, int, int]]]],
+        self._naive_reorder_best_orders: Dict[
+            PipeVariantType, List[tuple[int, ...]]
         ] = {}
-        self._naive_reorder_best_end: Dict[PipeVariantType, List[tuple[int, int]]] = {}
 
         for vt in candidate_variants:
             costs_v = variant_costs.get(vt)
@@ -613,43 +942,19 @@ class MyOptimizer(Optimizer):
                 for p_id in inner_ops
             ]
 
-            # frontiers[mask][last] -> list of states:
-            #   (cost, io_base_partial, prev_last, prev_idx)
-            frontiers: List[List[List[tuple[float, float, int, int]]]] = [
-                [[] for _ in range(n)] for _ in range(full_mask)
+            # A single frontier per mask is sufficient: future legality and
+            # transition costs depend on the mask, not on the previous last op.
+            # State: (cost, io_base_partial, appended_op, prev_state_idx).
+            frontiers: List[List[tuple[float, float, int, int]]] = [
+                [] for _ in range(full_mask)
             ]
-            best_end: List[tuple[int, int]] = [(-1, -1) for _ in range(full_mask)]
+            best_end: List[int] = [-1 for _ in range(full_mask)]
+            retained_states = 0
+            max_frontier = 0
+            progress_interval = max(1, (full_mask - 1) // 10)
 
-            def _prune_frontier(
-                states: List[tuple[float, float, int, int]],
-            ) -> List[tuple[float, float, int, int]]:
-                # Pareto: (cost, io_base_partial) 同时更小则支配
-                # 去重/裁剪：按 cost 升序，保留 io_base_partial 的严格下降“下包络”
-                states_sorted = sorted(states, key=lambda x: (x[0], x[1]))
-                pruned: List[tuple[float, float, int, int]] = []
-                best_io = float("inf")
-                for st in states_sorted:
-                    c, io_b, pl, pi = st
-                    if io_b < best_io:
-                        pruned.append((c, io_b, pl, pi))
-                        best_io = io_b
-                return pruned
-
-            # 初始化：单元素集合
-            for i in range(n):
-                if costs_v[i] == float("inf"):
-                    continue
-                mask = 1 << i
-                denom = base_input_sizes[i]
-                if denom <= 0:
-                    continue
-                # prev = 0 时 r_prod[0] 视为 1.0
-                cost = costs_v[i] / denom
-                io_base_partial = 1.0  # first input size（按 1.0 归一）
-                frontiers[mask][i] = [(cost, io_base_partial, -1, -1)]
-
-            # 转移：枚举 mask、末尾算子 i
             for mask in range(1, full_mask):
+                candidates: List[tuple[float, float, int, int]] = []
                 for i in range(n):
                     lsb = 1 << i
                     if not (mask & lsb):
@@ -658,7 +963,12 @@ class MyOptimizer(Optimizer):
                         continue
                     prev = mask ^ lsb
                     if prev == 0:
-                        continue  # 单元素已初始化
+                        denom = base_input_sizes[i]
+                        if denom > 0:
+                            candidates.append(
+                                (costs_v[i] / denom, 1.0, i, -1)
+                            )
+                        continue
 
                     # 合法性：i 作为 last，需要保证 prev 内不存在依赖 i 的结点（即 i 不能是它们的前驱）
                     valid = True
@@ -679,99 +989,92 @@ class MyOptimizer(Optimizer):
                     add_cost = r_prod[prev] * costs_v[i] / denom
                     add_io_base = 2.0 * r_prod[prev]  # baseline: non-first op 的 input 记两次
 
-                    cand_states: List[tuple[float, float, int, int]] = []
-                    for prev_last in range(n):
-                        if not frontiers[prev][prev_last]:
-                            continue
-                        for prev_idx, st in enumerate(frontiers[prev][prev_last]):
-                            prev_cost, prev_io_base, _, _ = st
-                            cand_states.append(
-                                (
-                                    prev_cost + add_cost,
-                                    prev_io_base + add_io_base,
-                                    prev_last,
-                                    prev_idx,
-                                )
+                    for prev_idx, st in enumerate(frontiers[prev]):
+                        prev_cost, prev_io_base, _, _ = st
+                        candidates.append(
+                            (
+                                prev_cost + add_cost,
+                                prev_io_base + add_io_base,
+                                i,
+                                prev_idx,
                             )
+                        )
 
-                    if cand_states:
-                        merged = frontiers[mask][i] + cand_states
-                        frontiers[mask][i] = _prune_frontier(merged)
+                if candidates:
+                    frontiers[mask] = self._prune_reorder_frontier(candidates)
+                    retained_states += len(frontiers[mask])
+                    max_frontier = max(max_frontier, len(frontiers[mask]))
 
                 # 计算这个 mask 的最终最优（考虑 io_ratio）
                 best_cost = float("inf")
-                best_pair = (-1, -1)
-                if mask != 0:
-                    fused_io = 1.0 + r_prod[mask]
-                    for last in range(n):
-                        for idx, st in enumerate(frontiers[mask][last]):
-                            cost, io_base_partial, _, _ = st
-                            baseline_io = io_base_partial + r_prod[mask]
-                            if baseline_io <= 0:
-                                continue
-                            io_ratio = fused_io / baseline_io
-                            final_cost = cost * io_ratio
-                            if final_cost < best_cost:
-                                best_cost = final_cost
-                                best_pair = (last, idx)
+                fused_io = 1.0 + r_prod[mask]
+                for idx, st in enumerate(frontiers[mask]):
+                    cost, io_base_partial, _, _ = st
+                    baseline_io = io_base_partial + r_prod[mask]
+                    if baseline_io <= 0:
+                        continue
+                    final_cost = cost * (fused_io / baseline_io)
+                    if final_cost < best_cost:
+                        best_cost = final_cost
+                        best_end[mask] = idx
 
-                best_end[mask] = best_pair
+                if mask % progress_interval == 0 or mask == full_mask - 1:
+                    logger.info(
+                        "[MyOptimizer] Reorder frontier variant=%s progress=%d/%d retained=%d max_frontier=%d",
+                        vt,
+                        mask,
+                        full_mask - 1,
+                        retained_states,
+                        max_frontier,
+                    )
 
             # out[vt][mask] = 已把 io_ratio 融合进来的“block baseline cost”（不含 output_sizes[source_p_id]）
             dp_final = [float("inf")] * full_mask
             dp_final[0] = 0.0
+            best_orders: List[tuple[int, ...]] = [tuple() for _ in range(full_mask)]
             for mask in range(1, full_mask):
-                last, idx = best_end[mask]
-                if last < 0 or idx < 0:
+                idx = best_end[mask]
+                if idx < 0:
                     continue
-                cost, io_base_partial, _, _ = frontiers[mask][last][idx]
+                cost, io_base_partial, _, _ = frontiers[mask][idx]
                 fused_io = 1.0 + r_prod[mask]
                 baseline_io = io_base_partial + r_prod[mask]
                 if baseline_io <= 0:
                     continue
                 dp_final[mask] = cost * (fused_io / baseline_io)
 
+                order_rev: List[int] = []
+                cur_mask = mask
+                cur_idx = idx
+                while cur_mask:
+                    _, _, last, prev_idx = frontiers[cur_mask][cur_idx]
+                    order_rev.append(last)
+                    cur_mask ^= 1 << last
+                    if cur_mask:
+                        if prev_idx < 0:
+                            raise RuntimeError(
+                                "Reorder frontier backtracking hit illegal state."
+                            )
+                        cur_idx = prev_idx
+                order_rev.reverse()
+                best_orders[mask] = tuple(order_rev)
+
             out[vt] = dp_final
-            self._naive_reorder_frontiers[vt] = frontiers
-            self._naive_reorder_best_end[vt] = best_end
+            self._naive_reorder_best_orders[vt] = best_orders
 
         return out
 
     def _reconstruct_naive_reorder_order(self, vt: PipeVariantType, mask: int) -> List[int]:
         """
-        从 `_dp_naive_reorder_cost_per_variant` 生成的 Pareto frontier/backpointer 回溯得到该 mask 的最优顺序。
+        返回 `_dp_naive_reorder_cost_per_variant` 已物化的 mask 最优顺序。
         返回的顺序元素是 0..n-1 的“inner_ops 槽位索引”（与外层的 ratios/costs_v 对齐）。
         """
-        frontiers = getattr(self, "_naive_reorder_frontiers", {}).get(vt)
-        best_end = getattr(self, "_naive_reorder_best_end", {}).get(vt)
-        if frontiers is None or best_end is None:
+        best_orders = getattr(self, "_naive_reorder_best_orders", {}).get(vt)
+        if best_orders is None:
             return []
-        if mask < 0 or mask >= len(best_end):
+        if mask < 0 or mask >= len(best_orders):
             return []
-
-        last, idx = best_end[mask]
-        if last < 0 or idx < 0:
-            return []
-
-        order_rev: List[int] = []
-        cur_mask = mask
-        cur_last = last
-        cur_idx = idx
-
-        while cur_mask:
-            order_rev.append(cur_last)
-            try:
-                _, _, prev_last, prev_idx = frontiers[cur_mask][cur_last][cur_idx]
-            except Exception:
-                break
-            if prev_last < 0 or prev_idx < 0:
-                break
-            cur_mask ^= 1 << cur_last
-            cur_last = prev_last
-            cur_idx = prev_idx
-
-        order_rev.reverse()
-        return order_rev
+        return list(best_orders[mask])
 
     # ========= 统一 DP：重排 + offload/cache/fusion 的 8 种组合 =========
 
@@ -883,6 +1186,8 @@ class MyOptimizer(Optimizer):
                 continue
 
             for vt in candidate_variants:
+                if mask.bit_count() > 1 and not self._dp_has_supported_fusion_cost(vt):
+                    continue
                 dp_by_mask = variant_final_costs[vt]
                 if mask.bit_count() > 1 and any(
                     not self._pipe_can_materialize_fusion(inner_ops[i], vt)
@@ -1345,9 +1650,101 @@ class MyOptimizer(Optimizer):
                     variant_type=PipeVariantType.TF, spec=spec
                 )
             else:
+                spec = None
+                if desc.variant_type in (
+                    PipeVariantType.RAY,
+                    PipeVariantType.TF_RAY,
+                ):
+                    # Match Optimizer._offload_and_fuse.  Constructing a Ray
+                    # context with its generic defaults leaves only ten
+                    # requests in flight for batch-size-one, which starves
+                    # large-item stages even when the DP selected exactly the
+                    # same physical topology as Cedar's staged optimizer.
+                    spec = {
+                        "n_actors": 1,
+                        "max_inflight": 100,
+                        "max_prefetch": 100,
+                        "use_threads": True,
+                        "submit_batch_size": constants.RAY_SUBMIT_BATCH_SIZE,
+                    }
                 desc.variant_ctx = PipeVariantContextFactory.create_context(
-                    variant_type=desc.variant_type
+                    variant_type=desc.variant_type,
+                    spec=spec,
                 )
+
+        # Match Cedar's shared Ray actor budget across all offloaded stages.
+        ray_contexts = [
+            self.physical_plan.pipe_descs[p_id].variant_ctx
+            for p_id in self.physical_plan.graph
+            if self.physical_plan.pipe_descs[p_id].variant_type
+            in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+        ]
+        if ray_contexts:
+            n_actors = math.ceil(
+                constants.RAY_AVAILABLE_PARALLELISM
+                / (len(ray_contexts) * self.physical_plan.n_local_workers)
+            )
+            for ctx in ray_contexts:
+                ctx.n_actors = n_actors
+
+        # The DP path deliberately bypasses Optimizer._offload_and_fuse(),
+        # which normally tunes these queueing parameters after materializing a
+        # Ray stage.  Keep the DP's plan choices unchanged, but apply the same
+        # execution-parameter rule to its final active Ray stages.
+        self._tune_final_ray_stage_contexts()
+
+    def _tune_final_ray_stage_contexts(self) -> None:
+        """Apply Cedar's Ray submit-batch rule to the final physical plan.
+
+        This is intentionally a post-processing step: it neither changes the
+        selected variants nor the reorder/fusion structure produced by DP.
+        """
+        input_size_map, output_size_map = self._calculate_size_map(
+            self.physical_plan.graph
+        )
+
+        for p_id in self.physical_plan.graph:
+            desc = self.physical_plan.pipe_descs[p_id]
+            if desc.variant_type not in (
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            ):
+                continue
+
+            if desc.is_fused_pipe():
+                # The original member ids are no longer graph nodes after
+                # fusion, so calculate their final output from the fused
+                # stage's physical input size.
+                input_size = input_size_map[p_id]
+                output_size = input_size
+                for fused_p_id in desc.fused_pipes:
+                    output_size *= self._data_size_ratio_map[fused_p_id]
+            else:
+                input_size = input_size_map[p_id]
+                output_size = output_size_map[p_id]
+
+            total_io_size = input_size + output_size
+            submit_batch_size = min(
+                max(
+                    int(
+                        constants.RAY_SUBMIT_BATCH_SCALING_FACTOR
+                        // total_io_size
+                    ),
+                    1,
+                ),
+                500,
+            )
+            desc.variant_ctx.set_submit_batch_size(submit_batch_size)
+            logger.info(
+                "[MyOptimizer] Tuned final Ray stage %s: input=%s, output=%s, "
+                "submit_batch_size=%s, max_inflight=%s, max_prefetch=%s",
+                p_id,
+                input_size,
+                output_size,
+                desc.variant_ctx.submit_batch_size,
+                desc.variant_ctx.max_inflight,
+                desc.variant_ctx.max_prefetch,
+            )
 
 
 __all__ = ["MyOptimizer"]

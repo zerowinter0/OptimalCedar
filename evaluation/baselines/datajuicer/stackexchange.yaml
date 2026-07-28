@@ -1,0 +1,61 @@
+# OptimalCedar native Data-Juicer baseline.
+# Source recipe: datajuicer/data-juicer-hub@47fc34588b5d4258c13747cea37c2b63cf4e11b0
+# refined_recipes/pretrain/redpajama-pile-stackexchange-refine.yaml
+project_name: optimalcedar-stackexchange
+dataset_path: /workspace/OptimalCedar/datasets/stackexchange/redpajama-stackexchange-35000.jsonl
+export_path: /tmp/optimalcedar-datajuicer/stackexchange.jsonl
+np: 64
+text_keys: raw_content
+
+executor_type: default
+auto_op_parallelism: false
+op_fusion: true
+fusion_strategy: probe
+use_cache: false
+open_tracer: false
+skip_op_error: false
+
+process:
+  - clean_email_mapper:
+  - clean_links_mapper:
+  - fix_unicode_mapper:
+  - punctuation_normalization_mapper:
+  - whitespace_normalization_mapper:
+  - alphanumeric_filter:
+      tokenization: false
+      min_ratio: 0.35
+      max_ratio: 0.943
+  - average_line_length_filter:
+      min_len: 20
+      max_len: 400
+  - character_repetition_filter:
+      rep_len: 10
+      max_ratio: 0.4
+  - flagged_words_filter:
+      lang: en
+      tokenization: true
+      max_ratio: 0.01
+  - language_id_score_filter:
+      min_score: 0.1
+  - maximum_line_length_filter:
+      min_len: 80
+  - perplexity_filter:
+      lang: en
+      max_ppl: 10000
+  - special_characters_filter:
+      min_ratio: 0.232
+      max_ratio: 0.7
+  - text_length_filter:
+      min_len: 200
+  - words_num_filter:
+      lang: en
+      tokenization: true
+      min_num: 100
+  - word_repetition_filter:
+      lang: en
+      tokenization: true
+      rep_len: 10
+      max_ratio: 0.8
+
+# The upstream recipe ends with document_simhash_deduplicator. It is omitted
+# here because Cedar's compared workload contains only per-sample operators.

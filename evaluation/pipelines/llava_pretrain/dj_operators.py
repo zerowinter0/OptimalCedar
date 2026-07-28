@@ -9,12 +9,12 @@ import json
 import os
 import pathlib
 import re
+import sys
 import threading
 from typing import Any, Dict, Iterable, List, Sequence
 
 import torch
-import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageOps
 from transformers import (
     BlipForImageTextRetrieval,
     BlipProcessor,
@@ -23,6 +23,7 @@ from transformers import (
 )
 
 from evaluation.pipelines.redpajama_c4 import dj_operators as text_ops
+from evaluation.pipelines.bloom_oscar.dj_operators import _load_words_dict
 
 TEXT_KEY = text_ops.TEXT_KEY
 FIELDS_STATS = text_ops.FIELDS_STATS
@@ -37,24 +38,21 @@ CharacterRepetitionFilter = text_ops.CharacterRepetitionFilter
 SpecialCharactersFilter = text_ops.SpecialCharactersFilter
 WordRepetitionFilter = text_ops.WordRepetitionFilter
 
-_DEFAULT_FLAGGED_WORDS = {
-    "porn",
-    "porno",
-    "sex",
-    "nude",
-    "naked",
-    "violence",
-    "gore",
-    "hate",
-}
 _SIZE_RE = re.compile(r"^\s*([0-9.]+)\s*([kmgt]?b)?\s*$", re.IGNORECASE)
+IMAGE_TOKEN = "<image>"
+EOC_TOKEN = "<|__dj__eoc|>"
+_SPECIAL_TOKENS = (IMAGE_TOKEN, "<audio>", "<video>", EOC_TOKEN)
 _MODEL_LOCK = threading.Lock()
 _CLIP_MODELS: Dict[str, tuple[CLIPProcessor, CLIPModel]] = {}
 _BLIP_MODELS: Dict[str, tuple[BlipProcessor, BlipForImageTextRetrieval]] = {}
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def parse_json_line(line: str) -> Dict[str, Any]:
+def parse_json_line(line: Any) -> Dict[str, Any]:
+    # Ray Data 2.7 represents read_text rows as {"text": raw_line};
+    # Cedar/PyTorch/tf.py_function pass the raw string directly.
+    if isinstance(line, dict):
+        line = line.get("text", "")
     sample = json.loads(line)
     if TEXT_KEY not in sample:
         sample[TEXT_KEY] = sample.get("text", "")
@@ -96,12 +94,45 @@ def _image_paths(sample: Dict[str, Any]) -> List[pathlib.Path]:
 
 def _reduce(results: Sequence[bool], any_or_all: str) -> bool:
     if not results:
-        return False
+        return True
     if any_or_all == "all":
         return all(results)
     if any_or_all == "any":
         return any(results)
     raise ValueError(f"Unsupported any_or_all={any_or_all!r}")
+
+
+def _validate_multi_image_options(any_or_all: str, reduce_mode: str | None = None):
+    if any_or_all not in {"any", "all"}:
+        raise ValueError(f"Unsupported any_or_all={any_or_all!r}")
+    if reduce_mode is not None and reduce_mode not in {"avg", "max", "min"}:
+        raise ValueError(f"Unsupported reduce_mode={reduce_mode!r}")
+
+
+def _reduce_scores(scores: Sequence[float], reduce_mode: str) -> float:
+    if reduce_mode == "avg":
+        return sum(scores) / len(scores)
+    if reduce_mode == "max":
+        return max(scores)
+    if reduce_mode == "min":
+        return min(scores)
+    raise ValueError(f"Unsupported reduce_mode={reduce_mode!r}")
+
+
+def _remove_special_tokens(text: str) -> str:
+    for token in _SPECIAL_TOKENS:
+        text = text.replace(token, "").strip()
+    return text
+
+
+def _iter_image_text_chunks(sample: Dict[str, Any]):
+    paths = _image_paths(sample)
+    offset = 0
+    for chunk in _get_text(sample).split(EOC_TOKEN):
+        count = chunk.count(IMAGE_TOKEN)
+        if count and chunk:
+            yield _remove_special_tokens(chunk), paths[offset : offset + count]
+        offset += count
 
 
 def _parse_size(value: int | float | str) -> int:
@@ -125,10 +156,6 @@ def _parse_size(value: int | float | str) -> int:
 def _open_rgb(path: pathlib.Path) -> Image.Image:
     with Image.open(path) as image:
         return image.convert("RGB")
-
-
-def _words(text: str) -> List[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
 
 
 def _resolve_hf_model_path(model_name: str) -> str:
@@ -198,17 +225,34 @@ class FlaggedWordsFilter:
         self,
         lang: str = "en",
         tokenization: bool = False,
+        min_ratio: float = 0.0,
         max_ratio: float = 0.0,
         flagged_words: Iterable[str] | None = None,
     ):
-        if tokenization:
-            raise NotImplementedError("The LLaVA Cedar workload uses whitespace words.")
         self.lang = lang
+        self.tokenization = tokenization
+        self.min_ratio = min_ratio
         self.max_ratio = max_ratio
-        self.flagged_words = set(flagged_words or _DEFAULT_FLAGGED_WORDS)
+        self.flagged_words = set(
+            flagged_words
+            if flagged_words is not None
+            else _load_words_dict("flagged_words").get(lang, [])
+        )
 
     def __call__(self, sample: Dict[str, Any]) -> bool:
-        words = _words(_get_text(sample))
+        token_func = None
+        if self.tokenization:
+            token_func = text_ops._get_sentencepiece_model(
+                self.lang
+            ).encode_as_pieces
+        words = text_ops._get_words_from_document(
+            _get_text(sample), token_func=token_func
+        )
+        words = text_ops._words_refinement(
+            words,
+            lower_case=True,
+            strip_chars=text_ops.SPECIAL_CHARACTERS,
+        )
         ratio = (
             sum(1 for word in words if word in self.flagged_words) / len(words)
             if words
@@ -216,7 +260,7 @@ class FlaggedWordsFilter:
         )
         ratio = min(ratio, 1.0)
         sample[FIELDS_STATS]["flagged_words_ratio"] = ratio
-        return ratio <= self.max_ratio
+        return self.min_ratio <= ratio <= self.max_ratio
 
 
 class PerplexityFilter:
@@ -237,6 +281,7 @@ class ImageAspectRatioFilter:
         self.min_ratio = min_ratio
         self.max_ratio = max_ratio
         self.any_or_all = any_or_all
+        _validate_multi_image_options(any_or_all)
 
     def __call__(self, sample: Dict[str, Any]) -> bool:
         ratios = []
@@ -254,10 +299,10 @@ class ImageAspectRatioFilter:
 class ImageShapeFilter:
     def __init__(
         self,
-        min_width: int = 0,
-        max_width: int = 2**31 - 1,
-        min_height: int = 0,
-        max_height: int = 2**31 - 1,
+        min_width: int = 1,
+        max_width: int = sys.maxsize,
+        min_height: int = 1,
+        max_height: int = sys.maxsize,
         any_or_all: str = "any",
     ):
         self.min_width = min_width
@@ -265,6 +310,7 @@ class ImageShapeFilter:
         self.min_height = min_height
         self.max_height = max_height
         self.any_or_all = any_or_all
+        _validate_multi_image_options(any_or_all)
 
     def __call__(self, sample: Dict[str, Any]) -> bool:
         shapes = []
@@ -284,13 +330,14 @@ class ImageShapeFilter:
 class ImageSizeFilter:
     def __init__(
         self,
-        min_size: int | str = 0,
-        max_size: int | str = 2**63 - 1,
+        min_size: int | str = "0",
+        max_size: int | str = "1TB",
         any_or_all: str = "any",
     ):
         self.min_size = _parse_size(min_size)
         self.max_size = _parse_size(max_size)
         self.any_or_all = any_or_all
+        _validate_multi_image_options(any_or_all)
 
     def __call__(self, sample: Dict[str, Any]) -> bool:
         sizes = []
@@ -309,37 +356,59 @@ class ImageTextSimilarityFilter:
         hf_clip: str = "openai/clip-vit-base-patch32",
         min_score: float = 0.0,
         max_score: float = 1.0,
+        horizontal_flip: bool = False,
+        vertical_flip: bool = False,
+        any_or_all: str = "any",
+        reduce_mode: str = "avg",
     ):
         self.hf_clip = hf_clip
         self.min_score = min_score
         self.max_score = max_score
+        self.horizontal_flip = horizontal_flip
+        self.vertical_flip = vertical_flip
+        self.any_or_all = any_or_all
+        self.reduce_mode = reduce_mode
+        _validate_multi_image_options(any_or_all, reduce_mode)
 
     @torch.inference_mode()
     def __call__(self, sample: Dict[str, Any]) -> bool:
+        if not _image_paths(sample):
+            sample[FIELDS_STATS]["image_text_similarity"] = []
+            return True
         processor, model = _get_clip_model(self.hf_clip)
-        text = _get_text(sample)
         scores = []
-        for path in _image_paths(sample):
-            image = _open_rgb(path)
+        for text_chunk, paths in _iter_image_text_chunks(sample):
+            images = []
+            for path in paths:
+                image = _open_rgb(path)
+                if self.horizontal_flip:
+                    image = ImageOps.mirror(image)
+                if self.vertical_flip:
+                    image = ImageOps.flip(image)
+                images.append(image)
+            if not images:
+                continue
             inputs = processor(
-                text=[text],
-                images=image,
+                text=text_chunk,
+                images=images,
                 return_tensors="pt",
+                truncation=True,
+                max_length=model.config.text_config.max_position_embeddings,
                 padding=True,
             )
             inputs = {key: value.to(_DEVICE) for key, value in inputs.items()}
-            image_features = model.get_image_features(pixel_values=inputs["pixel_values"])
-            text_features = model.get_text_features(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
+            logits = model(**inputs).logits_per_text / 100.0
+            scores.append(
+                _reduce_scores(
+                    [float(value) for value in logits.detach().cpu().reshape(-1)],
+                    self.reduce_mode,
+                )
             )
-            image_features = F.normalize(image_features, dim=-1)
-            text_features = F.normalize(text_features, dim=-1)
-            score = (image_features * text_features).sum(dim=-1).item()
-            scores.append(score)
-        score = max(scores) if scores else 0.0
-        sample[FIELDS_STATS]["image_text_similarity"] = score
-        return self.min_score <= score <= self.max_score
+        sample[FIELDS_STATS]["image_text_similarity"] = scores
+        return _reduce(
+            [self.min_score <= score <= self.max_score for score in scores],
+            self.any_or_all,
+        )
 
 
 class ImageTextMatchingFilter:
@@ -348,29 +417,51 @@ class ImageTextMatchingFilter:
         hf_blip: str = "Salesforce/blip-itm-base-coco",
         min_score: float = 0.0,
         max_score: float = 1.0,
+        horizontal_flip: bool = False,
+        vertical_flip: bool = False,
+        any_or_all: str = "any",
+        reduce_mode: str = "avg",
     ):
         self.hf_blip = hf_blip
         self.min_score = min_score
         self.max_score = max_score
+        self.horizontal_flip = horizontal_flip
+        self.vertical_flip = vertical_flip
+        self.any_or_all = any_or_all
+        self.reduce_mode = reduce_mode
+        _validate_multi_image_options(any_or_all, reduce_mode)
 
     @torch.inference_mode()
     def __call__(self, sample: Dict[str, Any]) -> bool:
+        if not _image_paths(sample):
+            sample[FIELDS_STATS]["image_text_matching_score"] = []
+            return True
         processor, model = _get_blip_model(self.hf_blip)
-        text = _get_text(sample)
         scores = []
-        for path in _image_paths(sample):
-            image = _open_rgb(path)
-            inputs = processor(
-                images=image,
-                text=text,
-                return_tensors="pt",
-                padding=True,
-            )
-            inputs = {key: value.to(_DEVICE) for key, value in inputs.items()}
-            output = model(**inputs, use_itm_head=True)
-            logits = output.itm_score if hasattr(output, "itm_score") else output[0]
-            score = logits.softmax(dim=-1)[0, 1].item()
-            scores.append(score)
-        score = max(scores) if scores else 0.0
-        sample[FIELDS_STATS]["image_text_matching"] = score
-        return self.min_score <= score <= self.max_score
+        for text_chunk, paths in _iter_image_text_chunks(sample):
+            chunk_scores = []
+            for path in paths:
+                image = _open_rgb(path)
+                if self.horizontal_flip:
+                    image = ImageOps.mirror(image)
+                if self.vertical_flip:
+                    image = ImageOps.flip(image)
+                inputs = processor(
+                    images=image,
+                    text=text_chunk,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=model.config.text_config.max_position_embeddings,
+                    padding=True,
+                )
+                inputs = {key: value.to(_DEVICE) for key, value in inputs.items()}
+                output = model(**inputs)
+                logits = output.itm_score if hasattr(output, "itm_score") else output[0]
+                chunk_scores.append(float(logits.softmax(dim=-1)[0, 1].detach().cpu()))
+            if chunk_scores:
+                scores.append(_reduce_scores(chunk_scores, self.reduce_mode))
+        sample[FIELDS_STATS]["image_text_matching_score"] = scores
+        return _reduce(
+            [self.min_score <= score <= self.max_score for score in scores],
+            self.any_or_all,
+        )

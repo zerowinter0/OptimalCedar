@@ -1,4 +1,5 @@
 from typing import List, Union, Iterator, Tuple, Optional, Callable
+import itertools
 import glob
 import ray
 import logging
@@ -30,11 +31,13 @@ class InProcessLocalFSListerPipeVariant(
         source: Union[List[str], InProcessPipeVariant],
         recursive: bool,
         rank_spec: Optional[Tuple[int, int]],
+        max_samples: Optional[int] = None,
     ) -> None:
         InProcessPipeVariant.__init__(self, None)
         SourcePipeVariantMixin.__init__(self, rank_spec=rank_spec)
         self.source = source
         self.recursive = recursive
+        self.max_samples = max_samples
         self.num_yielded = 0
 
         # evaluate all paths upon instantiation
@@ -47,11 +50,15 @@ class InProcessLocalFSListerPipeVariant(
 
     def _reset_source_iterator_for_epoch(self):
         it = iter(self.dp)
+        if self.max_samples is not None:
+            it = itertools.islice(it, self.max_samples)
         self.all_datasamples = self.create_datasamples(it, size=1)
 
     def _iter_impl(self):
         # self.num_yielded = 0
         it = iter(self.dp)
+        if self.max_samples is not None:
+            it = itertools.islice(it, self.max_samples)
         all_datasamples = self.create_datasamples(it, size=1)
 
         while True:
@@ -79,6 +86,10 @@ class InProcessLocalFSListerPipeVariant(
                         root=self.root, recursive=self.recursive
                     )
                     replay_it = iter(new_dp)
+                    if self.max_samples is not None:
+                        replay_it = itertools.islice(
+                            replay_it, self.max_samples
+                        )
                     replay_data = iter(
                         self.create_datasamples(replay_it, size=1)
                     )
@@ -130,6 +141,7 @@ class LocalFSListerPipe(Pipe):
         source: Union[Pipe, List[str]],
         recursive: bool,
         rank_spec: Optional[Tuple[int, int]],
+        max_samples: Optional[int] = None,
         is_random: bool = False,
     ) -> None:
         if isinstance(source, Pipe):
@@ -143,13 +155,17 @@ class LocalFSListerPipe(Pipe):
             self.source = source
         self.recursive = recursive
         self.rank_spec = rank_spec
+        self.max_samples = max_samples
 
     def _to_inprocess(
         self, variant_ctx: InProcessPipeVariantContext
     ) -> InProcessPipeVariant:
         if self.is_source():
             variant = InProcessLocalFSListerPipeVariant(
-                self.source, self.recursive, self.rank_spec
+                self.source,
+                self.recursive,
+                self.rank_spec,
+                self.max_samples,
             )
         else:
             if (
@@ -161,6 +177,7 @@ class LocalFSListerPipe(Pipe):
                 self.input_pipes[0].pipe_variant,
                 self.recursive,
                 self.rank_spec,
+                self.max_samples,
             )
         return variant
 
@@ -244,6 +261,7 @@ class LocalFSSource(Source):
         source: Union[str, List[str]],
         recursive: bool = False,
         rank_spec: Optional[Tuple[int, int]] = None,
+        max_samples: Optional[int] = None,
     ) -> None:
         if isinstance(source, str):
             self.source = [
@@ -255,10 +273,16 @@ class LocalFSSource(Source):
             raise TypeError("Invalid LocalFSSource input.")
         self.recursive = recursive
         self.rank_spec = rank_spec
+        if max_samples is not None and max_samples <= 0:
+            raise ValueError("max_samples must be positive when provided")
+        self.max_samples = max_samples
 
     def to_pipe(self) -> Pipe:
         pipe = LocalFSListerPipe(
-            self.source, self.recursive, rank_spec=self.rank_spec
+            self.source,
+            self.recursive,
+            rank_spec=self.rank_spec,
+            max_samples=self.max_samples,
         )
         pipe.fix()
         return pipe
@@ -278,16 +302,26 @@ class LocalLineSource(Source):
     """
 
     def __init__(
-        self, source: str, rank_spec: Optional[Tuple[int, int]] = None
+        self,
+        source: str,
+        rank_spec: Optional[Tuple[int, int]] = None,
+        max_samples: Optional[int] = None,
     ) -> None:
         if not isinstance(source, str):
             raise TypeError("Invalid LocalLineSource input.")
 
         self.source = source
         self.rank_spec = rank_spec
+        if max_samples is not None and max_samples <= 0:
+            raise ValueError("max_samples must be positive when provided")
+        self.max_samples = max_samples
 
     def to_pipe(self) -> Pipe:
-        pipe = LocalLinePipe(self.source, rank_spec=self.rank_spec)
+        pipe = LocalLinePipe(
+            self.source,
+            rank_spec=self.rank_spec,
+            max_samples=self.max_samples,
+        )
         pipe.fix()
         return pipe
 
@@ -315,6 +349,7 @@ class LocalLinePipe(Pipe):
         self,
         source: str,
         rank_spec: Optional[Tuple[int, int]],
+        max_samples: Optional[int] = None,
         is_random: bool = False,
     ) -> None:
         if not isinstance(source, str):
@@ -323,11 +358,14 @@ class LocalLinePipe(Pipe):
         super().__init__("LocalLinePipe", [], is_random=is_random)
         self.source = source
         self.rank_spec = rank_spec
+        self.max_samples = max_samples
 
     def _to_inprocess(
         self, variant_ctx: InProcessPipeVariantContext
     ) -> InProcessPipeVariant:
-        variant = InProcessLocalLinePipeVariant(self.source, self.rank_spec)
+        variant = InProcessLocalLinePipeVariant(
+            self.source, self.rank_spec, self.max_samples
+        )
         return variant
 
 
@@ -335,13 +373,18 @@ class InProcessLocalLinePipeVariant(
     InProcessPipeVariant, SourcePipeVariantMixin
 ):
     def __init__(
-        self, source: str, rank_spec: Optional[Tuple[int, int]]
+        self,
+        source: str,
+        rank_spec: Optional[Tuple[int, int]],
+        max_samples: Optional[int] = None,
     ) -> None:
         InProcessPipeVariant.__init__(self, None)
         SourcePipeVariantMixin.__init__(self, rank_spec=rank_spec)
         self.source = source
+        self.max_samples = max_samples
         self.num_yielded = 0
-        self.length = self._calculate_length()
+        length = self._calculate_length()
+        self.length = min(length, max_samples) if max_samples else length
         self.all_datasamples = None
         self.file = None
 
@@ -351,6 +394,8 @@ class InProcessLocalLinePipeVariant(
         stream = self._decode(stream)
         stream = self._strip(stream)
         it = iter(stream)
+        if self.max_samples is not None:
+            it = itertools.islice(it, self.max_samples)
         self.all_datasamples = iter(self.create_datasamples(it, size=1))
 
     def _iter_impl(self):
@@ -361,6 +406,8 @@ class InProcessLocalLinePipeVariant(
 
             # Create a new datasample for each line
             it = iter(stream)
+            if self.max_samples is not None:
+                it = itertools.islice(it, self.max_samples)
             all_datasamples = iter(self.create_datasamples(it, size=1))
 
             while True:
@@ -390,6 +437,10 @@ class InProcessLocalLinePipeVariant(
                         replay_stream = self._strip(replay_stream)
 
                         replay_it = iter(replay_stream)
+                        if self.max_samples is not None:
+                            replay_it = itertools.islice(
+                                replay_it, self.max_samples
+                            )
                         replay_data = iter(
                             self.create_datasamples(replay_it, size=1)
                         )

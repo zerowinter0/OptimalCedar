@@ -14,27 +14,33 @@ fi
 
 : "${CH6_OUT_DIR:=${CH6_SCRIPT_DIR}/results/$(date -u +%Y%m%dT%H%M%SZ)}"
 : "${CH6_WORKLOADS:=bloom_oscar}"
-: "${CH6_OPTIMIZERS:=optimizer dp_cedar_optimizer dp_seperate_optimizer dp_optimizer}"
+: "${CH6_OPTIMIZERS:=optimizer dp_cedar_optimizer dp_two_stage_optimizer dp_optimizer}"
 : "${CH6_REPEATS:=3}"
+: "${CH6_WARMUP_RUNS:=0}"
 : "${CH6_NUM_EPOCHS:=1}"
 : "${CH6_NUM_TOTAL_SAMPLES:=10000}"
 : "${CH6_DATA_NUM_TOTAL_SAMPLES:=1000}"
-: "${CH6_PROFILE_SAMPLES:=200}"
 : "${CH6_USE_RAY:=1}"
 : "${CH6_RAY_IP:=}"
+: "${CH6_RAY_AVAILABLE_PARALLELISM:=}"
 : "${CH6_DISABLE_OFFLOAD:=0}"
 : "${CH6_ENABLE_LOCAL_PARALLELISM:=1}"
 : "${CH6_DISABLE_CACHING:=0}"
 : "${CH6_FULL_DATA_RUN:=0}"
 : "${CH6_ALLOW_TORCH_PARALLELISM:=0}"
 : "${CH6_LOG_LEVEL:=INFO}"
+: "${CH6_CEDAR_REORDER_TIMEOUT_SEC:=}"
+: "${CH6_CEDAR_TIMEOUT_MULTIPLIER:=1.0}"
 : "${CH6_HOME:=${HOME}}"
+: "${CH6_LOG_FILE:=${CH6_REPO_ROOT}/evaluation/chapter6_experiments/formal_experiments.log}"
+: "${CH6_LOG_INITIALIZED:=0}"
 
-export CH6_OUT_DIR CH6_WORKLOADS CH6_OPTIMIZERS CH6_REPEATS CH6_NUM_EPOCHS
-export CH6_NUM_TOTAL_SAMPLES CH6_DATA_NUM_TOTAL_SAMPLES CH6_PROFILE_SAMPLES
-export CH6_USE_RAY CH6_RAY_IP CH6_DISABLE_OFFLOAD CH6_ENABLE_LOCAL_PARALLELISM
+export CH6_OUT_DIR CH6_WORKLOADS CH6_OPTIMIZERS CH6_REPEATS CH6_WARMUP_RUNS CH6_NUM_EPOCHS
+export CH6_NUM_TOTAL_SAMPLES CH6_DATA_NUM_TOTAL_SAMPLES
+export CH6_USE_RAY CH6_RAY_IP CH6_RAY_AVAILABLE_PARALLELISM CH6_DISABLE_OFFLOAD CH6_ENABLE_LOCAL_PARALLELISM
 export CH6_DISABLE_CACHING CH6_FULL_DATA_RUN CH6_ALLOW_TORCH_PARALLELISM
-export CH6_LOG_LEVEL CH6_HOME
+export CH6_LOG_LEVEL CH6_CEDAR_REORDER_TIMEOUT_SEC CH6_CEDAR_TIMEOUT_MULTIPLIER CH6_HOME
+export CH6_LOG_FILE CH6_LOG_INITIALIZED
 
 ch6_init() {
   cd "${CH6_REPO_ROOT}"
@@ -44,10 +50,43 @@ ch6_init() {
   export PYTHONPATH="${CH6_REPO_ROOT}:${PYTHONPATH:-}"
   mkdir -p "${CH6_OUT_DIR}/logs" "${CH6_OUT_DIR}/profiles" \
     "${CH6_OUT_DIR}/raw" "${CH6_OUT_DIR}/summary" "${CH6_OUT_DIR}/plans"
+  mkdir -p "$(dirname "${CH6_LOG_FILE}")"
+  if [[ "${CH6_LOG_INITIALIZED}" != "1" ]]; then
+    : > "${CH6_LOG_FILE}"
+    CH6_LOG_INITIALIZED=1
+    export CH6_LOG_INITIALIZED
+  fi
+  ch6_ensure_shared_ray
 }
 
 ch6_log() {
-  printf '[chapter6] %s\n' "$*" >&2
+  printf "[chapter6] %s\n" "$*" | tee -a "${CH6_LOG_FILE}" >&2
+}
+
+ch6_ensure_shared_ray() {
+  if [[ "${CH6_USE_RAY}" != "1" || "${CH6_ENABLE_LOCAL_PARALLELISM}" != "1" \
+      || -n "${CH6_RAY_IP}" ]]; then
+    return 0
+  fi
+
+  # Local Cedar workers must share one Ray cluster. Leaving ray_ip empty makes
+  # every multiprocessing worker call ray.init() and launch its own cluster.
+  local detected_gpus=0
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    detected_gpus="$(nvidia-smi -L | wc -l)"
+  fi
+  if ! ray status --address=127.0.0.1:6379 >/dev/null 2>&1; then
+    ch6_log "Starting shared local Ray head for multiprocessing workers."
+    ray start --head \
+      --node-ip-address=127.0.0.1 \
+      --port=6379 \
+      --num-cpus="${CH6_RAY_NUM_CPUS:-$(nproc)}" \
+      --num-gpus="${CH6_RAY_NUM_GPUS:-${detected_gpus}}" \
+      --object-store-memory="${CH6_RAY_OBJECT_STORE_BYTES:-10000000000}" \
+      --disable-usage-stats >/dev/null
+  fi
+  CH6_RAY_IP=127.0.0.1:6379
+  export CH6_RAY_IP
 }
 
 ch6_workloads() {
@@ -160,22 +199,25 @@ ch6_workload_samples() {
 }
 
 ch6_run_and_log() {
-  local log_path="$1"
+  # The log is truncated once by ch6_init at the start of each launch.
+  local _legacy_log_path="$1"
   shift
-  mkdir -p "$(dirname "${log_path}")"
-  ch6_log "log: ${log_path}"
+  ch6_log "log: ${CH6_LOG_FILE}"
   {
-    printf 'command:'
-    printf ' %q' "$@"
-    printf '\n'
+    printf "command:"
+    printf " %q" "$@"
+    printf "\n"
     HOME="${CH6_HOME}" "$@"
-  } 2>&1 | tee "${log_path}"
+  } >> "${CH6_LOG_FILE}" 2>&1
 }
 
 ch6_add_common_compare_flags() {
   local -n _args_ref="$1"
   if [[ "${CH6_USE_RAY}" == "1" ]]; then
     _args_ref+=(--use_ray)
+    if [[ -n "${CH6_RAY_AVAILABLE_PARALLELISM}" ]]; then
+      _args_ref+=(--ray_available_parallelism "${CH6_RAY_AVAILABLE_PARALLELISM}")
+    fi
     if [[ -n "${CH6_RAY_IP}" ]]; then
       _args_ref+=(--ray_ip "${CH6_RAY_IP}")
     fi
@@ -195,6 +237,36 @@ ch6_add_common_compare_flags() {
   if [[ "${CH6_ALLOW_TORCH_PARALLELISM}" == "1" ]]; then
     _args_ref+=(--allow_torch_parallelism)
   fi
+}
+
+ch6_cedar_reorder_timeout_sec_for_workload() {
+  local workload="$1"
+  if [[ -n "${CH6_CEDAR_REORDER_TIMEOUT_SEC}" ]]; then
+    printf '%s\n' "${CH6_CEDAR_REORDER_TIMEOUT_SEC}"
+    return 0
+  fi
+
+  local runtime_json="${CH6_OUT_DIR}/raw/runtime/${workload}_runtime.json"
+  if [[ ! -f "${runtime_json}" ]]; then
+    return 0
+  fi
+
+  python -c 'import json, sys
+path, mult = sys.argv[1], float(sys.argv[2])
+with open(path) as f:
+    data = json.load(f)
+values = []
+for item in data.get("runs", []):
+    if item.get("optimizer") == "optimizer":
+        continue
+    if item.get("workload_skipped") or item.get("timed_out"):
+        continue
+    value = item.get("workload_wall_time_sec") or item.get("perf_time_sec")
+    if isinstance(value, (int, float)) and value > 0:
+        values.append(float(value))
+if values:
+    print(max(values) * mult)
+' "${runtime_json}" "${CH6_CEDAR_TIMEOUT_MULTIPLIER}"
 }
 
 ch6_run_compare_optimizer_perf() {
@@ -226,6 +298,7 @@ ch6_run_compare_optimizer_perf() {
     --num_total_samples "${num_samples}"
     --data_num_total_samples "${CH6_DATA_NUM_TOTAL_SAMPLES}"
     --num_repeats "${CH6_REPEATS}"
+    --warmup_runs "${CH6_WARMUP_RUNS}"
     --results_path "${output_json}"
     --log_level "${CH6_LOG_LEVEL}"
     --optimizers "${optimizers[@]}"
@@ -233,7 +306,15 @@ ch6_run_compare_optimizer_perf() {
   if [[ -n "${dataset_kwargs}" ]]; then
     args+=(--dataset_kwargs "${dataset_kwargs}")
   fi
+  local cedar_timeout_sec
+  cedar_timeout_sec="$(ch6_cedar_reorder_timeout_sec_for_workload "${workload}")"
+  if [[ -n "${cedar_timeout_sec}" ]]; then
+    args+=(--cedar_reorder_timeout_sec "${cedar_timeout_sec}")
+  fi
   ch6_add_common_compare_flags args
+  # Apply the same fixed optimizer guard to every method. Do not derive
+  # Cedar's timeout from a competing method's measured runtime.
+  args+=(--disable_cedar_runtime_timeout)
   args+=("$@")
 
   ch6_run_and_log "${log_path}" "${args[@]}"
@@ -242,19 +323,17 @@ ch6_run_compare_optimizer_perf() {
 ch6_profile_workload() {
   local workload="$1"
   local profile_path="$2"
-  local num_profile_samples="$3"
-  local log_path="$4"
+  local log_path="$3"
 
   local dataset_file dataset_kwargs
   dataset_file="$(ch6_workload_dataset_file "${workload}")"
   dataset_kwargs="$(ch6_workload_kwargs "${workload}")"
 
   local args=(
-    python evaluation/eval_cedar.py
+    taskset -c 0 python evaluation/eval_cedar.py
     --dataset_file "${dataset_file}"
     --profiled_stats "${profile_path}"
     --run_profiling
-    --num_total_samples "${num_profile_samples}"
     --disable_optimizer
     --disable_controller
     --disable_prefetch

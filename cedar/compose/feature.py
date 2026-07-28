@@ -4,6 +4,7 @@ import yaml
 import copy
 import threading
 import inspect
+import os
 
 from pathlib import Path
 from typing import Any, Iterable, List, Dict, Tuple, Optional, Set, Union
@@ -30,6 +31,170 @@ from .utils import (
 from .constants import FUSED_PIPE_NAME
 
 logger = logging.getLogger(__name__)
+
+
+def _positive_resource_int(value: Any, name: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            f"Invalid profile resource signature {name}={value!r}"
+        ) from exc
+    if parsed < 1:
+        raise RuntimeError(
+            f"Profile resource signature {name} must be >= 1"
+        )
+    return parsed
+
+
+def apply_profile_matched_resources(
+    plan: PhysicalPlan,
+    profiled_stats: Dict[str, Any],
+    cpu_budget: int,
+    fixed_local_workers: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Bind a physical plan to the exact per-stage profile width.
+
+    Local workers replicate every active Ray/SMP stage. With one CPU for each
+    local worker process, the unified single-node budget is
+    W * (1 + K_ray * A_ray + K_smp * A_smp).
+    """
+    if cpu_budget < 1:
+        raise RuntimeError(
+            "CEDAR_PROFILE_MATCH_CPU_BUDGET must be >= 1, "
+            f"got {cpu_budget}"
+        )
+
+    config = profiled_stats.get("resource_config")
+    if not isinstance(config, dict):
+        raise RuntimeError(
+            "Profile resource matching requested, but profile YAML has no "
+            "resource_config signature. Re-profile with explicit actor widths."
+        )
+    if config.get("schema_version") != 1:
+        raise RuntimeError(
+            "Unsupported profile resource signature schema_version="
+            f"{config.get('schema_version')!r}"
+        )
+    if config.get("profile_scope") != "single_local_worker":
+        raise RuntimeError(
+            "Profile resource matching requires "
+            "profile_scope=single_local_worker"
+        )
+    if _positive_resource_int(
+        config.get("profile_local_workers"), "profile_local_workers"
+    ) != 1:
+        raise RuntimeError(
+            "Profile must have been collected with one local worker"
+        )
+
+    ray_width = _positive_resource_int(
+        config.get("ray_actors_per_stage"), "ray_actors_per_stage"
+    )
+    smp_width = _positive_resource_int(
+        config.get("smp_procs_per_stage"), "smp_procs_per_stage"
+    )
+    if (
+        ray_width != 1
+        or smp_width != 1
+        or config.get("actors_per_stage") != 1
+    ):
+        raise RuntimeError(
+            "This experiment requires actors_per_stage=1 for both Ray and SMP; "
+            f"profile has ray={ray_width}, smp={smp_width}, "
+            f"actors_per_stage={config.get('actors_per_stage')!r}"
+        )
+
+    active_descs = [plan.pipe_descs[p_id] for p_id in plan.graph]
+    active_ray_ds = [
+        p_id
+        for p_id in plan.graph
+        if plan.pipe_descs[p_id].variant_type == PipeVariantType.RAY_DS
+    ]
+    if active_ray_ds:
+        raise RuntimeError(
+            "Strict profile resource matching does not support active "
+            "RAY_DS stages because their Ray Data task width is not bound "
+            "by ray_actors_per_stage=1; active pipe IDs: "
+            f"{active_ray_ds}"
+        )
+    ray_descs = [
+        desc
+        for desc in active_descs
+        if desc.variant_type
+        in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+    ]
+    smp_descs = [
+        desc
+        for desc in active_descs
+        if desc.variant_type == PipeVariantType.SMP
+    ]
+    per_worker_cpus = (
+        1 + len(ray_descs) * ray_width + len(smp_descs) * smp_width
+    )
+    if per_worker_cpus > cpu_budget:
+        raise RuntimeError(
+            "Final plan cannot fit one local worker under the unified CPU "
+            f"budget: per_worker={per_worker_cpus}, budget={cpu_budget}"
+        )
+
+    max_local_workers = cpu_budget // per_worker_cpus
+    if fixed_local_workers is None:
+        local_workers = max_local_workers
+        local_worker_policy = "max_under_cpu_budget"
+    else:
+        local_workers = _positive_resource_int(
+            fixed_local_workers, "fixed_local_workers"
+        )
+        if local_workers > max_local_workers:
+            raise RuntimeError(
+                "Fixed local-worker ablation exceeds the unified CPU budget: "
+                f"fixed={local_workers}, max={max_local_workers}"
+            )
+        local_worker_policy = "fixed_ablation"
+    plan.set_local_workers(local_workers)
+    for desc in ray_descs:
+        desc.variant_ctx.n_actors = ray_width
+    for desc in smp_descs:
+        desc.variant_ctx.n_procs = smp_width
+
+    signature = {
+        "cpu_budget": cpu_budget,
+        "local_workers": local_workers,
+        "local_worker_policy": local_worker_policy,
+        "ray_stages": len(ray_descs),
+        "smp_stages": len(smp_descs),
+        "ray_actors_per_stage_per_worker": ray_width,
+        "smp_procs_per_stage_per_worker": smp_width,
+        "global_ray_actors": (
+            local_workers * len(ray_descs) * ray_width
+        ),
+        "global_smp_procs": (
+            local_workers * len(smp_descs) * smp_width
+        ),
+        "total_accounted_cpus": local_workers * per_worker_cpus,
+    }
+
+    if signature["total_accounted_cpus"] > cpu_budget:
+        raise RuntimeError(
+            f"Resource policy exceeded CPU budget: {signature}"
+        )
+    if any(
+        desc.variant_ctx.n_actors != ray_width for desc in ray_descs
+    ):
+        raise RuntimeError(
+            "Ray plan width does not match profile resource signature"
+        )
+    if any(desc.variant_ctx.n_procs != smp_width for desc in smp_descs):
+        raise RuntimeError(
+            "SMP plan width does not match profile resource signature"
+        )
+
+    logger.warning(
+        "Applied and verified profile-matched resource signature: %s",
+        signature,
+    )
+    return signature
 
 
 # make this a decorator?
@@ -94,6 +259,15 @@ class Feature(abc.ABC):
 
         self.optimizer = Optimizer()
         self._plan = None
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
 
     def set_optimizer(self, optimizer: Optimizer) -> None:
         """
@@ -1072,6 +1246,33 @@ class Feature(abc.ABC):
             raise RuntimeError("{} not found".format(profiled_data))
 
         plan = self.optimizer.run(profiled_data, options)
+        if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") == "1":
+            cpu_budget_raw = os.environ.get(
+                "CEDAR_PROFILE_MATCH_CPU_BUDGET"
+            )
+            if cpu_budget_raw is None:
+                raise RuntimeError(
+                    "CEDAR_MATCH_PROFILE_RESOURCES=1 requires "
+                    "CEDAR_PROFILE_MATCH_CPU_BUDGET"
+                )
+            profile = getattr(self.optimizer, "profiled_stats", None)
+            if not isinstance(profile, dict):
+                raise RuntimeError(
+                    "Optimizer did not retain loaded profile statistics"
+                )
+            fixed_local_workers_raw = os.environ.get(
+                "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
+            )
+            fixed_local_workers = (
+                int(fixed_local_workers_raw)
+                if fixed_local_workers_raw is not None
+                else None
+            )
+            self.profile_matched_resource_signature = (
+                apply_profile_matched_resources(
+                    plan, profile, int(cpu_budget_raw), fixed_local_workers
+                )
+            )
         return plan
 
     def shard_source(self, rank_spec: Tuple[int, int]):

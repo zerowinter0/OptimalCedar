@@ -28,7 +28,7 @@ def main() -> None:
     output_jsonl.parent.mkdir(parents=True, exist_ok=True)
 
     caption = (
-        "<image> Two people sitting at a train table using laptop computers "
+        "Two people sitting at a train table using laptop computers "
         "beside water bottles and a window."
     )
     image_paths = sorted(source_image_dir.glob("*.jpg"))
@@ -43,8 +43,11 @@ def main() -> None:
         rows.append(
             {
                 "id": idx,
-                "text": caption,
-                "images": [src.name],
+                "text": f"<image>\n{caption} <|__dj__eoc|>",
+                # Absolute paths let Cedar, Data-Juicer, and native framework
+                # baselines consume exactly the same fixture without relying
+                # on framework-specific relative-path rules.
+                "images": [str(dst.resolve())],
             }
         )
 

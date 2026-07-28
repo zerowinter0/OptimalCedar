@@ -1,5 +1,6 @@
 import tensorflow as tf
 import json
+import numpy as np
 from tensorflow.python.ops import math_ops
 import pathlib
 from evaluation.tf_utils import TFEvalSpec
@@ -197,7 +198,8 @@ def normalize(image, labels, boxes):
 
 
 def build_dataset(data_dir, spec):
-    ann_file = data_dir + "/annotations/instances_val2017.json"
+    split = spec.kwargs.get("split", "val2017")
+    ann_file = data_dir + f"/annotations/instances_{split}.json"
 
     annotations = {}
     imgs = []
@@ -214,11 +216,9 @@ def build_dataset(data_dir, spec):
 
     for img in ann_json["images"]:
         img_id = img["id"]
-        if img_id not in annotations:
-            continue
         boxes = []
         labels = []
-        for ann in annotations[img_id]:
+        for ann in annotations.get(img_id, []):
             x, y, w, h = ann["bbox"]
             # Normalize to width and height of image
             x1 = x / img["width"]
@@ -230,9 +230,9 @@ def build_dataset(data_dir, spec):
             labels.append(ann["category_id"])
 
         sample = (
-            data_dir + "/val2017/" + img["file_name"],
-            labels,
-            boxes,
+            data_dir + f"/{split}/" + img["file_name"],
+            np.asarray(labels, dtype=np.int32),
+            np.asarray(boxes, dtype=np.float32).reshape(-1, 4),
         )
 
         imgs.append(sample)
@@ -240,7 +240,10 @@ def build_dataset(data_dir, spec):
     ds = tf.data.Dataset.from_generator(
         lambda: imgs, (tf.string, tf.int32, tf.float32)
     )
-    ds = ds.map(read_image, num_parallel_calls=spec.num_parallel_calls)
+    map_kwargs = {"num_parallel_calls": spec.num_parallel_calls}
+    if spec.kwargs.get("fastflow"):
+        map_kwargs["name"] = "prep_begin"
+    ds = ds.map(read_image, **map_kwargs)
     ds = ds.map(
         distorted_bounding_box_crop, num_parallel_calls=spec.num_parallel_calls
     )
@@ -254,9 +257,11 @@ def build_dataset(data_dir, spec):
 
 
 def get_dataset(spec: TFEvalSpec):
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
+    data_dir = spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
 
     return build_dataset(
         str(data_dir),

@@ -1,7 +1,7 @@
 from typing import List
 
 from cedar.compose import Feature
-from cedar.compose.dp_seperate_optimizer import DpSeperateOptimizer
+from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 from cedar.compose.optimizer import OptimizerOptions
 from cedar.pipes import FilterPipe, NoopPipe, Pipe
 from cedar.sources import IterSource
@@ -65,14 +65,14 @@ def _linear_order(graph):
         curr = next(iter(graph[curr]))
 
 
-def test_dp_seperate_optimizer_reorders_before_strategy_pass():
+def test_dp_two_stage_optimizer_reorders_before_strategy_pass():
     feature = ConsecutiveFiltersFeature()
     feature.apply(IterSource([1, 2, 3]))
     name_by_pid = {
         p_id: pipe.get_logical_name() for p_id, pipe in feature.logical_pipes.items()
     }
 
-    optimizer = DpSeperateOptimizer()
+    optimizer = DpTwoStageOptimizer()
     optimizer.init(feature.logical_pipes, feature.logical_adj_list)
     fast_filter_name = "FilterPipe__other_true_filter"
     plan = optimizer.run(

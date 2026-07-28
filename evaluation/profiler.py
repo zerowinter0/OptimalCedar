@@ -193,6 +193,16 @@ class Profiler:
             "epoch_num_samples": self.epoch_num_samples,
         }
 
+    def close(self) -> None:
+        """Release resources held by the underlying dataset."""
+        close = getattr(self.dataset, "close", None)
+        if callable(close):
+            close()
+            return
+        exit_dataset = getattr(self.dataset, "_exit", None)
+        if callable(exit_dataset):
+            exit_dataset()
+
     def _print_status(
         self,
         epoch: int,

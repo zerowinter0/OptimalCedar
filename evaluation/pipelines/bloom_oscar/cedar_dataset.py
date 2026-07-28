@@ -39,20 +39,20 @@ class BloomOscarFeature(Feature):
             fp,
             dj_ops.LanguageIDScoreFilter(min_score=0.8, lang="en"),
             tag="language_id",
-        )
+        ).fix()
 
-        fp = MapperPipe(fp, dj_ops.WhitespaceNormalizationMapper(), tag="whitespace_norm")
+        fp = MapperPipe(fp, dj_ops.WhitespaceNormalizationMapper(), tag="whitespace_norm").fix()
         fp = MapperPipe(
             fp,
             dj_ops.PunctuationNormalizationMapper(),
             tag="punctuation_norm",
-        )
-        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode")
+        ).fix()
+        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode").fix()
         fp = MapperPipe(
             fp,
             dj_ops.RemoveWordsWithIncorrectSubstringsMapper(),
             tag="remove_bad_substrings",
-        )
+        ).fix()
         fp = MapperPipe(
             fp,
             dj_ops.RemoveLongWordsMapper(max_len=25),
@@ -110,7 +110,7 @@ class BloomOscarFeature(Feature):
             tag="perplexity",
         )
 
-        fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text")
+        fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text").fix()
         fp = MapperPipe(fp, dj_ops.extract_output_text, tag="extract_text").fix()
         return fp
 

@@ -15,11 +15,12 @@ from ..variant import (
 from typing import List, Any
 
 import copy
-import glob
+import json
 import logging
 import os
 import pathlib
 import pickle
+import shutil
 import tempfile
 import torch
 
@@ -74,10 +75,18 @@ class InProcessObjectDiskCachePipeVariant(InProcessPipeVariant):
         self._check_file_type()
         self.save_function = self.save_funcs[file_type]
         self.load_function = self.load_funcs[file_type]
-        temp_dir = tempfile.gettempdir()
-        pid = os.getpid()
-        dir_name = "cedar_" + str(pid)
-        self.cache_dir = pathlib.Path(temp_dir) / pathlib.Path(dir_name)
+        cache_root = pathlib.Path(
+            os.environ.get("CEDAR_CACHE_ROOT", tempfile.gettempdir())
+        )
+        namespace = os.environ.get("CEDAR_CACHE_NAMESPACE")
+        if namespace:
+            shard = os.environ.get("CEDAR_CACHE_SHARD", "single")
+            self.cache_dir = cache_root / namespace / shard
+        else:
+            # Preserve Cedar's historical path for callers outside the paper
+            # experiment driver.
+            self.cache_dir = cache_root / f"cedar_{os.getpid()}"
+        self.manifest_path = self.cache_dir / ".manifest.json"
 
     def _check_file_type(self) -> None:
         if (
@@ -111,40 +120,91 @@ class InProcessObjectDiskCachePipeVariant(InProcessPipeVariant):
         return self.load_function(file_name)
 
     def _save_given_count(self, data: List[Any], count: int) -> None:
+        if not data:
+            return
         file_name = f"data_batch_{count}"
         file_path = self.cache_dir / pathlib.Path(file_name)
-        self._save(data, file_path)
+        temp_path = self.cache_dir / pathlib.Path(f".{file_name}.tmp")
+        self._save(data, temp_path)
+        suffix = ".pt" if self.file_type == "pt" else ".pkl"
+        os.replace(f"{temp_path}{suffix}", f"{file_path}{suffix}")
+
+    def _write_manifest(self, num_items: int, num_files: int) -> None:
+        manifest = {
+            "complete": True,
+            "file_type": self.file_type,
+            "num_items": num_items,
+            "num_files": num_files,
+        }
+        temp_manifest = self.cache_dir / ".manifest.json.tmp"
+        with open(temp_manifest, "w") as file:
+            json.dump(manifest, file, sort_keys=True)
+        os.replace(temp_manifest, self.manifest_path)
+
+    def _load_manifest(self) -> Optional[dict]:
+        try:
+            with open(self.manifest_path) as file:
+                manifest = json.load(file)
+        except (OSError, ValueError):
+            return None
+        if (
+            manifest.get("complete") is not True
+            or manifest.get("file_type") != self.file_type
+        ):
+            return None
+        return manifest
 
     def _iter_impl(self):
-        # Check existance of caching directory
+        # A directory alone is not a valid cache: a worker may have been
+        # interrupted while materializing it. Only an atomically committed
+        # manifest makes the shard readable.
         pid = os.getpid()
-        logging.info(f"Checking existence of caching directory for pid {pid}")
-        cache_dir_exists = pathlib.Path.exists(self.cache_dir)
         logging.info(
-            f"Caching directory exists for pid {pid}? {cache_dir_exists}"
+            "Checking cache shard for pid %d at %s", pid, self.cache_dir
+        )
+        manifest = self._load_manifest()
+        logging.info(
+            "Complete cache shard exists for pid %d? %s",
+            pid,
+            manifest is not None,
         )
 
-        # Read from caching directory if it exists
-        if cache_dir_exists:
-            all_files = list(glob.glob(str(self.cache_dir) + "/*"))
-            for file in all_files:
+        if manifest is not None:
+            suffix = ".pt" if self.file_type == "pt" else ".pkl"
+            for count in range(int(manifest["num_files"])):
+                file = self.cache_dir / f"data_batch_{count}{suffix}"
                 items = self._load(file)
                 for item in items:
-                    # NOTE: Cached item should be datasample
                     item.read_from_cache = True
                     yield item
         else:
-            self.cache_dir.mkdir(parents=True)
+            if self.cache_dir.exists():
+                shutil.rmtree(self.cache_dir)
+            self.cache_dir.mkdir(parents=True, exist_ok=False)
             file_count = 0
+            num_items = 0
             item_buffer = []
+            completed = False
             try:
                 for item in self.input_pipe_variant:
                     item_cache_copy = copy.deepcopy(item)
                     item_buffer.append(item_cache_copy)
+                    num_items += 1
                     if len(item_buffer) == self.max_samples_in_cache_file:
                         self._save_given_count(item_buffer, file_count)
                         item_buffer = []
                         file_count += 1
                     yield item
+                completed = True
             finally:
-                self._save_given_count(item_buffer, file_count)
+                if completed:
+                    if item_buffer:
+                        self._save_given_count(item_buffer, file_count)
+                        file_count += 1
+                    self._write_manifest(num_items, file_count)
+                    logging.info(
+                        "Committed complete cache shard %s with %d items in %d files",
+                        self.cache_dir,
+                        num_items,
+                        file_count,
+                    )

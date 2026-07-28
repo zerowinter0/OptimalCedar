@@ -537,12 +537,35 @@ class _AsyncPipeVariant(PipeVariant):
         with self._buffer_not_full:
             self._buffer_not_full.notify()
 
-        if self._consumer_thread is not None:
-            self._consumer_thread.join(0.1)
-            self._consumer_thread = None
-        if self._producer_thread is not None:
-            self._producer_thread.join(0.1)
-            self._producer_thread = None
+        # The Ray consumer can be inside ray.get() for up to the poll timeout.
+        # Do not destroy its actors or clear variant_ctx while that thread may
+        # still dereference the service; doing so races with reset() and turns
+        # intentional actor cleanup into RayActorError/AttributeError.
+        threads = (
+            ("consumer", self._consumer_thread),
+            ("producer", self._producer_thread),
+        )
+        alive_threads = []
+        for name, thread in threads:
+            if thread is None:
+                continue
+            thread.join(timeout=5.0)
+            if thread.is_alive():
+                alive_threads.append(name)
+            else:
+                if name == "consumer":
+                    self._consumer_thread = None
+                else:
+                    self._producer_thread = None
+
+        if alive_threads:
+            logger.warning(
+                "Deferring shutdown for pipe %s; async thread(s) still alive: %s",
+                self.p_id,
+                ", ".join(alive_threads),
+            )
+            return
+
         if self.variant_ctx is not None:
             self.variant_ctx.shutdown()
         self.variant_ctx = None

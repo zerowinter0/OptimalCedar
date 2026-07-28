@@ -1,5 +1,4 @@
 import pathlib
-import matplotlib.pyplot as plt
 import torch
 import torchdata.datapipes as dp
 import librosa
@@ -71,9 +70,11 @@ def build_datapipe(root, spec: TorchEvalSpec):
 
 
 def get_dataset(spec: TorchEvalSpec):
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
+    data_dir = spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
 
     datapipe = build_datapipe(str(data_dir), spec)
 
@@ -83,6 +84,8 @@ def get_dataset(spec: TorchEvalSpec):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     dataset = get_dataset(TorchEvalSpec(8, 1))
     for x in dataset:
         print(x)

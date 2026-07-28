@@ -1,14 +1,14 @@
 import logging
 from typing import Any, Dict, List, Optional, Set, Union
 
-from .dp_seperate_optimizer import DpSeperateOptimizer
+from .dp_two_stage_optimizer import DpTwoStageOptimizer
 from .optimizer import Optimizer, OptimizerOptions, PhysicalPlan
 
 
 logger = logging.getLogger(__name__)
 
 
-class DpCedarOptimizer(DpSeperateOptimizer):
+class DpCedarOptimizer(DpTwoStageOptimizer):
     """
     Cedar optimizer with only the native reorder pass replaced by DP reorder.
 

@@ -3,6 +3,7 @@ import yaml
 import copy
 import math
 import multiprocessing
+import os
 import psutil
 import time
 
@@ -83,7 +84,8 @@ class OptimizerOptions:
 
         # Optimizer implementation selector used by DataSet:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
-        # 4/DpSeperateOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer.
+        # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
+        # 7/ExpOptimizer, 8/PecanOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
 
         # Maximum wall-clock time allowed for the original Optimizer reorder
@@ -534,18 +536,28 @@ class Optimizer:
                     self._fuse_local_tf(curr_fusion)
 
         logger.info("Checking for Ray DS fusion...")
-        if (
+        should_fuse_ray_source = (
             not self.options.enable_offload
             and self.options.enable_fusion
             and self._check_fuse_ray_local()
-        ):
-            self._fuse_ray_source()
-        if (
+        ) or (
             self.options.enable_offload
             and self.options.enable_fusion
             and self._check_fuse_ray_remote()
-        ):
-            self._fuse_ray_source()
+        )
+        if should_fuse_ray_source:
+            if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") == "1":
+                # RAY_DS does not expose a fixed per-stage actor width: Ray
+                # Data schedules map tasks independently of the profiled
+                # RAY/TF_RAY actor count. Keep the already fused Ray stage so
+                # strict runs can account for exactly one actor per worker.
+                logger.warning(
+                    "Skipping RAY_DS source lowering under strict profile "
+                    "resource matching; preserving the actor-accounted "
+                    "physical fusion stage."
+                )
+            else:
+                self._fuse_ray_source()
 
         logger.info(
             "[Physical Pass] Optimized graph {}".format(
@@ -1895,7 +1907,7 @@ class Optimizer:
             curr_path.append(p_id)
 
             if p_id == end:
-                if curr_len > max_len:
+                if curr_len > max_len or not max_path:
                     max_len = curr_len
                     max_path = curr_path.copy()
 

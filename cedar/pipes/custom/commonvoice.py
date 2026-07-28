@@ -66,16 +66,23 @@ def _read(x):
         return librosa.load(x)
 
 
-def _resample(x):
-    if isinstance(x, dict):
-        data = x["item"]
+def _resample(audio, orig_sr=None):
+    """Resample Cedar tuple data and Ray dictionary data consistently."""
+    if isinstance(audio, dict):
+        data = audio["item"]
         return {
             "item": librosa.resample(
                 y=data[0], orig_sr=data[1], target_sr=SAMPLE_FREQ
             )
         }
-    else:
-        return librosa.resample(y=x[0], orig_sr=x[1], target_sr=SAMPLE_FREQ)
+
+    # MapperPipe expands tuple-valued DataSample.data; direct callers may
+    # still provide the original (audio, sample_rate) tuple.
+    if orig_sr is None:
+        audio, orig_sr = audio
+    return librosa.resample(
+        y=audio, orig_sr=orig_sr, target_sr=SAMPLE_FREQ
+    )
 
 
 def _spec(x):

@@ -1,0 +1,16 @@
+.git
+.pytest_cache
+__pycache__
+*.py[cod]
+*.egg-info
+env
+.venv
+venv
+.mypy_cache
+.ruff_cache
+.DS_Store
+paper
+evaluation/datasets
+evaluation/results
+logs
+*.log

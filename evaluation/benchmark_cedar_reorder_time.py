@@ -29,7 +29,7 @@ OPTIMIZER_SELECTORS: Dict[str, int] = {
     "cedar": 0,
     "my_optimizer": 1,
     "dp_optimizer": 2,
-    "dp_separate_optimizer": 4,
+    "dp_two_stage_optimizer": 4,
     "dp_cedar_optimizer": 5,
 }
 
@@ -37,7 +37,7 @@ REORDER_PASS_RUNNERS: Dict[str, str] = {
     "cedar": "logical_reorder_pass",
     "my_optimizer": "physical_dp_pass",
     "dp_optimizer": "physical_dp_pass",
-    "dp_separate_optimizer": "physical_dp_pass",
+    "dp_two_stage_optimizer": "physical_dp_pass",
     "dp_cedar_optimizer": "logical_reorder_pass",
 }
 
@@ -47,7 +47,7 @@ def optimizer_label(optimizer_name: str) -> str:
         "cedar": "Cedar Native",
         "my_optimizer": "MyOptimizer",
         "dp_optimizer": "DP Optimizer",
-        "dp_separate_optimizer": "DP Separate Optimizer",
+        "dp_two_stage_optimizer": "DP Two-Stage Optimizer",
         "dp_cedar_optimizer": "DP Cedar Optimizer",
     }
     return labels.get(optimizer_name, optimizer_name)
@@ -143,10 +143,10 @@ def get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
         from cedar.compose.dp_optimizer import DpOptimizer
 
         return DpOptimizer
-    if optimizer_name == "dp_separate_optimizer":
-        from cedar.compose.dp_seperate_optimizer import DpSeperateOptimizer
+    if optimizer_name == "dp_two_stage_optimizer":
+        from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 
-        return DpSeperateOptimizer
+        return DpTwoStageOptimizer
     if optimizer_name == "dp_cedar_optimizer":
         from cedar.compose.dp_cedar_optimizer import DpCedarOptimizer
 

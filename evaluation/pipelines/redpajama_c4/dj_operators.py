@@ -4,14 +4,17 @@ import math
 import pathlib
 import re
 import string
+import sys
 import threading
 import urllib.request
 from collections import Counter
 from typing import Any, Dict, List, Optional, Sequence
 
+import emoji
 import fasttext
 import ftfy
 import kenlm
+import regex
 import sentencepiece as spm
 
 TEXT_KEY = "raw_content"
@@ -31,7 +34,10 @@ SENTENCEPIECE_MODEL_URL_TEMPLATE = (
 )
 
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9.\-+_]+@[a-z0-9.\-+_]+\.[a-z]+", re.DOTALL)
-LINK_PATTERN = re.compile(
+# Data-Juicer uses the third-party ``regex`` engine for this nested URL
+# expression.  Python's stdlib ``re`` can catastrophically backtrack on long
+# StackExchange documents even though the expression is otherwise identical.
+LINK_PATTERN = regex.compile(
     r"""(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|"""
     r"""[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|"""
     r"""(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|"""
@@ -111,11 +117,13 @@ SPECIAL_CHARACTERS = set(
         "」﴾》"
     )
 )
+SPECIAL_CHARACTERS.update(emoji.EMOJI_DATA.keys())
 
 _MODEL_LOCK = threading.Lock()
 _FASTTEXT_MODEL = None
 _KENLM_MODELS: Dict[str, kenlm.Model] = {}
 _SENTENCEPIECE_MODELS: Dict[str, spm.SentencePieceProcessor] = {}
+_ALPHANUMERIC_TOKENIZER = None
 
 
 def _ensure_model_file(filename: str, url: str) -> pathlib.Path:
@@ -160,6 +168,19 @@ def _get_kenlm_model(lang: str):
             )
             _KENLM_MODELS[lang] = kenlm.Model(str(model_path))
         return _KENLM_MODELS[lang]
+
+
+def _get_alphanumeric_tokenizer():
+    """Load the tokenizer used by Data-Juicer's tokenized alnum filter."""
+    global _ALPHANUMERIC_TOKENIZER
+    with _MODEL_LOCK:
+        if _ALPHANUMERIC_TOKENIZER is None:
+            from transformers import AutoTokenizer
+
+            _ALPHANUMERIC_TOKENIZER = AutoTokenizer.from_pretrained(
+                "EleutherAI/pythia-6.9b-deduped"
+            )
+        return _ALPHANUMERIC_TOKENIZER
 
 
 def _split_on_whitespace(document: str, new_line: bool = False, tab: bool = False):
@@ -247,7 +268,11 @@ def _word_repetition_ratio(words: List[str], rep_len: int) -> float:
     return sum(rep_more_than_one) / sum(freq_values) if sum(freq_values) else 0.0
 
 
-def parse_json_line(line: str) -> Dict[str, Any]:
+def parse_json_line(line: Any) -> Dict[str, Any]:
+    # Ray Data 2.7 represents read_text rows as {"text": raw_line};
+    # Cedar/PyTorch/tf.py_function pass the raw string directly.
+    if isinstance(line, dict):
+        line = line.get("text", "")
     sample = json.loads(line)
     if TEXT_KEY not in sample:
         if "text" in sample:
@@ -281,6 +306,43 @@ class CleanLinksMapper:
         return sample
 
 
+class CleanCopyrightMapper:
+    """Match Data-Juicer's clean_copyright_mapper for one sample."""
+
+    def __init__(self):
+        self._comment_pattern = regex.compile(
+            r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/"
+        )
+        self._copyright_pattern = regex.compile(
+            "copyright", regex.IGNORECASE
+        )
+
+    def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+        text = _get_text(sample)
+        match = self._comment_pattern.search(text)
+        if match:
+            block = text[match.start() : match.end()]
+            if self._copyright_pattern.search(block):
+                text = text[: match.start()] + text[match.end() :]
+        else:
+            lines = text.split("\n")
+            skip = 0
+            for line in lines:
+                if (
+                    line.startswith("//")
+                    or line.startswith("#")
+                    or line.startswith("--")
+                    or not line
+                ):
+                    skip += 1
+                else:
+                    break
+            if skip:
+                text = "\n".join(lines[skip:])
+        sample[TEXT_KEY] = text
+        return sample
+
+
 class FixUnicodeMapper:
     def __init__(self, normalization: str = "NFC"):
         self.normalization = normalization
@@ -308,14 +370,38 @@ class WhitespaceNormalizationMapper:
 
 
 class AlphanumericFilter:
-    def __init__(self, min_ratio: float, max_ratio: float):
+    def __init__(
+        self,
+        min_ratio: float,
+        max_ratio: float,
+        *,
+        tokenization: bool = False,
+        lang: str = "en",
+    ):
         self.min_ratio = min_ratio
         self.max_ratio = max_ratio
+        self.tokenization = tokenization
+        self.lang = lang
 
     def __call__(self, sample: Dict[str, Any]) -> bool:
         text = _get_text(sample)
-        ratio = sum(char.isalnum() for char in text) / len(text) if text else 0.0
-        sample[FIELDS_STATS]["alnum_ratio"] = ratio
+        if self.tokenization:
+            tokens = _get_alphanumeric_tokenizer().tokenize(text)
+            alpha_count = sum(char.isalpha() for char in text)
+            ratio = (
+                alpha_count / len(tokens)
+                if tokens
+                else 0.0
+            )
+            stats_key = "alpha_token_ratio"
+        else:
+            ratio = (
+                sum(char.isalnum() for char in text) / len(text)
+                if text
+                else 0.0
+            )
+            stats_key = "alnum_ratio"
+        sample[FIELDS_STATS][stats_key] = ratio
         return self.min_ratio <= ratio <= self.max_ratio
 
 
@@ -362,7 +448,7 @@ class LanguageIDScoreFilter:
 
 
 class MaximumLineLengthFilter:
-    def __init__(self, min_len: int = 10, max_len: int = 4000):
+    def __init__(self, min_len: int = 10, max_len: int = sys.maxsize):
         self.min_len = min_len
         self.max_len = max_len
 
@@ -371,6 +457,17 @@ class MaximumLineLengthFilter:
         max_line_len = max(map(len, lines)) if lines else 0
         sample[FIELDS_STATS]["max_line_length"] = max_line_len
         return self.min_len <= max_line_len <= self.max_len
+
+
+class TextLengthFilter:
+    def __init__(self, min_len: int = 0, max_len: int = sys.maxsize):
+        self.min_len = min_len
+        self.max_len = max_len
+
+    def __call__(self, sample: Dict[str, Any]) -> bool:
+        length = len(_get_text(sample))
+        sample[FIELDS_STATS]["text_length"] = length
+        return self.min_len <= length <= self.max_len
 
 
 class PerplexityFilter:

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "cedar_environment": {
+    "container": "optimalcedar-torch201-dev",
+    "pandas": "1.5.3",
+    "python": "3.10",
+    "pytorch": "2.0.1+cu118",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torchdata": "0.6.1"
+  },
+  "datajuicer": {
+    "repository": "https://github.com/datajuicer/data-juicer.git",
+    "commit": "bb3d88aac1",
+    "describe": "v1.5.3-2-gbb3d88aac1",
+    "hub_repository": "https://github.com/datajuicer/data-juicer-hub.git",
+    "hub_recipe_commit": "47fc34588b5d4258c13747cea37c2b63cf4e11b0"
+  },
+  "fastflow": {
+    "paper_repository_url": "https://github.com/SamsungLabs/FastFlow",
+    "availability": "original_url_requires_authentication_or_is_unavailable",
+    "local_requirement": "record the exact private/archive source or wheel hash used to build the FastFlow image"
+  },
+  "pecan": {
+    "paper": "other_paper_examples/atc24-Pecan.pdf",
+    "policy": "AutoOrder Algorithm 2"
+  },
+  "plumber": {
+    "app_repository": "https://github.com/mkuchnik/PlumberApp.git",
+    "app_commit": "6123f5bce36eec7dc75b6b9298054b493d930bdc",
+    "tensorflow_repository": "https://github.com/mkuchnik/PlumberTensorflow.git",
+    "tensorflow_commit": "08bf144ec13b0c27f2a02aaba975546506ee0f6a"
+  }
+}

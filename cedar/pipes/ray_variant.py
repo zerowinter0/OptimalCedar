@@ -45,7 +45,29 @@ class RayPipeVariant(_AsyncPipeVariant):
             actor = self._create_actor()
             actors.append(actor)
 
+        # Actor handles are returned before their processes necessarily finish
+        # starting. A fixed-width experiment must not begin with only a subset
+        # of a stage's actors ready.
+        try:
+            ray.get(
+                [actor.__ray_ready__.remote() for actor in actors],
+                timeout=60,
+            )
+        except Exception:
+            for actor in actors:
+                try:
+                    ray.kill(actor)
+                except Exception:
+                    pass
+            raise
+
         self.variant_ctx.service.register(name, actors)
+        actual_actors = self.variant_ctx.service.get_num_actors()
+        if actual_actors != variant_ctx.n_actors:
+            raise RuntimeError(
+                f"RayService for {name} registered {actual_actors} actors; "
+                f"expected {variant_ctx.n_actors}"
+            )
 
     @abc.abstractmethod
     def _create_actor(self) -> ray.actor.ActorClass:

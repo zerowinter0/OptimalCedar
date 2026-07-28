@@ -94,6 +94,7 @@ class RayService:
         self._num_inflight_tasks = 0
 
         self._lock = threading.Lock()
+        self._submitted = threading.Condition(self._lock)
         self._submit_batch = SampleBatch(self.submit_batch_size)
         self._receive_batch = None
 
@@ -177,8 +178,12 @@ class RayService:
                     futures.append(f)
                     futures_map[f] = q
 
-        if len(futures) is None:
-            raise queue.Empty
+            # A partially assembled batch contributes to the inflight count,
+            # but it has no Ray future yet. Wait for the producer to submit a
+            # complete (or final) batch instead of spinning on ray.wait([]).
+            if not futures:
+                self._submitted.wait(timeout=timeout)
+                raise queue.Empty
 
         # Get the first future that returns
         ready, _ = ray.wait(futures, num_returns=1, timeout=timeout)
@@ -222,8 +227,9 @@ class RayService:
         Called by the submitter thread to signal that there will be no
         further submissions.
         """
-        if len(self._submit_batch) > 0:
-            self._submit_batch_to_actor()
+        with self._lock:
+            if len(self._submit_batch) > 0:
+                self._submit_batch_to_actor()
 
     def _submit_batch_to_actor(self):
         # Caller holds lock
@@ -240,6 +246,7 @@ class RayService:
 
         q.append(self._submit_batch)
         self._submit_batch = SampleBatch(self.submit_batch_size)
+        self._submitted.notify_all()
 
     def get_num_actors(self) -> int:
         with self._lock:

@@ -77,7 +77,9 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
     )
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
-    source = LocalLineSource(str(train_filepath))
+    max_samples = (spec.kwargs or {}).get("max_samples")
+    max_samples = int(max_samples) if max_samples is not None else None
+    source = LocalLineSource(str(train_filepath), max_samples=max_samples)
     feature = Wikitext103Feature(batch_size=spec.batch_size)
     feature.apply(source)
 

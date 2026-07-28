@@ -1,5 +1,4 @@
 import pathlib
-import matplotlib.pyplot as plt
 import torch
 import librosa
 import numpy as np
@@ -50,12 +49,18 @@ class CommonvoiceFeature(Feature):
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
+    data_dir = (spec.kwargs or {}).get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
-    source = LocalFSSource(str(data_dir), recursive=True)
+    max_samples = (spec.kwargs or {}).get("max_samples")
+    max_samples = int(max_samples) if max_samples is not None else None
+    source = LocalFSSource(
+        str(data_dir), recursive=True, max_samples=max_samples
+    )
     feature = CommonvoiceFeature(batch_size=spec.batch_size)
     feature.apply(source)
 
@@ -84,7 +89,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
                 enable_caching=not spec.disable_caching,
-                num_samples= 40571,
+                num_samples=getattr(spec, "num_total_samples", None),
                 use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
                 reorder_timeout_sec=getattr(spec, "reorder_timeout_sec", None),
             ),
@@ -94,6 +99,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     dataset = get_dataset(CedarEvalSpec(1, None, 1))
     for x in dataset:
         print(x)

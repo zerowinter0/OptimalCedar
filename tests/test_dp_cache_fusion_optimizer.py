@@ -4,10 +4,12 @@ from typing import List, Type
 import pytest
 
 from cedar.compose import Feature
-from cedar.compose.dp_optimizer import DpOptimizer
+from cedar.compose import constants
+from cedar.compose.dp_optimizer import BlockCandidate, DpOptimizer
+from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 from cedar.compose.my_optimizer import MyOptimizer
-from cedar.compose.optimizer import Optimizer, OptimizerOptions
-from cedar.pipes import MapperPipe, Pipe
+from cedar.compose.optimizer import Optimizer, OptimizerOptions, PipeDesc
+from cedar.pipes import MapperPipe, Pipe, PipeVariantType
 from cedar.sources import IterSource
 
 
@@ -52,6 +54,23 @@ def _profile_for(feature: Feature):
         },
         "offloads": {},
     }
+
+
+def _ray_profile_for(feature: Feature):
+    profile = _profile_for(feature)
+    profile["offloads"] = {
+        "RAY": {
+            p_id: {
+                "throughput": 200.0,
+                "latencies": profile["baseline"]["latencies"].copy(),
+                "input_sizes": profile["baseline"]["input_sizes"].copy(),
+                "output_sizes": profile["baseline"]["output_sizes"].copy(),
+            }
+            for p_id, pipe in feature.logical_pipes.items()
+            if not pipe.is_source()
+        }
+    }
+    return profile
 
 
 def _run_optimizer(optimizer_cls: Type[Optimizer]):
@@ -112,3 +131,108 @@ def test_cache_can_be_inserted_after_materialized_fusion(optimizer_cls):
         plan=plan,
     )
     assert math.isfinite(cost)
+
+
+@pytest.mark.parametrize(
+    "optimizer_cls", [MyOptimizer, DpOptimizer, DpTwoStageOptimizer]
+)
+def test_dp_final_ray_stages_use_cedar_batch_tuning(optimizer_cls):
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    optimizer = optimizer_cls()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+
+    plan = optimizer.run(
+        _ray_profile_for(feature),
+        OptimizerOptions(
+            enable_prefetch=False,
+            enable_offload=True,
+            enable_reorder=True,
+            enable_local_parallelism=False,
+            enable_fusion=True,
+            enable_caching=False,
+        ),
+    )
+
+    ray_contexts = [
+        plan.pipe_descs[p_id].variant_ctx
+        for p_id in plan.graph
+        if plan.pipe_descs[p_id].variant_type == PipeVariantType.RAY
+    ]
+    assert ray_contexts
+    for ctx in ray_contexts:
+        assert ctx.submit_batch_size == 500
+        expected_inflight = ctx.submit_batch_size * ctx.n_actors * 3
+        assert ctx.max_inflight == expected_inflight
+        assert ctx.max_prefetch == expected_inflight
+
+
+def test_single_smp_stage_pays_placement_dependent_boundary_cost():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    profile = _profile_for(feature)
+    for p_id in feature.logical_pipes:
+        profile["baseline"]["input_sizes"][p_id] = 4_000_000.0
+        profile["baseline"]["output_sizes"][p_id] = 4_000_000.0
+
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = profile
+    optimizer.options = OptimizerOptions(enable_offload=False)
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    block = BlockCandidate(
+        mask=1,
+        order=(0,),
+        variant=PipeVariantType.SMP,
+        cost=0.0,
+        materializes_fusion=False,
+    )
+    boundary_cost = optimizer._dp_stage_boundary_cost(0, block)
+
+    assert math.isclose(boundary_cost, 80.0)
+    assert optimizer._dp_stage_boundary_cost(
+        0,
+        BlockCandidate(
+            mask=1,
+            order=(0,),
+            variant=PipeVariantType.INPROCESS,
+            cost=0.0,
+            materializes_fusion=False,
+        ),
+    ) == 0.0
+
+
+def test_unidentifiable_amdahl_cost_is_finite_and_capped():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    profile = _ray_profile_for(feature)
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = profile
+    optimizer.options = OptimizerOptions(enable_offload=True)
+    optimizer._validate_stats()
+    optimizer._init_stats()
+
+    p_id = next(
+        p_id
+        for p_id, pipe in feature.logical_pipes.items()
+        if isinstance(pipe, MapperPipe)
+    )
+    profile["offloads"]["RAY"][p_id]["throughput"] = 1e12
+    input_size = profile["baseline"]["input_sizes"][p_id]
+    cost = optimizer._calculate_pipe_cost(
+        p_id,
+        input_size,
+        PipeDesc(None, PipeVariantType.RAY, None),
+    )
+
+    assert cost > 0
+    assert math.isclose(
+        cost,
+        optimizer._base_cost_map[p_id]
+        / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
+    )

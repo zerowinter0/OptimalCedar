@@ -6,6 +6,7 @@ import argparse
 import json
 import importlib
 import logging
+import multiprocessing as mp
 import os
 import sys
 import torch
@@ -21,8 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def import_module_from_path(module_path: str):
-    module_name = os.path.basename(module_path).rstrip(".py")
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module_path_obj = Path(module_path).resolve()
+    try:
+        rel_path = module_path_obj.relative_to(Path.cwd().resolve())
+        module_name = ".".join(rel_path.with_suffix("").parts)
+    except ValueError:
+        module_name = os.path.basename(module_path).removesuffix(".py")
+    spec = importlib.util.spec_from_file_location(module_name, str(module_path_obj))
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
@@ -65,7 +71,10 @@ def write_output(
     if output_loc == "":
         raise RuntimeError("Invalid output location")
 
-    profiler.write_output(output_loc)
+    try:
+        profiler.write_output(output_loc)
+    finally:
+        profiler.close()
 
 
 def run_profiler(
@@ -92,20 +101,25 @@ def run_profiler(
     if not profiler:
         raise RuntimeError("Could not create profiler.")
 
-    profiler.run()
+    try:
+        profiler.run()
 
-    # Save result to specified location
-    # NOTE: Printed results are scaled by 10^6 compared to saved results.
-    if results_path != "":
-        try:
-            results = profiler.get_results()
+        # Save result to specified location
+        # NOTE: Printed results are scaled by 10^6 compared to saved results.
+        if results_path != "":
+            try:
+                results = profiler.get_results()
 
-            with open(results_path, "w") as f:
-                f.write(json.dumps(results))
-                f.write("\n")
-            logger.info(f"Appended profiler results to: {results_path}")
-        except Exception as e:
-            raise Exception(f"Could not save profiler run in file: {str(e)}")
+                with open(results_path, "w") as f:
+                    f.write(json.dumps(results))
+                    f.write("\n")
+                logger.info(f"Appended profiler results to: {results_path}")
+            except Exception as e:
+                raise Exception(
+                    f"Could not save profiler run in file: {str(e)}"
+                )
+    finally:
+        profiler.close()
 
 
 def create_spec(args: argparse.Namespace) -> CedarEvalSpec:
@@ -297,9 +311,12 @@ def main():
     parser.add_argument(
         "--use_my_optimizer",
         type=int,
-        choices=[0, 1, 2, 3, 4, 5, 6],
+        choices=list(range(9)),
         default=0,
-        help="Optimizer selector: 0 original Cedar, 6 Cedar joint enumeration.",
+        help=(
+            "Optimizer selector: 0 original Cedar, 6 Cedar joint enumeration, "
+            "8 Pecan AutoOrder."
+        ),
     )
     parser.add_argument(
         "--reorder_timeout_sec",
@@ -321,6 +338,14 @@ def main():
 
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level.upper())
+
+    mp_start_method = os.environ.get("CEDAR_MP_START_METHOD")
+    if mp_start_method:
+        logger.warning(
+            "Setting multiprocessing start method to %s via CEDAR_MP_START_METHOD",
+            mp_start_method,
+        )
+        mp.set_start_method(mp_start_method, force=True)
 
     spec = create_spec(args)
 

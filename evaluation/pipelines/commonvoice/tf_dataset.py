@@ -1,5 +1,4 @@
 import tensorflow as tf
-import matplotlib.pyplot as plt
 import pathlib
 import librosa
 import random
@@ -39,8 +38,7 @@ def mel(x):
     )
 
 
-@tf.py_function(Tout=tf.float32)
-def process_path(path):
+def _process_path(path):
     x, sr = librosa.load(path.numpy())
     x = librosa.resample(y=x, orig_sr=sr, target_sr=SAMPLE_FREQ)
     x = np.abs(librosa.stft(x, n_fft=N_FFT)) ** 2
@@ -51,11 +49,29 @@ def process_path(path):
     return x
 
 
+def process_path(path):
+    value = tf.py_function(_process_path, [path], Tout=tf.float32)
+    value.set_shape([N_MELS, None])
+    return value
+
+
 def build_dataset(data_dir, spec):
-    ds = tf.data.Dataset.list_files(f"{data_dir}/*", shuffle=False)
-    ds = ds.map(
-        lambda x: process_path(x), num_parallel_calls=spec.num_parallel_calls
+    # tf.data.Dataset.list_files delegates to tf.io.gfile.glob, where ``**``
+    # does not provide pathlib-style recursive matching. In particular,
+    # ``root/**/*.mp3`` misses files stored directly under ``root`` (the
+    # layout used by the enlarged CommonVoice dataset). Enumerate once with
+    # pathlib so both flat and nested layouts are handled, and sort to keep a
+    # deterministic input order across systems and runs.
+    paths = sorted(
+        str(path) for path in pathlib.Path(data_dir).rglob("*.mp3")
     )
+    if not paths:
+        raise FileNotFoundError(f"No MP3 files found under {data_dir}")
+    ds = tf.data.Dataset.from_tensor_slices(paths)
+    map_kwargs = {"num_parallel_calls": spec.num_parallel_calls}
+    if spec.kwargs.get("fastflow"):
+        map_kwargs["name"] = "prep_begin"
+    ds = ds.map(lambda x: process_path(x), **map_kwargs)
     ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     if spec.service_addr:
@@ -71,9 +87,11 @@ def build_dataset(data_dir, spec):
 
 
 def get_dataset(spec: TFEvalSpec):
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
+    data_dir = spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
 
     # return gen_files(train_filepath)
 
@@ -84,6 +102,8 @@ def get_dataset(spec: TFEvalSpec):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     batch_size = 8
     num_workers = tf.data.AUTOTUNE
 

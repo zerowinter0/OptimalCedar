@@ -30,7 +30,7 @@ if str(REPO_ROOT) not in sys.path:
 from cedar.client import DataSet
 from cedar.compose import Feature, OptimizerOptions
 from cedar.compose.dp_optimizer import DpOptimizer
-from cedar.compose.dp_seperate_optimizer import DpSeperateOptimizer
+from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 from cedar.compose.optimizer import Optimizer, PhysicalPlan
 from cedar.config import CedarContext, RayConfig
 from cedar.pipes import MapperPipe, Pipe
@@ -231,7 +231,7 @@ class CedarImageCooptFeature(Feature):
         return fp
 
 
-class FixedOrderPhysicalOptimizer(DpSeperateOptimizer):
+class FixedOrderPhysicalOptimizer(DpTwoStageOptimizer):
     """Run the fixed-order physical DP on the original order."""
 
     def _dp_reorder_offload_cache_fusion(self, inner_ops: List[int]) -> Tuple[List[int], Optional[int]]:
@@ -459,7 +459,7 @@ def main() -> None:
         ),
         run_optimizer(
             "reorder -> fusion/offload",
-            DpSeperateOptimizer,
+            DpTwoStageOptimizer,
             stats,
             args.num_samples,
             args.image_size,

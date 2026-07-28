@@ -164,3 +164,17 @@ cython_debug/
 
 # Paper sources
 /paper/
+
+# Reproducibly bootstrapped external baseline checkout. Its exact revision is
+# pinned in evaluation/baselines/versions.lock.json.
+/data-juicer/
+
+# Verified source archives used to build the legacy Plumber/FastFlow images.
+# The reproducible download script and checksums are tracked; archives are not.
+/docker/baselines/sources/
+
+# Enlarged formal matrices can contain caches, plans, and multi-GiB logs.
+# Keep the runner/analyzer/protocol tracked while excluding generated runs.
+/evaluation/chapter6_experiments/formal_results/scaled_reuse_plan_runs/
+/evaluation/chapter6_experiments/scaled_reuse_plan_*.nohup
+/evaluation/chapter6_experiments/coco_train2017_download.nohup

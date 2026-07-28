@@ -26,9 +26,8 @@ from evaluation.cedar_utils import CedarEvalSpec
 from evaluation.pipelines.redpajama_c4 import dj_operators as dj_ops
 
 
-DATA_JUICER_ROOT = pathlib.Path("/data-juicer")
-DEFAULT_DATASET_PATH = (
-    DATA_JUICER_ROOT / "demos" / "data_mixture" / "data" / "redpajama-c4-refined.jsonl"
+DEFAULT_DATASET_PATH = pathlib.Path(
+    "datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl"
 )
 DEFAULT_PROFILE_PATH = "/tmp/redpajama_c4_feature_profile.yml"
 TEXT_KEY = "raw_content"
@@ -483,14 +482,14 @@ class RedPajamaC4Feature(Feature):
         fp = source_pipes[0]
         fp = MapperPipe(fp, dj_ops.parse_json_line, tag="parse").fix()
 
-        fp = MapperPipe(fp, dj_ops.CleanEmailMapper(), tag="clean_email")
-        fp = MapperPipe(fp, dj_ops.CleanLinksMapper(), tag="clean_links")
-        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode")
+        fp = MapperPipe(fp, dj_ops.CleanEmailMapper(), tag="clean_email").fix()
+        fp = MapperPipe(fp, dj_ops.CleanLinksMapper(), tag="clean_links").fix()
+        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode").fix()
         fp = MapperPipe(
             fp,
             dj_ops.PunctuationNormalizationMapper(),
             tag="normalize_punct",
-        )
+        ).fix()
         fp = MapperPipe(
             fp,
             dj_ops.WhitespaceNormalizationMapper(),
@@ -550,7 +549,7 @@ class RedPajamaC4Feature(Feature):
             tag="word_repeat",
         )
 
-        fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text")
+        fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text").fix()
         fp = MapperPipe(fp, dj_ops.extract_output_text, tag="extract_text").fix()
         return fp
 
@@ -635,7 +634,12 @@ def main():
     parser.add_argument("--num_total_samples", type=int, default=20)
     parser.add_argument("--num_preview_samples", type=int, default=5)
     parser.add_argument("--use_ray", action="store_true")
-    parser.add_argument("--use_my_optimizer", type=int, choices=[0, 1, 2, 3, 4, 5, 6], default=0)
+    parser.add_argument(
+        "--use_my_optimizer",
+        type=int,
+        choices=list(range(9)),
+        default=0,
+    )
     parser.add_argument("--disable_prefetch", action="store_true")
     parser.add_argument("--disable_offload", action="store_true")
     parser.add_argument("--disable_parallelism", action="store_true")

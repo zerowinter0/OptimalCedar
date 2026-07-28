@@ -1,6 +1,6 @@
 from cedar.config import CedarContext
 from cedar.pipes import PipeVariantType
-from cedar.sources import IterSource, LocalFSSource, LocalLineSource
+from cedar.sources import COCOSource, IterSource, LocalFSSource, LocalLineSource
 from .utils import (
     check_fault_tolerance_funcs,
     check_replay_files_image_folder,
@@ -8,7 +8,10 @@ from .utils import (
 )
 
 import pathlib
+import json
+
 import pytest
+from PIL import Image
 
 
 def test_basic_itersource():
@@ -29,6 +32,37 @@ def test_basic_itersource():
 
     # Check fault tolerance basic funcs
     check_fault_tolerance_funcs(pipe, 1000, 1, 0, 0, 4)
+
+
+def test_coco_source_selects_split_and_keeps_images_without_annotations(tmp_path):
+    image_dir = tmp_path / "train2017"
+    annotation_dir = tmp_path / "annotations"
+    image_dir.mkdir()
+    annotation_dir.mkdir()
+    images = []
+    for image_id in (1, 2):
+        file_name = f"{image_id:012d}.jpg"
+        Image.new("RGB", (4, 3)).save(image_dir / file_name)
+        images.append(
+            {"id": image_id, "file_name": file_name, "width": 4, "height": 3}
+        )
+    payload = {
+        "images": images,
+        "annotations": [
+            {"image_id": 1, "bbox": [0, 0, 2, 2], "category_id": 7}
+        ],
+    }
+    (annotation_dir / "instances_train2017.json").write_text(
+        json.dumps(payload)
+    )
+
+    pipe = COCOSource(str(tmp_path), split="train2017").to_pipe()
+    pipe.mutate(CedarContext(), PipeVariantType.INPROCESS)
+    samples = [sample.data for sample in pipe.pipe_variant]
+
+    assert len(samples) == 2
+    assert samples[0]["boxes"].shape == (1, 4)
+    assert samples[1]["boxes"].shape == (0, 4)
 
 
 def test_localfssource_file(tmp_path):
@@ -65,6 +99,18 @@ def test_localfssource_file(tmp_path):
     check_fault_tolerance_funcs(pipe, 1000, 1, 0, 0, 1)
 
 
+def test_localfssource_max_samples_limits_a_deterministic_prefix(tmp_path):
+    for i in range(5):
+        (tmp_path / f"file{i}.txt").touch()
+
+    pipe = LocalFSSource(str(tmp_path), max_samples=3).to_pipe()
+    pipe.mutate(CedarContext(), PipeVariantType.INPROCESS)
+
+    assert [sample.data for sample in pipe.pipe_variant] == [
+        str(tmp_path / f"file{i}.txt") for i in range(3)
+    ]
+
+
 def test_locallinepipe():
     test_dir = pathlib.Path(__file__).resolve().parents[0]
     test_file = pathlib.Path(test_dir) / "data/test_text.txt"
@@ -84,6 +130,17 @@ def test_locallinepipe():
 
     # Check fault tolerance funcs
     check_fault_tolerance_funcs(pipe, 1000, 1, 0, 0, 1)
+
+
+def test_locallinesource_max_samples_limits_a_deterministic_prefix(tmp_path):
+    path = tmp_path / "lines.txt"
+    path.write_text("zero\none\ntwo\nthree\n")
+
+    pipe = LocalLineSource(str(path), max_samples=2).to_pipe()
+    pipe.mutate(CedarContext(), PipeVariantType.INPROCESS)
+
+    assert [sample.data for sample in pipe.pipe_variant] == ["zero", "one"]
+    assert pipe.pipe_variant.length == 2
 
 
 @pytest.mark.parametrize(

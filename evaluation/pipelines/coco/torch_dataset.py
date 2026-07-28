@@ -14,9 +14,9 @@ DATASET_LOC = "datasets/coco"
 
 
 class COCODataPipe(IterDataPipe):
-    def __init__(self, root):
-        self.root = root + "/val2017/"
-        self.ann_file = root + "/annotations/instances_val2017.json"
+    def __init__(self, root, split="val2017"):
+        self.root = root + f"/{split}/"
+        self.ann_file = root + f"/annotations/instances_{split}.json"
         self.imgs = {}
         self.annotations = {}
 
@@ -32,11 +32,7 @@ class COCODataPipe(IterDataPipe):
 
         for img in self.ann_json["images"]:
             id = img["id"]
-            if id not in self.annotations:
-                continue
             self.imgs[id] = img
-
-        assert len(self.annotations) == len(self.imgs)
 
     def __iter__(self):
         for id, img in self.imgs.items():
@@ -45,13 +41,16 @@ class COCODataPipe(IterDataPipe):
 
             boxes = []
             labels = []
-            for ann in self.annotations[id]:
+            for ann in self.annotations.get(id, []):
                 x, y, w, h = ann["bbox"]
                 boxes.append([x, y, x + w, y + h])
                 labels.append(ann["category_id"])
 
+            box_tensor = torch.as_tensor(boxes, dtype=torch.float32).reshape(
+                -1, 4
+            )
             bboxes = torchvision.datapoints.BoundingBox(
-                boxes,
+                box_tensor,
                 format=torchvision.datapoints.BoundingBoxFormat.XYXY,
                 spatial_size=(img.height, img.width),
             )
@@ -91,7 +90,7 @@ def crop(x):
 
 
 def build_datapipe(root, spec: TorchEvalSpec):
-    datapipe = COCODataPipe(root)
+    datapipe = COCODataPipe(root, spec.kwargs.get("split", "val2017"))
     datapipe = datapipe.sharding_filter()
     datapipe = dp.iter.Mapper(datapipe, zoom_out)
     datapipe = dp.iter.Mapper(datapipe, crop)
@@ -107,10 +106,11 @@ def build_datapipe(root, spec: TorchEvalSpec):
 
 
 def get_dataset(spec: TorchEvalSpec):
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
-    data_dir = data_dir
+    data_dir = spec.kwargs.get("dataset_path")
+    if not data_dir:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
 
     datapipe = build_datapipe(str(data_dir), spec)
     dataloader = DataLoader(

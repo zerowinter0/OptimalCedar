@@ -138,6 +138,15 @@ class SMPPipeVariantContext(PipeVariantContext):
     def shutdown(self) -> None:
         self.service.shutdown()
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("service", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.service = SMPService()
+
 
 class RayPipeVariantContext(PipeVariantContext):
     def __init__(
@@ -168,6 +177,15 @@ class RayPipeVariantContext(PipeVariantContext):
 
     def shutdown(self) -> None:
         self.service.shutdown()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("service", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.service = RayService(submit_batch_size=self.submit_batch_size)
 
     def set_submit_batch_size(self, size: int) -> None:
         self.submit_batch_size = size
@@ -240,6 +258,15 @@ class TFRayPipeVariantContext(PipeVariantContext):
 
     def shutdown(self) -> None:
         self.service.shutdown()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("service", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.service = RayService(submit_batch_size=self.submit_batch_size)
 
     def set_submit_batch_size(self, size: int) -> None:
         self.submit_batch_size = size

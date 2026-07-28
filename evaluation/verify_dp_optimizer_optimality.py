@@ -1,0 +1,585 @@
+"""Randomized exhaustive optimality verifier for :class:`DpOptimizer`.
+
+Each generated case has exactly six reorderable operators.  The verifier
+enumerates every legal topological order, every fusion partition, and every
+assignment of the three physical backends used by the case, then compares
+that independent oracle with the plan produced by DpOptimizer.
+
+All optimizer passes except caching are enabled. Prefetch and local parallelism
+do not alter this cost model, but enabling them exercises the requested setup.
+"""
+
+from __future__ import annotations
+
+import argparse
+import itertools
+import json
+import math
+import os
+import random
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Dict, Iterable, List, Sequence, Tuple
+
+from cedar.compose import Feature
+from cedar.compose import constants
+from cedar.compose.dp_optimizer import DpOptimizer
+from cedar.compose.optimizer import OptimizerOptions, PhysicalPlan
+from cedar.pipes import MapperPipe, Pipe, PipeVariantType
+from cedar.sources import IterSource
+
+
+def _identity(value):
+    return value
+
+
+NUM_OPERATORS = 6
+BACKENDS: Tuple[str, ...] = ("INPROCESS", "SMP", "RAY")
+
+
+def unconstrained_plan_count() -> int:
+    """Return the exact six-op plan count when there are no dependencies."""
+    partition_assignments = sum(
+        math.comb(NUM_OPERATORS - 1, blocks - 1) * len(BACKENDS) ** blocks
+        for blocks in range(1, NUM_OPERATORS + 1)
+    )
+    return math.factorial(NUM_OPERATORS) * partition_assignments
+
+
+@dataclass(frozen=True)
+class OperatorSpec:
+    tag: str
+    size_ratio: float
+    selectivity: float
+    costs: Dict[str, float]
+
+
+@dataclass(frozen=True)
+class GeneratedCase:
+    seed: int
+    operators: Tuple[OperatorSpec, ...]
+    # (predecessor index, successor index)
+    dependencies: Tuple[Tuple[int, int], ...]
+
+
+@dataclass(frozen=True)
+class ExhaustiveResult:
+    cost: float
+    order: Tuple[int, ...]
+    backends: Tuple[str, ...]
+    legal_orders: int
+    enumerated_plans: int
+
+
+@dataclass(frozen=True)
+class VerificationResult:
+    oracle: ExhaustiveResult
+    dp_cost: float
+    dp_order: Tuple[int, ...]
+    dp_backends: Tuple[str, ...]
+
+
+class GeneratedFeature(Feature):
+    def __init__(self, case: GeneratedCase) -> None:
+        super().__init__()
+        self.case = case
+
+    def _compose(self, source_pipes: List[Pipe]) -> Pipe:
+        pipe = source_pipes[0]
+        for index, spec in enumerate(self.case.operators):
+            predecessors = [
+                self.case.operators[pred].tag
+                for pred, succ in self.case.dependencies
+                if succ == index
+            ]
+            pipe = MapperPipe(pipe, _identity, tag=spec.tag)
+            if predecessors:
+                pipe = pipe.depends_on(predecessors)
+        return pipe
+
+
+def generate_case(seed: int, max_dependencies: int = 4) -> GeneratedCase:
+    """Generate one deterministic, sparse six-operator problem."""
+    if max_dependencies < 0:
+        raise ValueError("max_dependencies must be non-negative")
+
+    rng = random.Random(seed)
+    operators = tuple(
+        OperatorSpec(
+            tag=f"op_{index}",
+            size_ratio=round(rng.uniform(0.2, 1.5), 8),
+            selectivity=round(rng.uniform(0.2, 1.0), 8),
+            costs={
+                backend: round(rng.uniform(0.05, 20.0), 8)
+                for backend in BACKENDS
+            },
+        )
+        for index in range(NUM_OPERATORS)
+    )
+
+    possible_edges = [
+        (pred, succ)
+        for pred in range(NUM_OPERATORS)
+        for succ in range(pred + 1, NUM_OPERATORS)
+    ]
+    edge_limit = min(max_dependencies, len(possible_edges))
+    edge_count = rng.randint(0 if edge_limit == 0 else 1, edge_limit)
+    dependencies = tuple(sorted(rng.sample(possible_edges, edge_count)))
+    return GeneratedCase(seed, operators, dependencies)
+
+
+def _is_legal_order(
+    order: Sequence[int], dependencies: Iterable[Tuple[int, int]]
+) -> bool:
+    positions = {operator: position for position, operator in enumerate(order)}
+    return all(positions[pred] < positions[succ] for pred, succ in dependencies)
+
+
+def _partition_order(
+    order: Tuple[int, ...], boundary_mask: int
+) -> Tuple[Tuple[int, ...], ...]:
+    blocks: List[Tuple[int, ...]] = []
+    start = 0
+    for position in range(NUM_OPERATORS - 1):
+        if boundary_mask & (1 << position):
+            blocks.append(order[start : position + 1])
+            start = position + 1
+    blocks.append(order[start:])
+    return tuple(blocks)
+
+
+def _plan_cost(
+    case: GeneratedCase,
+    blocks: Sequence[Sequence[int]],
+    block_backends: Sequence[str],
+    objective: str = "additive",
+) -> float:
+    """Independent separable compute plus stage-boundary cost model."""
+    item_size = 1.0
+    cardinality = 1.0
+    volume = 1.0
+    cost = 0.0
+    local_work = 0.0
+    max_parallel_work = 0.0
+    total_inprocess_cost = sum(
+        operator.costs["INPROCESS"] for operator in case.operators
+    )
+    for block, backend in zip(blocks, block_backends):
+        block_input = volume
+        block_compute = 0.0
+        if backend == "SMP":
+            boundary_throughput = constants.LOCAL_PARALLELISM_THRESHOLD
+        elif backend == "RAY":
+            boundary_throughput = constants.RAY_STAGE_BOUNDARY_THROUGHPUT
+        else:
+            boundary_throughput = None
+        for operator_index in block:
+            operator = case.operators[operator_index]
+            operator_cost = operator.costs[backend]
+            isolated_backend_cost = operator_cost
+            if backend != "INPROCESS":
+                operator_cost = max(
+                    operator_cost,
+                    operator.costs["INPROCESS"]
+                    / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
+                )
+            if boundary_throughput is not None:
+                if (
+                    len(block) > 1
+                    and isolated_backend_cost
+                    > operator.costs["INPROCESS"]
+                    and (
+                        1.0
+                        + (
+                            isolated_backend_cost
+                            - operator.costs["INPROCESS"]
+                        )
+                        / total_inprocess_cost
+                    )
+                    > constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
+                ):
+                    slowdown = 1.0 + (
+                        isolated_backend_cost
+                        - operator.costs["INPROCESS"]
+                    ) / total_inprocess_cost
+                    operator_cost = (
+                        operator.costs["INPROCESS"] * slowdown
+                    )
+                else:
+                    profiled_boundary = (
+                        (1.0 + operator.size_ratio)
+                        / boundary_throughput
+                        * 1000.0
+                    )
+                    operator_cost = max(
+                        operator_cost - profiled_boundary, 0.0
+                    )
+                if (
+                    len(block) > 1
+                    and not (
+                        isolated_backend_cost
+                        > operator.costs["INPROCESS"]
+                        and (
+                            1.0
+                            + (
+                                isolated_backend_cost
+                                - operator.costs["INPROCESS"]
+                            )
+                            / total_inprocess_cost
+                        )
+                        > constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
+                    )
+                ):
+                    operator_cost = min(
+                        operator_cost,
+                        operator.costs["INPROCESS"],
+                    )
+            block_compute += volume * operator_cost
+            item_size *= operator.size_ratio
+            cardinality *= operator.selectivity
+            volume = item_size * cardinality
+        if backend != "INPROCESS" and len(block) > 1:
+            block_compute *= (
+                1.0 - constants.FUSED_OPERATOR_DISPATCH_DISCOUNT
+            )
+        stage_work = block_compute
+        if boundary_throughput is not None:
+            stage_work += (
+                (block_input + volume)
+                / boundary_throughput
+                * 1000.0
+            )
+        cost += stage_work
+        if backend == "INPROCESS":
+            local_work += stage_work
+        else:
+            max_parallel_work = max(max_parallel_work, stage_work)
+    if objective == "bottleneck":
+        return max(local_work, max_parallel_work)
+    if objective != "additive":
+        raise ValueError(f"Unknown objective: {objective}")
+    return cost
+
+
+def exhaustive_oracle(
+    case: GeneratedCase,
+    objective: str = "additive",
+    parallel_stage_limit: int | None = None,
+) -> ExhaustiveResult:
+    """Enumerate every legal order, fusion partition, and block backend."""
+    best_cost = math.inf
+    best_order: Tuple[int, ...] = ()
+    best_backends: Tuple[str, ...] = ()
+    legal_orders = 0
+    enumerated_plans = 0
+    for order in itertools.permutations(range(NUM_OPERATORS)):
+        if not _is_legal_order(order, case.dependencies):
+            continue
+        legal_orders += 1
+        for boundary_mask in range(1 << (NUM_OPERATORS - 1)):
+            blocks = _partition_order(order, boundary_mask)
+            for block_backends in itertools.product(BACKENDS, repeat=len(blocks)):
+                if (
+                    parallel_stage_limit is not None
+                    and sum(
+                        backend != "INPROCESS"
+                        for backend in block_backends
+                    )
+                    > parallel_stage_limit
+                ):
+                    continue
+                enumerated_plans += 1
+                cost = _plan_cost(
+                    case,
+                    blocks,
+                    block_backends,
+                    objective=objective,
+                )
+                if cost < best_cost:
+                    best_cost = cost
+                    best_order = order
+                    best_backends = tuple(
+                        backend
+                        for block, backend in zip(blocks, block_backends)
+                        for _ in block
+                    )
+    if not best_order:
+        raise RuntimeError("Generated dependency graph has no legal order")
+    return ExhaustiveResult(
+        best_cost, best_order, best_backends, legal_orders, enumerated_plans
+    )
+
+
+def _offload_throughput(
+    baseline_throughput: float,
+    total_inprocess_cost: float,
+    inprocess_cost: float,
+    target_cost: float,
+) -> float:
+    """Invert Cedar's Amdahl calculation so it yields ``target_cost``."""
+    denominator = 1.0 + (target_cost - inprocess_cost) / total_inprocess_cost
+    if denominator <= 0:
+        raise ValueError("Generated backend cost cannot be represented")
+    return baseline_throughput / denominator
+
+
+def build_profile(
+    case: GeneratedCase, feature: GeneratedFeature
+) -> Tuple[Dict, Dict[str, int]]:
+    """Encode direct per-backend costs in Cedar's profiling representation."""
+    p_id_by_tag = {
+        pipe.tag: p_id
+        for p_id, pipe in feature.logical_pipes.items()
+        if pipe.tag is not None
+    }
+    source_p_id = next(
+        p_id for p_id, pipe in feature.logical_pipes.items() if pipe.is_source()
+    )
+
+    total_inprocess_cost = sum(
+        operator.costs["INPROCESS"] for operator in case.operators
+    )
+    baseline_throughput = 1000.0 / total_inprocess_cost
+    input_sizes = {source_p_id: 1.0}
+    output_sizes = {source_p_id: 1.0}
+    latencies = {source_p_id: 0.0}
+    selectivities = {}
+
+    for operator in case.operators:
+        p_id = p_id_by_tag[operator.tag]
+        input_sizes[p_id] = 1.0
+        output_sizes[p_id] = operator.size_ratio
+        latencies[p_id] = operator.costs["INPROCESS"]
+        selectivities[p_id] = operator.selectivity
+
+    offloads: Dict[str, Dict[int, Dict[str, float]]] = {
+        "SMP": {},
+        "RAY": {},
+    }
+    for backend in ("SMP", "RAY"):
+        for operator in case.operators:
+            p_id = p_id_by_tag[operator.tag]
+            offloads[backend][p_id] = {
+                "throughput": _offload_throughput(
+                    baseline_throughput,
+                    total_inprocess_cost,
+                    operator.costs["INPROCESS"],
+                    operator.costs[backend],
+                )
+            }
+
+    profile = {
+        "baseline": {
+            "throughput": baseline_throughput,
+            "latencies": latencies,
+            "input_sizes": input_sizes,
+            "output_sizes": output_sizes,
+            "selectivities": selectivities,
+        },
+        "disk_info": {"read_latency": 0.0, "write_latency": 0.0},
+        "offloads": offloads,
+    }
+    return profile, p_id_by_tag
+
+
+def _linear_order(plan: PhysicalPlan, source_p_id: int) -> List[int]:
+    order: List[int] = []
+    current = source_p_id
+    visited = {source_p_id}
+    while plan.graph[current]:
+        if len(plan.graph[current]) != 1:
+            raise RuntimeError("DpOptimizer returned a non-linear plan")
+        current = next(iter(plan.graph[current]))
+        if current in visited:
+            raise RuntimeError("DpOptimizer returned a cyclic plan")
+        visited.add(current)
+        order.append(current)
+    if len(visited) != len(plan.graph):
+        raise RuntimeError("DpOptimizer returned a disconnected plan")
+    return order
+
+
+def run_dp_optimizer(
+    case: GeneratedCase,
+    objective: str = "additive",
+    parallel_stage_limit: int | None = None,
+) -> Tuple[float, Tuple[int, ...], Tuple[str, ...]]:
+    feature = GeneratedFeature(case)
+    feature.apply(IterSource([0]))
+    profile, p_id_by_tag = build_profile(case, feature)
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    old_objective = os.environ.get("CEDAR_DP_OBJECTIVE")
+    resource_env_names = (
+        "CEDAR_MATCH_PROFILE_RESOURCES",
+        "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS",
+        "CEDAR_PROFILE_MATCH_CPU_BUDGET",
+    )
+    old_resource_env = {
+        name: os.environ.get(name) for name in resource_env_names
+    }
+    try:
+        if objective == "bottleneck":
+            os.environ["CEDAR_DP_OBJECTIVE"] = "bottleneck"
+        elif objective == "additive":
+            os.environ.pop("CEDAR_DP_OBJECTIVE", None)
+        else:
+            raise ValueError(f"Unknown objective: {objective}")
+        if parallel_stage_limit is None:
+            for name in resource_env_names:
+                os.environ.pop(name, None)
+        else:
+            if parallel_stage_limit < 0:
+                raise ValueError("parallel_stage_limit must be non-negative")
+            os.environ["CEDAR_MATCH_PROFILE_RESOURCES"] = "1"
+            os.environ["CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"] = "1"
+            os.environ["CEDAR_PROFILE_MATCH_CPU_BUDGET"] = str(
+                parallel_stage_limit + 1
+            )
+        plan = optimizer.run(
+            profile,
+            OptimizerOptions(
+                enable_prefetch=True,
+                enable_offload=True,
+                enable_reorder=True,
+                enable_local_parallelism=True,
+                available_local_cpus=16,
+                enable_fusion=True,
+                enable_caching=False,
+            ),
+        )
+    finally:
+        if old_objective is None:
+            os.environ.pop("CEDAR_DP_OBJECTIVE", None)
+        else:
+            os.environ["CEDAR_DP_OBJECTIVE"] = old_objective
+        for name, old_value in old_resource_env.items():
+            if old_value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = old_value
+    source_p_id = next(
+        p_id for p_id, pipe in feature.logical_pipes.items() if pipe.is_source()
+    )
+    ordered_p_ids = _linear_order(plan, source_p_id)
+    index_by_p_id = {
+        p_id_by_tag[operator.tag]: index
+        for index, operator in enumerate(case.operators)
+    }
+    order: List[int] = []
+    backends: List[str] = []
+    for p_id in ordered_p_ids:
+        desc = plan.pipe_descs[p_id]
+        if p_id in index_by_p_id:
+            block = [index_by_p_id[p_id]]
+        elif desc.fused_pipes:
+            block = [index_by_p_id[x] for x in desc.fused_pipes]
+        else:
+            continue
+        order.extend(block)
+        backends.extend([desc.variant_type.name] * len(block))
+    cost = optimizer._last_dp_state_cost
+    return cost, tuple(order), tuple(backends)
+
+
+def verify_case(
+    case: GeneratedCase,
+    rel_tol: float = 1e-10,
+    abs_tol: float = 1e-10,
+    objective: str = "additive",
+    parallel_stage_limit: int | None = None,
+) -> VerificationResult:
+    oracle = exhaustive_oracle(
+        case,
+        objective=objective,
+        parallel_stage_limit=parallel_stage_limit,
+    )
+    dp_cost, dp_order, dp_backends = run_dp_optimizer(
+        case,
+        objective=objective,
+        parallel_stage_limit=parallel_stage_limit,
+    )
+
+    if not _is_legal_order(dp_order, case.dependencies):
+        raise AssertionError(
+            f"DpOptimizer returned an illegal order: seed={case.seed}, "
+            f"order={dp_order}, dependencies={case.dependencies}"
+        )
+    if not math.isclose(dp_cost, oracle.cost, rel_tol=rel_tol, abs_tol=abs_tol):
+        raise AssertionError(
+            "DpOptimizer is not globally optimal for generated case: "
+            f"seed={case.seed}, objective={objective}, "
+            f"oracle={oracle.cost:.15g}, "
+            f"dp={dp_cost:.15g}, oracle_order={oracle.order}, "
+            f"dp_order={dp_order}, oracle_backends={oracle.backends}, "
+            f"dp_backends={dp_backends}"
+        )
+    return VerificationResult(oracle, dp_cost, dp_order, dp_backends)
+
+
+def _write_failed_case(path: Path, case: GeneratedCase) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(asdict(case), indent=2), encoding="utf-8")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate sparse six-operator pipelines and compare DpOptimizer "
+            "against an independent exhaustive oracle."
+        )
+    )
+    parser.add_argument("--num-cases", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=20260715)
+    parser.add_argument("--max-dependencies", type=int, default=4)
+    parser.add_argument("--rel-tol", type=float, default=1e-10)
+    parser.add_argument("--abs-tol", type=float, default=1e-10)
+    parser.add_argument(
+        "--objective",
+        choices=("additive", "bottleneck"),
+        default="additive",
+    )
+    parser.add_argument(
+        "--failed-case",
+        type=Path,
+        default=Path("evaluation/failed_dp_optimality_case.json"),
+    )
+    args = parser.parse_args()
+
+    if args.num_cases <= 0:
+        parser.error("--num-cases must be positive")
+
+    print(f"unconstrained_plan_count={unconstrained_plan_count()}")
+    seed_rng = random.Random(args.seed)
+    for case_index in range(args.num_cases):
+        case_seed = seed_rng.randrange(0, 2**63)
+        case = generate_case(case_seed, args.max_dependencies)
+        try:
+            result = verify_case(
+                case,
+                args.rel_tol,
+                args.abs_tol,
+                objective=args.objective,
+            )
+        except Exception:
+            _write_failed_case(args.failed_case, case)
+            print(f"Failed case saved to {args.failed_case}")
+            raise
+
+        print(
+            f"[case {case_index:04d}] PASS seed={case_seed} "
+            f"dependencies={len(case.dependencies)} "
+            f"objective={args.objective} "
+            f"legal_orders={result.oracle.legal_orders} "
+            f"enumerated_plans={result.oracle.enumerated_plans} "
+            f"cost={result.dp_cost:.12f}"
+        )
+
+    print(
+        f"PASS: DpOptimizer matched the exhaustive optimum in "
+        f"all {args.num_cases} generated cases "
+        f"for objective={args.objective}."
+    )
+
+if __name__ == "__main__":
+    main()

@@ -161,6 +161,10 @@ def cedar_pipe(spec: CedarPipeSpec) -> Any:
                 super().__init__(*args, **kwargs)
                 self.pipe_spec = spec
 
+        # Make decorator-generated pipe classes importable by spawn workers.
+        WrappedPipe.__name__ = cls.__name__
+        WrappedPipe.__qualname__ = cls.__qualname__
+        WrappedPipe.__module__ = cls.__module__
         return WrappedPipe
 
     return pipe_decorator

@@ -94,9 +94,11 @@ class SMPService:
 
     def shutdown(self):
         logger.info("Shutting down SMP Procs")
-        for proc in self.procs:
-            proc.terminate()
-        self.procs = []
+        if self.procs is not None:
+            for proc in self.procs:
+                if getattr(proc, "_popen", None) is not None:
+                    proc.terminate()
+            self.procs = []
         if self.req_q is not None:
             self.req_q.close()
             self.req_q.cancel_join_thread()

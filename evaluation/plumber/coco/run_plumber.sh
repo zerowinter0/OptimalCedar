@@ -1,2 +1,5 @@
-#!/bin/bash
-python tf_dataset.py --profile && python graph_rewrites.py --skip_baseline=False
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${SCRIPT_DIR}/../run_workload.sh" coco "$@"

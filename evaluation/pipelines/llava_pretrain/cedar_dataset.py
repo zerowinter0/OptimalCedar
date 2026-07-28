@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import logging
 import multiprocessing as mp
+import os
 import pathlib
 from typing import List
 
@@ -29,6 +30,11 @@ DEFAULT_DATASET_PATH = "/tmp/llava_pretrain_cedar_fixture.jsonl"
 DEFAULT_IMAGE_ROOT = ""
 DEFAULT_PROFILE_PATH = "/tmp/llava_pretrain_feature_profile.yml"
 
+# LLaVA uses CUDA-backed CLIP/BLIP filters. Cedar local multiprocessing actors
+# must not fork after CUDA initialization; spawn gives each actor a fresh CUDA
+# context instead of inheriting a poisoned forked state.
+mp.set_start_method(os.environ.get("LLAVA_MP_START_METHOD", "spawn"), force=True)
+
 
 class LlavaPretrainFeature(Feature):
     """Cedar Feature matching the Data-Juicer LLaVA pretrain process list."""
@@ -44,14 +50,14 @@ class LlavaPretrainFeature(Feature):
             fp,
             dj_ops.SetImageRootMapper(self.image_root),
             tag="image_root",
-        )
+        ).fix()
 
-        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode")
+        fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode").fix()
         fp = MapperPipe(
             fp,
             dj_ops.PunctuationNormalizationMapper(),
             tag="punctuation_norm",
-        )
+        ).fix()
 
         fp = FilterPipe(
             fp,
@@ -150,6 +156,36 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
     feature = LlavaPretrainFeature(image_root=image_root)
     feature.apply(source)
 
+    # Cedar implements local parallelism by cloning and sharding the complete
+    # feature. Each clone would therefore materialize its own CUDA-backed CLIP
+    # and BLIP models. Bound complete feature replicas to the GPU-operator
+    # concurrency used by the experiment so every optimizer is evaluated under
+    # the same GPU resource budget. CPU-only workloads remain unaffected.
+    gpu_operator_parallelism = int(
+        os.environ.get("LLAVA_GPU_OPERATOR_PARALLELISM", "1")
+    )
+    if gpu_operator_parallelism < 1:
+        raise ValueError("LLAVA_GPU_OPERATOR_PARALLELISM must be at least 1")
+    if (
+        gpu_operator_parallelism > 1
+        and os.environ.get("LLAVA_ALLOW_GPU_FEATURE_REPLICATION") != "1"
+    ):
+        raise RuntimeError(
+            "LLaVA contains CUDA-backed operators inside INPROCESS/fused "
+            "blocks. Replicating the complete Feature would duplicate models "
+            "and invalidate the global GPU budget. Keep "
+            "LLAVA_GPU_OPERATOR_PARALLELISM=1 for paper runs; set "
+            "LLAVA_ALLOW_GPU_FEATURE_REPLICATION=1 only for explicit unsafe "
+            "diagnostics."
+        )
+    local_worker_budget = min(mp.cpu_count(), gpu_operator_parallelism)
+    logging.getLogger(__name__).info(
+        "Using a uniform LLaVA GPU operator parallelism of %d for all "
+        "optimizers (local worker budget=%d).",
+        gpu_operator_parallelism,
+        local_worker_budget,
+    )
+
     if spec.config:
         dataset = DataSet(
             ctx,
@@ -169,7 +205,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
             optimizer_options=OptimizerOptions(
                 enable_prefetch=not spec.disable_prefetch,
                 est_throughput=None,
-                available_local_cpus=mp.cpu_count(),
+                available_local_cpus=local_worker_budget,
                 enable_offload=not spec.disable_offload,
                 enable_reorder=not spec.disable_reorder,
                 enable_caching=not spec.disable_caching,
@@ -226,7 +262,7 @@ def main() -> None:
     parser.add_argument(
         "--use_my_optimizer",
         type=int,
-        choices=[0, 1, 2, 3, 4, 5, 6],
+        choices=list(range(9)),
         default=0,
     )
     parser.add_argument("--disable_optimizer", action="store_true")

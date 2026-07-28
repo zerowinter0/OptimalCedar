@@ -11,6 +11,7 @@ transformers==4.40.2
 pyyaml
 h5py
 pandas
+matplotlib==3.7.5
 responses
 ray[default]==2.7.0
 Pympler
@@ -22,3 +23,7 @@ librosa
 langdetect
 pyarrow==13.0.0
 numpy==1.26.0
+emoji==2.2.0
+datasets==2.19.2
+huggingface-hub==0.36.2
+zstandard==0.23.0

@@ -27,6 +27,9 @@
 - `run_profile_sensitivity.sh`：E6，profile 样本量敏感性。
 - `run_dp_ablation.py`：消融实验执行器。
 - `summarize_results.py`：将 JSON/CSV 汇总成论文表格友好的 CSV 和 Markdown。
+- `run_scaled_reuse_plan_matrix.sh`：复用既有 profile/计划，按
+  `SCALED_REUSE_PLAN_PROTOCOL.md` 放大数据量，并运行 16 个负载的 Cedar
+  与跨系统正式矩阵。
 
 ## 服务器迁移步骤
 
@@ -87,12 +90,13 @@ python evaluation/chapter6_experiments/summarize_results.py \
 
 ## 推荐执行策略
 
+Profile遵循原 Cedar 语义：baseline固定在CPU 0，每个baseline、Ray/SMP算子配置分别运行约10秒；profile不受运行阶段的样本数参数影响。
+
 先做 smoke：
 
 ```bash
 CH6_WORKLOADS=bloom_oscar \
 CH6_REPEATS=1 \
-CH6_PROFILE_SAMPLES=20 \
 CH6_DATA_NUM_TOTAL_SAMPLES=20 \
 CH6_FULL_DATA_RUN=0 \
 bash evaluation/chapter6_experiments/run_all.sh
@@ -103,7 +107,6 @@ bash evaluation/chapter6_experiments/run_all.sh
 ```bash
 CH6_WORKLOADS="bloom_oscar llava_pretrain wikitext103 simclrv2" \
 CH6_REPEATS=3 \
-CH6_PROFILE_SAMPLES=200 \
 CH6_FULL_DATA_RUN=1 \
 bash evaluation/chapter6_experiments/run_all.sh
 ```

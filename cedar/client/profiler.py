@@ -159,7 +159,8 @@ class FeatureProfiler:
         for idx, p_id in enumerate(ds.trace_order[1:], start=1):
             prev_p_id = ds.trace_order[idx - 1]
 
-            # Normalize to per sample
+            # Normalize to per sample. Preserve Cedar's calculation when
+            # tracing is complete; only fall back when size tracing failed.
             prev_sample_size = ds.size_dict.get(prev_p_id, 1) or 1
             input_size = ds.data_size_dict.get(prev_p_id, 0) / prev_sample_size
             curr_data_size = ds.data_size_dict.get(p_id)
@@ -172,7 +173,6 @@ class FeatureProfiler:
                     input_size,
                 )
             output_size = curr_data_size / (ds.size_dict.get(p_id, 1) or 1)
-
             self.data_sizes[p_id].append((input_size, output_size))
 
     def calculate_avg_latency_per_sample(self) -> Dict[int, float]:

@@ -11,9 +11,9 @@ ch6_log "Chapter 6 result directory: ${CH6_OUT_DIR}"
 ch6_log "Workloads: ${CH6_WORKLOADS}"
 
 bash "${SCRIPT_DIR}/run_profile_workloads.sh"
+bash "${SCRIPT_DIR}/run_runtime.sh"
 bash "${SCRIPT_DIR}/run_optimizer_overhead.sh"
 bash "${SCRIPT_DIR}/run_plan_quality.sh"
-bash "${SCRIPT_DIR}/run_runtime.sh"
 bash "${SCRIPT_DIR}/run_ablation.sh"
 bash "${SCRIPT_DIR}/run_cache_epoch.sh"
 

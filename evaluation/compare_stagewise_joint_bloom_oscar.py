@@ -18,11 +18,11 @@ from evaluation.pipelines.bloom_oscar.cedar_dataset import get_dataset
 
 
 COST_RE = re.compile(
-    r"\[(DpOptimizer|DpSeperateOptimizer)\] Optimized plan cost = ([0-9eE+\-.]+)"
+    r"\[(DpOptimizer|DpTwoStageOptimizer)\] Optimized plan cost = ([0-9eE+\-.]+)"
     r"|\[(DpCedarOptimizer)\] Optimized plan cost \(calculate_cost\) = ([0-9eE+\-.]+)"
 )
 ORDER_RE = re.compile(
-    r"\[(DpOptimizer|DpSeperateOptimizer|DpCedarOptimizer)\] "
+    r"\[(DpOptimizer|DpTwoStageOptimizer|DpCedarOptimizer)\] "
     r"(?:Best inner order \(DP\)|Stage-1 reorder order|DP reorder order): (.+)"
 )
 CACHE_RE = re.compile(r"DP suggests inserting cache after pipe ([0-9]+)")
@@ -214,7 +214,7 @@ def main() -> None:
     joint_log = _run_optimizer(dataset_path, profile_path, optimizer_selector=2)
 
     cedar_staged_cost = _extract_cost(cedar_staged_log, "DpCedarOptimizer")
-    stagewise_cost = _extract_cost(stagewise_log, "DpSeperateOptimizer")
+    stagewise_cost = _extract_cost(stagewise_log, "DpTwoStageOptimizer")
     joint_cost = _extract_cost(joint_log, "DpOptimizer")
     cedar_improvement = (cedar_staged_cost - joint_cost) / cedar_staged_cost * 100.0
     separate_improvement = (stagewise_cost - joint_cost) / stagewise_cost * 100.0
@@ -236,7 +236,7 @@ def main() -> None:
     print(f"joint_vs_cedar_staged_improvement_pct: {cedar_improvement:.2f}")
     print(f"joint_vs_stagewise_dp_improvement_pct: {separate_improvement:.2f}")
     print(f"cedar_staged_order: {_extract_order(cedar_staged_log, 'DpCedarOptimizer')}")
-    print(f"stagewise_order: {_extract_order(stagewise_log, 'DpSeperateOptimizer')}")
+    print(f"stagewise_order: {_extract_order(stagewise_log, 'DpTwoStageOptimizer')}")
     print(f"joint_order: {_extract_order(joint_log, 'DpOptimizer')}")
     print(f"cedar_staged_cache_after: {_extract_cache(cedar_staged_log)}")
     print(f"stagewise_cache_after: {_extract_cache(stagewise_log)}")

@@ -114,6 +114,19 @@ class Pipe(abc.ABC):
 
         self._pipes_to_fuse = None
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        event = state.pop("ok_to_mutate", None)
+        state["_ok_to_mutate_is_set"] = event is None or event.is_set()
+        return state
+
+    def __setstate__(self, state):
+        is_set = state.pop("_ok_to_mutate_is_set", True)
+        self.__dict__.update(state)
+        self.ok_to_mutate = threading.Event()
+        if is_set:
+            self.ok_to_mutate.set()
+
     def _to_inprocess(
         self, variant_ctx: InProcessPipeVariantContext
     ) -> InProcessPipeVariant:

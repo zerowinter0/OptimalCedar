@@ -1,4 +1,4 @@
-dispatcher_addr: 10.138.0.14
+dispatcher_addr: 127.0.0.1
 dispatcher_port: 5000 # dispatcher port 
 num_profile_steps: 100 # number of profiling steps
 num_initial_steps: 10 # number of initial steps to skip metric profiling

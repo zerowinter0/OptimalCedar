@@ -74,6 +74,37 @@ def test_mp_dataset_epochs():
     # dataset._exit()
 
 
+def test_mp_dataset_drains_truncated_epoch_before_next_epoch():
+    class TestFeature(Feature):
+        def _compose(self, source_pipes: List[Pipe]):
+            return NoopPipe(source_pipes[0])
+
+    data = range(200)
+    feats = {}
+    for i in range(2):
+        feature = TestFeature()
+        feature.apply(IterSource(data))
+        feats[str(i)] = feature
+
+    dataset = DataSet(
+        CedarContext(),
+        feats,
+        enable_controller=False,
+        iter_mode="mp",
+        prefetch=False,
+        enable_optimizer=False,
+    )
+
+    first_epoch = iter(dataset)
+    for _ in range(25):
+        next(first_epoch)
+
+    # Starting a new epoch must discard the unfinished epoch, including all
+    # of its sentinels, rather than letting stale sentinels end this epoch.
+    out = list(dataset)
+    assert sorted(out) == sorted(list(data) * 2)
+
+
 def test_epoch():
     class TestFeature(Feature):
         def _compose(self, source_pipes: List[Pipe]):

@@ -45,6 +45,11 @@ def crop(x):
     return x
 
 
+def get_boxes(x):
+    """Pickle-safe equivalent of torchvision's labels_getter="boxes"."""
+    return x["boxes"]
+
+
 class COCOFeature(Feature):
     def __init__(self, batch_size: int):
         super().__init__()
@@ -55,7 +60,7 @@ class COCOFeature(Feature):
         fp = MapperPipe(fp, zoom_out, tag="zoom")
         fp = MapperPipe(fp, crop, tag="crop").depends_on(["zoom"])
         fp = MapperPipe(
-            fp, v2.SanitizeBoundingBox(labels_getter="boxes"), tag="sanitize"
+            fp, v2.SanitizeBoundingBox(labels_getter=get_boxes), tag="sanitize"
         ).depends_on(["crop"])
         fp = MapperPipe(fp, v2.RandomHorizontalFlip(p=1)).depends_on(
             ["sanitize"]
@@ -71,7 +76,10 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
     )
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
-    source = COCOSource(str(data_dir))
+    # Keep the split explicit in experiment metadata while allowing the
+    # reduced validation protocol to reuse the already materialized val set.
+    split = (spec.kwargs or {}).get("split", "val2017")
+    source = COCOSource(str(data_dir), split=split)
     feature = COCOFeature(batch_size=spec.batch_size)
     feature.apply(source)
 
@@ -99,6 +107,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
                 enable_reorder=not spec.disable_reorder,
                 enable_local_parallelism=not spec.disable_parallelism,
                 enable_fusion=not spec.disable_fusion,
+                num_samples=getattr(spec, "num_total_samples", None),
                 use_my_optimizer=getattr(spec, "use_my_optimizer", 0),
                 reorder_timeout_sec=getattr(spec, "reorder_timeout_sec", None),
             ),

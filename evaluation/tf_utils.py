@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class TFEvalSpec:
@@ -11,6 +11,7 @@ class TFEvalSpec:
         iteration_time: Optional[float] = None,
         service_addr: Optional[str] = None,
         read_from_remote: bool = False,
+        kwargs: Optional[Dict[str, Any]] = None,
     ):
         self.batch_size = batch_size
         self.num_parallel_calls = num_parallel_calls
@@ -19,3 +20,4 @@ class TFEvalSpec:
         self.iteration_time = iteration_time
         self.service_addr = service_addr
         self.read_from_remote = read_from_remote
+        self.kwargs = dict(kwargs or {})

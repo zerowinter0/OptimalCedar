@@ -1,6 +1,6 @@
 """
 Compare runtime performance between Cedar's original Optimizer, DjOptimizer,
-DpOptimizer, DpSeperateOptimizer, and DpCedarOptimizer.
+DpOptimizer, DpTwoStageOptimizer, and DpCedarOptimizer.
 
 The workload timer starts only after the dataset has been constructed, so the
 profile/optimization/setup time is reported separately and is not included in
@@ -12,9 +12,13 @@ import contextlib
 import gc
 import json
 import logging
+import math
+import multiprocessing as mp
 import os
+import queue
 import signal
 import shutil
+import statistics
 import tempfile
 import threading
 import time
@@ -36,16 +40,21 @@ OPTIMIZERS = {
     "dj_optimizer": 3,
     "optimizer": 0,
     "dp_optimizer": 2,
+    "dp_two_stage_optimizer": 4,
+    # Backward-compatible CLI spellings; omitted from the default order.
     "dp_seperate_optimizer": 4,
+    "dp_separate_optimizer": 4,
     "dp_cedar_optimizer": 5,
+    "exp_optimizer": 7,
+    "pecan_optimizer": 8,
 }
 
 DEFAULT_OPTIMIZER_ORDER = [
     "dj_optimizer",
-    "optimizer",
     "dp_cedar_optimizer",
     "dp_optimizer",
-    "dp_seperate_optimizer",
+    "dp_two_stage_optimizer",
+    "optimizer",
 ]
 
 REQUIRED_PROFILE_KEYS = {
@@ -57,15 +66,81 @@ OPTIMIZER_TIME_LIMIT_SEC = 5 * 60
 OPTIMIZER_RSS_LIMIT_BYTES = 405078136832
 
 
-def _object_disk_cache_dir() -> Path:
-    return Path(tempfile.gettempdir()) / f"cedar_{os.getpid()}"
+def _cache_component(value: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in value)
 
 
-def _clear_object_disk_cache_dir() -> None:
-    cache_dir = _object_disk_cache_dir()
-    if cache_dir.exists():
-        logger.info("Clearing Cedar object cache directory %s", cache_dir)
+def _configure_object_disk_cache(
+    args: argparse.Namespace, optimizer_name: str, reset: bool
+) -> Path:
+    results_path = Path(args.results_path).resolve()
+    try:
+        experiment_dir = results_path.parents[2]
+    except IndexError:
+        experiment_dir = results_path.parent
+    workload_name = Path(args.dataset_file).resolve().parent.name
+    namespace = (
+        f"{_cache_component(workload_name)}__"
+        f"{_cache_component(optimizer_name)}"
+    )
+    cache_root = experiment_dir / "cache"
+    cache_dir = cache_root / namespace
+    os.environ["CEDAR_CACHE_ROOT"] = str(cache_root)
+    os.environ["CEDAR_CACHE_NAMESPACE"] = namespace
+    os.environ.pop("CEDAR_CACHE_SHARD", None)
+    if reset and cache_dir.exists():
+        logger.info("Clearing persistent Cedar cache namespace %s", cache_dir)
         shutil.rmtree(cache_dir)
+    logger.info(
+        "Configured persistent Cedar cache namespace %s for workload=%s "
+        "optimizer=%s",
+        cache_dir,
+        workload_name,
+        optimizer_name,
+    )
+    return cache_dir
+
+
+def _object_disk_cache_is_complete(dataset: Any) -> bool:
+    cache_root = os.environ.get("CEDAR_CACHE_ROOT")
+    namespace = os.environ.get("CEDAR_CACHE_NAMESPACE")
+    if not cache_root or not namespace:
+        return False
+    cache_dir = Path(cache_root) / namespace
+    expected_shards = (
+        len(getattr(dataset, "features", {}))
+        if getattr(dataset, "_iter_mode", "default") == "mp"
+        else 1
+    )
+    manifests = list(cache_dir.glob("*/.manifest.json"))
+    if len(manifests) != expected_shards:
+        return False
+    try:
+        return all(json.load(open(path)).get("complete") is True for path in manifests)
+    except (OSError, ValueError):
+        return False
+
+
+def _wait_for_object_disk_cache_complete(
+    dataset: Any,
+    timeout_sec: float = 60.0,
+    poll_interval_sec: float = 0.1,
+) -> bool:
+    """Wait for multiprocessing cache workers to commit their manifests.
+
+    The requested sample limit can be reached just before the worker processes
+    finish handling end-of-stream and atomically commit their shard manifests.
+    Treat that short shutdown window as asynchronous completion rather than a
+    failed cache warmup.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        if _object_disk_cache_is_complete(dataset):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(poll_interval_sec, remaining))
 
 
 def _parse_dataset_kwargs(raw: Optional[str]) -> Dict[str, Optional[str]]:
@@ -207,6 +282,30 @@ def _optimizer_resource_guard(
 
 
 def _configure_optimizer_runtime(args: argparse.Namespace) -> None:
+    if args.match_profile_resources:
+        os.environ["CEDAR_MATCH_PROFILE_RESOURCES"] = "1"
+        os.environ["CEDAR_PROFILE_MATCH_CPU_BUDGET"] = str(args.cpu_budget)
+        logger.warning(
+            "Enabled strict profile resource matching with unified "
+            "CPU budget=%d.",
+            args.cpu_budget,
+        )
+    else:
+        os.environ.pop("CEDAR_MATCH_PROFILE_RESOURCES", None)
+        os.environ.pop("CEDAR_PROFILE_MATCH_CPU_BUDGET", None)
+
+    if args.fixed_local_workers_ablation is None:
+        os.environ.pop("CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS", None)
+    else:
+        os.environ["CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"] = str(
+            args.fixed_local_workers_ablation
+        )
+        logger.warning(
+            "FIXED-LOCAL-WORKER ABLATION: forcing local_workers=%d; "
+            "CPU budget may be intentionally underutilized.",
+            args.fixed_local_workers_ablation,
+        )
+
     if args.ray_available_parallelism is None:
         return
 
@@ -224,14 +323,6 @@ def _normalize_ray_args(args: argparse.Namespace) -> None:
         logger.warning("--ray_ip was provided; enabling --use_ray automatically.")
         args.use_ray = True
 
-    if args.ray_ip:
-        logger.warning(
-            "--ray_ip=%s was provided, but this script is configured to use "
-            "local Ray only. Ignoring the remote Ray address.",
-            args.ray_ip,
-        )
-        args.ray_ip = ""
-
     if args.use_ray and args.disable_offload:
         logger.warning(
             "Ray is configured, but --disable_offload is set. Optimizers will "
@@ -243,14 +334,58 @@ def _verify_local_ray(args: argparse.Namespace) -> Dict[str, Any]:
     if not args.use_ray:
         return {}
 
+    address = None
+    if args.ray_ip:
+        if ":" in args.ray_ip:
+            address = args.ray_ip
+        else:
+            address = f"ray://{args.ray_ip}:10001"
+    logger.info("Verifying Ray resources at %s.", address or "local instance")
+    # Keep Ray out of this process before Cedar forks its local workers. Ray
+    # gRPC background state remains unsafe to fork even after ray.shutdown().
+    spawn_ctx = mp.get_context("spawn")
+    result_queue = spawn_ctx.Queue()
+    verifier = spawn_ctx.Process(
+        target=_query_ray_resources,
+        args=(address, result_queue),
+    )
+    verifier.start()
+    verifier.join(timeout=60)
+    if verifier.is_alive():
+        verifier.terminate()
+        verifier.join(timeout=5)
+        raise RuntimeError("Timed out while verifying Ray resources")
+    if verifier.exitcode != 0:
+        raise RuntimeError(
+            f"Ray resource verifier exited with code {verifier.exitcode}"
+        )
+    try:
+        status, payload = result_queue.get(timeout=5)
+    except queue.Empty as exc:
+        raise RuntimeError("Ray resource verifier returned no result") from exc
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
+    if status == "error":
+        raise RuntimeError(f"Failed to verify Ray resources: {payload}")
+    logger.info("Local Ray resources: %s", payload)
+    return payload
+
+
+def _query_ray_resources(
+    address: Optional[str], result_queue: mp.Queue
+) -> None:
+    """Query Ray in an isolated process so the benchmark remains fork-safe."""
     import ray
 
-    logger.info("Verifying local Ray resources.")
     try:
-        ray.init(ignore_reinit_error=True)
-        resources = ray.cluster_resources()
-        logger.info("Local Ray resources: %s", resources)
-        return dict(resources)
+        if address:
+            ray.init(address, ignore_reinit_error=True)
+        else:
+            ray.init(ignore_reinit_error=True)
+        result_queue.put(("ok", dict(ray.cluster_resources())))
+    except BaseException as exc:
+        result_queue.put(("error", repr(exc)))
     finally:
         if ray.is_initialized():
             ray.shutdown()
@@ -348,7 +483,9 @@ def _summarize_setup_only(
     return result
 
 
-def _calculate_plan_costs(dataset: Any) -> Dict[str, float]:
+def _calculate_plan_costs(
+    dataset: Any, profiled_stats: Optional[str] = None
+) -> Dict[str, float]:
     if getattr(dataset, "feature_plans", None) is None:
         raise RuntimeError("Dataset did not produce optimized feature plans.")
 
@@ -362,6 +499,15 @@ def _calculate_plan_costs(dataset: Any) -> Dict[str, float]:
             raise RuntimeError(f"Could not find optimizer for feature {f_name}.")
 
         optimizer = feature.optimizer
+        if not hasattr(optimizer, "profiled_stats"):
+            loaded_profile = _load_profile(profiled_stats or "")
+            if loaded_profile is None:
+                raise RuntimeError(
+                    f"Optimizer for feature {f_name} does not retain profiled_stats, "
+                    "and no readable profiled_stats file was provided."
+                )
+            optimizer.profiled_stats = loaded_profile
+            optimizer._init_stats()
         caching_on = optimizer._get_cache_pid(plan) is not None
         fused_blocks = [
             list(desc.fused_pipes)
@@ -402,6 +548,19 @@ def _new_workload_runner_like(workload_runner: Any) -> Any:
     )
 
 
+def _close_workload_runner(workload_runner: Any) -> None:
+    if workload_runner is None:
+        return
+    close = getattr(workload_runner, "close", None)
+    if callable(close):
+        close()
+        return
+    dataset = getattr(workload_runner, "dataset", None)
+    close = getattr(dataset, "close", None)
+    if callable(close):
+        close()
+
+
 def _summarize_timeout(
     name: str,
     setup_time_sec: float,
@@ -425,6 +584,7 @@ def _summarize_timeout(
 
 
 def _summarize_optimizer_overhead(
+    args: argparse.Namespace,
     name: str,
     setup_time_sec: float,
     error: _OptimizerResourceExceeded,
@@ -444,6 +604,12 @@ def _summarize_optimizer_overhead(
         "optimizer_overhead_too_high": True,
         "optimizer_time_limit_sec": OPTIMIZER_TIME_LIMIT_SEC,
         "optimizer_rss_limit_bytes": OPTIMIZER_RSS_LIMIT_BYTES,
+        "cedar_runs_last": False,
+        "cedar_reorder_timeout_sec": args.cedar_reorder_timeout_sec,
+        "cedar_runtime_timeout_enabled": (
+            not args.disable_cedar_runtime_timeout and not args.skip_workload
+        ),
+        "cedar_timeout_multiplier": args.cedar_timeout_multiplier,
         "error": error.detail,
     }
 
@@ -488,6 +654,45 @@ def _average_repeat_results(
         if values:
             result[field] = _mean(values)
 
+    result["statistics"] = {}
+    # Student-t critical values for two-sided 95% confidence intervals.
+    t95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
+           6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228}
+    for field in numeric_fields:
+        values = [
+            float(item[field])
+            for item in repeat_results
+            if field in item and isinstance(item[field], (int, float))
+        ]
+        if not values:
+            continue
+        mean = _mean(values)
+        nonfinite_count = sum(not math.isfinite(value) for value in values)
+        if nonfinite_count:
+            # Infinity is an intentional result for optimizer timeout/resource
+            # failures. Its variance and confidence interval are undefined, but
+            # the repeated timeout itself must remain visible in the output.
+            result["statistics"][field] = {
+                "n": len(values),
+                "finite_n": len(values) - nonfinite_count,
+                "nonfinite_n": nonfinite_count,
+                "mean": mean,
+                "stddev": None,
+                "ci95_low": None,
+                "ci95_high": None,
+            }
+            continue
+        stddev = statistics.stdev(values) if len(values) > 1 else 0.0
+        critical = t95.get(len(values) - 1, 1.96)
+        half_width = critical * stddev / (len(values) ** 0.5)
+        result["statistics"][field] = {
+            "n": len(values),
+            "mean": mean,
+            "stddev": stddev,
+            "ci95_low": mean - half_width,
+            "ci95_high": mean + half_width,
+        }
+
     if all("plan_costs_by_feature" in item for item in repeat_results):
         feature_names = set()
         for item in repeat_results:
@@ -512,6 +717,18 @@ def _average_repeat_results(
     return result
 
 
+def _workload_runtime_for_timeout(result: Dict[str, Any]) -> Optional[float]:
+    if result.get("workload_skipped") or result.get("timed_out"):
+        return None
+    runtime = result.get("workload_wall_time_sec")
+    if isinstance(runtime, (int, float)) and runtime > 0:
+        return float(runtime)
+    runtime = result.get("perf_time_sec")
+    if isinstance(runtime, (int, float)) and runtime > 0:
+        return float(runtime)
+    return None
+
+
 def _run_one(
     args: argparse.Namespace,
     optimizer_name: str,
@@ -520,13 +737,11 @@ def _run_one(
 ) -> Dict[str, Any]:
     spec = _make_spec(args, use_my_optimizer, reorder_timeout_sec)
     workload_runner = None
+    dataset = None
     cache_warmup_wall_time_sec = 0.0
 
     logger.info("Preparing dataset with %s...", optimizer_name)
     try:
-        if not args.skip_workload and not args.disable_caching:
-            _clear_object_disk_cache_dir()
-
         setup_start = time.perf_counter()
         try:
             with _optimizer_resource_guard(
@@ -539,7 +754,7 @@ def _run_one(
                     )
                     dataset_getter = getattr(module, args.dataset_func)
                     dataset = dataset_getter(spec)
-                    plan_costs_by_feature = _calculate_plan_costs(dataset)
+                    plan_costs_by_feature = _calculate_plan_costs(dataset, args.profiled_stats)
                     plan_cost = sum(plan_costs_by_feature.values())
                     logger.info(
                         "%s optimized plan cost (calculate_cost) = %s",
@@ -569,6 +784,7 @@ def _run_one(
                 e.detail,
             )
             return _summarize_optimizer_overhead(
+                args,
                 optimizer_name,
                 setup_time_sec,
                 e,
@@ -585,6 +801,7 @@ def _run_one(
                 error.detail,
             )
             return _summarize_optimizer_overhead(
+                args,
                 optimizer_name,
                 setup_time_sec,
                 error,
@@ -640,20 +857,41 @@ def _run_one(
             not args.disable_caching
             and _dataset_has_object_disk_cache(workload_runner.dataset)
         ):
-            logger.info(
-                "Plan for %s contains ObjectDiskCachePipe; running one "
-                "unmeasured warmup pass to materialize cache.",
-                optimizer_name,
-            )
-            warmup_start = time.perf_counter()
-            workload_runner.run()
-            cache_warmup_wall_time_sec = time.perf_counter() - warmup_start
-            logger.info(
-                "Finished cache warmup for %s in %.6fs; measuring second pass.",
-                optimizer_name,
-                cache_warmup_wall_time_sec,
-            )
-            workload_runner = _new_workload_runner_like(workload_runner)
+            if _object_disk_cache_is_complete(workload_runner.dataset):
+                logger.info(
+                    "Reusing complete persistent cache for %s; no warmup needed.",
+                    optimizer_name,
+                )
+            else:
+                logger.info(
+                    "Plan for %s contains ObjectDiskCachePipe; running one "
+                    "unmeasured warmup pass to materialize its persistent cache.",
+                    optimizer_name,
+                )
+                warmup_start = time.perf_counter()
+                workload_runner.run()
+                cache_warmup_wall_time_sec = time.perf_counter() - warmup_start
+                if not _wait_for_object_disk_cache_complete(
+                    workload_runner.dataset
+                ):
+                    raise RuntimeError(
+                        f"Cache warmup for {optimizer_name} finished without "
+                        "committing every worker shard"
+                    )
+                logger.info(
+                    "Finished cache warmup for %s in %.6fs; measuring from "
+                    "the committed cache.",
+                    optimizer_name,
+                    cache_warmup_wall_time_sec,
+                )
+                workload_runner = _new_workload_runner_like(workload_runner)
+
+        if args.warmup_runs and args.disable_caching:
+            logger.info("Running %d unmeasured warmup pass(es) for %s.", args.warmup_runs, optimizer_name)
+            for _ in range(args.warmup_runs):
+                workload_runner.run()
+                workload_runner.epoch_run_times.clear()
+                workload_runner.epoch_num_samples.clear()
 
         workload_start = time.perf_counter()
         workload_runner.run()
@@ -666,7 +904,16 @@ def _run_one(
             cache_warmup_wall_time_sec,
         )
     finally:
+        _close_workload_runner(workload_runner)
+        if dataset is not None and (
+            workload_runner is None
+            or dataset is not getattr(workload_runner, "dataset", None)
+        ):
+            close = getattr(dataset, "close", None)
+            if callable(close):
+                close()
         workload_runner = None
+        dataset = None
         _cleanup_runtime()
 
 
@@ -836,12 +1083,42 @@ def main() -> None:
         help="Disable optimizer cache insertion when constructing plans.",
     )
     parser.add_argument(
+        "--warmup_runs", type=int, default=0,
+        help="Full unmeasured warmup passes before cache-off measurement.",
+    )
+    parser.add_argument(
         "--ray_available_parallelism",
         type=int,
         default=None,
         help=(
             "Override Cedar's Ray actor parallelism budget for this comparison. "
             "Lower values reduce Ray memory pressure but may reduce throughput."
+        ),
+    )
+    parser.add_argument(
+        "--match_profile_resources",
+        action="store_true",
+        help=(
+            "Require a profile resource signature with one actor per Ray/SMP "
+            "stage, then derive local workers from the final physical plan."
+        ),
+    )
+    parser.add_argument(
+        "--cpu_budget",
+        type=int,
+        default=mp.cpu_count(),
+        help=(
+            "Unified single-node CPU budget used by "
+            "--match_profile_resources."
+        ),
+    )
+    parser.add_argument(
+        "--fixed_local_workers_ablation",
+        type=int,
+        default=None,
+        help=(
+            "Explicit ablation only: fix final local-worker count while "
+            "retaining profile-matched Ray/SMP width and CPU validation."
         ),
     )
     parser.add_argument(
@@ -886,6 +1163,32 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--cedar_reorder_timeout_sec",
+        type=float,
+        default=None,
+        help=(
+            "Explicit timeout for Cedar optimizer reorder. When set, it is "
+            "used even for --plan_only or --calculate_plan_cost runs."
+        ),
+    )
+    parser.add_argument(
+        "--disable_cedar_runtime_timeout",
+        action="store_true",
+        help=(
+            "Disable the dynamic Cedar reorder timeout derived from other "
+            "optimizers' measured workload runtime."
+        ),
+    )
+    parser.add_argument(
+        "--cedar_timeout_multiplier",
+        type=float,
+        default=1.0,
+        help=(
+            "Multiplier applied to the measured non-Cedar workload runtime "
+            "before using it as Cedar's reorder timeout."
+        ),
+    )
+    parser.add_argument(
         "--num_repeats",
         type=int,
         default=1,
@@ -919,6 +1222,23 @@ def main() -> None:
     _normalize_ray_args(args)
     if args.num_repeats < 1:
         raise ValueError("--num_repeats must be >= 1")
+    if args.cpu_budget < 1:
+        raise ValueError("--cpu_budget must be >= 1")
+    if args.fixed_local_workers_ablation is not None:
+        if args.fixed_local_workers_ablation < 1:
+            raise ValueError("--fixed_local_workers_ablation must be >= 1")
+        if not args.match_profile_resources:
+            raise ValueError(
+                "--fixed_local_workers_ablation requires "
+                "--match_profile_resources"
+            )
+    if args.cedar_timeout_multiplier <= 0:
+        raise ValueError("--cedar_timeout_multiplier must be > 0")
+    if (
+        args.cedar_reorder_timeout_sec is not None
+        and args.cedar_reorder_timeout_sec <= 0
+    ):
+        raise ValueError("--cedar_reorder_timeout_sec must be > 0")
     profile_complete = _has_complete_profile(args.profiled_stats)
     if args.use_ray and not args.disable_offload and not _profile_has_offload_variant(args.profiled_stats, "RAY"):
         raise RuntimeError(
@@ -965,26 +1285,64 @@ def main() -> None:
     optimizer_order = [
         name for name in DEFAULT_OPTIMIZER_ORDER if name in requested_optimizers
     ]
+    # Experimental optimizers are deliberately omitted from the default
+    # protocol, but an explicit --optimizers request must still execute them.
+    optimizer_order.extend(
+        name
+        for name in args.optimizers
+        if name in requested_optimizers and name not in optimizer_order
+    )
 
-    runs = []
-    for optimizer_name in optimizer_order:
-        repeat_results = []
-        for repeat_idx in range(args.num_repeats):
+    repeat_results_by_optimizer = {name: [] for name in optimizer_order}
+    execution_order_by_repeat = []
+    non_cedar_workload_runtimes = []
+    for repeat_idx in range(args.num_repeats):
+        offset = repeat_idx % len(optimizer_order)
+        repeat_order = optimizer_order[offset:] + optimizer_order[:offset]
+        execution_order_by_repeat.append(repeat_order)
+        logger.info("Repeat %d optimizer order: %s", repeat_idx + 1, repeat_order)
+        for optimizer_name in repeat_order:
+            if not args.skip_workload and not args.disable_caching:
+                # Treat repeats as independent cache trials.
+                _configure_object_disk_cache(args, optimizer_name, reset=True)
+            cedar_timeout_sec = None
+            if (
+                optimizer_name == "optimizer"
+                and args.cedar_reorder_timeout_sec is not None
+            ):
+                cedar_timeout_sec = args.cedar_reorder_timeout_sec
+            elif (
+                optimizer_name == "optimizer"
+                and not args.disable_cedar_runtime_timeout
+                and not args.skip_workload
+                and non_cedar_workload_runtimes
+            ):
+                cedar_timeout_sec = (
+                    max(non_cedar_workload_runtimes)
+                    * args.cedar_timeout_multiplier
+                )
             logger.info(
                 "Starting %s repeat %d/%d",
                 optimizer_name,
                 repeat_idx + 1,
                 args.num_repeats,
             )
-            repeat_results.append(
-                _run_one(
-                    args,
-                    optimizer_name,
-                    OPTIMIZERS[optimizer_name],
-                    None,
-                )
+            item = _run_one(
+                args,
+                optimizer_name,
+                OPTIMIZERS[optimizer_name],
+                cedar_timeout_sec,
             )
-        runs.append(_average_repeat_results(optimizer_name, repeat_results))
+            repeat_results_by_optimizer[optimizer_name].append(item)
+            if optimizer_name != "optimizer":
+                runtime = _workload_runtime_for_timeout(item)
+                if runtime is not None:
+                    non_cedar_workload_runtimes.append(runtime)
+
+    runs = [
+        _average_repeat_results(name, repeat_results_by_optimizer[name])
+        for name in optimizer_order
+    ]
 
     results = {
         "dataset_file": args.dataset_file,
@@ -999,8 +1357,24 @@ def main() -> None:
         "ray_cluster_resources": ray_cluster_resources,
         "caching_enabled": not args.disable_caching,
         "ray_available_parallelism": args.ray_available_parallelism,
+        "match_profile_resources": args.match_profile_resources,
+        "fixed_local_workers_ablation": (
+            args.fixed_local_workers_ablation
+            if args.match_profile_resources
+            else None
+        ),
+        "cpu_budget": (
+            args.cpu_budget if args.match_profile_resources else None
+        ),
         "optimizer_time_limit_sec": OPTIMIZER_TIME_LIMIT_SEC,
         "optimizer_rss_limit_bytes": OPTIMIZER_RSS_LIMIT_BYTES,
+        "cedar_runs_last": False,
+        "execution_order_policy": "round_robin",
+        "execution_order_by_repeat": execution_order_by_repeat,
+        "cedar_runtime_timeout_enabled": (
+            not args.disable_cedar_runtime_timeout and not args.skip_workload
+        ),
+        "cedar_timeout_multiplier": args.cedar_timeout_multiplier,
         "profile_complete": profile_complete,
         "plan_only": args.plan_only,
         "calculate_plan_cost": args.calculate_plan_cost,
