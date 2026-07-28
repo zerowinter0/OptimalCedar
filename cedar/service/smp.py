@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import logging
+import math
 
 from typing import Any, List
 
@@ -28,6 +29,9 @@ class SMPService:
         self.req_q = None
         self.resp_q = None
         self.procs = None
+        self._backend_compute_count = 0
+        self._backend_compute_sum_ns = 0.0
+        self._backend_compute_sum_sq_ns = 0.0
 
     def register(
         self,
@@ -69,7 +73,38 @@ class SMPService:
             name: Name of the queue
         """
         data = self.resp_q.get(block=True, timeout=timeout)
+        elapsed_ns = getattr(data, "backend_compute_ns", None)
+        if elapsed_ns is not None:
+            value = float(elapsed_ns)
+            self._backend_compute_count += 1
+            self._backend_compute_sum_ns += value
+            self._backend_compute_sum_sq_ns += value * value
+            data.backend_compute_ns = None
         return data
+
+    def get_backend_compute_stats(self):
+        count = self._backend_compute_count
+        if count == 0:
+            return None
+        mean = self._backend_compute_sum_ns / count
+        variance = 0.0
+        if count > 1:
+            variance = max(
+                0.0,
+                (
+                    self._backend_compute_sum_sq_ns
+                    - count * mean * mean
+                )
+                / (count - 1),
+            )
+        stddev = math.sqrt(variance)
+        return {
+            "method": "worker_wall_clock",
+            "count": count,
+            "mean_ms_per_sample": mean / 1e6,
+            "stddev_ms_per_sample": stddev / 1e6,
+            "stderr_ms_per_sample": stddev / math.sqrt(count) / 1e6,
+        }
 
     def can_submit(self):
         """

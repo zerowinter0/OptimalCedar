@@ -30,6 +30,7 @@ wikitext103, wikitext103_cache, stackexchange.
 
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
 dp_optimizer.  The default "all" preserves the complete five-optimizer matrix.
+OPTIMIZER_SET=dp_only regenerates only dp_optimizer.
 EOF
 }
 
@@ -73,8 +74,11 @@ case "${OPTIMIZER_SET}" in
   required)
     OPTIMIZERS=(dj_optimizer dp_cedar_optimizer dp_optimizer)
     ;;
+  dp_only)
+    OPTIMIZERS=(dp_optimizer)
+    ;;
   *)
-    echo "OPTIMIZER_SET must be all or required." >&2
+    echo "OPTIMIZER_SET must be all, required, or dp_only." >&2
     exit 2
     ;;
 esac

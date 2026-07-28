@@ -13,6 +13,8 @@ RAY_ADDRESS="127.0.0.1:6379"
 CPU_BUDGET=64
 PROFILE_TIMEOUT_SEC=3600
 SELECTED_WORKLOADS="all"
+INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
+export INCREMENTAL_BACKEND_COMPUTE
 
 usage() {
   cat <<'EOF'
@@ -98,6 +100,22 @@ for key in ("baseline", "disk_info", "offloads"):
 offloads = profile["offloads"]
 if not isinstance(offloads, dict) or "RAY" not in offloads or "SMP" not in offloads:
     raise RuntimeError(f"Profile {path} does not contain both RAY and SMP results")
+if os.environ.get("INCREMENTAL_BACKEND_COMPUTE") == "1":
+    updated = 0
+    for variant_name, pipe_profiles in offloads.items():
+        for pipe_id, pipe_profile in pipe_profiles.items():
+            timing = pipe_profile.get("backend_compute")
+            if not isinstance(timing, dict):
+                raise RuntimeError(
+                    f"Missing backend_compute for {variant_name} pipe {pipe_id}"
+                )
+            if int(timing.get("count", 0)) < 1:
+                raise RuntimeError(
+                    f"Empty backend_compute for {variant_name} pipe {pipe_id}"
+                )
+            updated += 1
+    if updated < 1:
+        raise RuntimeError(f"No backend timings found in {path}")
 if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
     baseline = profile["baseline"]
     for key in (
@@ -179,6 +197,13 @@ run_profile() {
   if [[ -n "${kwargs}" ]]; then
     args+=(--dataset_kwargs "${kwargs}")
   fi
+  if [[ "${INCREMENTAL_BACKEND_COMPUTE}" == "1" ]]; then
+    [[ -f "${target_profile}" ]] || {
+      echo "Missing base profile for incremental update: ${target_profile}" >&2
+      return 1
+    }
+    args=(env "CEDAR_INCREMENTAL_PROFILE_FROM=${target_profile}" "${args[@]}")
+  fi
 
   echo "[$(date -Is)] Profiling ${name} -> ${target_profile}"
   printf 'command:' > "${log}"
@@ -215,6 +240,7 @@ run_selected_profile() {
 }
 
 echo "[$(date -Is)] Starting formal profile run ${RUN_ID}"
+echo "[$(date -Is)] Incremental backend compute: ${INCREMENTAL_BACKEND_COMPUTE}"
 echo "[$(date -Is)] Profile width: local_workers=1 ray_actors_per_stage=1 smp_procs_per_stage=1"
 
 echo "[$(date -Is)] Per-workload profile timeout: ${PROFILE_TIMEOUT_SEC}s"

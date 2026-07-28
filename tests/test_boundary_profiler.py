@@ -1,6 +1,11 @@
 import pytest
 
-from cedar.client.boundary_profiler import fit_boundary_model
+from cedar.client import boundary_profiler
+from cedar.client.boundary_profiler import (
+    fit_boundary_model,
+    profile_stage_boundary_cached,
+)
+from cedar.pipes import PipeVariantType
 
 
 def test_fit_boundary_model_recovers_latency_and_bandwidth():
@@ -37,3 +42,36 @@ def test_fit_boundary_model_rejects_degenerate_payload_sizes():
                 },
             ]
         )
+
+
+def test_boundary_calibration_reuses_exact_signature(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_profile(**kwargs):
+        calls.append(kwargs)
+        return {
+            "throughput_bytes_per_sec": 123.0,
+            "fixed_latency_ms": 0.5,
+        }
+
+    monkeypatch.setattr(
+        boundary_profiler, "profile_stage_boundary", fake_profile
+    )
+    cache = tmp_path / "boundary.json"
+    first = profile_stage_boundary_cached(
+        ctx=object(),
+        variant=PipeVariantType.SMP,
+        width=3,
+        cache_path=str(cache),
+    )
+    second = profile_stage_boundary_cached(
+        ctx=object(),
+        variant=PipeVariantType.SMP,
+        width=3,
+        cache_path=str(cache),
+    )
+
+    assert len(calls) == 1
+    assert first["calibration_source"] == "measured"
+    assert second["calibration_source"] == "cache"
+    assert second["calibration_key"] == first["calibration_key"]

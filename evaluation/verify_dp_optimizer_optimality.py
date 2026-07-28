@@ -161,9 +161,6 @@ def _plan_cost(
     cost = 0.0
     local_work = 0.0
     max_parallel_work = 0.0
-    total_inprocess_cost = sum(
-        operator.costs["INPROCESS"] for operator in case.operators
-    )
     for block, backend in zip(blocks, block_backends):
         block_input = volume
         block_compute = 0.0
@@ -176,7 +173,6 @@ def _plan_cost(
         for operator_index in block:
             operator = case.operators[operator_index]
             operator_cost = operator.costs[backend]
-            isolated_backend_cost = operator_cost
             if backend != "INPROCESS":
                 operator_cost = max(
                     operator_cost,
@@ -184,64 +180,18 @@ def _plan_cost(
                     / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
                 )
             if boundary_throughput is not None:
-                if (
-                    len(block) > 1
-                    and isolated_backend_cost
-                    > operator.costs["INPROCESS"]
-                    and (
-                        1.0
-                        + (
-                            isolated_backend_cost
-                            - operator.costs["INPROCESS"]
-                        )
-                        / total_inprocess_cost
-                    )
-                    > constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
-                ):
-                    slowdown = 1.0 + (
-                        isolated_backend_cost
-                        - operator.costs["INPROCESS"]
-                    ) / total_inprocess_cost
-                    operator_cost = (
-                        operator.costs["INPROCESS"] * slowdown
-                    )
-                else:
-                    profiled_boundary = (
-                        (1.0 + operator.size_ratio)
-                        / boundary_throughput
-                        * 1000.0
-                    )
-                    operator_cost = max(
-                        operator_cost - profiled_boundary, 0.0
-                    )
-                if (
-                    len(block) > 1
-                    and not (
-                        isolated_backend_cost
-                        > operator.costs["INPROCESS"]
-                        and (
-                            1.0
-                            + (
-                                isolated_backend_cost
-                                - operator.costs["INPROCESS"]
-                            )
-                            / total_inprocess_cost
-                        )
-                        > constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
-                    )
-                ):
-                    operator_cost = min(
-                        operator_cost,
-                        operator.costs["INPROCESS"],
-                    )
+                profiled_boundary = (
+                    (1.0 + operator.size_ratio)
+                    / boundary_throughput
+                    * 1000.0
+                )
+                operator_cost = max(
+                    operator_cost - profiled_boundary, 0.0
+                )
             block_compute += volume * operator_cost
             item_size *= operator.size_ratio
             cardinality *= operator.selectivity
             volume = item_size * cardinality
-        if backend != "INPROCESS" and len(block) > 1:
-            block_compute *= (
-                1.0 - constants.FUSED_OPERATOR_DISPATCH_DISCOUNT
-            )
         stage_work = block_compute
         if boundary_throughput is not None:
             stage_work += (

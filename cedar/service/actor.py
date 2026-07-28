@@ -3,6 +3,7 @@ import logging
 import queue
 import multiprocessing as mp
 import torch
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class SMPActor(mp.Process):
         self.name = name
         self.shutdown_event = mp.Event()
         self.disable_torch_parallelism = disable_torch_parallelism
+        self.profile_backend_compute = False
 
     def register(self, req_q: mp.Queue, resp_q: mp.Queue):
         logger.info(f"Registered SMPActor for {self.name}.")
@@ -38,7 +40,14 @@ class SMPActor(mp.Process):
             except queue.Empty:
                 continue
             if hasattr(sample, "data"):
-                sample.data = self.process(sample.data)
+                if self.profile_backend_compute:
+                    started = time.perf_counter_ns()
+                    sample.data = self.process(sample.data)
+                    sample.backend_compute_ns = (
+                        time.perf_counter_ns() - started
+                    )
+                else:
+                    sample.data = self.process(sample.data)
             else:
                 sample = self.process(sample)
             self.resp_q.put(sample, block=True)

@@ -416,7 +416,35 @@ class MyOptimizer(Optimizer):
         variant: PipeVariantType,
         profiled_total_cost: float,
     ) -> float:
-        """Remove the profiled stage boundary from backend operator work."""
+        """Return backend operator work, preferring worker-side measurement.
+
+        New profiles record compute inside the Ray actor/SMP process.  A
+        one-sided 95% normal confidence bound keeps noisy short profiles from
+        making a backend look artificially cheap.  Profiles created before
+        this instrumentation retain the boundary-subtracted Amdahl fallback.
+        """
+        profile = self.profiled_stats.get("offloads", {}).get(
+            variant.name, {}
+        ).get(p_id, {})
+        direct = profile.get("backend_compute")
+        if isinstance(direct, dict):
+            try:
+                mean = float(direct["mean_ms_per_sample"])
+                stderr = float(direct.get("stderr_ms_per_sample", 0.0))
+                count = int(direct["count"])
+            except (KeyError, TypeError, ValueError):
+                mean = float("nan")
+                stderr = float("nan")
+                count = 0
+            if (
+                count > 0
+                and math.isfinite(mean)
+                and mean >= 0
+                and math.isfinite(stderr)
+                and stderr >= 0
+            ):
+                return mean + 1.645 * stderr
+
         throughput = self._dp_boundary_throughput(variant)
         if throughput is None:
             return profiled_total_cost

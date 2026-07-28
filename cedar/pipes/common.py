@@ -56,6 +56,11 @@ class DataSample:
         self.dummy = False
         self.read_from_cache = read_from_cache
 
+        # Populated only by explicitly instrumented parallel variants during
+        # profiling.  Keeping the measurement on the envelope lets SMP retain
+        # timings even for filter results that are discarded downstream.
+        self.backend_compute_ns: Optional[int] = None
+
         self.trace_data_size = trace_data_size
         # Size of the output "data" of each pipe, in bytes
         self.data_size_dict: Optional[Dict[int, int]] = None

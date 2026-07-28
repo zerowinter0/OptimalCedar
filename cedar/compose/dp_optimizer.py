@@ -224,44 +224,11 @@ class BlockCandidateProvider:
                 opt, self.inner_ops, variant_compute_costs[vt]
             )
             if vt != PipeVariantType.INPROCESS:
-                # A slower isolated backend profile includes per-stage queue,
-                # dispatch, and serialization overhead. Those intermediate
-                # boundaries disappear inside a fused block, while the outer
-                # DP prices the one surviving block boundary explicitly.
-                # The operator implementation itself is unchanged, so its
-                # fused compute work is conservatively bounded by the measured
-                # in-process compute work.
-                baseline_throughput = opt.profiled_stats["baseline"][
-                    "throughput"
-                ]
-                fused_compute = []
-                for i, (backend_cost, inprocess_cost) in enumerate(
-                    zip(
-                        variant_compute_costs[vt],
-                        variant_compute_costs[PipeVariantType.INPROCESS],
-                    )
-                ):
-                    if backend_cost == float("inf"):
-                        fused_compute.append(backend_cost)
-                        continue
-                    p_id = self.inner_ops[i]
-                    observed_throughput = opt.profiled_stats["offloads"][
-                        vt.name
-                    ][p_id]["throughput"]
-                    if (
-                        observed_throughput
-                        * constants.FUSED_BACKEND_SLOWDOWN_TOLERANCE
-                        < baseline_throughput
-                    ):
-                        fused_compute.append(
-                            inprocess_cost
-                            * baseline_throughput
-                            / observed_throughput
-                        )
-                    else:
-                        fused_compute.append(
-                            min(backend_cost, inprocess_cost)
-                        )
+                # Worker-side profiles already isolate operator execution from
+                # stage queueing and transport.  Fusion removes intermediate
+                # boundaries, which the outer DP prices explicitly, but does
+                # not justify an unmeasured compute discount.
+                fused_compute = variant_compute_costs[vt]
                 self._fused_variant_indexes[vt] = _BlockCostIndex(
                     opt, self.inner_ops, fused_compute
                 )
@@ -301,8 +268,6 @@ class BlockCandidateProvider:
             if is_multi and vt in self._fused_variant_indexes:
                 index = self._fused_variant_indexes[vt]
             block_cost, order = index.get(mask)
-            if is_multi and vt != PipeVariantType.INPROCESS:
-                block_cost *= 1.0 - constants.FUSED_OPERATOR_DISPATCH_DISCOUNT
             if block_cost == float("inf") or not order:
                 continue
             candidates.append(
@@ -413,6 +378,11 @@ class CacheTransitionPolicy:
         yield TransitionChoice(
             state=DpStateSummary(
                 cache_active=True,
+                # A cache hit bypasses upstream iteration, but Cedar still
+                # materializes the complete physical graph and keeps every
+                # upstream Ray actor/SMP process alive for the plan lifetime
+                # (also needed to fill a missing cache).  Preserve those CPU
+                # reservations in the steady-state feasibility state.
                 parallel_stage_cpus=next_parallel_stage_cpus,
             ),
             extra_cost=cache_cost,

@@ -5,6 +5,8 @@ import ray
 import queue
 import threading
 import sys
+import math
+import time
 from collections import deque
 from typing import Any, List
 
@@ -32,6 +34,12 @@ class RayActor:
     def exit(self):
         ray.actor.exit_actor()
 
+    def process_profiled(self, data: Any) -> Any:
+        """Execute one actor batch and return worker-side compute time."""
+        started = time.perf_counter_ns()
+        result = self.process(data)
+        return result, time.perf_counter_ns() - started
+
 
 class SampleBatch:
     def __init__(self, batch_size: int):
@@ -39,6 +47,10 @@ class SampleBatch:
         self.submit_batch_samples = deque()
         self.future = None
         self.has_result = False
+        self.profile_backend_compute = False
+        self.backend_compute_ns = None
+        self._timing_consumed = False
+        self._result_sample_count = 0
 
     def append(self, x: Any) -> bool:
         """
@@ -47,7 +59,9 @@ class SampleBatch:
         self.submit_batch_samples.append(x)
         return len(self.submit_batch_samples) == self.batch_size
 
-    def submit(self, actor: RayActor) -> None:
+    def submit(
+        self, actor: RayActor, profile_backend_compute: bool = False
+    ) -> None:
         """
         Submit the current buffer for processing.
         """
@@ -56,11 +70,18 @@ class SampleBatch:
             batch.append(x.data)
             x.data = None
 
-        self.future = actor.process.remote(batch)
+        self.profile_backend_compute = profile_backend_compute
+        if profile_backend_compute:
+            self.future = actor.process_profiled.remote(batch)
+        else:
+            self.future = actor.process.remote(batch)
 
     def next(self) -> Any:
         if not self.has_result:
             result = ray.get(self.future)
+            if self.profile_backend_compute:
+                result, self.backend_compute_ns = result
+                self._result_sample_count = len(result)
             self.has_result = True
             if len(result) != len(self.submit_batch_samples):
                 raise RuntimeError("Retrieved fewer samples than submitted")
@@ -69,6 +90,15 @@ class SampleBatch:
                 sample.data = result[i]
 
         return self.submit_batch_samples.popleft()
+
+    def take_backend_compute_observation(self):
+        if self.backend_compute_ns is None or self._timing_consumed:
+            return None
+        sample_count = self._result_sample_count
+        if sample_count < 1:
+            return None
+        self._timing_consumed = True
+        return float(self.backend_compute_ns) / sample_count
 
     def exhausted(self) -> bool:
         return len(self.submit_batch_samples) == 0
@@ -82,11 +112,19 @@ class RayService:
     RayService manages a pool of RayActors for a given PipeVariant.
     """
 
-    def __init__(self, submit_batch_size: int = 1):
+    def __init__(
+        self,
+        submit_batch_size: int = 1,
+        profile_backend_compute: bool = False,
+    ):
         self.name = None
         if submit_batch_size < 1:
             raise ValueError("Submit batch size cannot be <1")
         self.submit_batch_size = submit_batch_size
+        self.profile_backend_compute = profile_backend_compute
+        self._backend_compute_count = 0
+        self._backend_compute_sum_ns = 0.0
+        self._backend_compute_sum_sq_ns = 0.0
 
         self._actors = None
         self._inflight_tasks = None
@@ -152,7 +190,9 @@ class RayService:
         ):
             with self._lock:
                 self._num_inflight_tasks -= 1
-            return self._receive_batch.next()
+            sample = self._receive_batch.next()
+            self._record_backend_compute(self._receive_batch)
+            return sample
 
         # Otherwise, need to fetch a new batch
         self._receive_batch = None
@@ -200,7 +240,42 @@ class RayService:
 
         with self._lock:
             self._num_inflight_tasks -= 1
-        return self._receive_batch.next()
+        sample = self._receive_batch.next()
+        self._record_backend_compute(self._receive_batch)
+        return sample
+
+    def _record_backend_compute(self, batch: SampleBatch) -> None:
+        value = batch.take_backend_compute_observation()
+        if value is None:
+            return
+        self._backend_compute_count += 1
+        self._backend_compute_sum_ns += value
+        self._backend_compute_sum_sq_ns += value * value
+
+    def get_backend_compute_stats(self):
+        count = self._backend_compute_count
+        if count == 0:
+            return None
+        mean = self._backend_compute_sum_ns / count
+        variance = 0.0
+        if count > 1:
+            variance = max(
+                0.0,
+                (
+                    self._backend_compute_sum_sq_ns
+                    - count * mean * mean
+                )
+                / (count - 1),
+            )
+        stddev = math.sqrt(variance)
+        return {
+            "method": "worker_wall_clock",
+            "observation_unit": "actor_batch_mean",
+            "count": count,
+            "mean_ms_per_sample": mean / 1e6,
+            "stddev_ms_per_sample": stddev / 1e6,
+            "stderr_ms_per_sample": stddev / math.sqrt(count) / 1e6,
+        }
 
     def get_num_inflight_tasks(self) -> int:
         """
@@ -242,7 +317,7 @@ class RayService:
         q = self._inflight_tasks[idx]
         actor = self._actors[idx]
 
-        self._submit_batch.submit(actor)
+        self._submit_batch.submit(actor, self.profile_backend_compute)
 
         q.append(self._submit_batch)
         self._submit_batch = SampleBatch(self.submit_batch_size)

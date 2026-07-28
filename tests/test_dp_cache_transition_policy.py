@@ -45,6 +45,7 @@ def test_cache_transition_prices_block_output_and_excludes_source_cost():
             prev_state=DpStateSummary(cache_active=False),
             regular_cost=7.0,
             block=block,
+            next_parallel_stage_cpus=5,
         )
     )
 
@@ -52,6 +53,7 @@ def test_cache_transition_prices_block_output_and_excludes_source_cost():
     cache_choice = choices[1]
     assert cache_choice.replaces_prefix_cost
     assert cache_choice.cache_after_idx == 1
+    assert cache_choice.state.parallel_stage_cpus == 5
     # 0.001 seconds/byte * 1000 ms/second * 10 bytes/source sample
     # * output ratio 10.  The source cost must not be subtracted.
     assert cache_choice.extra_cost == pytest.approx(100.0)

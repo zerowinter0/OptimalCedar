@@ -38,13 +38,3 @@ RAY_STAGE_BOUNDARY_THROUGHPUT = 10_000_000_000
 # improvement signal without ever turning that operator into a zero-cost
 # candidate.
 MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP = 64.0
-
-# Small isolated-stage slowdowns are dominated by queue/dispatch noise that
-# disappears inside a fused stage. Larger regressions are retained as a real
-# backend-execution penalty.
-FUSED_BACKEND_SLOWDOWN_TOLERANCE = 1.25
-
-# Conservative reduction in per-operator dispatch/call overhead when several
-# Python operators execute inside one parallel stage. This is deliberately
-# much smaller than Cedar's legacy IO-ratio discount of the full compute cost.
-FUSED_OPERATOR_DISPATCH_DISCOUNT = 0.01

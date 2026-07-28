@@ -115,12 +115,14 @@ class SMPPipeVariantContext(PipeVariantContext):
         max_prefetch: int = 10,
         use_threads: bool = True,
         disable_torch_parallelism: bool = True,
+        profile_backend_compute: bool = False,
     ):
         self.n_procs = n_procs
         self.max_inflight = max_inflight
         self.max_prefetch = max_prefetch
         self.use_threads = use_threads
         self.disable_torch_parallelism = disable_torch_parallelism
+        self.profile_backend_compute = profile_backend_compute
 
         self.service = SMPService()
         self.variant_type = PipeVariantType.SMP
@@ -156,12 +158,17 @@ class RayPipeVariantContext(PipeVariantContext):
         max_prefetch: int = 10,
         use_threads: bool = True,
         submit_batch_size: int = 1,
+        profile_backend_compute: bool = False,
     ):
         self.max_inflight = max_inflight
         self.max_prefetch = max_prefetch
         self.use_threads = use_threads
         self.n_actors = n_actors
-        self.service = RayService(submit_batch_size=submit_batch_size)
+        self.profile_backend_compute = profile_backend_compute
+        self.service = RayService(
+            submit_batch_size=submit_batch_size,
+            profile_backend_compute=profile_backend_compute,
+        )
         self.variant_type = PipeVariantType.RAY
         self.submit_batch_size = submit_batch_size
 
@@ -185,7 +192,13 @@ class RayPipeVariantContext(PipeVariantContext):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.service = RayService(submit_batch_size=self.submit_batch_size)
+        self.profile_backend_compute = getattr(
+            self, "profile_backend_compute", False
+        )
+        self.service = RayService(
+            submit_batch_size=self.submit_batch_size,
+            profile_backend_compute=self.profile_backend_compute,
+        )
 
     def set_submit_batch_size(self, size: int) -> None:
         self.submit_batch_size = size
@@ -235,12 +248,17 @@ class TFRayPipeVariantContext(PipeVariantContext):
         use_threads: bool = True,
         submit_batch_size: int = 1,
         num_parallel_calls: Optional[int] = None,
+        profile_backend_compute: bool = False,
     ):
         self.max_inflight = max_inflight
         self.max_prefetch = max_prefetch
         self.use_threads = use_threads
         self.n_actors = n_actors
-        self.service = RayService(submit_batch_size=submit_batch_size)
+        self.profile_backend_compute = profile_backend_compute
+        self.service = RayService(
+            submit_batch_size=submit_batch_size,
+            profile_backend_compute=profile_backend_compute,
+        )
         self.variant_type = PipeVariantType.TF_RAY
         self.submit_batch_size = submit_batch_size
         self.num_parallel_calls = num_parallel_calls
@@ -266,7 +284,13 @@ class TFRayPipeVariantContext(PipeVariantContext):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.service = RayService(submit_batch_size=self.submit_batch_size)
+        self.profile_backend_compute = getattr(
+            self, "profile_backend_compute", False
+        )
+        self.service = RayService(
+            submit_batch_size=self.submit_batch_size,
+            profile_backend_compute=self.profile_backend_compute,
+        )
 
     def set_submit_batch_size(self, size: int) -> None:
         self.submit_batch_size = size

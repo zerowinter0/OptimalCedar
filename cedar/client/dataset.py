@@ -25,7 +25,7 @@ from cedar.pipes import (
     SMPPipeVariantContext,
 )
 from .profiler import FeatureProfiler
-from .boundary_profiler import profile_stage_boundary
+from .boundary_profiler import profile_stage_boundary_cached
 from .controller import FeatureController
 from .logger import DataSetLogger
 from .utils import (
@@ -1187,6 +1187,18 @@ class DataSet:
         # Need to initialize ctx before profiling
         self._init_ctx()
 
+        incremental_from = os.environ.get(
+            "CEDAR_INCREMENTAL_PROFILE_FROM"
+        )
+        if incremental_from:
+            return self._profile_backend_compute_incremental(
+                f_name=f_name,
+                feature_to_profile=self.features[f_name],
+                n_samples=n_samples,
+                output_file=output_file,
+                existing_profile=incremental_from,
+            )
+
         # Enable profiling for the feature
         logger.info(
             "Profiling feature {}, output to {}...".format(f_name, output_file)
@@ -1269,6 +1281,110 @@ class DataSet:
             yaml.dump(d, outfile)
         return d
 
+    def _profile_backend_compute_incremental(
+        self,
+        f_name: str,
+        feature_to_profile: Feature,
+        n_samples: Optional[int],
+        output_file: Optional[str],
+        existing_profile: str,
+    ) -> Dict[str, Any]:
+        """Add worker-side backend timings without perturbing old profile data.
+
+        This deliberately preserves baseline throughput, selectivities, data
+        sizes, disk measurements, and isolated offload throughput.  As a
+        result, optimizers that do not understand ``backend_compute`` see
+        byte-for-byte equivalent numeric inputs, while DpOptimizer can consume
+        the new direct measurement.
+        """
+        with open(existing_profile, "r") as stream:
+            profile = yaml.safe_load(stream)
+        if not isinstance(profile, dict):
+            raise RuntimeError(
+                f"Incremental profile is not a mapping: {existing_profile}"
+            )
+        expected_resources = {
+            "schema_version": 1,
+            "profile_scope": "single_local_worker",
+            "profile_local_workers": 1,
+            "actors_per_stage": (
+                RAY_PROFILE_N_ACTORS
+                if RAY_PROFILE_N_ACTORS == SMP_PROFILE_N_PROCS
+                else None
+            ),
+            "ray_actors_per_stage": RAY_PROFILE_N_ACTORS,
+            "smp_procs_per_stage": SMP_PROFILE_N_PROCS,
+        }
+        if profile.get("resource_config") != expected_resources:
+            raise RuntimeError(
+                "Incremental profiling resource mismatch: "
+                f"existing={profile.get('resource_config')}, "
+                f"current={expected_resources}"
+            )
+
+        fresh: Dict[str, Any] = {}
+        if self.ctx.use_ray():
+            self._profile_ray(
+                fresh, feature_to_profile, f_name, n_samples
+            )
+        _set_cpu_affinity(SMP_TASKSET_MASK)
+        self._profile_smp(fresh, feature_to_profile, f_name, n_samples)
+
+        existing_offloads = profile.get("offloads")
+        if not isinstance(existing_offloads, dict):
+            raise RuntimeError("Existing profile has no offload mapping.")
+        updated = 0
+        for variant_name, pipe_profiles in fresh.get(
+            "offloads", {}
+        ).items():
+            existing_variant = existing_offloads.get(variant_name)
+            if not isinstance(existing_variant, dict):
+                if pipe_profiles:
+                    raise RuntimeError(
+                        f"Existing profile has no {variant_name} section."
+                    )
+                continue
+            for p_id, new_pipe_profile in pipe_profiles.items():
+                direct = new_pipe_profile.get("backend_compute")
+                if direct is None:
+                    raise RuntimeError(
+                        "No worker-side backend timing was collected for "
+                        f"{variant_name} pipe {p_id}."
+                    )
+                if p_id not in existing_variant:
+                    raise RuntimeError(
+                        f"Existing profile has no {variant_name} pipe {p_id}."
+                    )
+                existing_variant[p_id]["backend_compute"] = direct
+                updated += 1
+        if updated == 0:
+            raise RuntimeError("Incremental profiling found no mutable backends.")
+
+        physical_model = profile.setdefault(
+            "physical_model", {"schema_version": 1, "boundary": {}}
+        )
+        physical_model["schema_version"] = 1
+        physical_model.setdefault("boundary", {})
+        if self.ctx.use_ray():
+            self._profile_boundary_model(
+                profile, PipeVariantType.RAY, RAY_PROFILE_N_ACTORS
+            )
+        self._profile_boundary_model(
+            profile, PipeVariantType.SMP, SMP_PROFILE_N_PROCS
+        )
+        profile["incremental_backend_compute"] = {
+            "schema_version": 1,
+            "source_profile": os.path.abspath(existing_profile),
+            "updated_operator_variants": updated,
+            "confidence_bound": "one_sided_normal_95pct",
+        }
+
+        if output_file is None:
+            output_file = f"/tmp/{f_name}_profile.yml"
+        with open(output_file, "w") as outfile:
+            yaml.dump(profile, outfile)
+        return profile
+
     def _profile_boundary_model(
         self,
         profile: Dict[str, Any],
@@ -1288,7 +1404,7 @@ class DataSet:
         )
         boundaries = physical_model.setdefault("boundary", {})
         try:
-            boundaries[variant.name] = profile_stage_boundary(
+            boundaries[variant.name] = profile_stage_boundary_cached(
                 ctx=self.ctx,
                 variant=variant,
                 width=width,
@@ -1430,6 +1546,7 @@ class DataSet:
                     max_prefetch=SMP_PROFILE_PREFETCH,
                     use_threads=True,
                     disable_torch_parallelism=True,
+                    profile_backend_compute=True,
                 )
                 profile = self._profile_feature(
                     f_name,
@@ -1468,6 +1585,7 @@ class DataSet:
                         max_prefetch=RAY_PROFILE_PREFETCH,
                         use_threads=True,
                         submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
+                        profile_backend_compute=True,
                     )
 
                     profile = self._profile_feature(
@@ -1491,6 +1609,7 @@ class DataSet:
                         max_prefetch=RAY_PROFILE_PREFETCH,
                         use_threads=True,
                         submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
+                        profile_backend_compute=True,
                     )
 
                     profile = self._profile_feature(
@@ -1566,6 +1685,31 @@ class DataSet:
         pipe_latencies = profiler.calculate_avg_latency_per_sample()
         input_sizes, output_sizes = profiler.calculate_avg_data_size()
 
+        # A backend profile mutates exactly one logical operator.  Read the
+        # worker-side timing accumulator before reset tears down its service.
+        # This measures only operator execution; queueing and serialization
+        # remain in the separately calibrated boundary model.
+        backend_compute = None
+        if mutation_dict is not None and len(mutation_dict) == 1:
+            profiled_p_id = next(iter(mutation_dict))
+            physical_pipe = feature_to_profile.physical_pipes.get(
+                profiled_p_id
+            )
+            if physical_pipe is not None:
+                variant = physical_pipe.get_variant()
+                service = getattr(variant, "service", None)
+                if service is None:
+                    service = getattr(
+                        getattr(variant, "variant_ctx", None),
+                        "service",
+                        None,
+                    )
+                stats_fn = getattr(
+                    service, "get_backend_compute_stats", None
+                )
+                if stats_fn is not None:
+                    backend_compute = stats_fn()
+
         # Reset the feature and init
         feature_to_profile.reset()
         time.sleep(5)  # Sleep in case we need some time to shutdown
@@ -1576,6 +1720,8 @@ class DataSet:
             "output_sizes": output_sizes,
             "throughput": throughput_samples_per_sec,
         }
+        if backend_compute is not None:
+            result["backend_compute"] = backend_compute
         if collect_filter_selectivity:
             input_counts = {
                 p_id: counter.input_count

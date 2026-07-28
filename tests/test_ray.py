@@ -176,6 +176,29 @@ def test_tail_batch_submit(setup_ray):
     assert set(result) == set(data)
 
 
+def test_profile_backend_compute_records_actor_time(setup_ray):
+    data = range(33)
+    source_pipe = IterSource(data).to_pipe()
+    mapped = MapperPipe(source_pipe, functools.partial(_add, y=1))
+    ctx = CedarContext()
+    variant_ctx = RayPipeVariantContext(
+        n_actors=2,
+        use_threads=True,
+        submit_batch_size=8,
+        profile_backend_compute=True,
+    )
+    source_pipe.mutate(ctx, PipeVariantType.INPROCESS)
+    mapped.mutate(ctx, PipeVariantType.RAY, variant_ctx)
+
+    assert [x.data for x in mapped.pipe_variant]
+    stats = variant_ctx.service.get_backend_compute_stats()
+    variant_ctx.service.shutdown()
+
+    # Four full actor batches plus one tail batch.
+    assert stats["count"] == 5
+    assert stats["mean_ms_per_sample"] >= 0
+
+
 def test_partial_batch_does_not_livelock_producer(setup_ray):
     data = range(200)
     source = IterSource(data)

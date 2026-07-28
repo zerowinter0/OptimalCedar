@@ -8,9 +8,17 @@ without conflating the measurement with pipeline-stage overlap.
 """
 
 import logging
+import copy
+import fcntl
+import hashlib
+import json
 import math
 import multiprocessing as mp
+import os
+import pathlib
+import platform
 import statistics
+import tempfile
 import time
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
@@ -35,6 +43,8 @@ DEFAULT_TARGET_BYTES = 128 * 1024 * 1024
 MIN_MEASURED_SAMPLES = 32
 MAX_MEASURED_SAMPLES = 512
 MIN_ACCEPTED_R_SQUARED = 0.75
+CALIBRATION_SCHEMA_VERSION = 1
+DEFAULT_CACHE_PATH = "/tmp/cedar_boundary_profiles_v1.json"
 
 
 @ray.remote
@@ -278,3 +288,129 @@ def profile_stage_boundary(
     )
     logger.info("Profiled %s boundary model: %s", variant.name, model)
     return model
+
+
+def boundary_calibration_signature(
+    variant: PipeVariantType,
+    width: int,
+    payload_bytes: Iterable[int] = DEFAULT_PAYLOAD_BYTES,
+    repetitions: int = DEFAULT_REPETITIONS,
+    warmup_samples: int = DEFAULT_WARMUP_SAMPLES,
+    target_bytes: int = DEFAULT_TARGET_BYTES,
+) -> Dict[str, Any]:
+    """Return the exact platform/resource signature for cache reuse."""
+    signature: Dict[str, Any] = {
+        "schema_version": CALIBRATION_SCHEMA_VERSION,
+        "method": "synchronous_round_trip_linear_fit",
+        "host": platform.node(),
+        "machine": platform.machine(),
+        "kernel": platform.release(),
+        "python": platform.python_version(),
+        "cpu_affinity": sorted(os.sched_getaffinity(0)),
+        "variant": variant.name,
+        "stage_width": width,
+        "payload_bytes": sorted(set(int(x) for x in payload_bytes)),
+        "repetitions": repetitions,
+        "warmup_samples": warmup_samples,
+        "target_bytes": target_bytes,
+    }
+    if variant == PipeVariantType.RAY:
+        signature["ray_version"] = ray.__version__
+        if ray.is_initialized():
+            signature["ray_cluster_resources"] = {
+                key: float(value)
+                for key, value in sorted(ray.cluster_resources().items())
+                if not key.startswith("node:")
+            }
+    return signature
+
+
+def _cache_key(signature: Dict[str, Any]) -> str:
+    payload = json.dumps(
+        signature, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def profile_stage_boundary_cached(
+    ctx: CedarContext,
+    variant: PipeVariantType,
+    width: int,
+    cache_path: str = None,
+    **profile_kwargs: Any,
+) -> Dict[str, Any]:
+    """Reuse calibration only for an identical platform/resource signature.
+
+    The lock covers both lookup and measurement so concurrent workload
+    profilers cannot independently benchmark the same shared worker pool.
+    Writes use atomic replacement, leaving a complete cache after interruption.
+    Set ``CEDAR_REFRESH_BOUNDARY_MODEL=1`` to force a fresh measurement or
+    ``CEDAR_REUSE_BOUNDARY_MODEL=0`` to bypass the cache entirely.
+    """
+    reuse = os.environ.get("CEDAR_REUSE_BOUNDARY_MODEL", "1") == "1"
+    refresh = os.environ.get("CEDAR_REFRESH_BOUNDARY_MODEL", "0") == "1"
+    if not reuse:
+        result = profile_stage_boundary(
+            ctx=ctx, variant=variant, width=width, **profile_kwargs
+        )
+        result["calibration_source"] = "measured"
+        return result
+
+    path = pathlib.Path(
+        cache_path
+        or os.environ.get(
+            "CEDAR_BOUNDARY_MODEL_CACHE", DEFAULT_CACHE_PATH
+        )
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    signature = boundary_calibration_signature(
+        variant=variant, width=width, **profile_kwargs
+    )
+    key = _cache_key(signature)
+    lock_path = pathlib.Path(str(path) + ".lock")
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        cache: Dict[str, Any] = {"schema_version": 1, "entries": {}}
+        if path.exists():
+            try:
+                loaded = json.loads(path.read_text())
+                if (
+                    isinstance(loaded, dict)
+                    and loaded.get("schema_version") == 1
+                    and isinstance(loaded.get("entries"), dict)
+                ):
+                    cache = loaded
+            except (OSError, ValueError) as exc:
+                logger.warning("Ignoring invalid boundary cache %s: %s", path, exc)
+        entry = cache["entries"].get(key)
+        if not refresh and isinstance(entry, dict):
+            if entry.get("signature") == signature:
+                result = copy.deepcopy(entry["model"])
+                result["calibration_source"] = "cache"
+                result["calibration_key"] = key
+                return result
+
+        model = profile_stage_boundary(
+            ctx=ctx, variant=variant, width=width, **profile_kwargs
+        )
+        cache["entries"][key] = {
+            "signature": signature,
+            "model": model,
+            "created_unix_sec": time.time(),
+        }
+        fd, temp_name = tempfile.mkstemp(
+            prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+        )
+        try:
+            with os.fdopen(fd, "w") as temp_file:
+                json.dump(cache, temp_file, sort_keys=True)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.replace(temp_name, path)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        result = copy.deepcopy(model)
+        result["calibration_source"] = "measured"
+        result["calibration_key"] = key
+        return result

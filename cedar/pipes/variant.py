@@ -738,6 +738,9 @@ class SMPPipeVariant(_AsyncPipeVariant):
         procs = []
         for i in range(variant_ctx.n_procs):
             actor = self._create_actor()
+            actor.profile_backend_compute = getattr(
+                variant_ctx, "profile_backend_compute", False
+            )
             actor.register(req_q, resp_q)
             procs.append(actor)
         self.service = variant_ctx.service
