@@ -118,16 +118,29 @@ if os.environ.get("INCREMENTAL_BACKEND_COMPUTE") == "1":
         raise RuntimeError(f"No backend timings found in {path}")
 if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
     baseline = profile["baseline"]
-    for key in (
+    selectivity_keys = (
         "input_counts",
         "output_counts",
         "selectivities",
         "selectivity_observation_sources",
+    )
+    missing_selectivity_keys = [
+        key for key in selectivity_keys if key not in baseline
+    ]
+    # Legacy profiles for pipelines without a FilterPipe contain none of
+    # these mappings. Incremental backend timing intentionally preserves that
+    # profile instead of inventing unrelated selectivity observations.
+    if missing_selectivity_keys and not (
+        os.environ.get("INCREMENTAL_BACKEND_COMPUTE") == "1"
+        and len(missing_selectivity_keys) == len(selectivity_keys)
     ):
-        if key not in baseline:
-            raise RuntimeError(
-                f"Selectivity-aware profile {path} is missing {key}"
-            )
+        raise RuntimeError(
+            f"Selectivity-aware profile {path} is missing "
+            f"{missing_selectivity_keys}"
+        )
+    if missing_selectivity_keys:
+        print(f"Validated complete profile: {path}: {actual}")
+        raise SystemExit(0)
     filter_ids = set(baseline["input_counts"])
     if filter_ids != set(baseline["output_counts"]):
         raise RuntimeError(f"Filter count key mismatch in {path}")
@@ -194,6 +207,12 @@ run_profile() {
     --use_ray
     --ray_ip "${RAY_ADDRESS}"
   )
+  if [[ "${INCREMENTAL_BACKEND_COMPUTE}" == "1" ]] && \
+     [[ -f "${target_profile}" ]] && \
+     validate_profile "${target_profile}" >> "${log}" 2>&1; then
+    echo "[$(date -Is)] REUSE ${name}: backend timings already complete"
+    return 0
+  fi
   if [[ -n "${kwargs}" ]]; then
     args+=(--dataset_kwargs "${kwargs}")
   fi
