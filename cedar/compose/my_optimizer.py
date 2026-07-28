@@ -345,7 +345,10 @@ class MyOptimizer(Optimizer):
             workers = max(1, self.physical_plan.n_local_workers)
         profile_throughput = self.profiled_stats["baseline"]["throughput"]
         aggregate_input_rate = input_size * profile_throughput * workers
-        feasible = aggregate_input_rate <= constants.LOCAL_PARALLELISM_THRESHOLD
+        transport_limit = self._dp_boundary_throughput(PipeVariantType.SMP)
+        if transport_limit is None:
+            transport_limit = constants.LOCAL_PARALLELISM_THRESHOLD
+        feasible = aggregate_input_rate <= transport_limit
         if not feasible:
             log_key = ("aggregate_rate", first_p_id)
             if log_key not in self._transport_rejection_logs:
@@ -357,16 +360,55 @@ class MyOptimizer(Optimizer):
                     block.order,
                     prev_mask,
                     aggregate_input_rate / 1e6,
-                    constants.LOCAL_PARALLELISM_THRESHOLD / 1e6,
+                    transport_limit / 1e6,
                 )
         return feasible
 
+    def _dp_boundary_profile(
+        self, variant: PipeVariantType
+    ) -> Optional[Dict[str, Any]]:
+        physical_model = self.profiled_stats.get("physical_model", {})
+        boundaries = (
+            physical_model.get("boundary", {})
+            if isinstance(physical_model, dict)
+            else {}
+        )
+        if not isinstance(boundaries, dict):
+            return None
+        key = (
+            PipeVariantType.RAY.name
+            if variant == PipeVariantType.TF_RAY
+            else variant.name
+        )
+        model = boundaries.get(key)
+        return model if isinstance(model, dict) else None
+
     def _dp_boundary_throughput(self, variant: PipeVariantType) -> Optional[float]:
+        model = self._dp_boundary_profile(variant)
+        if model is not None:
+            try:
+                throughput = float(model["throughput_bytes_per_sec"])
+            except (KeyError, TypeError, ValueError):
+                throughput = float("nan")
+            if math.isfinite(throughput) and throughput > 0:
+                return throughput
         if variant == PipeVariantType.SMP:
             return constants.LOCAL_PARALLELISM_THRESHOLD
         if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
             return constants.RAY_STAGE_BOUNDARY_THROUGHPUT
         return None
+
+    def _dp_boundary_fixed_latency_ms(
+        self, variant: PipeVariantType
+    ) -> float:
+        model = self._dp_boundary_profile(variant)
+        if model is None:
+            return 0.0
+        try:
+            latency = float(model.get("fixed_latency_ms", 0.0))
+        except (TypeError, ValueError):
+            return 0.0
+        return latency if math.isfinite(latency) and latency >= 0 else 0.0
 
     def _dp_profiled_operator_compute_cost(
         self,
@@ -380,7 +422,9 @@ class MyOptimizer(Optimizer):
             return profiled_total_cost
         input_size = self.profiled_stats["baseline"]["input_sizes"][p_id]
         output_size = self.profiled_stats["baseline"]["output_sizes"][p_id]
-        boundary_cost = (input_size + output_size) / throughput * 1000.0
+        boundary_cost = self._dp_boundary_fixed_latency_ms(variant) + (
+            (input_size + output_size) / throughput * 1000.0
+        )
         compute_cost = profiled_total_cost - boundary_cost
         if compute_cost >= 0:
             return compute_cost
@@ -413,7 +457,9 @@ class MyOptimizer(Optimizer):
         next_mask = prev_mask | block.mask
         input_size = source_size * self._dp_work_prod(prev_mask)
         output_size = source_size * self._dp_work_prod(next_mask)
-        return (input_size + output_size) / throughput * 1000.0
+        return self._dp_boundary_fixed_latency_ms(block.variant) + (
+            (input_size + output_size) / throughput * 1000.0
+        )
 
     def _dp_work_prod(self, mask: int) -> float:
         """Aggregate byte-volume multiplier for one source record.

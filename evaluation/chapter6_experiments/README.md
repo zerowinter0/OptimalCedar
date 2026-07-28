@@ -90,7 +90,7 @@ python evaluation/chapter6_experiments/summarize_results.py \
 
 ## 推荐执行策略
 
-Profile遵循原 Cedar 语义：baseline固定在CPU 0，每个baseline、Ray/SMP算子配置分别运行约10秒；profile不受运行阶段的样本数参数影响。
+Profile遵循原 Cedar 语义：baseline固定在CPU 0，每个baseline、Ray/SMP算子配置分别运行约10秒；profile不受运行阶段的样本数参数影响。每份新 profile 还使用多种 payload size 自动测量同步 identity round trip，拟合 Ray/SMP 的固定 boundary latency 与 byte throughput，并将结果写入 `physical_model.boundary`；同一 workload 的全部 optimizer 共享该 profile。
 
 先做 smoke：
 

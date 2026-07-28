@@ -25,6 +25,7 @@ from cedar.pipes import (
     SMPPipeVariantContext,
 )
 from .profiler import FeatureProfiler
+from .boundary_profiler import profile_stage_boundary
 from .controller import FeatureController
 from .logger import DataSetLogger
 from .utils import (
@@ -1216,14 +1217,39 @@ class DataSet:
         )
         d["baseline"] = baseline_profile
 
+        boundary_profile_setting = os.environ.get(
+            "CEDAR_PROFILE_BOUNDARY_MODEL"
+        )
+        if boundary_profile_setting is None:
+            profile_boundaries = "pytest" not in sys.modules
+        else:
+            profile_boundaries = boundary_profile_setting == "1"
+        if profile_boundaries:
+            d["physical_model"] = {
+                "schema_version": 1,
+                "boundary": {},
+            }
+
         # If using ray, profile each op
         if self.ctx.use_ray():
             self._profile_ray(d, feature_to_profile, f_name, n_samples)
+            if profile_boundaries:
+                self._profile_boundary_model(
+                    d,
+                    PipeVariantType.RAY,
+                    RAY_PROFILE_N_ACTORS,
+                )
 
         # NOTE: Run this last as it un-tasksets
         _set_cpu_affinity(SMP_TASKSET_MASK)
 
         self._profile_smp(d, feature_to_profile, f_name, n_samples)
+        if profile_boundaries:
+            self._profile_boundary_model(
+                d,
+                PipeVariantType.SMP,
+                SMP_PROFILE_N_PROCS,
+            )
 
         if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
             _consolidate_filter_selectivity(d)
@@ -1242,6 +1268,41 @@ class DataSet:
         with open(output_file, "w") as outfile:
             yaml.dump(d, outfile)
         return d
+
+    def _profile_boundary_model(
+        self,
+        profile: Dict[str, Any],
+        variant: PipeVariantType,
+        width: int,
+    ) -> None:
+        """Attach a measured stage-boundary model without failing profiling.
+
+        Boundary calibration is platform-specific. A failed calibration leaves
+        the corresponding entry absent so optimizers can use their
+        backward-compatible constants for old or partially collected profiles.
+        """
+
+        physical_model = profile.setdefault(
+            "physical_model",
+            {"schema_version": 1, "boundary": {}},
+        )
+        boundaries = physical_model.setdefault("boundary", {})
+        try:
+            boundaries[variant.name] = profile_stage_boundary(
+                ctx=self.ctx,
+                variant=variant,
+                width=width,
+            )
+        except Exception as exc:
+            physical_model.setdefault("calibration_errors", {})[
+                variant.name
+            ] = f"{type(exc).__name__}: {exc}"
+            logger.warning(
+                "Failed to profile %s stage boundary; optimizer will use "
+                "its compatibility fallback: %s",
+                variant.name,
+                exc,
+            )
 
     def _profile_io(
         self, character: str = "a", file_size_mb: int = 10

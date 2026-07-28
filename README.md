@@ -139,6 +139,14 @@ ds = DataSet(
 
 This will automatically run a profiling job and immediately exit. After profiling completes, *this will output a statistics file at `/tmp/<FEATURE_NAME>_profile.yml`*. Move this file to a safe place to use for the next step!
 
+The profile also calibrates Ray and SMP stage boundaries with synchronous
+identity round trips over multiple payload sizes. The resulting fixed
+latency and byte-throughput coefficients are stored under
+`physical_model.boundary`; optimizers prefer these measurements and retain
+compatibility constants for older profiles. Set
+`CEDAR_PROFILE_BOUNDARY_MODEL=0` only when this additional platform
+calibration must be skipped.
+
 We'll next use the profiling results to run the Optimizer to do this, create a new DataSet, and simply turn on the generate_plan flat to True. This will output an optimized plan and immediately exit. After this completes, this will create a plan config file at `/tmp/cedar_<FEATURE_NAME>_plan.yml`. Save this file for the next step.
 
 ```python

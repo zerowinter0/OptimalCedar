@@ -206,6 +206,65 @@ def test_single_smp_stage_pays_placement_dependent_boundary_cost():
     ) == 0.0
 
 
+def test_profiled_boundary_model_overrides_compatibility_constant():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    profile = _profile_for(feature)
+    profile["physical_model"] = {
+        "schema_version": 1,
+        "boundary": {
+            "SMP": {
+                "fixed_latency_ms": 3.0,
+                "throughput_bytes_per_sec": 2_000_000.0,
+            }
+        },
+    }
+    for p_id in feature.logical_pipes:
+        profile["baseline"]["input_sizes"][p_id] = 1000.0
+        profile["baseline"]["output_sizes"][p_id] = 1000.0
+
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = profile
+    optimizer.options = OptimizerOptions(enable_offload=False)
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    block = BlockCandidate(
+        mask=1,
+        order=(0,),
+        variant=PipeVariantType.SMP,
+        cost=0.0,
+        materializes_fusion=False,
+    )
+
+    # 3 ms fixed latency + 2,000 bytes / 2 MB/s = 4 ms.
+    assert optimizer._dp_stage_boundary_cost(0, block) == pytest.approx(4.0)
+
+
+def test_profiled_ray_boundary_is_reused_for_tf_ray():
+    optimizer = MyOptimizer()
+    optimizer.profiled_stats = {
+        "physical_model": {
+            "boundary": {
+                "RAY": {
+                    "fixed_latency_ms": 0.5,
+                    "throughput_bytes_per_sec": 123_456_789.0,
+                }
+            }
+        }
+    }
+
+    assert optimizer._dp_boundary_throughput(
+        PipeVariantType.TF_RAY
+    ) == pytest.approx(123_456_789.0)
+    assert optimizer._dp_boundary_fixed_latency_ms(
+        PipeVariantType.TF_RAY
+    ) == pytest.approx(0.5)
+
+
 def test_unidentifiable_amdahl_cost_is_finite_and_capped():
     feature = TwoMapFeature()
     feature.apply(IterSource([1, 2, 3]))
