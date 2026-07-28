@@ -1481,7 +1481,7 @@ class DataSet:
         source_pipe = feature_to_profile.get_source_pipes()
 
         # Create an Iterable
-        iter = _DataSetIter(
+        dataset_iter = _DataSetIter(
             loaded_features={f_name: loaded_feature},
             return_datasample=False,
             source_pipes={f_name: source_pipe},
@@ -1490,7 +1490,7 @@ class DataSet:
 
         n_batches = 0
         start_time = None
-        for x in iter:
+        for x in dataset_iter:
             # Warm up time
             if n_batches == 0:
                 start_time = time.time()
@@ -1656,7 +1656,7 @@ class DataSet:
         b_sz = profiler.get_batch_size()
 
         # Create an Iterable
-        iter = _DataSetIter(
+        dataset_iter = _DataSetIter(
             loaded_features={f_name: loaded_feature},
             profilers={f_name: profiler},
             return_datasample=False,
@@ -1664,7 +1664,7 @@ class DataSet:
         )
 
         n_batches = 0
-        for x in iter:
+        for x in dataset_iter:
             # Warm up time
             if n_batches == 0:
                 start_time = time.time()
