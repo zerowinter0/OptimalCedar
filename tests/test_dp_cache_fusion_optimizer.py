@@ -240,8 +240,9 @@ def test_profiled_boundary_model_overrides_compatibility_constant():
         materializes_fusion=False,
     )
 
-    # 3 ms fixed latency + 2,000 bytes / 2 MB/s = 4 ms.
-    assert optimizer._dp_stage_boundary_cost(0, block) == pytest.approx(4.0)
+    # Cedar overlaps up to 100 requests: 3/100 ms fixed latency plus
+    # 2,000 bytes / 2 MB/s = 1.03 ms steady-state service time.
+    assert optimizer._dp_stage_boundary_cost(0, block) == pytest.approx(1.03)
 
 
 def test_profiled_ray_boundary_is_reused_for_tf_ray():

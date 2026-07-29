@@ -4,6 +4,10 @@ FUSED_PIPE_NAME = "FusedPipe"
 
 RAY_SUBMIT_BATCH_SIZE = 30
 RAY_AVAILABLE_PARALLELISM = 32
+# Profiling keeps this many requests in flight for both Ray and SMP stages.
+# A synchronous round-trip calibration measures latency, but a steady-state
+# stage amortizes that latency across these concurrent requests.
+PROFILE_STAGE_MAX_INFLIGHT = 100
 # RAY_SUBMIT_BATCH_SCALING_FACTOR = 2000
 RAY_SUBMIT_BATCH_SCALING_FACTOR = 2000000
 

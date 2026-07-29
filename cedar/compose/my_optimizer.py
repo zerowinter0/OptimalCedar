@@ -410,23 +410,86 @@ class MyOptimizer(Optimizer):
             return 0.0
         return latency if math.isfinite(latency) and latency >= 0 else 0.0
 
+    def _dp_boundary_cost_ms(
+        self,
+        variant: PipeVariantType,
+        input_size: float,
+        output_size: float,
+    ) -> float:
+        """Return steady-state boundary service time per sample.
+
+        Boundary calibration is deliberately synchronous, while Cedar keeps
+        many stage requests in flight.  Charging its fitted round-trip latency
+        once per sample makes latency the throughput bottleneck even though it
+        is overlapped in the actual pipeline.  Bandwidth remains a per-sample
+        service cost; amortize only the fixed latency by the profiled in-flight
+        width.
+        """
+        throughput = self._dp_boundary_throughput(variant)
+        if throughput is None:
+            return 0.0
+        config = self.profiled_stats.get("resource_config", {})
+        key = (
+            "ray_max_inflight"
+            if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+            else "smp_max_inflight"
+        )
+        try:
+            max_inflight = int(
+                config.get(key, constants.PROFILE_STAGE_MAX_INFLIGHT)
+            )
+        except (TypeError, ValueError):
+            max_inflight = constants.PROFILE_STAGE_MAX_INFLIGHT
+        max_inflight = max(1, max_inflight)
+        return self._dp_boundary_fixed_latency_ms(variant) / max_inflight + (
+            (input_size + output_size) / throughput * 1000.0
+        )
+
     def _dp_profiled_operator_compute_cost(
         self,
         p_id: int,
         variant: PipeVariantType,
         profiled_total_cost: float,
     ) -> float:
-        """Return backend operator work, preferring worker-side measurement.
+        """Split a profiled offload cost into compute and stage-boundary work.
 
-        New profiles record compute inside the Ray actor/SMP process.  A
-        one-sided 95% normal confidence bound keeps noisy short profiles from
-        making a backend look artificially cheap.  Profiles created before
-        this instrumentation retain the boundary-subtracted Amdahl fallback.
+        ``profiled_total_cost`` is inferred from the measured end-to-end
+        throughput after changing exactly this operator's backend.  It is the
+        only observation that includes integration effects on the surrounding
+        pipeline, so a singleton DP stage must reproduce that observation:
+        compute = profiled total - boundary.  Worker-side timings are useful
+        diagnostics, but are not directly comparable with Cedar's local costs,
+        which are apportioned from cumulative baseline latencies.  Preferring
+        the worker timer would therefore mix two measurement domains and can
+        reverse an observed end-to-end speedup.
+
+        Direct backend timing remains a fallback for profiles without a usable
+        boundary model.  Its one-sided 95% confidence bound avoids selecting a
+        backend merely because a short profile happened to be optimistic.
         """
         profile = self.profiled_stats.get("offloads", {}).get(
             variant.name, {}
         ).get(p_id, {})
         direct = profile.get("backend_compute")
+
+        throughput = self._dp_boundary_throughput(variant)
+        baseline = self.profiled_stats.get("baseline", {})
+        input_sizes = baseline.get("input_sizes", {})
+        output_sizes = baseline.get("output_sizes", {})
+        if (
+            throughput is not None
+            and p_id in input_sizes
+            and p_id in output_sizes
+        ):
+            input_size = input_sizes[p_id]
+            output_size = output_sizes[p_id]
+            boundary_cost = self._dp_boundary_cost_ms(
+                variant, input_size, output_size
+            )
+            compute_cost = profiled_total_cost - boundary_cost
+            if math.isfinite(compute_cost):
+                return max(0.0, compute_cost)
+
         if isinstance(direct, dict):
             try:
                 mean = float(direct["mean_ms_per_sample"])
@@ -445,27 +508,7 @@ class MyOptimizer(Optimizer):
             ):
                 return mean + 1.645 * stderr
 
-        throughput = self._dp_boundary_throughput(variant)
-        if throughput is None:
-            return profiled_total_cost
-        input_size = self.profiled_stats["baseline"]["input_sizes"][p_id]
-        output_size = self.profiled_stats["baseline"]["output_sizes"][p_id]
-        boundary_cost = self._dp_boundary_fixed_latency_ms(variant) + (
-            (input_size + output_size) / throughput * 1000.0
-        )
-        compute_cost = profiled_total_cost - boundary_cost
-        if compute_cost >= 0:
-            return compute_cost
-        log_key = ("negative_compute", variant, p_id)
-        if log_key not in self._transport_rejection_logs:
-            self._transport_rejection_logs.add(log_key)
-            logger.warning(
-                "[MyOptimizer] Profiled %s total cost for pipe %s is below "
-                "the measured boundary cost; clamping operator work to zero.",
-                variant.name,
-                p_id,
-            )
-        return 0.0
+        return profiled_total_cost
 
     def _dp_stage_boundary_cost(self, prev_mask: int, block) -> float:
         """Model each parallel stage boundary separately from operator work.
@@ -485,8 +528,8 @@ class MyOptimizer(Optimizer):
         next_mask = prev_mask | block.mask
         input_size = source_size * self._dp_work_prod(prev_mask)
         output_size = source_size * self._dp_work_prod(next_mask)
-        return self._dp_boundary_fixed_latency_ms(block.variant) + (
-            (input_size + output_size) / throughput * 1000.0
+        return self._dp_boundary_cost_ms(
+            block.variant, input_size, output_size
         )
 
     def _dp_work_prod(self, mask: int) -> float:
