@@ -181,6 +181,16 @@ cython_debug/
 
 # Stable paper experiment: keep profiles, plans, metadata, results, and its
 # README reviewable; exclude only reproducible scratch/cache and raw logs.
+/evaluation/chapter6_experiments/formal_results/*
+!/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/
+!/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/**
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/README.md
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/**
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/**
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/runner.out
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/cache/
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/logs/
+/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/nohup.log
