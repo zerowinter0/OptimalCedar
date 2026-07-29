@@ -9,7 +9,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
-PROFILE_DIR="${BASE_DIR}/formal_results/profiles"
+PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/profiles}"
+MATRIX_OUTPUT_ROOT="${MATRIX_OUTPUT_ROOT:-${BASE_DIR}}"
 RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
 CPU_BUDGET="${CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
@@ -29,7 +30,9 @@ commonvoice_cache, llava_pretrain, redpajama_c4, simclrv2, simclrv2_cache,
 wikitext103, wikitext103_cache, stackexchange.
 
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
-dp_optimizer.  The default "all" preserves the complete five-optimizer matrix.
+dp_optimizer. OPTIMIZER_SET=paper runs the five optimizers in the current
+paper figure. OPTIMIZER_SET=complete runs their union with dp_two_stage_optimizer.
+The default "all" preserves the project-standard five-optimizer matrix.
 OPTIMIZER_SET=dp_only regenerates only dp_optimizer.
 EOF
 }
@@ -74,11 +77,30 @@ case "${OPTIMIZER_SET}" in
   required)
     OPTIMIZERS=(dj_optimizer dp_cedar_optimizer dp_optimizer)
     ;;
+  paper)
+    OPTIMIZERS=(
+      optimizer
+      dj_optimizer
+      dp_cedar_optimizer
+      dp_optimizer
+      pecan_optimizer
+    )
+    ;;
+  complete)
+    OPTIMIZERS=(
+      optimizer
+      dj_optimizer
+      dp_cedar_optimizer
+      dp_optimizer
+      dp_two_stage_optimizer
+      pecan_optimizer
+    )
+    ;;
   dp_only)
     OPTIMIZERS=(dp_optimizer)
     ;;
   *)
-    echo "OPTIMIZER_SET must be all, required, or dp_only." >&2
+    echo "OPTIMIZER_SET must be all, required, paper, complete, or dp_only." >&2
     exit 2
     ;;
 esac
@@ -94,8 +116,8 @@ if [[ "${LOCAL_WORKERS}" != "8" ]]; then
   echo "This script is the fixed-W=8 ablation; LOCAL_WORKERS must be 8." >&2
   exit 2
 fi
-if [[ "${REPEATS}" != "1" ]]; then
-  echo "This reduced protocol requires exactly one measured run." >&2
+if [[ "${REPEATS}" != "1" && "${REPEATS}" != "3" ]]; then
+  echo "REPEATS must be 1 (legacy reduced run) or 3 (paper run)." >&2
   exit 2
 fi
 if [[ "${RESUME_EXISTING}" != "0" && "${RESUME_EXISTING}" != "1" ]]; then
@@ -107,9 +129,26 @@ if [[ "${PLAN_ONLY}" != "0" && "${PLAN_ONLY}" != "1" ]]; then
   exit 2
 fi
 
-if ! ray status --address="${RAY_ADDRESS}" >/dev/null 2>&1; then
+ray_healthy() {
+  timeout 20s python - "${RAY_ADDRESS}" <<'PY' >/dev/null 2>&1
+import ray
+import sys
+
+ray.init(address=sys.argv[1], logging_level="ERROR")
+resources = ray.cluster_resources()
+ray.shutdown()
+assert resources.get("CPU", 0) >= 64, resources
+PY
+}
+
+if ! ray_healthy; then
+  ray stop --force >/dev/null 2>&1 || true
   ray start --head --node-ip-address=127.0.0.1 --port=6379 \
-    --disable-usage-stats >/dev/null
+    --num-cpus="${CPU_BUDGET}" --disable-usage-stats >/dev/null
+  ray_healthy || {
+    echo "Failed to start a healthy local Ray cluster at ${RAY_ADDRESS}." >&2
+    exit 1
+  }
 fi
 
 TMP_PLAN="/tmp/cedar_optimized_plan.yml"
@@ -129,7 +168,7 @@ trap cleanup_tmp_plan EXIT
 
 reset_workload_dir() {
   local workload="$1"
-  local root="${BASE_DIR}/${workload}"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
 
   # These are generated artifacts only. Profiles and source files are kept.
   rm -rf "${root}/plans" "${root}/results" "${root}/warmup_results" \
@@ -141,10 +180,10 @@ reset_workload_dir() {
 
 write_metadata() {
   local workload="$1" profile="$2" samples="$3" cache_mode="$4" kwargs="$5"
-  local root="${BASE_DIR}/${workload}"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   {
     printf 'ablation=fixed_local_workers_w8\n'
-    printf 'measurement_protocol=reduced_single_run\n'
+    printf 'measurement_protocol=fixed_w8_%s_round_robin_repeats\n' "${REPEATS}"
     printf 'profile_source=%s\n' "${profile#${REPO_ROOT}/}"
     printf 'cpu_budget=%s\n' "${CPU_BUDGET}"
     printf 'local_workers=%s\n' "${LOCAL_WORKERS}"
@@ -176,7 +215,7 @@ write_metadata() {
 generate_plan() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
   local cache_mode="$5" kwargs="$6" optimizer="$7"
-  local root="${BASE_DIR}/${workload}"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local log="${root}/logs/plan__${optimizer}.log"
   local result="${root}/warmup_results/plan_only__${optimizer}.json"
   local -a args=(
@@ -237,7 +276,7 @@ generate_plan() {
 
 warm_cache() {
   local workload="$1" dataset="$2" samples="$3" kwargs="$4" optimizer="$5"
-  local root="${BASE_DIR}/${workload}"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local warmup_request=$((samples + 1))
   local -a args=(
     python evaluation/eval_cedar.py
@@ -293,7 +332,7 @@ PY
 run_workload() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
   local cache_mode="$5" kwargs="$6"
-  local root="${BASE_DIR}/${workload}"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local optimizer round offset i tag
   local -a available_optimizers=()
 
@@ -381,10 +420,12 @@ run_workload() {
     done
   done
   echo "[$(date -Is)] COMPLETE ${workload}" | tee -a "${root}/nohup.log"
-  python evaluation/chapter6_experiments/analyze_w8_acceptance.py \
-    --json-output "${BASE_DIR}/formal_results/w8_acceptance_latest.json" \
-    --markdown-output "${BASE_DIR}/formal_results/w8_acceptance_latest.md" \
-    | tee -a "${root}/nohup.log"
+  if [[ "${MATRIX_OUTPUT_ROOT}" == "${BASE_DIR}" ]]; then
+    python evaluation/chapter6_experiments/analyze_w8_acceptance.py \
+      --json-output "${BASE_DIR}/formal_results/w8_acceptance_latest.json" \
+      --markdown-output "${BASE_DIR}/formal_results/w8_acceptance_latest.md" \
+      | tee -a "${root}/nohup.log"
+  fi
 }
 
 run_workload coco \

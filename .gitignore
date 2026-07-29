@@ -178,3 +178,9 @@ cython_debug/
 /evaluation/chapter6_experiments/formal_results/scaled_reuse_plan_runs/
 /evaluation/chapter6_experiments/scaled_reuse_plan_*.nohup
 /evaluation/chapter6_experiments/coco_train2017_download.nohup
+
+# Stable paper experiment: keep profiles, plans, metadata, results, and its
+# README reviewable; exclude only reproducible scratch/cache and raw logs.
+/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/runner.out
+/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/cache/
+/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/logs/
