@@ -1191,6 +1191,14 @@ class DataSet:
             "CEDAR_INCREMENTAL_PROFILE_FROM"
         )
         if incremental_from:
+            if os.environ.get("CEDAR_INCREMENTAL_WALL_BASELINE") == "1":
+                return self._profile_wall_baseline_incremental(
+                    f_name=f_name,
+                    feature_to_profile=self.features[f_name],
+                    n_samples=n_samples,
+                    output_file=output_file,
+                    existing_profile=incremental_from,
+                )
             return self._profile_backend_compute_incremental(
                 f_name=f_name,
                 feature_to_profile=self.features[f_name],
@@ -1280,6 +1288,74 @@ class DataSet:
         with open(output_file, "w") as outfile:
             yaml.dump(d, outfile)
         return d
+
+    def _profile_wall_baseline_incremental(
+        self,
+        f_name: str,
+        feature_to_profile: Feature,
+        n_samples: Optional[int],
+        output_file: Optional[str],
+        existing_profile: str,
+    ) -> Dict[str, Any]:
+        """Add baseline wall-clock operator timings to an existing profile.
+
+        The isolated offload throughputs, backend worker measurements,
+        selectivities, sizes, and boundary calibration remain unchanged. This
+        makes the extension inexpensive and preserves the common profile used
+        by every optimizer in the comparison.
+        """
+        with open(existing_profile, "r") as stream:
+            profile = yaml.safe_load(stream)
+        if not isinstance(profile, dict):
+            raise RuntimeError(
+                f"Incremental profile is not a mapping: {existing_profile}"
+            )
+        expected_resources = {
+            "schema_version": 1,
+            "profile_scope": "single_local_worker",
+            "profile_local_workers": 1,
+            "actors_per_stage": (
+                RAY_PROFILE_N_ACTORS
+                if RAY_PROFILE_N_ACTORS == SMP_PROFILE_N_PROCS
+                else None
+            ),
+            "ray_actors_per_stage": RAY_PROFILE_N_ACTORS,
+            "smp_procs_per_stage": SMP_PROFILE_N_PROCS,
+        }
+        if profile.get("resource_config") != expected_resources:
+            raise RuntimeError(
+                "Incremental wall profiling resource mismatch: "
+                f"existing={profile.get('resource_config')}, "
+                f"current={expected_resources}"
+            )
+        baseline = profile.get("baseline")
+        if not isinstance(baseline, dict):
+            raise RuntimeError("Existing profile has no baseline mapping.")
+
+        fresh_baseline = self._profile_feature(
+            f_name, feature_to_profile, n_samples, None
+        )
+        wall_latencies = fresh_baseline.get("wall_latencies")
+        if not isinstance(wall_latencies, dict) or not wall_latencies:
+            raise RuntimeError("No baseline wall-clock timings were collected.")
+        if set(wall_latencies) != set(baseline.get("latencies", {})):
+            raise RuntimeError(
+                "Wall-clock baseline pipe set does not match the existing "
+                "profile."
+            )
+        baseline["wall_latencies"] = wall_latencies
+        profile["incremental_wall_baseline"] = {
+            "schema_version": 1,
+            "source_profile": os.path.abspath(existing_profile),
+            "clock": "perf_counter_ns",
+            "updated_operators": len(wall_latencies),
+        }
+
+        if output_file is None:
+            output_file = f"/tmp/{f_name}_profile.yml"
+        with open(output_file, "w") as outfile:
+            yaml.dump(profile, outfile)
+        return profile
 
     def _profile_backend_compute_incremental(
         self,
@@ -1683,6 +1759,7 @@ class DataSet:
         )
         # Per-pipe latencies
         pipe_latencies = profiler.calculate_avg_latency_per_sample()
+        wall_pipe_latencies = profiler.calculate_avg_wall_latency_per_sample()
         input_sizes, output_sizes = profiler.calculate_avg_data_size()
 
         # A backend profile mutates exactly one logical operator.  Read the
@@ -1716,6 +1793,7 @@ class DataSet:
 
         result = {
             "latencies": pipe_latencies,
+            "wall_latencies": wall_pipe_latencies,
             "input_sizes": input_sizes,
             "output_sizes": output_sizes,
             "throughput": throughput_samples_per_sec,

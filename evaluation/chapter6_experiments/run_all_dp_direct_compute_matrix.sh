@@ -9,8 +9,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
 FORMAL_ROOT="${BASE_DIR}/formal_results"
 RUN_ID="${ALL_DP_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
-RUN_ROOT="${FORMAL_ROOT}/dp_direct_compute_runs/${RUN_ID}"
+RUN_PARENT="${ALL_DP_RUN_PARENT:-${FORMAL_ROOT}/dp_direct_compute_runs}"
+RUN_ROOT="${RUN_PARENT}/${RUN_ID}"
+PROTOCOL_NAME="${ALL_DP_PROTOCOL_NAME:-all_workloads_dp_direct_compute_w8}"
 PROFILE_ROOT="${RUN_ROOT}/profiles"
+SOURCE_PROFILE_ROOT="${ALL_DP_SOURCE_PROFILE_ROOT:-${FORMAL_ROOT}/profiles}"
+SKIP_PROFILE_REFRESH="${ALL_DP_SKIP_PROFILE_REFRESH:-0}"
 RAY_ADDRESS="127.0.0.1:6379"
 CPU_BUDGET=64
 LOCAL_WORKERS=8
@@ -23,6 +27,9 @@ WORKLOADS=(
   redpajama_code pile_europarl pile_hackernews pile_pubmed_abstracts
   pile_freelaw pile_uspto_backgrounds
 )
+if [[ -n "${ALL_DP_WORKLOADS:-}" ]]; then
+  IFS=',' read -r -a WORKLOADS <<< "${ALL_DP_WORKLOADS}"
+fi
 EXTRA_INCREMENTAL="stackexchange,redpajama_code,pile_europarl,pile_hackernews,pile_pubmed_abstracts,pile_uspto_backgrounds"
 
 [[ ! -e "${RUN_ROOT}" ]] || {
@@ -143,25 +150,29 @@ PY
 
 echo "[$(date -Is)] Isolated all-workload DP run ${RUN_ID}"
 for workload in "${WORKLOADS[@]}"; do
-  source_profile="${FORMAL_ROOT}/profiles/${workload}.yaml"
+  source_profile="${SOURCE_PROFILE_ROOT}/${workload}.yaml"
   [[ -f "${source_profile}" ]] && cp -p "${source_profile}" "${PROFILE_ROOT}/${workload}.yaml"
 done
 
-echo "[$(date -Is)] Add direct backend timings to the six legacy profiles"
-INCREMENTAL_BACKEND_COMPUTE=1 \
-CH6_PROFILE_ROOT="${PROFILE_ROOT}" \
-CH6_PROFILE_RUN_ID="${RUN_ID}_incremental" \
-bash "${BASE_DIR}/run_formal_profiles.sh" --workloads "${EXTRA_INCREMENTAL}"
+if [[ "${SKIP_PROFILE_REFRESH}" == "0" ]]; then
+  echo "[$(date -Is)] Add direct backend timings to the six legacy profiles"
+  INCREMENTAL_BACKEND_COMPUTE=1 \
+  CH6_PROFILE_ROOT="${PROFILE_ROOT}" \
+  CH6_PROFILE_RUN_ID="${RUN_ID}_incremental" \
+  bash "${BASE_DIR}/run_formal_profiles.sh" --workloads "${EXTRA_INCREMENTAL}"
 
-echo "[$(date -Is)] Build the previously missing FreeLaw profile in isolation"
-set +e
-CH6_PROFILE_ROOT="${PROFILE_ROOT}" \
-CH6_PROFILE_RUN_ID="${RUN_ID}_freelaw" \
-bash "${BASE_DIR}/run_formal_profiles.sh" --workloads pile_freelaw
-freelaw_profile_status=$?
-set -e
-if [[ "${freelaw_profile_status}" -ne 0 ]] || ! profile_valid "${PROFILE_ROOT}/pile_freelaw.yaml"; then
-  write_status pile_freelaw profile profile_failed "isolated formal profile failed validation"
+  echo "[$(date -Is)] Build the previously missing FreeLaw profile in isolation"
+  set +e
+  CH6_PROFILE_ROOT="${PROFILE_ROOT}" \
+  CH6_PROFILE_RUN_ID="${RUN_ID}_freelaw" \
+  bash "${BASE_DIR}/run_formal_profiles.sh" --workloads pile_freelaw
+  freelaw_profile_status=$?
+  set -e
+  if [[ "${freelaw_profile_status}" -ne 0 ]] || ! profile_valid "${PROFILE_ROOT}/pile_freelaw.yaml"; then
+    write_status pile_freelaw profile profile_failed "isolated formal profile failed validation"
+  fi
+else
+  echo "[$(date -Is)] Reusing frozen profiles from ${SOURCE_PROFILE_ROOT}"
 fi
 
 ray status --address="${RAY_ADDRESS}" >/dev/null 2>&1 || \
@@ -177,7 +188,7 @@ generate_plan() {
   profile="${PROFILE_ROOT}/${workload}.yaml"
   mkdir -p "${root}"/{plans,plan_results,results,status,logs,cache}
   {
-    echo protocol=all_workloads_dp_direct_compute_w8
+    echo protocol="${PROTOCOL_NAME}"
     echo workload="${workload}"
     echo profile="${profile}"
     echo samples="${samples}"
@@ -220,6 +231,38 @@ raise SystemExit(0 if any("Cache" in str(x.get("name","")) for x in p.values()) 
 PY
 }
 
+run_guarded_result() {
+  local timeout_sec="$1" result="$2" log="$3"
+  shift 3
+  local pid status=0 start_time="${SECONDS}"
+  rm -f "${result}"
+  setsid "$@" >"${log}" 2>&1 &
+  pid=$!
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [[ -s "${result}" ]]; then
+      # eval_cedar writes the result only after the measured epoch. Give
+      # ordinary teardown a short grace period, then prevent orphaned SMP
+      # workers from blocking the remainder of the matrix.
+      sleep 10
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 0
+    fi
+    if (( SECONDS - start_time >= timeout_sec )); then
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 124
+    fi
+    sleep 5
+  done
+  wait "${pid}" || status=$?
+  [[ "${status}" -eq 0 && -s "${result}" ]]
+}
+
 warm_cache() {
   local workload="$1" root="${RUN_ROOT}/$1" dataset kwargs samples
   dataset="$(dataset_file "${workload}")"; kwargs="$(dataset_kwargs "${workload}")"; samples="$(sample_count "${workload}")"
@@ -227,7 +270,9 @@ warm_cache() {
   args=(python evaluation/eval_cedar.py --dataset_file "${dataset}" --master_feature_config "${root}/plans/dp_optimizer.yaml" --num_total_samples "$((samples+1))" --num_epochs 1 --use_ray --ray_ip "${RAY_ADDRESS}" --results_path "${root}/results/cache_warmup.json")
   [[ -n "${kwargs}" ]] && args+=(--dataset_kwargs "${kwargs}")
   echo "[$(date -Is)] WARM ${workload}/dp_optimizer"
-  timeout --signal=TERM --kill-after=30s "${EXECUTION_TIMEOUT_SEC}" "${args[@]}" >"${root}/logs/cache_warmup.log" 2>&1
+  run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
+    "${root}/results/cache_warmup.json" \
+    "${root}/logs/cache_warmup.log" "${args[@]}"
   python - "${root}/cache/${workload}__dp_optimizer" "${samples}" <<'PY'
 import json,pathlib,sys
 paths=list(pathlib.Path(sys.argv[1]).glob("**/.manifest.json"))
@@ -247,7 +292,8 @@ execute_round() {
   [[ -n "${kwargs}" ]] && args+=(--dataset_kwargs "${kwargs}")
   echo "[$(date -Is)] RUN ${workload}/round${round}__dp_optimizer"
   set +e
-  timeout --signal=TERM --kill-after=30s "${EXECUTION_TIMEOUT_SEC}" "${args[@]}" >"${root}/logs/round${round}__dp_optimizer.log" 2>&1
+  run_guarded_result "${EXECUTION_TIMEOUT_SEC}" "${result}" \
+    "${root}/logs/round${round}__dp_optimizer.log" "${args[@]}"
   status=$?
   set -e
   if [[ "${status}" -ne 0 || ! -f "${result}" ]]; then

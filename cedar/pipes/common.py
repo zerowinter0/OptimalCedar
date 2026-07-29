@@ -47,6 +47,13 @@ class DataSample:
         self.do_trace = do_trace
         self.sample_id = sample_id
         self.trace_dict: Optional[Dict[int, int]] = None
+        # Wall-clock trace recorded alongside the historical process-time
+        # trace. Process time remains available to the runtime controller;
+        # wall time is comparable with Ray/SMP worker timings in profiles.
+        self.wall_trace_dict: Optional[Dict[int, int]] = None
+        # Timestamp after tracing/size instrumentation has completed. The
+        # next pipe's wall latency starts here, excluding profiler overhead.
+        self.wall_trace_resume_dict: Optional[Dict[int, int]] = None
         # Trace of the number of raw samples contained in data,
         # For example, a batch of 10 samples would correspond to a size of 10
         self.size_dict: Optional[Dict[int, int]] = None
@@ -75,6 +82,8 @@ class DataSample:
         if p_id is None:
             logger.warning("Attempting to trace pipe without assigned ID.")
         self.trace_dict[p_id] = time.process_time_ns()
+        if self.wall_trace_dict is not None:
+            self.wall_trace_dict[p_id] = time.perf_counter_ns()
 
         if p_id not in self.size_dict:
             # Not set by set_size, automatically use previous size
@@ -95,6 +104,8 @@ class DataSample:
                 self.data_size_dict[p_id] = get_sizeof_data(self.data)
             except Exception as e:
                 logger.warning(f"Failed to get size of data: {e}")
+        if self.wall_trace_resume_dict is not None:
+            self.wall_trace_resume_dict[p_id] = time.perf_counter_ns()
 
     def set_size(self, p_id: int, size: int) -> None:
         """
@@ -108,6 +119,8 @@ class DataSample:
     def copy_metadata_from(self, ds: "DataSample") -> None:
         self.do_trace = ds.do_trace
         self.trace_dict = ds.trace_dict
+        self.wall_trace_dict = ds.wall_trace_dict
+        self.wall_trace_resume_dict = ds.wall_trace_resume_dict
         self.size_dict = ds.size_dict
         self.trace_order = ds.trace_order
         self.buffer_size_dict = ds.buffer_size_dict

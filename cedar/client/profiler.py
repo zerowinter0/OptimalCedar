@@ -37,6 +37,8 @@ class FeatureProfiler:
 
         # List of calculated latencies to yield a sample for each pipe, in ns
         self.latencies: Dict[int, Deque[int]] = {}
+        # Wall-clock counterpart collected for offline profile artifacts.
+        self.wall_latencies: Dict[int, Deque[int]] = {}
         # List of buffer lengths for each async pipe
         self.buffer_sizes: Dict[int, Deque[int]] = {}
         # List of data sizes for each async pipe
@@ -94,6 +96,11 @@ class FeatureProfiler:
                     p_id: deque(maxlen=maxlen)
                     for p_id in self.feature.physical_pipes.keys()
                 }
+                if self.profile_mode:
+                    self.wall_latencies = {
+                        p_id: deque(maxlen=maxlen)
+                        for p_id in self.feature.physical_pipes.keys()
+                    }
                 self.buffer_sizes = {
                     p_id: deque(maxlen=maxlen)
                     for p_id in self.feature.physical_pipes.keys()
@@ -105,6 +112,8 @@ class FeatureProfiler:
                     }
         with self._lock:
             self._update_latencies(ds)
+            if self.profile_mode:
+                self._update_wall_latencies(ds)
             self._update_buffer_sizes(ds)
             if self.profile_mode:
                 self._update_data_sizes(ds)
@@ -149,6 +158,26 @@ class FeatureProfiler:
         # if self.ds_logger:
         #     self.ds_logger.log("\tBUF SIZE: " + str(log_dict))
 
+    def _update_wall_latencies(self, ds: DataSample) -> None:
+        if (
+            len(ds.trace_order) < 2
+            or ds.wall_trace_dict is None
+            or ds.wall_trace_resume_dict is None
+        ):
+            return
+        for idx, p_id in enumerate(ds.trace_order[1:], start=1):
+            prev_p_id = ds.trace_order[idx - 1]
+            if (
+                p_id not in ds.wall_trace_dict
+                or prev_p_id not in ds.wall_trace_resume_dict
+            ):
+                continue
+            latency = (
+                ds.wall_trace_dict[p_id]
+                - ds.wall_trace_resume_dict[prev_p_id]
+            ) / ds.size_dict[p_id]
+            self.wall_latencies[p_id].append(latency)
+
     def _update_data_sizes(self, ds: DataSample) -> None:
         if len(ds.trace_order) < 2:
             return
@@ -187,6 +216,15 @@ class FeatureProfiler:
                 if len(v) > 0
             }
         return res
+
+    def calculate_avg_wall_latency_per_sample(self) -> Dict[int, float]:
+        """Return per-pipe wall-clock latency in nanoseconds per sample."""
+        with self._lock:
+            return {
+                k: sum(v) / len(v)
+                for k, v in self.wall_latencies.items()
+                if len(v) > 0
+            }
 
     def calculate_avg_buffer_size(self) -> Dict[int, float]:
         """

@@ -92,6 +92,26 @@ def test_optimizer_uses_direct_worker_bound_without_boundary_model():
     assert cost == pytest.approx(2.0 + 1.645 * 0.1)
 
 
+def test_optimizer_uses_wall_clock_cost_domain_for_new_profiles():
+    optimizer = MyOptimizer()
+    optimizer.profiled_stats = {
+        "baseline": {
+            "throughput": 250.0,
+            "latencies": {7: 99.0, 8: 1.0},
+            "wall_latencies": {7: 1_000_000.0, 8: 3_000_000.0},
+            "input_sizes": {7: 100.0, 8: 100.0},
+            "output_sizes": {7: 100.0, 8: 100.0},
+        },
+        "disk_info": {"read_latency": 0.0, "write_latency": 0.0},
+        "offloads": {},
+    }
+
+    optimizer._init_stats()
+
+    assert optimizer._dp_wall_latency_scale == pytest.approx(1.0)
+    assert optimizer._base_cost_map == pytest.approx({7: 1.0, 8: 3.0})
+
+
 def test_boundary_cost_amortizes_fixed_latency_by_profile_inflight():
     optimizer = MyOptimizer()
     optimizer.profiled_stats = {

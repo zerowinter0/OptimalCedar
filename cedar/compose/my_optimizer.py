@@ -50,6 +50,7 @@ class MyOptimizer(Optimizer):
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
         self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
         self._transport_rejection_logs: Set[Tuple[Any, ...]] = set()
+        self._dp_wall_latency_scale: Optional[float] = None
 
     #复用父类的init和_init_stats
     def init(self, logical_pipes: Dict[int, Pipe], logical_adj_list: Dict[int, Set[int]]) -> None:
@@ -59,7 +60,60 @@ class MyOptimizer(Optimizer):
         super().init(logical_pipes, logical_adj_list)
 
     def _init_stats(self) -> None:
-        super()._init_stats()        
+        super()._init_stats()
+        wall_latencies = self.profiled_stats["baseline"].get(
+            "wall_latencies"
+        )
+        if not isinstance(wall_latencies, dict):
+            return
+        # Filter pipelines require the isolated end-to-end offload signal:
+        # dropped records do not reach the output profiler, so a wall-clock
+        # sum over surviving samples is not an unbiased local cost breakdown.
+        # The selectivity-aware outer DP still models their cardinality.
+        has_filter = self.logical_pipes is not None and any(
+            "filterpipe" in pipe.__class__.__name__.lower()
+            or "filterpipe" in pipe.get_logical_name().lower()
+            for pipe in self.logical_pipes.values()
+        )
+        if has_filter:
+            logger.info(
+                "[MyOptimizer] Retaining end-to-end cost attribution for a "
+                "pipeline containing filters."
+            )
+            return
+        expected_ids = set(self._base_cost_map)
+        if set(wall_latencies) != expected_ids:
+            logger.warning(
+                "[MyOptimizer] Ignoring incomplete baseline wall latencies: "
+                "expected=%s observed=%s",
+                sorted(expected_ids),
+                sorted(wall_latencies),
+            )
+            return
+        try:
+            wall_ns = {
+                p_id: float(wall_latencies[p_id]) for p_id in expected_ids
+            }
+        except (TypeError, ValueError):
+            return
+        total_wall_ns = sum(wall_ns.values())
+        if not math.isfinite(total_wall_ns) or total_wall_ns <= 0:
+            return
+
+        total_cost_ms = 1000.0 / self.profiled_stats["baseline"]["throughput"]
+        self._dp_wall_latency_scale = total_cost_ms / (total_wall_ns / 1e6)
+        self._fractional_latencies = {
+            p_id: latency / total_wall_ns for p_id, latency in wall_ns.items()
+        }
+        self._base_cost_map = {
+            p_id: fraction * total_cost_ms
+            for p_id, fraction in self._fractional_latencies.items()
+        }
+        logger.info(
+            "[MyOptimizer] Using baseline wall-clock operator costs "
+            "(normalization scale %.6f).",
+            self._dp_wall_latency_scale,
+        )
     # ========= 外部入口 =========
 
     def run(
@@ -472,6 +526,35 @@ class MyOptimizer(Optimizer):
         ).get(p_id, {})
         direct = profile.get("backend_compute")
 
+        direct_upper_bound: Optional[float] = None
+        if isinstance(direct, dict):
+            try:
+                mean = float(direct["mean_ms_per_sample"])
+                stderr = float(direct.get("stderr_ms_per_sample", 0.0))
+                count = int(direct["count"])
+            except (KeyError, TypeError, ValueError):
+                mean = float("nan")
+                stderr = float("nan")
+                count = 0
+            if (
+                count > 0
+                and math.isfinite(mean)
+                and mean >= 0
+                and math.isfinite(stderr)
+                and stderr >= 0
+            ):
+                direct_upper_bound = mean + 1.645 * stderr
+
+        # New profiles provide local and backend compute in the same
+        # wall-clock domain. Prefer the direct worker observation: unlike an
+        # Amdahl inverse, it remains identifiable near the whole-pipeline
+        # speedup asymptote and composes additively inside a fused block.
+        if (
+            self._dp_wall_latency_scale is not None
+            and direct_upper_bound is not None
+        ):
+            return direct_upper_bound * self._dp_wall_latency_scale
+
         throughput = self._dp_boundary_throughput(variant)
         baseline = self.profiled_stats.get("baseline", {})
         input_sizes = baseline.get("input_sizes", {})
@@ -490,23 +573,8 @@ class MyOptimizer(Optimizer):
             if math.isfinite(compute_cost):
                 return max(0.0, compute_cost)
 
-        if isinstance(direct, dict):
-            try:
-                mean = float(direct["mean_ms_per_sample"])
-                stderr = float(direct.get("stderr_ms_per_sample", 0.0))
-                count = int(direct["count"])
-            except (KeyError, TypeError, ValueError):
-                mean = float("nan")
-                stderr = float("nan")
-                count = 0
-            if (
-                count > 0
-                and math.isfinite(mean)
-                and mean >= 0
-                and math.isfinite(stderr)
-                and stderr >= 0
-            ):
-                return mean + 1.645 * stderr
+        if direct_upper_bound is not None:
+            return direct_upper_bound
 
         return profiled_total_cost
 

@@ -385,6 +385,7 @@ class SourcePipeVariantMixin:
             curr_idx = self.world_size - self.rank - 1
         while True:
             try:
+                wall_source_start = time.perf_counter_ns()
                 x = next(it)
             except StopIteration:
                 return
@@ -404,6 +405,8 @@ class SourcePipeVariantMixin:
                     ds.do_trace = True
                     # Use -1 to designate dummy source op
                     ds.trace_dict = {-1: start_time}
+                    ds.wall_trace_dict = {-1: wall_source_start}
+                    ds.wall_trace_resume_dict = {-1: wall_source_start}
                     ds.trace_order = [-1]
                     # Set size of source op and dummy op
                     ds.set_size(-1, size)
@@ -432,6 +435,7 @@ class SourcePipeVariantMixin:
             curr_idx = self.world_size - self.rank - 1
         while True:
             try:
+                wall_source_start = time.perf_counter_ns()
                 x = it.get_next()
             except tf.errors.OutOfRangeError:
                 return
@@ -448,6 +452,8 @@ class SourcePipeVariantMixin:
                 ds.do_trace = True
                 # Use -1 to designate dummy source op
                 ds.trace_dict = {-1: start_time}
+                ds.wall_trace_dict = {-1: wall_source_start}
+                ds.wall_trace_resume_dict = {-1: wall_source_start}
                 ds.trace_order = [-1]
                 # Set size of source op and dummy op
                 ds.set_size(-1, size)

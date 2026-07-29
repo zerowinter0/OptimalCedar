@@ -292,6 +292,20 @@ def test_profiler_missing_traced_data_size_falls_back(basic_noop_feature):
         1: 40,
         0: 50,
     }
+    ds.wall_trace_dict = {
+        -1: 100,
+        3: 120,
+        2: 150,
+        1: 190,
+        0: 250,
+    }
+    ds.wall_trace_resume_dict = {
+        -1: 100,
+        3: 120,
+        2: 150,
+        1: 190,
+        0: 250,
+    }
     ds.trace_order = [-1, 3, 2, 1, 0]
     ds.size_dict = {
         -1: 1,
@@ -314,6 +328,12 @@ def test_profiler_missing_traced_data_size_falls_back(basic_noop_feature):
     input_sizes, output_sizes = profiler.calculate_avg_data_size()
     assert input_sizes[1] == 64
     assert output_sizes[1] == 64
+    assert profiler.calculate_avg_wall_latency_per_sample() == {
+        3: 20.0,
+        2: 30.0,
+        1: 40.0,
+        0: 60.0,
+    }
 
 
 def test_buffer_sizes(monkeypatch, noop_sleep_dataset):
