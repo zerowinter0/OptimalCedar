@@ -112,6 +112,26 @@ def test_optimizer_uses_wall_clock_cost_domain_for_new_profiles():
     assert optimizer._base_cost_map == pytest.approx({7: 1.0, 8: 3.0})
 
 
+def test_optimizer_rejects_wall_clock_costs_inconsistent_with_throughput():
+    optimizer = MyOptimizer()
+    optimizer.profiled_stats = {
+        "baseline": {
+            "throughput": 250.0,
+            "latencies": {7: 99.0, 8: 1.0},
+            "wall_latencies": {7: 2_000_000.0, 8: 6_000_000.0},
+            "input_sizes": {7: 100.0, 8: 100.0},
+            "output_sizes": {7: 100.0, 8: 100.0},
+        },
+        "disk_info": {"read_latency": 0.0, "write_latency": 0.0},
+        "offloads": {},
+    }
+
+    optimizer._init_stats()
+
+    assert optimizer._dp_wall_latency_scale is None
+    assert optimizer._base_cost_map == pytest.approx({7: 3.96, 8: 0.04})
+
+
 def test_boundary_cost_amortizes_fixed_latency_by_profile_inflight():
     optimizer = MyOptimizer()
     optimizer.profiled_stats = {

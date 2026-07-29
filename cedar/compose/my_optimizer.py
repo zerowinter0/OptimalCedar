@@ -101,7 +101,22 @@ class MyOptimizer(Optimizer):
             return
 
         total_cost_ms = 1000.0 / self.profiled_stats["baseline"]["throughput"]
-        self._dp_wall_latency_scale = total_cost_ms / (total_wall_ns / 1e6)
+        measured_wall_cost_ms = total_wall_ns / 1e6
+        relative_error = (
+            abs(measured_wall_cost_ms - total_cost_ms) / total_cost_ms
+        )
+        if relative_error > constants.MAX_WALL_CLOCK_COST_RELATIVE_ERROR:
+            logger.warning(
+                "[MyOptimizer] Ignoring inconsistent baseline wall-clock "
+                "operator costs: summed=%.6f ms observed=%.6f ms "
+                "relative_error=%.2f%% (limit=%.2f%%).",
+                measured_wall_cost_ms,
+                total_cost_ms,
+                100.0 * relative_error,
+                100.0 * constants.MAX_WALL_CLOCK_COST_RELATIVE_ERROR,
+            )
+            return
+        self._dp_wall_latency_scale = total_cost_ms / measured_wall_cost_ms
         self._fractional_latencies = {
             p_id: latency / total_wall_ns for p_id, latency in wall_ns.items()
         }
