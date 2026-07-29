@@ -16,6 +16,7 @@ CPU_BUDGET="${CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
 REPEATS="${REPEATS:-1}"
 OPTIMIZER_PLAN_TIMEOUT_SEC="${OPTIMIZER_PLAN_TIMEOUT_SEC:-300}"
+EXECUTION_TIMEOUT_SEC="${EXECUTION_TIMEOUT_SEC:-3600}"
 RESUME_EXISTING="${RESUME_EXISTING:-0}"
 OPTIMIZER_SET="${OPTIMIZER_SET:-all}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
@@ -189,6 +190,7 @@ write_metadata() {
     printf 'local_workers=%s\n' "${LOCAL_WORKERS}"
     printf 'repeats=%s\n' "${REPEATS}"
     printf 'optimizer_plan_timeout_sec=%s\n' "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
+    printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
     printf 'cache=%s\n' "${cache_mode}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     printf 'dataset_kwargs=%s\n' "${kwargs}"
@@ -274,6 +276,61 @@ generate_plan() {
   cp -p "${TMP_PLAN}" "${root}/plans/${optimizer}.yaml"
 }
 
+run_guarded_result() {
+  local timeout_sec="$1" result="$2" log="$3"
+  shift 3
+  local pid status=0 start_time="${SECONDS}"
+
+  rm -f "${result}"
+  setsid "$@" > "${log}" 2>&1 &
+  pid=$!
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [[ -s "${result}" ]]; then
+      # eval_cedar writes its result only after the measured epoch. Allow
+      # normal teardown briefly, then reclaim the complete process group so
+      # orphaned Ray/SMP workers cannot stall the remaining matrix.
+      sleep 10
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 0
+    fi
+    if ((SECONDS - start_time >= timeout_sec)); then
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 124
+    fi
+    sleep 5
+  done
+  wait "${pid}" || status=$?
+  [[ "${status}" -eq 0 && -s "${result}" ]]
+}
+
+validate_result() {
+  local result="$1" expected_samples="$2"
+  python - "${result}" "${expected_samples}" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+expected = int(sys.argv[2])
+with open(path) as handle:
+    result = json.load(handle)
+
+if result.get("num_epochs") != 1:
+    raise SystemExit(f"unexpected num_epochs in {path}: {result.get('num_epochs')}")
+epoch_samples = result.get("epoch_num_samples")
+if epoch_samples != [expected]:
+    raise SystemExit(
+        f"sample count mismatch in {path}: expected [{expected}], "
+        f"found {epoch_samples}"
+    )
+PY
+}
+
 warm_cache() {
   local workload="$1" dataset="$2" samples="$3" kwargs="$4" optimizer="$5"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
@@ -297,7 +354,13 @@ warm_cache() {
   export CEDAR_CACHE_NAMESPACE="${workload}__${optimizer}"
   unset CEDAR_CACHE_SHARD
   echo "[$(date -Is)] WARMUP ${workload}/${optimizer}" | tee -a "${root}/nohup.log"
-  "${args[@]}" > "${root}/logs/warmup__${optimizer}.log" 2>&1
+  if ! run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
+      "${root}/warmup_results/warmup__${optimizer}.json" \
+      "${root}/logs/warmup__${optimizer}.log" "${args[@]}"; then
+    echo "Cache warmup failed or exceeded ${EXECUTION_TIMEOUT_SEC}s for ${workload}/${optimizer}" >&2
+    return 1
+  fi
+  validate_result "${root}/warmup_results/warmup__${optimizer}.json" "${samples}"
 
   # A bounded Cedar iteration can exit successfully without exhausting the
   # source.  Such a run leaves no complete cache manifest and must never be
@@ -415,7 +478,13 @@ run_workload() {
         unset CEDAR_CACHE_SHARD
       fi
       echo "[$(date -Is)] RUN ${workload}/${tag}" | tee -a "${root}/nohup.log"
-      "${args[@]}" > "${root}/logs/${tag}.log" 2>&1
+      if ! run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
+          "${root}/results/${tag}.json" \
+          "${root}/logs/${tag}.log" "${args[@]}"; then
+        echo "Execution failed or exceeded ${EXECUTION_TIMEOUT_SEC}s for ${workload}/${tag}" >&2
+        return 1
+      fi
+      validate_result "${root}/results/${tag}.json" "${samples}"
       echo "[$(date -Is)] DONE ${workload}/${tag}" | tee -a "${root}/nohup.log"
     done
   done
