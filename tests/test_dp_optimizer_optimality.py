@@ -66,35 +66,6 @@ def test_dp_optimizer_matches_exhaustive_oracle():
         assert result.oracle.enumerated_plans > 0
 
 
-def test_bottleneck_dp_optimizer_matches_exhaustive_oracle():
-    result = verify_case(
-        generate_case(47),
-        objective="bottleneck",
-    )
-    assert math.isclose(
-        result.dp_cost,
-        result.oracle.cost,
-        rel_tol=1e-10,
-        abs_tol=1e-10,
-    )
-    assert result.oracle.enumerated_plans > 0
-
-
-def test_resource_limited_bottleneck_dp_matches_exhaustive_oracle():
-    result = verify_case(
-        generate_case(53),
-        objective="bottleneck",
-        parallel_stage_limit=2,
-    )
-    assert math.isclose(
-        result.dp_cost,
-        result.oracle.cost,
-        rel_tol=1e-10,
-        abs_tol=1e-10,
-    )
-    assert result.oracle.enumerated_plans > 0
-
-
 def test_selectivity_aware_block_cost_moves_cheap_rejector_first():
     optimizer = DpOptimizer()
     optimizer._dp_pred_indices = [[], []]

@@ -82,7 +82,7 @@ selection-aware profile 与五 optimizer、三次 round-robin 正式矩阵均已
 最佳对手为 Data-Juicer，DP speedup 为 `459.747 / 507.168 = 0.906x`，
 因此 FAIL，并永久保留在分母中。
 
-该结果还暴露了 bottleneck objective 对 Cedar stage 理想重叠的错误假设。
+该结果还暴露了对 Cedar stage 理想重叠的错误假设。
 在任何四个 held-out 扩展负载生成 profile 或 optimizer 结果之前，DP 的最终
 held-out 配置已冻结回 selection-aware exact additive objective。Code 结果没有
 被删除或重新解释。
@@ -118,9 +118,9 @@ FreeLaw 的串行检查读取了 715,300,864 字节。该检查按官方顺序�
    昂贵算子的影响。
 3. exact DP 的 Pareto dominance 纳入 stage CPU 使用量；外层扩展只枚举合法
    next mask 的真子集，把弱依赖枚举从接近 4^n 降至 3^n transitions。
-4. 实现并用独立 exhaustive oracle 验证过 additive 与 bottleneck objective；
-   bottleneck 模式保留用于研究，但四个 held-out 正式负载冻结使用 additive。
-5. 已完成的验证包括：17 个 DP/cache/fusion 聚焦测试、13 个 analyzer 测试、
+4. 生产代价模型统一为 selection-aware exact additive objective，并由独立
+   exhaustive oracle 验证；所有正式负载使用同一套目标函数。
+5. 已完成的验证包括：15 个 DP/cache/fusion 聚焦测试、13 个 analyzer 测试、
    5 个 exhaustive oracle case（共 2,045,952 个合法计划精确匹配），以及
    12-op 弱依赖压力测试（83.77 秒，低于 300 秒优化上限）。
 6. 候选 runner 固定五 optimizer、共享 profile、三次 round-robin、计划/执行

@@ -152,15 +152,12 @@ def _plan_cost(
     case: GeneratedCase,
     blocks: Sequence[Sequence[int]],
     block_backends: Sequence[str],
-    objective: str = "additive",
 ) -> float:
     """Independent separable compute plus stage-boundary cost model."""
     item_size = 1.0
     cardinality = 1.0
     volume = 1.0
     cost = 0.0
-    local_work = 0.0
-    max_parallel_work = 0.0
     for block, backend in zip(blocks, block_backends):
         block_input = volume
         block_compute = 0.0
@@ -200,20 +197,11 @@ def _plan_cost(
                 * 1000.0
             )
         cost += stage_work
-        if backend == "INPROCESS":
-            local_work += stage_work
-        else:
-            max_parallel_work = max(max_parallel_work, stage_work)
-    if objective == "bottleneck":
-        return max(local_work, max_parallel_work)
-    if objective != "additive":
-        raise ValueError(f"Unknown objective: {objective}")
     return cost
 
 
 def exhaustive_oracle(
     case: GeneratedCase,
-    objective: str = "additive",
     parallel_stage_limit: int | None = None,
 ) -> ExhaustiveResult:
     """Enumerate every legal order, fusion partition, and block backend."""
@@ -243,7 +231,6 @@ def exhaustive_oracle(
                     case,
                     blocks,
                     block_backends,
-                    objective=objective,
                 )
                 if cost < best_cost:
                     best_cost = cost
@@ -351,7 +338,6 @@ def _linear_order(plan: PhysicalPlan, source_p_id: int) -> List[int]:
 
 def run_dp_optimizer(
     case: GeneratedCase,
-    objective: str = "additive",
     parallel_stage_limit: int | None = None,
 ) -> Tuple[float, Tuple[int, ...], Tuple[str, ...]]:
     feature = GeneratedFeature(case)
@@ -359,7 +345,6 @@ def run_dp_optimizer(
     profile, p_id_by_tag = build_profile(case, feature)
     optimizer = DpOptimizer()
     optimizer.init(feature.logical_pipes, feature.logical_adj_list)
-    old_objective = os.environ.get("CEDAR_DP_OBJECTIVE")
     resource_env_names = (
         "CEDAR_MATCH_PROFILE_RESOURCES",
         "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS",
@@ -369,12 +354,6 @@ def run_dp_optimizer(
         name: os.environ.get(name) for name in resource_env_names
     }
     try:
-        if objective == "bottleneck":
-            os.environ["CEDAR_DP_OBJECTIVE"] = "bottleneck"
-        elif objective == "additive":
-            os.environ.pop("CEDAR_DP_OBJECTIVE", None)
-        else:
-            raise ValueError(f"Unknown objective: {objective}")
         if parallel_stage_limit is None:
             for name in resource_env_names:
                 os.environ.pop(name, None)
@@ -399,10 +378,6 @@ def run_dp_optimizer(
             ),
         )
     finally:
-        if old_objective is None:
-            os.environ.pop("CEDAR_DP_OBJECTIVE", None)
-        else:
-            os.environ["CEDAR_DP_OBJECTIVE"] = old_objective
         for name, old_value in old_resource_env.items():
             if old_value is None:
                 os.environ.pop(name, None)
@@ -436,17 +411,14 @@ def verify_case(
     case: GeneratedCase,
     rel_tol: float = 1e-10,
     abs_tol: float = 1e-10,
-    objective: str = "additive",
     parallel_stage_limit: int | None = None,
 ) -> VerificationResult:
     oracle = exhaustive_oracle(
         case,
-        objective=objective,
         parallel_stage_limit=parallel_stage_limit,
     )
     dp_cost, dp_order, dp_backends = run_dp_optimizer(
         case,
-        objective=objective,
         parallel_stage_limit=parallel_stage_limit,
     )
 
@@ -458,7 +430,7 @@ def verify_case(
     if not math.isclose(dp_cost, oracle.cost, rel_tol=rel_tol, abs_tol=abs_tol):
         raise AssertionError(
             "DpOptimizer is not globally optimal for generated case: "
-            f"seed={case.seed}, objective={objective}, "
+            f"seed={case.seed}, "
             f"oracle={oracle.cost:.15g}, "
             f"dp={dp_cost:.15g}, oracle_order={oracle.order}, "
             f"dp_order={dp_order}, oracle_backends={oracle.backends}, "
@@ -485,11 +457,6 @@ def main() -> None:
     parser.add_argument("--rel-tol", type=float, default=1e-10)
     parser.add_argument("--abs-tol", type=float, default=1e-10)
     parser.add_argument(
-        "--objective",
-        choices=("additive", "bottleneck"),
-        default="additive",
-    )
-    parser.add_argument(
         "--failed-case",
         type=Path,
         default=Path("evaluation/failed_dp_optimality_case.json"),
@@ -509,7 +476,6 @@ def main() -> None:
                 case,
                 args.rel_tol,
                 args.abs_tol,
-                objective=args.objective,
             )
         except Exception:
             _write_failed_case(args.failed_case, case)
@@ -519,7 +485,6 @@ def main() -> None:
         print(
             f"[case {case_index:04d}] PASS seed={case_seed} "
             f"dependencies={len(case.dependencies)} "
-            f"objective={args.objective} "
             f"legal_orders={result.oracle.legal_orders} "
             f"enumerated_plans={result.oracle.enumerated_plans} "
             f"cost={result.dp_cost:.12f}"
@@ -527,8 +492,7 @@ def main() -> None:
 
     print(
         f"PASS: DpOptimizer matched the exhaustive optimum in "
-        f"all {args.num_cases} generated cases "
-        f"for objective={args.objective}."
+        f"all {args.num_cases} generated cases."
     )
 
 if __name__ == "__main__":

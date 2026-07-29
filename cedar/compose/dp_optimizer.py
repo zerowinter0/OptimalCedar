@@ -33,8 +33,6 @@ class DpStateSummary:
 
     cache_active: bool = False
     parallel_stage_cpus: int = 0
-    local_work: float = 0.0
-    max_parallel_work: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -340,8 +338,6 @@ class CacheTransitionPolicy:
         next_state = DpStateSummary(
             cache_active=prev_state.cache_active,
             parallel_stage_cpus=next_parallel_stage_cpus,
-            local_work=prev_state.local_work,
-            max_parallel_work=prev_state.max_parallel_work,
         )
         yield TransitionChoice(state=next_state, extra_cost=regular_cost)
 
@@ -430,9 +426,6 @@ class ExtensibleDpSearch:
         self.block_provider = block_provider
         self.cache_policy = cache_policy
         self.parallel_stage_cpu_limit = optimizer._dp_parallel_stage_cpu_limit()
-        self.use_bottleneck_objective = (
-            optimizer._dp_use_bottleneck_objective()
-        )
 
     def run(self) -> SearchResult:
         initial_state = self.cache_policy.initial_state()
@@ -476,9 +469,7 @@ class ExtensibleDpSearch:
         )
         state_counts = [len(dp[mask]) for mask in legal_masks]
         search_stats = {
-            "objective": (
-                "bottleneck" if self.use_bottleneck_objective else "additive"
-            ),
+            "objective": "additive",
             "legal_prefix_masks": len(legal_masks),
             "retained_states": sum(state_counts),
             "maximum_frontier": max(state_counts, default=0),
@@ -545,18 +536,6 @@ class ExtensibleDpSearch:
                     > self.parallel_stage_cpu_limit
                 ):
                     continue
-                if self.use_bottleneck_objective:
-                    self._try_bottleneck_transition(
-                        dp,
-                        back,
-                        prev_mask,
-                        next_mask,
-                        prev_state,
-                        next_parallel_stage_cpus,
-                        regular_cost,
-                        block,
-                    )
-                    continue
                 for choice in self.cache_policy.transitions(
                     prev_mask,
                     next_mask,
@@ -593,95 +572,6 @@ class ExtensibleDpSearch:
                             block=block,
                             cache_after_idx=choice.cache_after_idx,
                         )
-
-    def _try_bottleneck_transition(
-        self,
-        dp: List[Dict[DpStateSummary, float]],
-        back: List[Dict[DpStateSummary, BackPointer]],
-        prev_mask: int,
-        next_mask: int,
-        prev_state: DpStateSummary,
-        next_parallel_stage_cpus: int,
-        regular_cost: float,
-        block: BlockCandidate,
-    ) -> None:
-        if block.variant == PipeVariantType.INPROCESS:
-            local_work = prev_state.local_work + regular_cost
-            max_parallel_work = prev_state.max_parallel_work
-        else:
-            local_work = prev_state.local_work
-            max_parallel_work = max(
-                prev_state.max_parallel_work,
-                regular_cost,
-            )
-        next_state = DpStateSummary(
-            cache_active=False,
-            parallel_stage_cpus=next_parallel_stage_cpus,
-            local_work=local_work,
-            max_parallel_work=max_parallel_work,
-        )
-        candidate_cost = max(local_work, max_parallel_work)
-
-        # A state that consumes no more stage CPUs, has no more local work,
-        # and has no larger parallel bottleneck dominates the new state for
-        # every possible suffix. This is the exact three-dimensional Pareto
-        # frontier; requiring equal CPU use retains redundant states and can
-        # make long filter pipelines exceed the planning limit.
-        same_strategy = [
-            state
-            for state in dp[next_mask]
-            if state.cache_active == next_state.cache_active
-        ]
-        for state in same_strategy:
-            if (
-                state.parallel_stage_cpus
-                <= next_state.parallel_stage_cpus
-                and state.local_work <= next_state.local_work
-                and state.max_parallel_work
-                <= next_state.max_parallel_work
-            ):
-                if (
-                    state.parallel_stage_cpus
-                    == next_state.parallel_stage_cpus
-                    and state.local_work == next_state.local_work
-                    and state.max_parallel_work
-                    == next_state.max_parallel_work
-                ):
-                    old_pointer = back[next_mask].get(state)
-                    if (
-                        block.materializes_fusion
-                        and (
-                            old_pointer is None
-                            or block.mask.bit_count()
-                            > old_pointer.block.mask.bit_count()
-                        )
-                    ):
-                        back[next_mask][state] = BackPointer(
-                            prev_mask=prev_mask,
-                            prev_state=prev_state,
-                            block=block,
-                            cache_after_idx=None,
-                        )
-                return
-
-        for state in same_strategy:
-            if (
-                next_state.parallel_stage_cpus
-                <= state.parallel_stage_cpus
-                and next_state.local_work <= state.local_work
-                and next_state.max_parallel_work
-                <= state.max_parallel_work
-            ):
-                del dp[next_mask][state]
-                back[next_mask].pop(state, None)
-
-        dp[next_mask][next_state] = candidate_cost
-        back[next_mask][next_state] = BackPointer(
-            prev_mask=prev_mask,
-            prev_state=prev_state,
-            block=block,
-            cache_after_idx=None,
-        )
 
     def _block_can_follow(self, prev_mask: int, block: BlockCandidate) -> bool:
         if block.mask.bit_count() == 1:
@@ -831,21 +721,6 @@ class DpOptimizer(MyOptimizer):
             )
         return cpu_budget // fixed_workers - 1
 
-    def _dp_use_bottleneck_objective(self) -> bool:
-        """Use an exact pipeline-service-time objective when requested.
-
-        Cache replacement changes which prefix is paid in later epochs and
-        remains on the established additive objective. Candidate workloads
-        have caching disabled, so the bottleneck objective can be attributed
-        independently without changing cache semantics.
-        """
-        requested = os.environ.get("CEDAR_DP_OBJECTIVE") == "bottleneck"
-        return bool(
-            requested
-            and self.options is not None
-            and not self.options.enable_caching
-        )
-
     def _dp_parallel_stage_cpu_cost(
         self, variant: PipeVariantType
     ) -> int:
@@ -891,11 +766,7 @@ class DpOptimizer(MyOptimizer):
         logger.info("[DpOptimizer] DP state cost (inner ops only): %s", result.cost)
         logger.info(
             "[DpOptimizer] DP objective: %s",
-            (
-                "pipeline_bottleneck"
-                if self._dp_use_bottleneck_objective()
-                else "additive_work"
-            ),
+            "additive_work",
         )
 
         best_order = [inner_ops[idx] for idx in result.order]

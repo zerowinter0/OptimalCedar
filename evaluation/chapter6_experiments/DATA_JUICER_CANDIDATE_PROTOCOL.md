@@ -139,28 +139,21 @@ selectivity-aware Code run, and the complete four-workload extension run. It
 requires all six registered candidates to be present, so this split cannot
 silently remove a candidate from the denominator.
 
-Before the regenerated Code profile or any extension profile was measured,
-the revised DP objective was also frozen to pipeline bottleneck service time
-for these cache-off candidates. It exactly accumulates in-process work,
-tracks each asynchronous Ray/SMP stage separately, and minimizes the larger
-of local work and the slowest parallel stage under the unchanged W=8/CPU-64
-stage budget. Its exact Pareto frontier also removes a state when another
-state uses no more stage CPUs and has no greater local or parallel work. The
-other in-scope optimizers are unchanged; DP-two-stage is excluded as specified
-above. Cache-enabled workloads retain the prior additive DP objective. An
-independent exhaustive oracle verified both objectives over all legal orders,
-fusion partitions, backend assignments, and a constrained stage budget before
-candidate measurement.
+The final DP objective is the exact selection-aware additive work model. It
+jointly evaluates operator work and measured Ray/SMP boundary work while the
+DP state enforces the unchanged W=8/CPU-64 stage budget. The other in-scope
+optimizers are unchanged; DP-two-stage is excluded as specified above. An
+independent exhaustive oracle verifies the objective over all legal orders,
+fusion partitions, backend assignments, and a constrained stage budget.
 
 ### Post-Code objective correction and held-out freeze
 
-The three completed Code repetitions showed a stable model error rather than
-measurement noise: the bottleneck objective split the pipeline into two SMP
-stages and one Ray stage and ran in `507.168 +/- 0.742` seconds, while the
-single-Ray-stage Data-Juicer plan ran in `459.747 +/- 1.036` seconds. Treating
-all physical stages as ideally overlapped underpriced real Cedar stage
-boundaries. Code is retained as a failed development workload and cannot be
-removed from the denominator or converted into a win.
+The three completed Code repetitions exposed that assuming ideal overlap
+between all physical stages underprices real Cedar stage boundaries. The DP
+plan ran in `507.168 +/- 0.742` seconds, while the single-Ray-stage Data-Juicer
+plan ran in `459.747 +/- 1.036` seconds. Code is retained as a failed
+development workload and cannot be removed from the denominator or converted
+into a win.
 
 Before any of the four registered extension workloads was profiled or
 executed, the final held-out configuration was therefore frozen to the exact

@@ -91,34 +91,18 @@ each later operator by both preceding products. Treating the entire block as
 having one selection ratio is insufficient because filter order is the
 optimization decision.
 
-## Pipeline-throughput objective
+## Additive work objective
 
-Distinct Ray/SMP stages execute as an asynchronous pipeline, so their
-steady-state service time is governed by the bottleneck stage, while all
-in-process work assigned to one local worker remains additive. For cache-off
-candidate workloads, the outer DP retains an exact Pareto frontier over:
+The joint DP minimizes total selection-aware operator work plus measured
+Ray/SMP stage-boundary work. Its state additionally records parallel-stage CPU
+use, so the fixed W=8, CPU-budget-64 constraint is enforced while comparing
+otherwise equivalent prefixes. Cache replacement is evaluated in the same
+additive objective by replacing the work of the cached prefix in later epochs.
 
-```text
-(local_worker_work, maximum_parallel_stage_work, stage_cpu_use)
-```
-
-and minimizes `max(local_worker_work, maximum_parallel_stage_work)`. A state
-is pruned only when another state for the same subset uses no more stage
-CPUs, has no greater local work, and has no greater parallel bottleneck. The
-fixed W=8, CPU-budget-64 constraint remains in the DP state, so splitting
-work into more parallel stages cannot exceed the established resource budget.
 For each legal prefix, the outer search enumerates only its actual previous
 subsets instead of scanning every pair of legal masks. This covers the same
 transitions while reducing the weak-dependency bound from approximately
 `4^n` mask pairs to `3^n` subset transitions.
-
-The objective is enabled explicitly with
-`CEDAR_DP_OBJECTIVE=bottleneck`. Cache replacement changes which prefix is
-paid in later epochs, so cache-enabled workloads deliberately retain the
-established additive objective until a separate multi-epoch service-time
-model is validated. `DpTwoStageOptimizer` retains its independent two-stage
-objective in the codebase, but is explicitly excluded from the current
-comparison scope.
 
 ## Implementation status
 
@@ -133,10 +117,7 @@ The implemented slices are:
 - exact within-block work, outer-block work, parallel-boundary work, and cache
   read work use the volume product;
 - profiles without `selectivities` reproduce the old size-only objective.
-- the completed Code development run diagnosed the optional bottleneck
-  objective as underpricing real multi-stage boundaries; held-out extension
-  runs use the exact selection-aware additive objective;
-- cache-enabled and non-candidate runs retain the additive objective.
+- all workloads use the exact selection-aware additive objective.
 
 A selectivity-aware revision of the heuristic aggregate-rate feasibility
 guard remains a separate follow-up change.
@@ -162,21 +143,13 @@ As of 2026-07-25:
   `4 -> 2 -> 1` and restoration of the original predicates;
 - profile aggregation tests verify maximum-coverage selection, deterministic
   baseline tie-breaking, and count collection in a mutated profile pass;
-- the focused optimizer suite has 29 passing tests across optimality, cache,
+- the focused optimizer suite has 27 passing tests across optimality, cache,
   fusion, two-stage, profile, recipe-registry, and reporting behavior;
 - `verify_dp_optimizer_optimality.py --num-cases 5 --seed 20260725`
   exhaustively enumerated 2,045,952 legal order/fusion/backend plans across
   five random dependency graphs and matched the DP optimum in every case;
-- the same 2,045,952-plan campaign with
-  `--objective bottleneck` independently tracked local work and every
-  parallel stage, and matched the Pareto DP optimum in all five cases;
 - a separate exhaustive case constrained to at most two parallel stages
-  matched the resource-indexed Pareto DP optimum, covering the same mechanism
+  matched the resource-indexed DP optimum, covering the same mechanism
   that enforces the formal per-worker stage limit of seven at W=8/CPU-64;
-- a weakly constrained 12-operator stress case retained 98,281 states with a
-  maximum frontier of 267 and completed the exact bottleneck search in
-  83.77 seconds, below the unchanged 300-second formal planning limit;
-- the Code development workload completed three formal repetitions and
-  rejected the bottleneck objective (`507.168 +/- 0.742` seconds versus
-  Data-Juicer's `459.747 +/- 1.036` seconds); held-out additive extension
-  validation remains pending in the serialized background experiment chain.
+- held-out workloads and cache-enabled workloads use the same additive cost
+  semantics, avoiding an experiment-only objective switch.

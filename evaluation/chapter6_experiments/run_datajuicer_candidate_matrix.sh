@@ -47,7 +47,6 @@ export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 export TF_CPP_MIN_LOG_LEVEL=2
 export CEDAR_PROFILE_RAY_ACTORS=1
 export CEDAR_PROFILE_SMP_PROCS=1
-export CEDAR_DP_OBJECTIVE=additive
 unset CEDAR_LOCAL_WORKERS
 ulimit -n 65536
 
@@ -445,7 +444,7 @@ write_metadata() {
     printf 'profile_filter_selectivity=%s\n' \
       "${CEDAR_PROFILE_FILTER_SELECTIVITY:-1}"
     printf 'profile_selectivity_strategy=max_coverage_existing_pass\n'
-    printf 'dp_objective=%s\n' "${CEDAR_DP_OBJECTIVE}"
+    printf 'dp_objective=additive\n'
     printf 'outputs=20000\nrepeats=%s\n' "${REPEATS}"
     printf 'optimizer_timeout_sec=%s\n' "${OPTIMIZER_TIMEOUT_SEC}"
     printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
