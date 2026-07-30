@@ -331,6 +331,10 @@ if epoch_samples != [expected]:
 PY
 }
 
+plan_has_cache() {
+  grep -q "ObjectDiskCachePipe" "$1"
+}
+
 warm_cache() {
   local workload="$1" dataset="$2" samples="$3" kwargs="$4" optimizer="$5"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
@@ -437,6 +441,11 @@ run_workload() {
   if [[ "${cache_mode}" == "on" ]]; then
     for optimizer in "${OPTIMIZERS[@]}"; do
       [[ -f "${root}/plans/${optimizer}.yaml" ]] || continue
+      if ! plan_has_cache "${root}/plans/${optimizer}.yaml"; then
+        echo "[$(date -Is)] SKIP ${workload}/${optimizer} cache warmup: plan has no cache" \
+          | tee -a "${root}/nohup.log"
+        continue
+      fi
       if [[ "${RESUME_EXISTING}" == "1" && \
             -f "${root}/results/round1__${optimizer}.json" ]]; then
         echo "[$(date -Is)] REUSE ${workload}/${optimizer} cache warmup" \
