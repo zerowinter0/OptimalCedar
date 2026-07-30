@@ -9,7 +9,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
-PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/profiles}"
+PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/paper_optimizer_w8/profiles}"
 MATRIX_OUTPUT_ROOT="${MATRIX_OUTPUT_ROOT:-${BASE_DIR}}"
 RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
 CPU_BUDGET="${CPU_BUDGET:-64}"

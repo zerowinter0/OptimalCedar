@@ -103,11 +103,18 @@ def read_json(path: Path):
 def load_latest(args) -> dict:
     audit = read_json(args.candidate_report)
     data = {}
+    replaced_dp_workloads = (
+        {"coco", "simclrv2", "simclrv2_cache"}
+        if args.dp_replacement_matrix is not None
+        else set()
+    )
 
     # The enlarged three-repeat run is the newest source for these workloads.
     for workload in ("coco", "commonvoice", "commonvoice_cache"):
         data[workload] = {}
         for optimizer, _, _, _ in OPTIMIZERS:
+            if optimizer == "dp_optimizer" and workload in replaced_dp_workloads:
+                continue
             files = sorted(
                 (args.scaled_run / "cedar" / workload / optimizer).glob("*.json")
             )
@@ -136,6 +143,8 @@ def load_latest(args) -> dict:
     for workload, _ in CORE[3:]:
         data[workload] = {}
         for optimizer, _, _, _ in OPTIMIZERS:
+            if optimizer == "dp_optimizer" and workload in replaced_dp_workloads:
+                continue
             workload_root = args.paper_matrix / "workloads" / workload
             unavailable = workload_root / "plans" / f"{optimizer}.unavailable.json"
             result_files = sorted(

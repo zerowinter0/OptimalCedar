@@ -1,0 +1,977 @@
+{
+  "protocol": {
+    "threshold": 1.2,
+    "candidate_repeats": 3,
+    "candidate_outputs": 20000,
+    "local_workers": 8,
+    "cpu_budget": 64,
+    "candidate_optimizer_set": [
+      "optimizer",
+      "dj_optimizer",
+      "dp_cedar_optimizer",
+      "dp_optimizer",
+      "pecan_optimizer"
+    ],
+    "candidate_roots": [
+      "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_prior_ledger",
+      "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_code_selectivity",
+      "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity"
+    ]
+  },
+  "candidates": {
+    "pile_europarl": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "unavailable",
+          "valid": false,
+          "formally_unavailable": true,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "plan__optimizer.json",
+              "status": "optimizer_timeout",
+              "reason": "plan optimization exceeded 300s"
+            },
+            {
+              "file": "round1__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            }
+          ],
+          "errors": [
+            "plan__optimizer.json: optimizer_timeout: plan optimization exceeded 300s",
+            "round1__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "plan result missing"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": 2.946139261010103,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "unavailable",
+          "valid": false,
+          "formally_unavailable": true,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "round1__dj_optimizer.json",
+              "status": "infeasible_timeout",
+              "reason": "execution exceeded 3600s"
+            }
+          ],
+          "errors": [
+            "round1__dj_optimizer.json: infeasible_timeout: execution exceeded 3600s"
+          ]
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": 5.8726071220007725,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "round1__dp_cedar_optimizer.json",
+              "status": "invalid_interference",
+              "reason": "discarded because non-formal optimizer verification overlapped this execution"
+            }
+          ],
+          "errors": [
+            "round1__dp_cedar_optimizer.json: invalid_interference: discarded because non-formal optimizer verification overlapped this execution"
+          ]
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": 24.87170474798768,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": 2.954359258990735,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "invalid",
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": null,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false
+    },
+    "redpajama_code": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [
+            554.504055893005,
+            552.4130741760018,
+            549.0378523239924
+          ],
+          "mean_execution_time_sec": 551.9849941309998,
+          "stddev_execution_time_sec": 2.758130663722841,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 19.42561490900698,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            459.8168291979964,
+            460.74675592398853,
+            458.677471463001
+          ],
+          "mean_execution_time_sec": 459.74701886166196,
+          "stddev_execution_time_sec": 1.036407090585295,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.140462480005226,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            555.4376971579914,
+            553.9565554690053,
+            551.3023889750039
+          ],
+          "mean_execution_time_sec": 553.5655472006669,
+          "stddev_execution_time_sec": 2.095199045795557,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.895732771998155,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            507.09361722299946,
+            506.4662396710046,
+            507.94408445099543
+          ],
+          "mean_execution_time_sec": 507.16798044833314,
+          "stddev_execution_time_sec": 0.74172347636978,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 20.914584012003615,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            466.92185084699304,
+            464.27091540099354,
+            466.9452118570043
+          ],
+          "mean_execution_time_sec": 466.04599270166364,
+          "stddev_execution_time_sec": 1.5373064111337236,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.1257644339930266,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 459.74701886166196,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": 0.9064985105235718,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false
+    },
+    "pile_hackernews": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "unavailable",
+          "valid": false,
+          "formally_unavailable": true,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "plan__optimizer.json",
+              "status": "optimizer_timeout",
+              "reason": "plan optimization exceeded 300s"
+            },
+            {
+              "file": "round1__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round2__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round3__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            }
+          ],
+          "errors": [
+            "plan__optimizer.json: optimizer_timeout: plan optimization exceeded 300s",
+            "round1__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round2__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round3__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "plan result missing"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            1315.4494340829842,
+            1305.146516259003,
+            1304.2736336139787
+          ],
+          "mean_execution_time_sec": 1308.2898613186553,
+          "stddev_execution_time_sec": 6.215713366443661,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.117243034997955,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            1291.512828549021,
+            1290.287694292987,
+            1294.4586684420065
+          ],
+          "mean_execution_time_sec": 1292.0863970946714,
+          "stddev_execution_time_sec": 2.143826484435459,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 4.574041888990905,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            469.264087899006,
+            466.41400672099553,
+            467.51746113802074
+          ],
+          "mean_execution_time_sec": 467.7318519193407,
+          "stddev_execution_time_sec": 1.4370849785759365,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.26414730399847,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            1305.2177642440074,
+            1308.6781982959947,
+            1296.9020211840107
+          ],
+          "mean_execution_time_sec": 1303.5993279080042,
+          "stddev_execution_time_sec": 6.052610095940053,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.087750020000385,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dp_cedar_optimizer",
+      "best_other_execution_time_sec": 1292.0863970946714,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": 2.762451160408654,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true
+    },
+    "pile_pubmed_abstracts": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "unavailable",
+          "valid": false,
+          "formally_unavailable": true,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "plan__optimizer.json",
+              "status": "optimizer_timeout",
+              "reason": "plan optimization exceeded 300s"
+            },
+            {
+              "file": "round1__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round2__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round3__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            }
+          ],
+          "errors": [
+            "plan__optimizer.json: optimizer_timeout: plan optimization exceeded 300s",
+            "round1__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round2__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round3__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "plan result missing"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            305.83838323000236,
+            303.9855951879872,
+            303.6709987029899
+          ],
+          "mean_execution_time_sec": 304.49832570699317,
+          "stddev_execution_time_sec": 1.171135500624652,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.065467336011352,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            303.1906455139979,
+            304.1237445699808,
+            303.72639395599253
+          ],
+          "mean_execution_time_sec": 303.68026134665706,
+          "stddev_execution_time_sec": 0.46825700774480267,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 6.226066965988139,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            201.5935449259996,
+            201.8546220920107,
+            201.10418509098236
+          ],
+          "mean_execution_time_sec": 201.51745070299754,
+          "stddev_execution_time_sec": 0.3809615088284026,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.0693060499907,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            305.3939857140067,
+            303.42291102500167,
+            304.56781787998625
+          ],
+          "mean_execution_time_sec": 304.4615715396649,
+          "stddev_execution_time_sec": 0.989823252420774,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.072050252027111,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dp_cedar_optimizer",
+      "best_other_execution_time_sec": 303.68026134665706,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": 1.506967561803023,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true
+    },
+    "pile_freelaw": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": [
+            "plan result missing"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": [
+            "plan result missing"
+          ]
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": [
+            "plan result missing"
+          ]
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": [
+            "plan result missing"
+          ]
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "invalid",
+          "valid": false,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": [
+            "plan result missing"
+          ]
+        }
+      },
+      "workload_outcome": "invalid",
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": null,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false
+    },
+    "pile_uspto_backgrounds": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "processed_samples": [],
+          "optimization_time_sec": null,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "unavailable",
+          "valid": false,
+          "formally_unavailable": true,
+          "source_infeasible": false,
+          "statuses": [
+            {
+              "file": "plan__optimizer.json",
+              "status": "optimizer_timeout",
+              "reason": "plan optimization exceeded 300s"
+            },
+            {
+              "file": "round1__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round2__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round3__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            }
+          ],
+          "errors": [
+            "plan__optimizer.json: optimizer_timeout: plan optimization exceeded 300s",
+            "round1__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round2__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round3__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "plan result missing"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            834.0327363230172,
+            826.5372228329943,
+            827.18477360002
+          ],
+          "mean_execution_time_sec": 829.2515775853439,
+          "stddev_execution_time_sec": 4.153244473311381,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.077500475978013,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            911.2637160080194,
+            925.1277441180137,
+            913.6302563250065
+          ],
+          "mean_execution_time_sec": 916.6739054836798,
+          "stddev_execution_time_sec": 7.416243591569622,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 6.227119668998057,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            338.9133554250002,
+            337.8037552909809,
+            338.53428324099514
+          ],
+          "mean_execution_time_sec": 338.41713131899206,
+          "stddev_execution_time_sec": 0.5640004822477153,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.26395659899572,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            892.5374439029838,
+            891.6191243459762,
+            886.4970170689921
+          ],
+          "mean_execution_time_sec": 890.2178617726507,
+          "stddev_execution_time_sec": 3.254895034214414,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.0795747869997285,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 829.2515775853439,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": 2.45038297663392,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true
+    }
+  },
+  "combined": {
+    "coco": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_pecan_optimizer",
+      "best_other_execution_time_sec": 54.57436631000019,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 57.13659172100233,
+      "dp_speedup_over_best_other": 0.9551561384075291,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "commonvoice": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_dp_cedar_optimizer",
+      "best_other_execution_time_sec": 48.73357066199969,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 24.5020699730012,
+      "dp_speedup_over_best_other": 1.9889572887392435,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "commonvoice_cache": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_dp_cedar_optimizer",
+      "best_other_execution_time_sec": 6.113214074008283,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 6.345054832010646,
+      "dp_speedup_over_best_other": 0.9634611892031678,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "llava_pretrain": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_dj_optimizer",
+      "best_other_execution_time_sec": 79.0318160229981,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 89.48305745299876,
+      "dp_speedup_over_best_other": 0.8832042430435482,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "redpajama_c4": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_pecan_optimizer",
+      "best_other_execution_time_sec": 328.0063518419993,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 306.21796174300107,
+      "dp_speedup_over_best_other": 1.0711532072611878,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "simclrv2": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_pecan_optimizer",
+      "best_other_execution_time_sec": 13.320610786999168,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 13.39341496200359,
+      "dp_speedup_over_best_other": 0.9945641813375481,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "simclrv2_cache": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_optimizer",
+      "best_other_execution_time_sec": 13.169026835996192,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 9.010083052999107,
+      "dp_speedup_over_best_other": 1.4615877299391522,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "stackexchange": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_dj_optimizer",
+      "best_other_execution_time_sec": 282.7866899380024,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 304.87970261800365,
+      "dp_speedup_over_best_other": 0.9275353115006068,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "wikitext103": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_pecan_optimizer",
+      "best_other_execution_time_sec": 43.65461695099657,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 44.39479415600363,
+      "dp_speedup_over_best_other": 0.9833273873867717,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "wikitext103_cache": {
+      "valid": true,
+      "workload_outcome": "success",
+      "best_other_optimizer": "cedar_pecan_optimizer",
+      "best_other_execution_time_sec": 49.50681703101145,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 49.96977628300374,
+      "dp_speedup_over_best_other": 0.9907352146351363,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
+    },
+    "pile_europarl": {
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": null,
+      "dp_speedup_over_best_other": null,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_prior_ledger",
+      "workload_outcome": "invalid"
+    },
+    "redpajama_code": {
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 459.74701886166196,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 507.16798044833314,
+      "dp_speedup_over_best_other": 0.9064985105235718,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_code_selectivity",
+      "workload_outcome": "success"
+    },
+    "pile_hackernews": {
+      "valid": true,
+      "best_other_optimizer": "dp_cedar_optimizer",
+      "best_other_execution_time_sec": 1292.0863970946714,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 467.7318519193407,
+      "dp_speedup_over_best_other": 2.762451160408654,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
+      "workload_outcome": "success"
+    },
+    "pile_pubmed_abstracts": {
+      "valid": true,
+      "best_other_optimizer": "dp_cedar_optimizer",
+      "best_other_execution_time_sec": 303.68026134665706,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 201.51745070299754,
+      "dp_speedup_over_best_other": 1.506967561803023,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
+      "workload_outcome": "success"
+    },
+    "pile_freelaw": {
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": null,
+      "dp_speedup_over_best_other": null,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": false,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
+      "workload_outcome": "invalid"
+    },
+    "pile_uspto_backgrounds": {
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 829.2515775853439,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 338.41713131899206,
+      "dp_speedup_over_best_other": 2.45038297663392,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
+      "workload_outcome": "success"
+    }
+  },
+  "summary": {
+    "total_workloads": 16,
+    "valid_workloads": 14,
+    "dp_20pct_wins": 5,
+    "fraction": 0.3125,
+    "target_fraction": 0.3,
+    "minimum_wins_required": 5,
+    "additional_wins_needed": 0,
+    "target_met": true
+  }
+}

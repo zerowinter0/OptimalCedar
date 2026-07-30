@@ -1,0 +1,12 @@
+ablation=fixed_local_workers_w8
+measurement_protocol=fixed_w8_3_round_robin_repeats
+profile_source=evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/profiles/simclrv2_cache.yaml
+cpu_budget=64
+local_workers=8
+repeats=3
+optimizer_plan_timeout_sec=300
+execution_timeout_sec=3600
+cache=on
+samples=9469
+optimizers=dp_optimizer
+dataset_kwargs=

@@ -1,0 +1,63 @@
+physical_plan:
+  graph:
+    0: '7'
+    2: '0'
+    3: '2'
+    6: '8'
+    7: ''
+    8: '3'
+  n_local_workers: 8
+  pipes:
+    0:
+      name: MapperPipe_to_tensor
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 1
+        use_threads: true
+        variant_type: RAY
+    1:
+      name: MapperPipe_distort
+      variant: INPROCESS
+    2:
+      name: MapperPipe_RandomHorizontalFlip
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    3:
+      name: MapperPipe_SanitizeBoundingBox
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    4:
+      name: MapperPipe_crop
+      variant: INPROCESS
+    5:
+      name: MapperPipe_zoom_out
+      variant: INPROCESS
+    6:
+      name: COCOSourcePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    7:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    8:
+      fused_pipes:
+      - 1
+      - 5
+      - 4
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 1
+        use_threads: true
+        variant_type: RAY

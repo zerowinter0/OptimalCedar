@@ -1,83 +1,48 @@
-# Paper optimizer matrix (W=8)
+# Formal optimizer results (W=8)
 
-This directory is the canonical location for the optimizer execution data used
-to generate `paper_figures_optimizer_w8_three_repeat/latest_optimizer_execution_dp_cedar_baseline.pdf`.
-It deliberately has a stable, descriptive name rather than a timestamped run
-identifier.
+This is the single canonical archive behind the current optimizer figures.
+It contains only the five plotted optimizers: DP-Cedar (baseline), Data-Juicer,
+Pecan, DP (ours), and Cedar. The obsolete two-stage optimizer is excluded.
 
-## Current figure and replacement policy
+## Layout
 
-The frozen table behind the current PDF is
-`../paper_figures_latest_dp_cedar/latest_optimizer_data.tsv`; the PDF, TSV,
-SVG, PNG, and its explanatory README are kept together in that stable figure
-bundle. Its source rows are:
+- `data/enlarged_core/`: COCO, CommonVoice, and CommonVoice-cache measurements.
+- `data/standard_core/`: the other seven Cedar workload measurements.
+- `data/dp_no_wall_clock/`: replacement DP measurements for COCO and the two
+  SimCLR-v2 workloads after removal of the wall-clock cost correction.
+- `data/data_pipeline_matrix.json`: RP-Code and Pile aggregate measurements.
+- `profiles/`: the exact profiles used to create the plans.
+- `figures/`: current PDF, SVG, PNG, and source TSV figure artifacts.
+- `MANIFEST.tsv`: size and SHA-256 checksum of every archived file.
 
-- COCO and both CommonVoice variants: `../scaled_reuse_plan_latest.json` and
-  the enlarged three-repeat artifacts documented by the figure bundle.
-- The seven workloads in this matrix: `../cross_system_w8_latest.json`, whose
-  existing cells have only one measured execution.
-- RedPajama-Code and the valid Pile workloads: `../dp_20pct_goal_latest.json`,
-  with three round-robin repetitions.
+All plotted successful executions contain three measurements. Experiments use
+W=8 and a 64-CPU budget. COCO uses 50,000 `train2017` samples; SimCLR-v2 uses
+all 9,469 files. Cache workloads are measured only after a separate warmup.
 
-The matrix is complete. Every available optimizer has three valid measured
-results; Cedar plan generation exceeded the fixed 300-second limit on LLaVA
-and StackExchange and is recorded as unavailable. These seven stable results
-replace the corresponding single-run rows. Historical timestamped directories
-remain provenance only and must not be referenced as the primary paper-data
-location.
+## Reproduce the figures
 
-## Scope
-
-The matrix reruns the seven workloads whose previous figure cells had only one
-measured execution:
-
-| Workload | Measured outputs | Input scope | Cache |
-| --- | ---: | --- | --- |
-| LLaVA-pretrain | 5,000 | 20,000 source records; filters reduce cardinality | off |
-| RedPajama-C4 | 20,000 | bounded 829,916-record source | off |
-| StackExchange | 10,000 | bounded 35,000-record source | off |
-| SimCLRv2 | 9,469 | complete Imagenette2 train split | off |
-| SimCLRv2-cache | 9,469 | complete Imagenette2 train split | on |
-| WikiText-103 | 100,000 | 100,000-line prefix | off |
-| WikiText-103-cache | 100,000 | 100,000-line prefix | on |
-
-Every optimizer uses the same workload profile, `W=8`, `CPU_BUDGET=64`, the
-same sample count, and three measured executions. Optimizers rotate in
-round-robin order between repetitions. A cache-workload plan that actually
-contains `ObjectDiskCachePipe` receives an independent, unmeasured warmup and
-only complete cache manifests are accepted. A plan that elects not to cache is
-executed directly for three rounds. Plan generation has a five-minute timeout.
-
-The five optimizers plotted in the current figure are `optimizer`,
-`dj_optimizer`, `dp_cedar_optimizer`, `dp_optimizer`, and `pecan_optimizer`.
-The matrix also records `dp_two_stage_optimizer`, which is required by the
-current project protocol and can be used as an additional ablation baseline.
-
-## Reproduction code
-
-Run the stable entry point from the project container:
+From the repository root inside `optimalcedar-torch201-dev`:
 
 ```bash
-cd /workspace/OptimalCedar
 source env/bin/activate
-nohup bash evaluation/chapter6_experiments/run_paper_optimizer_w8.sh \
-  > evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/runner.out 2>&1 &
+python evaluation/chapter6_experiments/plot_latest_optimizer_dp_cedar_baseline.py \
+  --candidate-report evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/data_pipeline_matrix.json \
+  --scaled-run evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core \
+  --paper-matrix evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core \
+  --dp-replacement-matrix evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/dp_no_wall_clock \
+  --output-dir evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/figures
 ```
 
-The entry point delegates plan generation, cache validation, and round-robin
-execution to `evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh`.
-The figure is generated by
-`evaluation/chapter6_experiments/plot_latest_optimizer_dp_cedar_baseline.py`.
+Runtime logs and materialized caches are deliberately omitted: neither is an
+input to the figures, and cache contents account for nearly all of the former
+`formal_results` disk usage.
 
-## Artifact layout
+Some immutable raw JSON/YAML records contain their original absolute
+`source` or `profiled_stats` path. Those strings are provenance captured at
+measurement time, not live dependencies; the referenced profiles and all
+values consumed by the plotting script are present in this archive.
 
-- `profiles/<workload>.yaml`: frozen shared profile used by every optimizer.
-- `workloads/<workload>/metadata.txt`: exact protocol and source arguments.
-- `workloads/<workload>/plans/`: generated physical plans or timeout records.
-- `workloads/<workload>/results/`: measured per-round JSON results.
-- `workloads/<workload>/warmup_results/`: plan-only and cache-warmup records.
-- `workloads/<workload>/logs/`: command output for diagnosis; not primary data.
-- `runner.out`: top-level offline runner output.
-
-Materialized `cache/` directories are reproducible scratch data and are not
-paper artifacts. They may be deleted after all cache rounds complete.
+The measurement entry point is
+`evaluation/chapter6_experiments/run_paper_dp_no_wall_clock_w8.sh`. By default
+it writes a new scratch run outside `formal_results`, so rerunning experiments
+does not modify this canonical archive.

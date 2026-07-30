@@ -1,0 +1,86 @@
+physical_plan:
+  graph:
+    0: '11'
+    1: '0'
+    2: '10'
+    3: '2'
+    4: '7'
+    5: '4'
+    6: '5'
+    7: '1'
+    8: '3'
+    9: '8'
+    10: '6'
+    11: ''
+  n_local_workers: 8
+  pipes:
+    0:
+      name: BatcherPipe(batch_size=1)
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    1:
+      name: MapperPipe_Normalize
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 4
+        use_threads: true
+        variant_type: RAY
+    2:
+      name: MapperPipe_GaussianBlur
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    3:
+      name: MapperPipe_Grayscale
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    4:
+      name: MapperPipe_ColorJitter
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    5:
+      name: MapperPipe_RandomHorizontalFlip
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    6:
+      name: MapperPipe_RandomResizedCrop
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    7:
+      name: MapperPipe_to_float
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    8:
+      name: ImageReaderPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      name: LocalFSListerPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    10:
+      name: ObjectDiskCachePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    11:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS

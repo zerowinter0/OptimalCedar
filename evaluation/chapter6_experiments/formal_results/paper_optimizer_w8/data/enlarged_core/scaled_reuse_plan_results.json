@@ -1,0 +1,822 @@
+{
+  "protocol": {
+    "cpu_budget": 64,
+    "execution_timeout_sec": 3600,
+    "local_workers": 8,
+    "name": "enlarged_reused_plan_w8",
+    "optimizer_timeout_sec": 3600,
+    "plans_reused_except_missing_artifacts": true,
+    "profile_reused": true,
+    "repeats": 3,
+    "shrink_rule": "halve when more than two optimizer cells time out"
+  },
+  "schema_version": 1,
+  "workloads": {
+    "coco": {
+      "attempt": 1,
+      "no_optimizer": {
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "statuses": [
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          }
+        ],
+        "stddev_execution_time_sec": null,
+        "valid": false
+      },
+      "optimizers": {
+        "dj_optimizer": {
+          "execution_times_sec": [
+            909.3428193569998,
+            907.1141305789934,
+            904.4056670490536
+          ],
+          "mean_execution_time_sec": 906.9542056616823,
+          "optimization_time_sec": 8.68343,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 2.4724583337940054,
+          "valid": true
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            547.6014558169991,
+            560.8427263539634,
+            550.8903121780022
+          ],
+          "mean_execution_time_sec": 553.1114981163215,
+          "optimization_time_sec": 8.80204,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 6.894422498491832,
+          "valid": true
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            571.401556183002,
+            558.0208400840056,
+            556.709254203015
+          ],
+          "mean_execution_time_sec": 562.0438834900075,
+          "optimization_time_sec": 8.46797,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 8.130473113707081,
+          "valid": true
+        },
+        "optimizer": {
+          "execution_times_sec": [
+            586.6869746180018,
+            545.5157732920488,
+            551.1728287030128
+          ],
+          "mean_execution_time_sec": 561.1251922043544,
+          "optimization_time_sec": 9.06118,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 22.31712591492613,
+          "valid": true
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            570.387058384018,
+            577.8040562390233,
+            551.8686867729994
+          ],
+          "mean_execution_time_sec": 566.6866004653469,
+          "optimization_time_sec": 8.65568,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 13.357802549097817,
+          "valid": true
+        }
+      },
+      "samples": 50000,
+      "systems": {
+        "fastflow": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "execution exceeded 3600s",
+              "status": "execution_timeout"
+            },
+            {
+              "reason": "earlier round exceeded 3600s",
+              "status": "skipped_after_timeout"
+            },
+            {
+              "reason": "earlier round exceeded 3600s",
+              "status": "skipped_after_timeout"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        },
+        "plumber": {
+          "execution_times_sec": [
+            394.14910078048706,
+            401.12754106521606,
+            403.5197615623474
+          ],
+          "mean_execution_time_sec": 399.59880113601685,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 4.868788884365386,
+          "valid": true
+        },
+        "pytorch": {
+          "execution_times_sec": [
+            1623.4033807009691,
+            1645.0308681519818,
+            1649.9479391119676
+          ],
+          "mean_execution_time_sec": 1639.4607293216395,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 14.12172901066624,
+          "valid": true
+        },
+        "ray": {
+          "execution_times_sec": [
+            1330.8610981359961,
+            1334.492225804017,
+            1329.5833061630256
+          ],
+          "mean_execution_time_sec": 1331.6455433676795,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 2.5467408096547293,
+          "valid": true
+        },
+        "tensorflow": {
+          "execution_times_sec": [
+            451.83438419597223,
+            442.6511657909723,
+            448.1521523130359
+          ],
+          "mean_execution_time_sec": 447.54590076666017,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 4.6215290512550755,
+          "valid": true
+        }
+      }
+    },
+    "commonvoice": {
+      "attempt": 1,
+      "no_optimizer": {
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "statuses": [
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          }
+        ],
+        "stddev_execution_time_sec": null,
+        "valid": false
+      },
+      "optimizers": {
+        "dj_optimizer": {
+          "execution_times_sec": [
+            734.4704284010222,
+            731.0299704609788,
+            729.6042414520052
+          ],
+          "mean_execution_time_sec": 731.7015467713354,
+          "optimization_time_sec": 8.47712,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 2.501640444022677,
+          "valid": true
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            717.9607328060083,
+            721.3062107480364,
+            719.0870129470131
+          ],
+          "mean_execution_time_sec": 719.451318833686,
+          "optimization_time_sec": 8.47938,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 1.702232284221945,
+          "valid": true
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            601.8667372709606,
+            610.3415515200468,
+            608.9556223659893
+          ],
+          "mean_execution_time_sec": 607.0546370523322,
+          "optimization_time_sec": 8.38092,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 4.545979323664313,
+          "valid": true
+        },
+        "optimizer": {
+          "execution_times_sec": [
+            721.7312394609908,
+            715.6209875540226,
+            720.0543420269969
+          ],
+          "mean_execution_time_sec": 719.1355230140034,
+          "optimization_time_sec": 8.42371,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 3.157050185795409,
+          "valid": true
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            718.9851765450439,
+            720.7482565810205,
+            721.3589682010352
+          ],
+          "mean_execution_time_sec": 720.3641337756999,
+          "optimization_time_sec": 8.27324,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 1.23263313832176,
+          "valid": true
+        }
+      },
+      "samples": 160000,
+      "systems": {
+        "fastflow": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        },
+        "plumber": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        },
+        "pytorch": {
+          "execution_times_sec": [
+            1534.2973632640205,
+            1542.707720277016,
+            1534.3406621419708
+          ],
+          "mean_execution_time_sec": 1537.1152485610025,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 4.843270962791248,
+          "valid": true
+        },
+        "ray": {
+          "execution_times_sec": [
+            790.5216429769644,
+            789.078945545014,
+            808.3647023979574
+          ],
+          "mean_execution_time_sec": 795.9884303066452,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 10.742412537632484,
+          "valid": true
+        },
+        "tensorflow": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        }
+      }
+    },
+    "commonvoice_cache": {
+      "attempt": 1,
+      "no_optimizer": {
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "statuses": [
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          },
+          {
+            "reason": "no status recorded",
+            "status": "not_run"
+          }
+        ],
+        "stddev_execution_time_sec": null,
+        "valid": false
+      },
+      "optimizers": {
+        "dj_optimizer": {
+          "execution_times_sec": [
+            87.98284806404263,
+            88.34090730600292,
+            90.2917504759971
+          ],
+          "mean_execution_time_sec": 88.87183528201422,
+          "optimization_time_sec": 8.43445,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 1.2426467614595433,
+          "valid": true
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            89.13126456999453,
+            88.28993157402147,
+            89.90352814598009
+          ],
+          "mean_execution_time_sec": 89.1082414299987,
+          "optimization_time_sec": 8.36248,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 0.8070446226762225,
+          "valid": true
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            92.7433046149672,
+            87.67192451795563,
+            88.58569636201719
+          ],
+          "mean_execution_time_sec": 89.66697516498,
+          "optimization_time_sec": 8.37279,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 2.7030717543923615,
+          "valid": true
+        },
+        "optimizer": {
+          "execution_times_sec": [
+            90.99787672102684,
+            178.50309398199897,
+            90.35452248499496
+          ],
+          "mean_execution_time_sec": 119.95183106267359,
+          "optimization_time_sec": 8.62688,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 50.70790143808192,
+          "valid": true
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            89.08648534299573,
+            89.80282907799119,
+            89.97232046996942
+          ],
+          "mean_execution_time_sec": 89.62054496365211,
+          "optimization_time_sec": 8.36833,
+          "optimization_time_source": "materialized_missing_plan_in_this_run",
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 0.47020909370237557,
+          "valid": true
+        }
+      },
+      "samples": 160000,
+      "systems": {
+        "fastflow": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        },
+        "plumber": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        },
+        "pytorch": {
+          "execution_times_sec": [
+            1551.0549821979948,
+            1578.6116035989835,
+            1555.792498558003
+          ],
+          "mean_execution_time_sec": 1561.8196947849938,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 14.733878190359302,
+          "valid": true
+        },
+        "ray": {
+          "execution_times_sec": [
+            311.55326716799755,
+            249.81497740896884,
+            278.8541282490478
+          ],
+          "mean_execution_time_sec": 280.0741242753381,
+          "statuses": [
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            },
+            {
+              "reason": "",
+              "status": "success"
+            }
+          ],
+          "stddev_execution_time_sec": 30.887220631202318,
+          "valid": true
+        },
+        "tensorflow": {
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "statuses": [
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            },
+            {
+              "reason": "exit_status=1",
+              "status": "failed"
+            }
+          ],
+          "stddev_execution_time_sec": null,
+          "valid": false
+        }
+      }
+    }
+  }
+}

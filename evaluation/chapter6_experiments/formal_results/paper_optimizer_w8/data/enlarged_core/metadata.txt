@@ -1,0 +1,13 @@
+protocol=enlarged_reused_plan_w8
+selected_workloads=commonvoice,commonvoice_cache
+local_workers=8
+cpu_budget=64
+repeats=3
+optimizer_timeout_sec=3600
+execution_timeout_sec=3600
+profile_policy=reuse_only
+plan_policy=strict_w8_reuse_when_valid_otherwise_regenerate_from_profile
+forced_plan_regeneration=0
+shrink_rule=halve_output_target_if_more_than_two_optimizers_time_out
+datajuicer_system=excluded_by_request
+no_optimizer=excluded_by_request

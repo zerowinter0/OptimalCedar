@@ -179,32 +179,8 @@ cython_debug/
 /evaluation/chapter6_experiments/scaled_reuse_plan_*.nohup
 /evaluation/chapter6_experiments/coco_train2017_download.nohup
 
-# Stable paper experiment: keep profiles, plans, metadata, results, and its
-# README reviewable; exclude only reproducible scratch/cache and raw logs.
+# Single canonical paper archive: exact profiles, plans, measured results,
+# source tables, figures, documentation, and checksums are all tracked here.
 /evaluation/chapter6_experiments/formal_results/*
-!/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/
-!/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/**
-!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_three_repeat/
-!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_three_repeat/**
 !/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/README.md
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/**
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/**
-/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/runner.out
-/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/cache/
-/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/logs/
-/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/nohup.log
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/README.md
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/profiles/
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/profiles/**
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/
-!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/**
-/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/runner.out
-/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/cache/
-/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/logs/
-/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/nohup.log
-!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_no_wall_clock/
-!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_no_wall_clock/**
+!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/**
