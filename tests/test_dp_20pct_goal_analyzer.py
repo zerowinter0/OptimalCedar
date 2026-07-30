@@ -119,6 +119,31 @@ def test_three_complete_repetitions_are_successful(tmp_path):
     assert result["optimization_time_sec"] == 1.5
 
 
+def test_one_repetition_with_reduced_output_is_configurable(tmp_path):
+    _write_success(tmp_path, "candidate", "dp_optimizer", [1.0])
+    result_path = (
+        tmp_path
+        / "candidate"
+        / "results"
+        / "round1__dp_optimizer.json"
+    )
+    payload = json.loads(result_path.read_text())
+    payload["epoch_num_samples"] = [10_000]
+    _write_json(result_path, payload)
+
+    result = analyzer._read_candidate(
+        tmp_path,
+        "candidate",
+        "dp_optimizer",
+        expected_repeats=1,
+        expected_samples=10_000,
+    )
+
+    assert result["outcome"] == "success"
+    assert result["valid"]
+    assert result["processed_samples"] == [10_000]
+
+
 def test_optimizer_file_matching_does_not_consume_prefixed_optimizers(
     tmp_path,
 ):

@@ -11,7 +11,7 @@ STAGING_ROOT="${RUN_ROOT}/profiles"
 ARCHIVE_ROOT="${RUN_ROOT}/replaced_profiles"
 RAY_ADDRESS="127.0.0.1:6379"
 CPU_BUDGET=64
-PROFILE_TIMEOUT_SEC=3600
+PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-3600}"
 SELECTED_WORKLOADS="all"
 INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
 export INCREMENTAL_BACKEND_COMPUTE
@@ -26,6 +26,11 @@ Data-Juicer candidates: pile_europarl, redpajama_code, pile_hackernews,
 pile_pubmed_abstracts, pile_freelaw, pile_uspto_backgrounds.
 EOF
 }
+
+if [[ ! "${PROFILE_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "CH6_PROFILE_TIMEOUT_SEC must be a positive integer." >&2
+  exit 2
+fi
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in

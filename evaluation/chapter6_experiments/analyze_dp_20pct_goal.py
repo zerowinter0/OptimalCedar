@@ -78,7 +78,12 @@ def _status_files(root: Path, workload: str, optimizer: str) -> list[Path]:
 
 
 def _read_candidate(
-    root: Path, workload: str, optimizer: str
+    root: Path,
+    workload: str,
+    optimizer: str,
+    expected_repeats: int = 3,
+    expected_samples: int = 20_000,
+    execution_timeout_sec: float = EXECUTION_TIMEOUT_SEC,
 ) -> Dict[str, Any]:
     files = _result_files(root, workload, optimizer)
     values = []
@@ -132,9 +137,9 @@ def _read_candidate(
         errors.append("plan result missing")
 
     successful = (
-        len(values) == 3
+        len(values) == expected_repeats
         and len(set(samples)) == 1
-        and samples[0] == 20_000
+        and samples[0] == expected_samples
         and setup is not None
         and not errors
     )
@@ -162,15 +167,15 @@ def _read_candidate(
         and item["status"] == "infeasible_timeout"
     ]
     execution_time_lower_bound_sec = (
-        EXECUTION_TIMEOUT_SEC
-        if len(round_execution_timeouts) == 3
+        execution_timeout_sec
+        if len(round_execution_timeouts) == expected_repeats
         and not values
         else None
     )
     source_infeasible = (
-        len(values) == 3
+        len(values) == expected_repeats
         and len(set(samples)) == 1
-        and 0 <= samples[0] < 20_000
+        and 0 <= samples[0] < expected_samples
         and setup is not None
         and (
             not statuses
@@ -197,9 +202,22 @@ def _read_candidate(
     }
 
 
-def _candidate_summary(root: Path, workload: str) -> Dict[str, Any]:
+def _candidate_summary(
+    root: Path,
+    workload: str,
+    expected_repeats: int = 3,
+    expected_samples: int = 20_000,
+    execution_timeout_sec: float = EXECUTION_TIMEOUT_SEC,
+) -> Dict[str, Any]:
     runs = {
-        optimizer: _read_candidate(root, workload, optimizer)
+        optimizer: _read_candidate(
+            root,
+            workload,
+            optimizer,
+            expected_repeats,
+            expected_samples,
+            execution_timeout_sec,
+        )
         for optimizer in OPTIMIZERS
     }
     workload_marker = (
@@ -320,6 +338,9 @@ def audit(
     candidate_roots: Union[Path, Iterable[Path]],
     existing_report: Path,
     require_all_registered: bool = False,
+    expected_repeats: int = 3,
+    expected_samples: int = 20_000,
+    execution_timeout_sec: float = EXECUTION_TIMEOUT_SEC,
 ) -> Dict[str, Any]:
     if isinstance(candidate_roots, Path):
         roots = [candidate_roots]
@@ -343,7 +364,13 @@ def audit(
                     f"Duplicate candidate workload {workload} in "
                     f"{candidate_sources[workload]} and {root}"
                 )
-            candidates[workload] = _candidate_summary(root, workload)
+            candidates[workload] = _candidate_summary(
+                root,
+                workload,
+                expected_repeats,
+                expected_samples,
+                execution_timeout_sec,
+            )
             candidate_sources[workload] = root
 
     if require_all_registered:
@@ -399,8 +426,9 @@ def audit(
     return {
         "protocol": {
             "threshold": THRESHOLD,
-            "candidate_repeats": 3,
-            "candidate_outputs": 20_000,
+            "candidate_repeats": expected_repeats,
+            "candidate_outputs": expected_samples,
+            "execution_timeout_sec": execution_timeout_sec,
             "local_workers": 8,
             "cpu_budget": 64,
             "candidate_optimizer_set": list(OPTIMIZERS),
@@ -429,8 +457,9 @@ def render(report: Dict[str, Any]) -> str:
     lines = [
         "# DP ≥20% workload audit",
         "",
-        "Candidate results use three round-robin repetitions. Execution time "
-        "excludes optimization; optimization time is reported separately.",
+        f"Candidate results use {report['protocol']['candidate_repeats']} "
+        "round-robin repetitions. Execution time excludes optimization; "
+        "optimization time is reported separately.",
         "",
         "| workload | outcome | DP (s) | best other | best other (s) | DP speedup | gate |",
         "|---|---|---:|---|---:|---:|:---:|",
@@ -475,7 +504,8 @@ def render(report: Dict[str, Any]) -> str:
             elif item["execution_time_lower_bound_sec"] is not None:
                 runtime = (
                     f">={item['execution_time_lower_bound_sec']:.0f} "
-                    "(3/3 timed out)"
+                    f"({report['protocol']['candidate_repeats']}/"
+                    f"{report['protocol']['candidate_repeats']} timed out)"
                 )
             if item["valid"]:
                 status = "valid"
@@ -483,7 +513,8 @@ def render(report: Dict[str, Any]) -> str:
                 observed = item["processed_samples"]
                 status = (
                     "source_infeasible: "
-                    f"{observed[0] if observed else 'unknown'}/20000 retained"
+                    f"{observed[0] if observed else 'unknown'}/"
+                    f"{report['protocol']['candidate_outputs']} retained"
                 )
             elif item["formally_unavailable"]:
                 status = "unavailable: " + "; ".join(item["errors"])
@@ -540,11 +571,27 @@ def main() -> None:
     )
     parser.add_argument("--json-output", type=Path)
     parser.add_argument("--markdown-output", type=Path)
+    parser.add_argument("--expected-repeats", type=int, default=3)
+    parser.add_argument("--expected-samples", type=int, default=20_000)
+    parser.add_argument(
+        "--execution-timeout-sec",
+        type=float,
+        default=EXECUTION_TIMEOUT_SEC,
+    )
     args = parser.parse_args()
+    if args.expected_repeats <= 0:
+        parser.error("--expected-repeats must be positive")
+    if args.expected_samples <= 0:
+        parser.error("--expected-samples must be positive")
+    if args.execution_timeout_sec <= 0:
+        parser.error("--execution-timeout-sec must be positive")
     report = audit(
         args.candidate_root,
         args.existing_report,
         require_all_registered=args.require_all_registered,
+        expected_repeats=args.expected_repeats,
+        expected_samples=args.expected_samples,
+        execution_timeout_sec=args.execution_timeout_sec,
     )
     markdown = render(report)
     print(markdown)

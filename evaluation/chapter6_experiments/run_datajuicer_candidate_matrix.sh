@@ -13,10 +13,11 @@ LOG_ROOT="${RUN_ROOT}/logs"
 RAY_ADDRESS="127.0.0.1:6379"
 CPU_BUDGET=64
 LOCAL_WORKERS=8
-REPEATS=3
-OPTIMIZER_TIMEOUT_SEC=300
-EXECUTION_TIMEOUT_SEC=3600
-PROFILE_TIMEOUT_SEC=3600
+REPEATS="${DJ_CANDIDATE_REPEATS:-3}"
+OUTPUTS="${DJ_CANDIDATE_OUTPUTS:-20000}"
+OPTIMIZER_TIMEOUT_SEC="${DJ_OPTIMIZER_TIMEOUT_SEC:-300}"
+EXECUTION_TIMEOUT_SEC="${DJ_EXECUTION_TIMEOUT_SEC:-3600}"
+PROFILE_TIMEOUT_SEC="${DJ_PROFILE_TIMEOUT_SEC:-3600}"
 RESUME_RUN="${DJ_CANDIDATE_RESUME:-0}"
 REUSE_PROFILE_RUN_ID="${DJ_REUSE_PROFILE_RUN_ID:-}"
 REUSE_EXISTING_PROFILES="${DJ_REUSE_EXISTING_PROFILES:-0}"
@@ -45,6 +46,14 @@ if [[ "${REUSE_EXISTING_PROFILES}" != "0" && \
   echo "DJ_REUSE_EXISTING_PROFILES must be 0 or 1." >&2
   exit 2
 fi
+for numeric_setting in REPEATS OUTPUTS OPTIMIZER_TIMEOUT_SEC \
+  EXECUTION_TIMEOUT_SEC PROFILE_TIMEOUT_SEC; do
+  numeric_value="${!numeric_setting}"
+  if [[ ! "${numeric_value}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "${numeric_setting} must be a positive integer: ${numeric_value}" >&2
+    exit 2
+  fi
+done
 
 cd "${REPO_ROOT}"
 # shellcheck source=/dev/null
@@ -309,7 +318,7 @@ generate_plan() {
     --dataset_file "${dataset}"
     --profiled_stats "${profile}"
     --dataset_kwargs "${kwargs}"
-    --num_total_samples 20000
+    --num_total_samples "${OUTPUTS}"
     --num_epochs 1
     --num_repeats 1
     --warmup_runs 0
@@ -374,7 +383,7 @@ execute_plan() {
     --dataset_file "${dataset}"
     --master_feature_config "${plan}"
     --dataset_kwargs "${kwargs}"
-    --num_total_samples 20000
+    --num_total_samples "${OUTPUTS}"
     --num_epochs 1
     --use_ray
     --ray_ip "${RAY_ADDRESS}"
@@ -416,12 +425,12 @@ PY
       "result does not contain one valid epoch sample count"
     return 0
   fi
-  if (( processed_samples < 20000 )); then
+  if (( processed_samples < OUTPUTS )); then
     write_status "${workload}" "${tag}" "source_exhausted" \
-      "source exhausted after ${processed_samples}/20000 retained samples"
+      "source exhausted after ${processed_samples}/${OUTPUTS} retained samples"
     write_status "${workload}" "source_infeasible" "source_infeasible" \
-      "deterministic recipe retains fewer than 20000 records"
-    echo "[$(date -Is)] SOURCE_INFEASIBLE ${workload}: ${processed_samples}/20000"
+      "deterministic recipe retains fewer than ${OUTPUTS} records"
+    echo "[$(date -Is)] SOURCE_INFEASIBLE ${workload}: ${processed_samples}/${OUTPUTS}"
     return 0
   fi
   echo "[$(date -Is)] DONE ${workload}/${tag}"
@@ -451,7 +460,7 @@ write_metadata() {
       "${CEDAR_PROFILE_FILTER_SELECTIVITY:-1}"
     printf 'profile_selectivity_strategy=max_coverage_existing_pass\n'
     printf 'dp_objective=additive\n'
-    printf 'outputs=20000\nrepeats=%s\n' "${REPEATS}"
+    printf 'outputs=%s\nrepeats=%s\n' "${OUTPUTS}" "${REPEATS}"
     printf 'optimizer_timeout_sec=%s\n' "${OPTIMIZER_TIMEOUT_SEC}"
     printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
     printf 'cache=off\nomitted_operator=document_simhash_deduplicator\n'
@@ -501,6 +510,7 @@ for workload in "${SOURCE_FEASIBLE_WORKLOADS[@]}"; do
   profile_run_id="${RUN_ID}_${workload}_profile"
   if env CH6_RESULT_ROOT="${FORMAL_ROOT}" \
      CH6_PROFILE_ROOT="${PROFILE_DIR}" \
+     CH6_PROFILE_TIMEOUT_SEC="${PROFILE_TIMEOUT_SEC}" \
      CH6_PROFILE_RUN_ID="${profile_run_id}" \
      bash "${BASE_DIR}/run_formal_profiles.sh" --workloads "${workload}" &&
      validate_profile_file "${PROFILE_DIR}/${workload}.yaml"; then
@@ -514,7 +524,7 @@ for workload in "${SOURCE_FEASIBLE_WORKLOADS[@]}"; do
       profile_reason="isolated formal profile exceeded ${PROFILE_TIMEOUT_SEC}s"
     fi
     write_status "${workload}" profile "${profile_status}" "${profile_reason}"
-    write_status "${workload}" candidate_failure candidate_failed "no valid shared profile; three successful DP repetitions are impossible"
+    write_status "${workload}" candidate_failure candidate_failed "no valid shared profile; ${REPEATS} successful DP repetitions are impossible"
     echo "[$(date -Is)] PROFILE_UNAVAILABLE ${workload}; retaining it in the denominator"
   fi
 done
@@ -533,7 +543,7 @@ for workload in "${FEASIBLE_WORKLOADS[@]}"; do
   if [[ ! -f "${workload_root}/plans/dp_optimizer.yaml" ]]; then
     write_status "${workload}" "candidate_failure" \
       "candidate_failed" \
-      "DP did not produce a valid plan; three successful DP repeats are impossible"
+      "DP did not produce a valid plan; ${REPEATS} successful DP repeats are impossible"
     echo "[$(date -Is)] CANDIDATE_FAILED ${workload}: DP plan unavailable"
     continue
   fi
@@ -550,7 +560,7 @@ for workload in "${FEASIBLE_WORKLOADS[@]}"; do
             -f "${workload_root}/status/round${round}__dp_optimizer.json" ]]; then
         write_status "${workload}" "candidate_failure" \
           "candidate_failed" \
-          "DP repeat ${round} was not successful; three successful DP repeats are impossible"
+          "DP repeat ${round} was not successful; ${REPEATS} successful DP repeats are impossible"
         echo "[$(date -Is)] CANDIDATE_FAILED ${workload}: DP round ${round}"
         break 2
       fi
@@ -560,6 +570,9 @@ done
 
 python "${BASE_DIR}/analyze_dp_20pct_goal.py" \
   --candidate-root "${RUN_ROOT}" \
+  --expected-repeats "${REPEATS}" \
+  --expected-samples "${OUTPUTS}" \
+  --execution-timeout-sec "${EXECUTION_TIMEOUT_SEC}" \
   --json-output "${RUN_ROOT}/dp_20pct_report.json" \
   --markdown-output "${RUN_ROOT}/dp_20pct_report.md"
 printf '%s\n' "${RUN_ROOT}" > \
