@@ -184,6 +184,8 @@ cython_debug/
 /evaluation/chapter6_experiments/formal_results/*
 !/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/
 !/evaluation/chapter6_experiments/formal_results/paper_figures_latest_dp_cedar/**
+!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_three_repeat/
+!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_three_repeat/**
 !/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/
 !/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/README.md
 !/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/

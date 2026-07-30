@@ -1,0 +1,80 @@
+physical_plan:
+  graph:
+    0: '11'
+    3: '10'
+    5: '12'
+    6: '5'
+    8: '3'
+    9: '8'
+    10: '6'
+    11: ''
+    12: '0'
+  n_local_workers: 8
+  pipes:
+    0:
+      name: BatcherPipe(batch_size=1)
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    1:
+      name: MapperPipe_Normalize
+      variant: INPROCESS
+    2:
+      name: MapperPipe_GaussianBlur
+      variant: INPROCESS
+    3:
+      name: MapperPipe_Grayscale
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    4:
+      name: MapperPipe_ColorJitter
+      variant: INPROCESS
+    5:
+      name: MapperPipe_RandomHorizontalFlip
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    6:
+      name: MapperPipe_RandomResizedCrop
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    7:
+      name: MapperPipe_to_float
+      variant: INPROCESS
+    8:
+      name: ImageReaderPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      name: LocalFSListerPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    10:
+      name: ObjectDiskCachePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    11:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    12:
+      fused_pipes:
+      - 4
+      - 2
+      - 7
+      - 1
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 6
+        use_threads: true
+        variant_type: RAY

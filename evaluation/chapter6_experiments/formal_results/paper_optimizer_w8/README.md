@@ -1,7 +1,7 @@
 # Paper optimizer matrix (W=8)
 
 This directory is the canonical location for the optimizer execution data used
-to update `paper_figures_latest_dp_cedar/latest_optimizer_execution_dp_cedar_baseline.pdf`.
+to generate `paper_figures_optimizer_w8_three_repeat/latest_optimizer_execution_dp_cedar_baseline.pdf`.
 It deliberately has a stable, descriptive name rather than a timestamped run
 identifier.
 
@@ -19,10 +19,12 @@ bundle. Its source rows are:
 - RedPajama-Code and the valid Pile workloads: `../dp_20pct_goal_latest.json`,
   with three round-robin repetitions.
 
-Once every cell in this directory has three valid measured results, these
-seven stable results replace the corresponding single-run rows. Historical
-timestamped directories remain provenance only and must not be referenced as
-the primary paper-data location.
+The matrix is complete. Every available optimizer has three valid measured
+results; Cedar plan generation exceeded the fixed 300-second limit on LLaVA
+and StackExchange and is recorded as unavailable. These seven stable results
+replace the corresponding single-run rows. Historical timestamped directories
+remain provenance only and must not be referenced as the primary paper-data
+location.
 
 ## Scope
 
@@ -41,9 +43,10 @@ measured execution:
 
 Every optimizer uses the same workload profile, `W=8`, `CPU_BUDGET=64`, the
 same sample count, and three measured executions. Optimizers rotate in
-round-robin order between repetitions. Cache workloads receive an independent,
-unmeasured warmup for every plan; only complete cache manifests are accepted.
-Plan generation has a five-minute timeout.
+round-robin order between repetitions. A cache-workload plan that actually
+contains `ObjectDiskCachePipe` receives an independent, unmeasured warmup and
+only complete cache manifests are accepted. A plan that elects not to cache is
+executed directly for three rounds. Plan generation has a five-minute timeout.
 
 The five optimizers plotted in the current figure are `optimizer`,
 `dj_optimizer`, `dp_cedar_optimizer`, `dp_optimizer`, and `pecan_optimizer`.

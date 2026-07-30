@@ -1,0 +1,12 @@
+ablation=fixed_local_workers_w8
+measurement_protocol=fixed_w8_3_round_robin_repeats
+profile_source=evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/profiles/wikitext103.yaml
+cpu_budget=64
+local_workers=8
+repeats=3
+optimizer_plan_timeout_sec=300
+execution_timeout_sec=3600
+cache=off
+optimizers=optimizer dj_optimizer dp_cedar_optimizer dp_optimizer dp_two_stage_optimizer pecan_optimizer
+dataset_kwargs=max_samples=100000
+scale_note=reduced_protocol_100000_line_prefix

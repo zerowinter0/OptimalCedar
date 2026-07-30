@@ -100,12 +100,7 @@ def read_json(path: Path):
         return json.load(handle)
 
 
-def canonical_legacy_key(optimizer: str) -> str:
-    return f"cedar_{optimizer}"
-
-
 def load_latest(args) -> dict:
-    legacy = read_json(args.legacy_report)
     audit = read_json(args.candidate_report)
     data = {}
 
@@ -136,22 +131,59 @@ def load_latest(args) -> dict:
                 "protocol": "enlarged W=8; three round-robin repeats",
             }
 
-    # Remaining established workloads retain their newest completed formal
-    # cells. These are single-run results and are labeled as such in the TSV.
+    # These established workloads were rerun with the same W=8 profile and
+    # three round-robin repetitions in the stable paper matrix.
     for workload, _ in CORE[3:]:
         data[workload] = {}
-        entities = legacy["workloads"][workload]["entities"]
         for optimizer, _, _, _ in OPTIMIZERS:
-            item = entities[canonical_legacy_key(optimizer)]
+            workload_root = args.paper_matrix / "workloads" / workload
+            unavailable = workload_root / "plans" / f"{optimizer}.unavailable.json"
+            result_files = sorted(
+                (workload_root / "results").glob(f"round*__{optimizer}.json")
+            )
+            if unavailable.exists():
+                unavailable_item = read_json(unavailable)
+                data[workload][optimizer] = {
+                    "status": unavailable_item["status"],
+                    "mean": None,
+                    "sd": 0.0,
+                    "repeats": 0,
+                    "samples": None,
+                    "setup": float(unavailable_item["timeout_sec"]),
+                    "source": str(args.paper_matrix),
+                    "protocol": "fixed W=8; three round-robin repeats",
+                }
+                continue
+            if len(result_files) != 3:
+                raise ValueError(
+                    f"Expected three results for {workload}/{optimizer}, "
+                    f"found {len(result_files)}"
+                )
+            times = []
+            samples = []
+            for path in result_files:
+                result = read_json(path)
+                if result.get("num_epochs") != 1:
+                    raise ValueError(f"Unexpected epoch count in {path}")
+                times.append(float(result["epoch_run_times"][0]))
+                samples.append(int(result["epoch_num_samples"][0]))
+            if len(set(samples)) != 1:
+                raise ValueError(
+                    f"Inconsistent sample counts for {workload}/{optimizer}: "
+                    f"{samples}"
+                )
+            plan_result = read_json(
+                workload_root / "warmup_results" / f"plan_only__{optimizer}.json"
+            )
             data[workload][optimizer] = {
-                "status": item["status"],
-                "mean": item.get("execution_time_sec"),
-                "sd": 0.0,
-                "repeats": 1 if positive(item.get("execution_time_sec")) else 0,
-                "samples": legacy["workloads"][workload].get("expected_outputs"),
-                "setup": item.get("optimization_or_setup_time_sec"),
-                "source": str(args.legacy_report),
-                "protocol": "reduced W=8; one formal measured run",
+                "status": "success",
+                "mean": statistics.mean(times),
+                "sd": statistics.stdev(times),
+                "repeats": len(times),
+                "samples": samples[0],
+                "setup": float(plan_result["runs"][0]["setup_time_sec"]),
+                "source": str(args.paper_matrix),
+                "protocol": "fixed W=8; three round-robin repeats",
             }
 
     # New Data-Juicer/Pile pipelines have three round-robin repetitions.
@@ -224,6 +256,7 @@ def plotted_workloads(data: dict):
 def draw_execution_panel(ax, data: dict, workloads, title: str) -> None:
     width = 0.82 / len(OPTIMIZERS)
     centers = list(range(len(workloads)))
+    plotted_upper_bounds = []
     for idx, (workload, _) in enumerate(workloads):
         if not positive(data[workload][BASELINE]["mean"]):
             ax.axvspan(idx - 0.45, idx + 0.45, facecolor="#EFEFEF", hatch="//", zorder=0)
@@ -234,6 +267,7 @@ def draw_execution_panel(ax, data: dict, workloads, title: str) -> None:
             value, error = ratio(data, workload, optimizer)
             item = data[workload][optimizer]
             if positive(value):
+                plotted_upper_bounds.append(value + (error or 0.0))
                 ax.bar(
                     x,
                     value,
@@ -251,7 +285,8 @@ def draw_execution_panel(ax, data: dict, workloads, title: str) -> None:
                 ax.text(x, 0.14, "TO", ha="center", color="#D55E00", fontsize=5.5, fontweight="bold")
     ax.axhline(1, color="#333333", linewidth=0.8)
     ax.set_xlim(-0.55, len(workloads) - 0.45)
-    ax.set_ylim(0, 3.05)
+    data_upper = max(plotted_upper_bounds, default=0.0)
+    ax.set_ylim(0, max(3.05, data_upper * 1.12))
     ax.set_xticks(centers, [label for _, label in workloads], rotation=32)
     for tick in ax.get_xticklabels():
         tick.set_ha("right")
@@ -276,7 +311,7 @@ def execution_figure(data: dict, output_dir: Path) -> None:
     )
     fig.text(
         0.995, -0.075,
-        "Error bars: sample SD propagated from three repeats; absent for single-run cells",
+        "Error bars: sample SD propagated from three round-robin repeats",
         ha="right", va="bottom", fontsize=6,
     )
     save(fig, output_dir, "latest_optimizer_execution_dp_cedar_baseline")
@@ -398,7 +433,13 @@ def aggregate_figure(data: dict, output_dir: Path) -> dict:
 
 def save(fig, output_dir: Path, stem: str) -> None:
     for suffix in ("pdf", "svg", "png"):
-        fig.savefig(output_dir / f"{stem}.{suffix}", bbox_inches="tight", pad_inches=0.03)
+        path = output_dir / f"{stem}.{suffix}"
+        fig.savefig(path, bbox_inches="tight", pad_inches=0.03)
+        if suffix == "svg":
+            # Matplotlib emits trailing spaces in path data. Normalize the
+            # tracked vector artifact so repository whitespace checks pass.
+            lines = path.read_text().splitlines()
+            path.write_text("\n".join(line.rstrip() for line in lines) + "\n")
     plt.close(fig)
 
 
@@ -409,7 +450,9 @@ def export(data: dict, summary: dict, output_dir: Path) -> None:
         "protocol", "source",
     ]
     with (output_dir / "latest_optimizer_data.tsv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+        writer = csv.DictWriter(
+            handle, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         for workload, _ in ALL:
             for optimizer, _, _, _ in OPTIMIZERS:
@@ -427,7 +470,9 @@ def export(data: dict, summary: dict, output_dir: Path) -> None:
                 )
     with (output_dir / "latest_optimizer_aggregate.tsv").open("w", newline="") as handle:
         fields = ["optimizer"] + list(next(iter(summary.values())).keys())
-        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
+        writer = csv.DictWriter(
+            handle, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         for optimizer, values in summary.items():
             writer.writerow({"optimizer": optimizer, **values})
@@ -435,46 +480,57 @@ def export(data: dict, summary: dict, output_dir: Path) -> None:
 
 def write_readme(args, summary: dict, output_dir: Path) -> None:
     dp = summary["dp_optimizer"]
+    valid = dp["valid_baselines"]
     text = f"""# Latest optimizer figures with DP-Cedar baseline
 
-This is a source-tracked synthesis of the newest valid artifacts, not a claim
-that every workload used one identical repetition protocol:
+This is a source-tracked synthesis of the newest valid W=8 artifacts. Every
+successful plotted cell contains three round-robin measured executions:
 
-- COCO, CommonVoice, and CommonVoice-cache: `{args.scaled_run.resolve()}`
+- COCO, CommonVoice, and CommonVoice-cache: `{args.scaled_run}`
   (enlarged inputs, three round-robin repetitions).
 - LLaVA, RP-C4, StackExchange, SimCLR(v2), and WikiText-103 variants:
-  `{args.legacy_report.resolve()}` (latest completed formal cell; one run).
-- RP-Code and the Pile pipelines: `{args.candidate_report.resolve()}`
+  `{args.paper_matrix}` (fixed W=8, three round-robin repetitions).
+- RP-Code and the Pile pipelines: `{args.candidate_report}`
   (20,000 outputs, three round-robin repetitions).
 
-Fourteen workloads have a valid DP-Cedar execution baseline. Pile EuroParl is
+{valid} workloads have a valid DP-Cedar execution baseline. Pile EuroParl is
 excluded because its DP-Cedar run was invalidated by interference; Pile FreeLaw
 is excluded because it has no valid plans. Invalid workloads are not plotted.
 The per-workload x-axis is ordered by increasing logical Cedar operator count
 (excluding the source); ties retain the suite order.
-Cedar has valid execution plans on {summary['optimizer']['valid_optimizer_runs']}/14
+Cedar has valid execution plans on {summary['optimizer']['valid_optimizer_runs']}/{valid}
 workloads and optimizer-timeout outcomes on the other valid-baseline pipelines.
 
 Headline values:
 
-- DP geomean speedup over DP-Cedar across all 14 valid-baseline workloads:
+- DP geomean speedup over DP-Cedar across all {valid} valid-baseline workloads:
   **{dp['geomean_all_valid']:.3f}x**.
 - On the common {dp['common_workloads']} workloads where Cedar also completes,
   DP achieves **{dp['geomean_common']:.3f}x** over DP-Cedar.
 
-Use the per-workload figures as the primary paper evidence. The aggregate is
-preliminary because the source suite mixes one-run legacy cells with newer
-three-repeat cells. Error bars are shown only where three repeated executions
-exist; they are propagated sample standard deviations of the normalized ratio.
+Use the per-workload figures as the primary paper evidence. Error bars are
+propagated sample standard deviations of the normalized ratio.
+
+## Reproduction
+
+Run inside the project container after `source env/bin/activate`:
+
+```bash
+python evaluation/chapter6_experiments/plot_latest_optimizer_dp_cedar_baseline.py \\
+  --candidate-report {args.candidate_report} \\
+  --scaled-run {args.scaled_run} \\
+  --paper-matrix {args.paper_matrix} \\
+  --output-dir {output_dir}
+```
 """
     (output_dir / "README.md").write_text(text)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--legacy-report", type=Path, required=True)
     parser.add_argument("--candidate-report", type=Path, required=True)
     parser.add_argument("--scaled-run", type=Path, required=True)
+    parser.add_argument("--paper-matrix", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)

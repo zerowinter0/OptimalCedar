@@ -1,0 +1,6 @@
+{
+  "optimizer": "optimizer",
+  "status": "unavailable",
+  "reason": "plan_generation_timeout",
+  "timeout_sec": 300
+}

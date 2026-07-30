@@ -1,0 +1,96 @@
+physical_plan:
+  graph:
+    17: '19'
+    18: ''
+    19: '18'
+  n_local_workers: 8
+  pipes:
+    0:
+      name: MapperPipe_extract_output_text
+      variant: INPROCESS
+    1:
+      name: MapperPipe_sync_text_key
+      variant: INPROCESS
+    2:
+      name: FilterPipe_WordRepetitionFilter
+      variant: INPROCESS
+    3:
+      name: FilterPipe_WordsNumFilter
+      variant: INPROCESS
+    4:
+      name: FilterPipe_SpecialCharactersFilter
+      variant: INPROCESS
+    5:
+      name: FilterPipe_PerplexityFilter
+      variant: INPROCESS
+    6:
+      name: FilterPipe_MaximumLineLengthFilter
+      variant: INPROCESS
+    7:
+      name: FilterPipe_LanguageIDScoreFilter
+      variant: INPROCESS
+    8:
+      name: FilterPipe_CharacterRepetitionFilter
+      variant: INPROCESS
+    9:
+      name: FilterPipe_AverageLineLengthFilter
+      variant: INPROCESS
+    10:
+      name: FilterPipe_AlphanumericFilter
+      variant: INPROCESS
+    11:
+      name: MapperPipe_WhitespaceNormalizationMapper
+      variant: INPROCESS
+    12:
+      name: MapperPipe_PunctuationNormalizationMapper
+      variant: INPROCESS
+    13:
+      name: MapperPipe_FixUnicodeMapper
+      variant: INPROCESS
+    14:
+      name: MapperPipe_CleanLinksMapper
+      variant: INPROCESS
+    15:
+      name: MapperPipe_CleanEmailMapper
+      variant: INPROCESS
+    16:
+      name: MapperPipe_parse_json_line
+      variant: INPROCESS
+    17:
+      name: LocalLinePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    18:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    19:
+      fused_pipes:
+      - 16
+      - 15
+      - 14
+      - 13
+      - 12
+      - 11
+      - 2
+      - 3
+      - 7
+      - 5
+      - 8
+      - 4
+      - 6
+      - 10
+      - 9
+      - 1
+      - 0
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 1041
+        max_prefetch: 1041
+        n_actors: 1
+        submit_batch_size: 347
+        use_threads: true
+        variant_type: RAY
