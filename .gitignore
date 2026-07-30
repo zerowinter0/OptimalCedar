@@ -196,3 +196,15 @@ cython_debug/
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/cache/
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/logs/
 /evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/workloads/*/nohup.log
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/README.md
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/profiles/
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/profiles/**
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/
+!/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/**
+/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/runner.out
+/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/cache/
+/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/logs/
+/evaluation/chapter6_experiments/formal_results/paper_dp_no_wall_clock_w8/workloads/*/nohup.log
+!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_no_wall_clock/
+!/evaluation/chapter6_experiments/formal_results/paper_figures_optimizer_w8_no_wall_clock/**

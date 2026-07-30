@@ -50,7 +50,6 @@ class MyOptimizer(Optimizer):
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
         self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
         self._transport_rejection_logs: Set[Tuple[Any, ...]] = set()
-        self._dp_wall_latency_scale: Optional[float] = None
 
     #复用父类的init和_init_stats
     def init(self, logical_pipes: Dict[int, Pipe], logical_adj_list: Dict[int, Set[int]]) -> None:
@@ -59,76 +58,6 @@ class MyOptimizer(Optimizer):
         # 保持与基类一致：init 只做 logical graph/plan 初始化。
         super().init(logical_pipes, logical_adj_list)
 
-    def _init_stats(self) -> None:
-        super()._init_stats()
-        wall_latencies = self.profiled_stats["baseline"].get(
-            "wall_latencies"
-        )
-        if not isinstance(wall_latencies, dict):
-            return
-        # Filter pipelines require the isolated end-to-end offload signal:
-        # dropped records do not reach the output profiler, so a wall-clock
-        # sum over surviving samples is not an unbiased local cost breakdown.
-        # The selectivity-aware outer DP still models their cardinality.
-        has_filter = self.logical_pipes is not None and any(
-            "filterpipe" in pipe.__class__.__name__.lower()
-            or "filterpipe" in pipe.get_logical_name().lower()
-            for pipe in self.logical_pipes.values()
-        )
-        if has_filter:
-            logger.info(
-                "[MyOptimizer] Retaining end-to-end cost attribution for a "
-                "pipeline containing filters."
-            )
-            return
-        expected_ids = set(self._base_cost_map)
-        if set(wall_latencies) != expected_ids:
-            logger.warning(
-                "[MyOptimizer] Ignoring incomplete baseline wall latencies: "
-                "expected=%s observed=%s",
-                sorted(expected_ids),
-                sorted(wall_latencies),
-            )
-            return
-        try:
-            wall_ns = {
-                p_id: float(wall_latencies[p_id]) for p_id in expected_ids
-            }
-        except (TypeError, ValueError):
-            return
-        total_wall_ns = sum(wall_ns.values())
-        if not math.isfinite(total_wall_ns) or total_wall_ns <= 0:
-            return
-
-        total_cost_ms = 1000.0 / self.profiled_stats["baseline"]["throughput"]
-        measured_wall_cost_ms = total_wall_ns / 1e6
-        relative_error = (
-            abs(measured_wall_cost_ms - total_cost_ms) / total_cost_ms
-        )
-        if relative_error > constants.MAX_WALL_CLOCK_COST_RELATIVE_ERROR:
-            logger.warning(
-                "[MyOptimizer] Ignoring inconsistent baseline wall-clock "
-                "operator costs: summed=%.6f ms observed=%.6f ms "
-                "relative_error=%.2f%% (limit=%.2f%%).",
-                measured_wall_cost_ms,
-                total_cost_ms,
-                100.0 * relative_error,
-                100.0 * constants.MAX_WALL_CLOCK_COST_RELATIVE_ERROR,
-            )
-            return
-        self._dp_wall_latency_scale = total_cost_ms / measured_wall_cost_ms
-        self._fractional_latencies = {
-            p_id: latency / total_wall_ns for p_id, latency in wall_ns.items()
-        }
-        self._base_cost_map = {
-            p_id: fraction * total_cost_ms
-            for p_id, fraction in self._fractional_latencies.items()
-        }
-        logger.info(
-            "[MyOptimizer] Using baseline wall-clock operator costs "
-            "(normalization scale %.6f).",
-            self._dp_wall_latency_scale,
-        )
     # ========= 外部入口 =========
 
     def run(
@@ -513,85 +442,6 @@ class MyOptimizer(Optimizer):
         return self._dp_boundary_fixed_latency_ms(variant) / max_inflight + (
             (input_size + output_size) / throughput * 1000.0
         )
-
-    def _dp_profiled_operator_compute_cost(
-        self,
-        p_id: int,
-        variant: PipeVariantType,
-        profiled_total_cost: float,
-    ) -> float:
-        """Split a profiled offload cost into compute and stage-boundary work.
-
-        ``profiled_total_cost`` is inferred from the measured end-to-end
-        throughput after changing exactly this operator's backend.  It is the
-        only observation that includes integration effects on the surrounding
-        pipeline, so a singleton DP stage must reproduce that observation:
-        compute = profiled total - boundary.  Worker-side timings are useful
-        diagnostics, but are not directly comparable with Cedar's local costs,
-        which are apportioned from cumulative baseline latencies.  Preferring
-        the worker timer would therefore mix two measurement domains and can
-        reverse an observed end-to-end speedup.
-
-        Direct backend timing remains a fallback for profiles without a usable
-        boundary model.  Its one-sided 95% confidence bound avoids selecting a
-        backend merely because a short profile happened to be optimistic.
-        """
-        profile = self.profiled_stats.get("offloads", {}).get(
-            variant.name, {}
-        ).get(p_id, {})
-        direct = profile.get("backend_compute")
-
-        direct_upper_bound: Optional[float] = None
-        if isinstance(direct, dict):
-            try:
-                mean = float(direct["mean_ms_per_sample"])
-                stderr = float(direct.get("stderr_ms_per_sample", 0.0))
-                count = int(direct["count"])
-            except (KeyError, TypeError, ValueError):
-                mean = float("nan")
-                stderr = float("nan")
-                count = 0
-            if (
-                count > 0
-                and math.isfinite(mean)
-                and mean >= 0
-                and math.isfinite(stderr)
-                and stderr >= 0
-            ):
-                direct_upper_bound = mean + 1.645 * stderr
-
-        # New profiles provide local and backend compute in the same
-        # wall-clock domain. Prefer the direct worker observation: unlike an
-        # Amdahl inverse, it remains identifiable near the whole-pipeline
-        # speedup asymptote and composes additively inside a fused block.
-        if (
-            self._dp_wall_latency_scale is not None
-            and direct_upper_bound is not None
-        ):
-            return direct_upper_bound * self._dp_wall_latency_scale
-
-        throughput = self._dp_boundary_throughput(variant)
-        baseline = self.profiled_stats.get("baseline", {})
-        input_sizes = baseline.get("input_sizes", {})
-        output_sizes = baseline.get("output_sizes", {})
-        if (
-            throughput is not None
-            and p_id in input_sizes
-            and p_id in output_sizes
-        ):
-            input_size = input_sizes[p_id]
-            output_size = output_sizes[p_id]
-            boundary_cost = self._dp_boundary_cost_ms(
-                variant, input_size, output_size
-            )
-            compute_cost = profiled_total_cost - boundary_cost
-            if math.isfinite(compute_cost):
-                return max(0.0, compute_cost)
-
-        if direct_upper_bound is not None:
-            return direct_upper_bound
-
-        return profiled_total_cost
 
     def _dp_stage_boundary_cost(self, prev_mask: int, block) -> float:
         """Model each parallel stage boundary separately from operator work.

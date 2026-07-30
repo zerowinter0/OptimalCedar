@@ -42,10 +42,3 @@ RAY_STAGE_BOUNDARY_THROUGHPUT = 10_000_000_000
 # improvement signal without ever turning that operator into a zero-cost
 # candidate.
 MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP = 64.0
-
-# A per-operator wall-clock decomposition is only used when it reconstructs
-# the observed baseline cost closely enough.  Larger disagreement means that
-# sampling/tracing effects make the decomposition a different cost domain
-# from end-to-end throughput, so the optimizer retains the end-to-end
-# attribution instead.
-MAX_WALL_CLOCK_COST_RELATIVE_ERROR = 0.25

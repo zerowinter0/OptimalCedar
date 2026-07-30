@@ -20,6 +20,8 @@ EXECUTION_TIMEOUT_SEC="${EXECUTION_TIMEOUT_SEC:-3600}"
 RESUME_EXISTING="${RESUME_EXISTING:-0}"
 OPTIMIZER_SET="${OPTIMIZER_SET:-all}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
+COCO_SAMPLES="${COCO_SAMPLES:-5000}"
+COCO_DATASET_KWARGS="${COCO_DATASET_KWARGS:-split=val2017}"
 SELECTED_WORKLOADS="all"
 
 usage() {
@@ -192,6 +194,7 @@ write_metadata() {
     printf 'optimizer_plan_timeout_sec=%s\n' "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
     printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
     printf 'cache=%s\n' "${cache_mode}"
+    printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     printf 'dataset_kwargs=%s\n' "${kwargs}"
     if [[ "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
@@ -508,7 +511,7 @@ run_workload() {
 
 run_workload coco \
   evaluation/pipelines/coco/cedar_dataset.py \
-  "${PROFILE_DIR}/coco.yaml" 5000 off "split=val2017"
+  "${PROFILE_DIR}/coco.yaml" "${COCO_SAMPLES}" off "${COCO_DATASET_KWARGS}"
 run_workload commonvoice \
   evaluation/pipelines/commonvoice/cedar_dataset.py \
   "${PROFILE_DIR}/commonvoice.yaml" 10000 off "max_samples=10000"

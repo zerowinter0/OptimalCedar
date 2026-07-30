@@ -203,9 +203,7 @@ class BlockCandidateProvider:
                     total_cost = opt._calculate_pipe_cost(
                         p_id, base_input_size, desc
                     )
-                    costs_v[i] = opt._dp_profiled_operator_compute_cost(
-                        p_id, vt, total_cost
-                    )
+                    costs_v[i] = total_cost
                 except Exception:
                     continue
 
@@ -222,10 +220,9 @@ class BlockCandidateProvider:
                 opt, self.inner_ops, variant_compute_costs[vt]
             )
             if vt != PipeVariantType.INPROCESS:
-                # Worker-side profiles already isolate operator execution from
-                # stage queueing and transport.  Fusion removes intermediate
-                # boundaries, which the outer DP prices explicitly, but does
-                # not justify an unmeasured compute discount.
+                # Fusion removes intermediate boundaries, which the outer DP
+                # prices explicitly, but does not justify an unmeasured
+                # discount to the profiled offload cost.
                 fused_compute = variant_compute_costs[vt]
                 self._fused_variant_indexes[vt] = _BlockCostIndex(
                     opt, self.inner_ops, fused_compute

@@ -176,15 +176,6 @@ def _plan_cost(
                     operator.costs["INPROCESS"]
                     / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
                 )
-            if boundary_throughput is not None:
-                profiled_boundary = (
-                    (1.0 + operator.size_ratio)
-                    / boundary_throughput
-                    * 1000.0
-                )
-                operator_cost = max(
-                    operator_cost - profiled_boundary, 0.0
-                )
             block_compute += volume * operator_cost
             item_size *= operator.size_ratio
             cardinality *= operator.selectivity

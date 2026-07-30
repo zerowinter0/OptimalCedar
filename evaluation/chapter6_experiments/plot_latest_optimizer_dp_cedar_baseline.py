@@ -211,6 +211,48 @@ def load_latest(args) -> dict:
                 "source": str(args.candidate_report),
                 "protocol": "candidate W=8; three round-robin repeats",
             }
+
+    # An ablation may replace only the proposed optimizer while retaining all
+    # unchanged baselines from the canonical three-repeat sources.
+    if args.dp_replacement_matrix is not None:
+        for workload in ("coco", "simclrv2", "simclrv2_cache"):
+            workload_root = args.dp_replacement_matrix / workload
+            result_files = sorted(
+                (workload_root / "results").glob("round*__dp_optimizer.json")
+            )
+            if len(result_files) != 3:
+                raise ValueError(
+                    f"Expected three replacement results for {workload}/"
+                    f"dp_optimizer, found {len(result_files)}"
+                )
+            times = []
+            samples = []
+            for path in result_files:
+                result = read_json(path)
+                if result.get("num_epochs") != 1:
+                    raise ValueError(f"Unexpected epoch count in {path}")
+                times.append(float(result["epoch_run_times"][0]))
+                samples.append(int(result["epoch_num_samples"][0]))
+            if len(set(samples)) != 1:
+                raise ValueError(
+                    f"Inconsistent replacement sample counts for {workload}: "
+                    f"{samples}"
+                )
+            plan_result = read_json(
+                workload_root / "warmup_results" / "plan_only__dp_optimizer.json"
+            )
+            data[workload]["dp_optimizer"] = {
+                "status": "success",
+                "mean": statistics.mean(times),
+                "sd": statistics.stdev(times),
+                "repeats": len(times),
+                "samples": samples[0],
+                "setup": float(plan_result["runs"][0]["setup_time_sec"]),
+                "source": str(args.dp_replacement_matrix),
+                "protocol": (
+                    "fixed W=8; no wall-clock correction; three repeats"
+                ),
+            }
     return data
 
 
@@ -481,6 +523,19 @@ def export(data: dict, summary: dict, output_dir: Path) -> None:
 def write_readme(args, summary: dict, output_dir: Path) -> None:
     dp = summary["dp_optimizer"]
     valid = dp["valid_baselines"]
+    replacement_source = ""
+    replacement_arg = ""
+    if args.dp_replacement_matrix is not None:
+        replacement_source = (
+            "- DP results for COCO and SimCLR(v2) variants: "
+            f"`{args.dp_replacement_matrix}` (wall-clock correction removed; "
+            "three repetitions)."
+        )
+        replacement_arg = (
+            f"  --dp-replacement-matrix {args.dp_replacement_matrix} "
+            + chr(92)
+            + "\n"
+        )
     text = f"""# Latest optimizer figures with DP-Cedar baseline
 
 This is a source-tracked synthesis of the newest valid W=8 artifacts. Every
@@ -492,6 +547,7 @@ successful plotted cell contains three round-robin measured executions:
   `{args.paper_matrix}` (fixed W=8, three round-robin repetitions).
 - RP-Code and the Pile pipelines: `{args.candidate_report}`
   (20,000 outputs, three round-robin repetitions).
+{replacement_source}
 
 {valid} workloads have a valid DP-Cedar execution baseline. Pile EuroParl is
 excluded because its DP-Cedar run was invalidated by interference; Pile FreeLaw
@@ -520,7 +576,7 @@ python evaluation/chapter6_experiments/plot_latest_optimizer_dp_cedar_baseline.p
   --candidate-report {args.candidate_report} \\
   --scaled-run {args.scaled_run} \\
   --paper-matrix {args.paper_matrix} \\
-  --output-dir {output_dir}
+{replacement_arg}  --output-dir {output_dir}
 ```
 """
     (output_dir / "README.md").write_text(text)
@@ -531,6 +587,7 @@ def main() -> None:
     parser.add_argument("--candidate-report", type=Path, required=True)
     parser.add_argument("--scaled-run", type=Path, required=True)
     parser.add_argument("--paper-matrix", type=Path, required=True)
+    parser.add_argument("--dp-replacement-matrix", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
