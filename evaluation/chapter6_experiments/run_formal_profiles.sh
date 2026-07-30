@@ -2,7 +2,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RESULT_ROOT="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results"
+RESULT_ROOT="${CH6_RESULT_ROOT:-${REPO_ROOT}/evaluation/chapter6_experiments/formal_results}"
 PROFILE_ROOT="${CH6_PROFILE_ROOT:-${RESULT_ROOT}/profiles}"
 RUN_ID="${CH6_PROFILE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RUN_ROOT="${RESULT_ROOT}/profile_runs/${RUN_ID}"

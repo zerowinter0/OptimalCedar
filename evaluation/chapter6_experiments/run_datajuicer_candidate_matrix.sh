@@ -5,8 +5,8 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
-FORMAL_ROOT="${BASE_DIR}/formal_results"
-PROFILE_DIR="${FORMAL_ROOT}/profiles"
+FORMAL_ROOT="${DJ_CANDIDATE_OUTPUT_ROOT:-${BASE_DIR}/formal_results}"
+PROFILE_DIR="${DJ_CANDIDATE_PROFILE_DIR:-${FORMAL_ROOT}/profiles}"
 RUN_ID="${DJ_CANDIDATE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RUN_ROOT="${FORMAL_ROOT}/datajuicer_candidate_runs/${RUN_ID}"
 LOG_ROOT="${RUN_ROOT}/logs"
@@ -19,6 +19,7 @@ EXECUTION_TIMEOUT_SEC=3600
 PROFILE_TIMEOUT_SEC=3600
 RESUME_RUN="${DJ_CANDIDATE_RESUME:-0}"
 REUSE_PROFILE_RUN_ID="${DJ_REUSE_PROFILE_RUN_ID:-}"
+REUSE_EXISTING_PROFILES="${DJ_REUSE_EXISTING_PROFILES:-0}"
 OPTIMIZERS=(
   optimizer
   dj_optimizer
@@ -37,6 +38,11 @@ case "${RUN_ID}" in
 esac
 if [[ -e "${RUN_ROOT}" && "${RESUME_RUN}" != "1" ]]; then
   echo "Candidate run already exists: ${RUN_ROOT}" >&2
+  exit 2
+fi
+if [[ "${REUSE_EXISTING_PROFILES}" != "0" && \
+      "${REUSE_EXISTING_PROFILES}" != "1" ]]; then
+  echo "DJ_REUSE_EXISTING_PROFILES must be 0 or 1." >&2
   exit 2
 fi
 
@@ -486,9 +492,17 @@ for workload in "${SOURCE_FEASIBLE_WORKLOADS[@]}"; do
     echo "[$(date -Is)] Reusing validated profile ${workload} from ${REUSE_PROFILE_RUN_ID}"
     FEASIBLE_WORKLOADS+=("${workload}"); continue
   fi
+  if [[ "${REUSE_EXISTING_PROFILES}" == 1 ]] && \
+     validate_profile_file "${PROFILE_DIR}/${workload}.yaml"; then
+    echo "[$(date -Is)] Reusing validated existing profile ${workload}"
+    FEASIBLE_WORKLOADS+=("${workload}"); continue
+  fi
   echo "[$(date -Is)] Generating isolated formal profile ${workload}"
   profile_run_id="${RUN_ID}_${workload}_profile"
-  if env CH6_PROFILE_RUN_ID="${profile_run_id}" bash "${BASE_DIR}/run_formal_profiles.sh" --workloads "${workload}" &&
+  if env CH6_RESULT_ROOT="${FORMAL_ROOT}" \
+     CH6_PROFILE_ROOT="${PROFILE_DIR}" \
+     CH6_PROFILE_RUN_ID="${profile_run_id}" \
+     bash "${BASE_DIR}/run_formal_profiles.sh" --workloads "${workload}" &&
      validate_profile_file "${PROFILE_DIR}/${workload}.yaml"; then
     FEASIBLE_WORKLOADS+=("${workload}")
   else
