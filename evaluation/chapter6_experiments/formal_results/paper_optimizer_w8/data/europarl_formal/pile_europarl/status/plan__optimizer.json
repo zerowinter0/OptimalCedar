@@ -1,0 +1,4 @@
+{
+  "status": "optimizer_timeout",
+  "reason": "plan optimization exceeded 300s"
+}

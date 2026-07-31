@@ -32,7 +32,6 @@ DATA_PIPELINES = [
     ("pile_pubmed_abstracts", "PubMed"),
     ("pile_uspto_backgrounds", "USPTO"),
     ("pile_europarl", "EuroParl"),
-    ("pile_freelaw", "FreeLaw"),
 ]
 ALL = CORE + DATA_PIPELINES
 
@@ -55,14 +54,13 @@ PIPELINE_OPERATOR_COUNTS = {
     "pile_pubmed_abstracts": 19,
     "pile_uspto_backgrounds": 19,
     "pile_europarl": 19,
-    "pile_freelaw": 20,
 }
 
 OPTIMIZERS = [
     ("dp_cedar_optimizer", "DP-Cedar", "#9E9E9E", ""),
     ("dj_optimizer", "Data-Juicer", "#E69F00", "---"),
     ("pecan_optimizer", "Pecan", "#009E73", "xxx"),
-    ("dp_optimizer", "DP (ours)", "#0072B2", "///"),
+    ("dp_optimizer", "PICO", "#0072B2", "///"),
     ("optimizer", "Cedar", "#CC79A7", "\\\\\\"),
 ]
 BASELINE = "dp_cedar_optimizer"
@@ -555,12 +553,13 @@ successful plotted cell contains three round-robin measured executions:
 - LLaVA, RP-C4, StackExchange, SimCLR(v2), and WikiText-103 variants:
   `{args.paper_matrix}` (fixed W=8, three round-robin repetitions).
 - RP-Code and the Pile pipelines: `{args.candidate_report}`
-  (20,000 outputs, three round-robin repetitions).
+  (20,000 outputs by default; EuroParl uses 2,500 retained outputs; three
+  round-robin repetitions).
 {replacement_source}
 
-{valid} workloads have a valid DP-Cedar execution baseline. Pile EuroParl is
-excluded because its DP-Cedar run was invalidated by interference; Pile FreeLaw
-is excluded because it has no valid plans. Invalid workloads are not plotted.
+{valid} workloads have a valid DP-Cedar execution baseline. Pile FreeLaw is
+excluded because no valid formal profile was produced within the three-hour
+limit. Invalid workloads are not plotted.
 The per-workload x-axis is ordered by increasing logical Cedar operator count
 (excluding the source); ties retain the suite order.
 Cedar has valid execution plans on {summary['optimizer']['valid_optimizer_runs']}/{valid}

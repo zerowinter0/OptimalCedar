@@ -8,21 +8,22 @@ successful plotted cell contains three round-robin measured executions:
 - LLaVA, RP-C4, StackExchange, SimCLR(v2), and WikiText-103 variants:
   `evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core` (fixed W=8, three round-robin repetitions).
 - RP-Code and the Pile pipelines: `evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/data_pipeline_matrix.json`
-  (20,000 outputs, three round-robin repetitions).
+  (20,000 outputs by default; EuroParl uses 2,500 retained outputs; three
+  round-robin repetitions).
 - DP results for COCO and SimCLR(v2) variants: `evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/dp_no_wall_clock` (wall-clock correction removed; three repetitions).
 
-14 workloads have a valid DP-Cedar execution baseline. Pile EuroParl is
-excluded because its DP-Cedar run was invalidated by interference; Pile FreeLaw
-is excluded because it has no valid plans. Invalid workloads are not plotted.
+15 workloads have a valid DP-Cedar execution baseline. Pile FreeLaw is
+excluded because no valid formal profile was produced within the three-hour
+limit. Invalid workloads are not plotted.
 The per-workload x-axis is ordered by increasing logical Cedar operator count
 (excluding the source); ties retain the suite order.
-Cedar has valid execution plans on 9/14
+Cedar has valid execution plans on 9/15
 workloads and optimizer-timeout outcomes on the other valid-baseline pipelines.
 
 Headline values:
 
-- DP geomean speedup over DP-Cedar across all 14 valid-baseline workloads:
-  **1.334x**.
+- DP geomean speedup over DP-Cedar across all 15 valid-baseline workloads:
+  **1.391x**.
 - On the common 9 workloads where Cedar also completes,
   DP achieves **1.054x** over DP-Cedar.
 

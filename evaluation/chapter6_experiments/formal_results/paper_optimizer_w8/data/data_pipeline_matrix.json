@@ -2,7 +2,10 @@
   "protocol": {
     "threshold": 1.2,
     "candidate_repeats": 3,
-    "candidate_outputs": 20000,
+    "candidate_outputs": {
+      "default": 20000,
+      "pile_europarl": 2500
+    },
     "local_workers": 8,
     "cpu_budget": 64,
     "candidate_optimizer_set": [
@@ -16,7 +19,11 @@
       "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_prior_ledger",
       "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_code_selectivity",
       "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity"
-    ]
+    ],
+    "excluded_workloads": [
+      "pile_freelaw"
+    ],
+    "europarl_source": "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal"
   },
   "candidates": {
     "pile_europarl": {
@@ -42,95 +49,123 @@
               "file": "round1__optimizer.json",
               "status": "skipped",
               "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round2__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
+            },
+            {
+              "file": "round3__optimizer.json",
+              "status": "skipped",
+              "reason": "optimizer did not produce a valid plan"
             }
           ],
           "errors": [
             "plan__optimizer.json: optimizer_timeout: plan optimization exceeded 300s",
             "round1__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round2__optimizer.json: skipped: optimizer did not produce a valid plan",
+            "round3__optimizer.json: skipped: optimizer did not produce a valid plan",
             "plan result missing"
           ]
         },
         "dj_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": 2.946139261010103,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "unavailable",
-          "valid": false,
-          "formally_unavailable": true,
-          "source_infeasible": false,
-          "statuses": [
-            {
-              "file": "round1__dj_optimizer.json",
-              "status": "infeasible_timeout",
-              "reason": "execution exceeded 3600s"
-            }
+          "execution_times_sec": [
+            1837.251230443013,
+            1833.2974714100128,
+            1838.9901792230085
           ],
-          "errors": [
-            "round1__dj_optimizer.json: infeasible_timeout: execution exceeded 3600s"
-          ]
-        },
-        "dp_cedar_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": 5.8726071220007725,
+          "mean_execution_time_sec": 1836.5129603586781,
+          "stddev_execution_time_sec": 2.917278286194731,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 2.959886953001842,
           "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
+          "outcome": "success",
+          "valid": true,
           "formally_unavailable": false,
           "source_infeasible": false,
-          "statuses": [
-            {
-              "file": "round1__dp_cedar_optimizer.json",
-              "status": "invalid_interference",
-              "reason": "discarded because non-formal optimizer verification overlapped this execution"
-            }
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            3078.538772828062,
+            3086.0975484279916,
+            3072.0562356789596
           ],
-          "errors": [
-            "round1__dp_cedar_optimizer.json: invalid_interference: discarded because non-formal optimizer verification overlapped this execution"
-          ]
+          "mean_execution_time_sec": 3078.8975189783378,
+          "stddev_execution_time_sec": 7.027527305481273,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 6.112496682908386,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
         },
         "dp_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": 24.87170474798768,
+          "execution_times_sec": [
+            1226.0652575659333,
+            1230.451086494024,
+            1226.939293660922
+          ],
+          "mean_execution_time_sec": 1227.8185459069598,
+          "stddev_execution_time_sec": 2.321354611157238,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 29.052542070974596,
           "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
+          "outcome": "success",
+          "valid": true,
           "formally_unavailable": false,
           "source_infeasible": false,
           "statuses": [],
           "errors": []
         },
         "pecan_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": 2.954359258990735,
+          "execution_times_sec": [
+            2406.7465558859985,
+            2408.1998040518956,
+            2399.6687910049222
+          ],
+          "mean_execution_time_sec": 2404.871716980939,
+          "stddev_execution_time_sec": 4.564078394577783,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 2.9625831389566883,
           "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
+          "outcome": "success",
+          "valid": true,
           "formally_unavailable": false,
           "source_infeasible": false,
           "statuses": [],
           "errors": []
         }
       },
-      "workload_outcome": "invalid",
-      "valid": false,
-      "best_other_optimizer": null,
-      "best_other_execution_time_sec": null,
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 1836.5129603586781,
       "best_other_is_lower_bound": false,
-      "dp_speedup_over_best_other": null,
+      "dp_speedup_over_best_other": 1.495752744964518,
       "dp_speedup_is_lower_bound": false,
-      "dp_at_least_20pct_faster": false
+      "dp_at_least_20pct_faster": true
     },
     "redpajama_code": {
       "runs": {
@@ -536,98 +571,6 @@
       "dp_speedup_is_lower_bound": false,
       "dp_at_least_20pct_faster": true
     },
-    "pile_freelaw": {
-      "runs": {
-        "optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": null,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
-          "formally_unavailable": false,
-          "source_infeasible": false,
-          "statuses": [],
-          "errors": [
-            "plan result missing"
-          ]
-        },
-        "dj_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": null,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
-          "formally_unavailable": false,
-          "source_infeasible": false,
-          "statuses": [],
-          "errors": [
-            "plan result missing"
-          ]
-        },
-        "dp_cedar_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": null,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
-          "formally_unavailable": false,
-          "source_infeasible": false,
-          "statuses": [],
-          "errors": [
-            "plan result missing"
-          ]
-        },
-        "dp_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": null,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
-          "formally_unavailable": false,
-          "source_infeasible": false,
-          "statuses": [],
-          "errors": [
-            "plan result missing"
-          ]
-        },
-        "pecan_optimizer": {
-          "execution_times_sec": [],
-          "mean_execution_time_sec": null,
-          "stddev_execution_time_sec": null,
-          "processed_samples": [],
-          "optimization_time_sec": null,
-          "execution_time_lower_bound_sec": null,
-          "outcome": "invalid",
-          "valid": false,
-          "formally_unavailable": false,
-          "source_infeasible": false,
-          "statuses": [],
-          "errors": [
-            "plan result missing"
-          ]
-        }
-      },
-      "workload_outcome": "invalid",
-      "valid": false,
-      "best_other_optimizer": null,
-      "best_other_execution_time_sec": null,
-      "best_other_is_lower_bound": false,
-      "dp_speedup_over_best_other": null,
-      "dp_speedup_is_lower_bound": false,
-      "dp_at_least_20pct_faster": false
-    },
     "pile_uspto_backgrounds": {
       "runs": {
         "optimizer": {
@@ -892,16 +835,16 @@
       "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/cross_system_w8_latest.json"
     },
     "pile_europarl": {
-      "valid": false,
-      "best_other_optimizer": null,
-      "best_other_execution_time_sec": null,
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 1836.5129603586781,
       "best_other_is_lower_bound": false,
-      "dp_execution_time_sec": null,
-      "dp_speedup_over_best_other": null,
+      "dp_execution_time_sec": 1227.8185459069598,
+      "dp_speedup_over_best_other": 1.495752744964518,
       "dp_speedup_is_lower_bound": false,
-      "dp_at_least_20pct_faster": false,
-      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_prior_ledger",
-      "workload_outcome": "invalid"
+      "dp_at_least_20pct_faster": true,
+      "source": "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal",
+      "workload_outcome": "success"
     },
     "redpajama_code": {
       "valid": true,
@@ -939,18 +882,6 @@
       "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
       "workload_outcome": "success"
     },
-    "pile_freelaw": {
-      "valid": false,
-      "best_other_optimizer": null,
-      "best_other_execution_time_sec": null,
-      "best_other_is_lower_bound": false,
-      "dp_execution_time_sec": null,
-      "dp_speedup_over_best_other": null,
-      "dp_speedup_is_lower_bound": false,
-      "dp_at_least_20pct_faster": false,
-      "source": "/workspace/OptimalCedar/evaluation/chapter6_experiments/formal_results/datajuicer_candidate_runs/20260725T072333Z_selectivity",
-      "workload_outcome": "invalid"
-    },
     "pile_uspto_backgrounds": {
       "valid": true,
       "best_other_optimizer": "dj_optimizer",
@@ -965,10 +896,10 @@
     }
   },
   "summary": {
-    "total_workloads": 16,
-    "valid_workloads": 14,
-    "dp_20pct_wins": 5,
-    "fraction": 0.3125,
+    "total_workloads": 15,
+    "valid_workloads": 15,
+    "dp_20pct_wins": 6,
+    "fraction": 0.4,
     "target_fraction": 0.3,
     "minimum_wins_required": 5,
     "additional_wins_needed": 0,

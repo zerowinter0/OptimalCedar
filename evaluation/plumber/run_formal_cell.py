@@ -74,7 +74,12 @@ def main():
     optimizer.apply_parallelism()
     if args.cache:
         optimizer.apply_cache(add_take_repeat=False)
-    optimized = optimizer.instantiate_pipeline().batch(1)
+    optimized = optimizer.instantiate_pipeline()
+    # SimCLR-v2 already yields one batched image tensor. Adding another batch
+    # dimension makes Plumber's minibatch-rate normalization count each image
+    # batch as one sample and understates throughput.
+    if args.dataset_file.parent.name != "simclrv2":
+        optimized = optimized.batch(1)
     analyzed = tf.data.Options()
     gen_util.add_analysis_to_dataset_options(analyzed, hard_fail=True)
     optimized = optimized.with_options(analyzed)

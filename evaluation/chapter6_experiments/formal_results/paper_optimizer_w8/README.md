@@ -11,13 +11,17 @@ Pecan, DP (ours), and Cedar. The obsolete two-stage optimizer is excluded.
 - `data/dp_no_wall_clock/`: replacement DP measurements for COCO and the two
   SimCLR-v2 workloads after removal of the wall-clock cost correction.
 - `data/data_pipeline_matrix.json`: RP-Code and Pile aggregate measurements.
+- `data/europarl_formal/`: the three-round EuroParl run selected after the
+  feasibility sweep (2,500 retained outputs). FreeLaw is excluded because a
+  valid formal profile could not be produced even with a three-hour limit.
 - `profiles/`: the exact profiles used to create the plans.
 - `figures/`: current PDF, SVG, PNG, and source TSV figure artifacts.
 - `MANIFEST.tsv`: size and SHA-256 checksum of every archived file.
 
 All plotted successful executions contain three measurements. Experiments use
 W=8 and a 64-CPU budget. COCO uses 50,000 `train2017` samples; SimCLR-v2 uses
-all 9,469 files. Cache workloads are measured only after a separate warmup.
+all 9,469 files; EuroParl uses 2,500 retained outputs. Cache workloads are
+measured only after a separate warmup.
 
 ## Reproduce the figures
 
