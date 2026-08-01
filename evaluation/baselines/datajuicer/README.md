@@ -14,6 +14,14 @@ itself is an ignored nested checkout pinned to
 `versions.lock.json` and `bootstrap_datajuicer.sh`; record both revisions in
 every experiment result.
 
+The reproducible baseline image is built by
+`docker/baselines/datajuicer-pinned.Dockerfile`. It uses the locally archived
+CUDA 12.2 Data-Juicer image for system/model dependencies and installs the
+exact pinned checkout as a `PYTHONPATH` source overlay. The build verifies the
+base environment with `pip check` and confirms that both Python and
+`dj-process` resolve that overlay; the formal runner verifies the checkout and
+OCI revision label, then records the resulting immutable image ID.
+
 The C4 and StackExchange upstream recipes include a final
 `document_simhash_deduplicator`. OptimalCedar's compared Cedar workloads omit
 that global, cross-sample operator because it is outside Cedar's per-sample

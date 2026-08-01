@@ -299,6 +299,13 @@ def get_address():
     return os.environ.get("FASTFLOW_LOCAL_ADDRESS", "127.0.0.1")
 
 
+# FastFlow's metric profiler obtains the dispatcher host through this helper.
+# ``hostname -I`` can return multiple space-separated interfaces on a Docker
+# host, which produces an invalid gRPC endpoint such as "IP1 IP2:5000".
+# Keep every in-process FastFlow component on the same explicit interface.
+ff_utils.get_address = get_address
+
+
 def launch_local_worker(num_local_workers, dispatcher_addr, worker_base_port):
     print("Launch local worker")
     num_workers = num_local_workers

@@ -2,6 +2,7 @@ import pathlib
 import librosa
 import numpy as np
 import glob
+import math
 import random
 
 import ray
@@ -89,8 +90,13 @@ class Timer:
         return self._end - self._start
 
 
-def build_ds(root):
-    files = glob.glob(f"{str(root)}/**/*.mp3", recursive=True)
+def build_ds(root, num_total_samples=None):
+    files = sorted(glob.glob(f"{str(root)}/**/*.mp3", recursive=True))
+    if not files:
+        raise FileNotFoundError(f"No MP3 files found under {root}")
+    if num_total_samples is not None:
+        repeats = max(1, math.ceil(num_total_samples / len(files)))
+        files = (files * repeats)[:num_total_samples]
     # Get list of dirs
     ds = ray.data.from_items(files)
     ds = ds.map(_read)
@@ -110,7 +116,10 @@ def get_dataset(spec=None):
         data_dir = (
             pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
         )
-    ds = build_ds(str(data_dir))
+    num_total_samples = (
+        None if spec is None else spec.num_total_samples
+    )
+    ds = build_ds(str(data_dir), num_total_samples=num_total_samples)
 
     return ds
 

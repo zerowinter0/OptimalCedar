@@ -5,7 +5,7 @@ project_name: optimalcedar-redpajama-c4
 dataset_path: /workspace/OptimalCedar/datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl
 export_path: /tmp/optimalcedar-datajuicer/redpajama_c4.jsonl
 np: 64
-text_keys: raw_content
+text_keys: text
 
 executor_type: default
 auto_op_parallelism: false

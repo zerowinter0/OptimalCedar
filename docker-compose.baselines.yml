@@ -2,11 +2,13 @@ services:
   datajuicer:
     container_name: optimalcedar-datajuicer
     build:
-      context: ./data-juicer
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/baselines/datajuicer-pinned.Dockerfile
       network: host
+      args:
+        DATAJUICER_COMMIT: bb3d88aac183cc22b6f816262a812a9e5d5abb57
     image: optimalcedar-datajuicer:v1.5.3-bb3d88aac1
-    working_dir: /data-juicer
+    working_dir: /opt/data-juicer
     command: tail -f /dev/null
     tty: true
     stdin_open: true
@@ -19,7 +21,6 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
-      - ./data-juicer:/data-juicer
       - ./evaluation/baselines/datajuicer:/optimalcedar-configs:ro
       - .:/workspace/OptimalCedar:ro
       - ./evaluation/baselines/results:/workspace/OptimalCedar/evaluation/baselines/results

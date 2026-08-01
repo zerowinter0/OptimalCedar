@@ -5,7 +5,7 @@ project_name: optimalcedar-stackexchange
 dataset_path: /workspace/OptimalCedar/datasets/stackexchange/redpajama-stackexchange-35000.jsonl
 export_path: /tmp/optimalcedar-datajuicer/stackexchange.jsonl
 np: 64
-text_keys: raw_content
+text_keys: text
 
 executor_type: default
 auto_op_parallelism: false

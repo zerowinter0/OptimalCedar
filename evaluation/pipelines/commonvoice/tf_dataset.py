@@ -1,5 +1,6 @@
 import tensorflow as tf
 import pathlib
+import math
 import librosa
 import random
 import numpy as np
@@ -18,7 +19,7 @@ def time_mask(x):
     t = np.random.uniform(low=0.0, high=TIME_MASK_PARAM)
     t = int(t)
     tau = x.shape[1]
-    t0 = random.randint(0, tau - t)
+    t0 = random.randint(0, max(0, tau - t))
     x[:, t0 : t0 + t] = 0
     return x
 
@@ -68,6 +69,9 @@ def build_dataset(data_dir, spec):
     if not paths:
         raise FileNotFoundError(f"No MP3 files found under {data_dir}")
     ds = tf.data.Dataset.from_tensor_slices(paths)
+    if spec.num_total_samples is not None:
+        repeats = max(1, math.ceil(spec.num_total_samples / len(paths)))
+        ds = ds.repeat(repeats)
     map_kwargs = {"num_parallel_calls": spec.num_parallel_calls}
     if spec.kwargs.get("fastflow"):
         map_kwargs["name"] = "prep_begin"

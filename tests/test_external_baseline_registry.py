@@ -91,6 +91,15 @@ def test_datajuicer_recipe_operator_order_matches_shared_workloads():
         ]
 
 
+def test_datajuicer_recipes_use_the_formal_dataset_text_field():
+    for workload in ("llava_pretrain", "redpajama_c4", "stackexchange"):
+        entry = get_entry("datajuicer", workload)
+        config = yaml.safe_load(
+            (REPO_ROOT / entry.implementation).read_text(encoding="utf-8")
+        )
+        assert config["text_keys"] == "text"
+
+
 def test_opaque_fm_tensorflow_pipelines_are_not_claimed_by_graph_optimizers():
     for workload in (
         "llava_pretrain",
@@ -113,3 +122,10 @@ def test_redpajama_tensorflow_w8_python_udf_is_marked_infeasible():
     assert entry.status == "unsupported"
     assert entry.backend == "tf_py_function"
     assert "W=8" in entry.reason
+
+
+def test_wikitext_flatmap_source_is_unsupported_by_plumber():
+    for workload in ("wikitext103", "wikitext103_cache"):
+        entry = get_entry("plumber", workload)
+        assert entry.status == "unsupported"
+        assert "FlatMap" in entry.reason

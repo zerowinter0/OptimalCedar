@@ -1,4 +1,5 @@
 import pathlib
+import math
 import torch
 import torchdata.datapipes as dp
 import librosa
@@ -24,7 +25,7 @@ def time_mask(x):
     t = np.random.uniform(low=0.0, high=TIME_MASK_PARAM)
     t = int(t)
     tau = x.shape[1]
-    t0 = random.randint(0, tau - t)
+    t0 = random.randint(0, max(0, tau - t))
     x[:, t0 : t0 + t] = 0
     return x
 
@@ -45,7 +46,13 @@ def mel(x):
 
 
 def build_datapipe(root, spec: TorchEvalSpec):
-    datapipe = dp.iter.FileLister(root=root, recursive=True)
+    paths = sorted(str(path) for path in pathlib.Path(root).rglob("*.mp3"))
+    if not paths:
+        raise FileNotFoundError(f"No MP3 files found under {root}")
+    repeats = 1
+    if spec.num_total_samples is not None:
+        repeats = max(1, math.ceil(spec.num_total_samples / len(paths)))
+    datapipe = dp.iter.IterableWrapper(paths).cycle(repeats)
     # TODO: Evaluate where is a fair place to put this...
     datapipe = datapipe.sharding_filter()
     datapipe = dp.iter.Mapper(datapipe, lambda x: librosa.load(x))

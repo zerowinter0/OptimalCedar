@@ -35,10 +35,12 @@ class RayEvalSpec:
         *,
         batch_size: int,
         num_workers: int,
+        num_total_samples: Optional[int],
         kwargs: Dict[str, Any],
     ):
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.num_total_samples = num_total_samples
         self.kwargs = dict(kwargs)
 
 
@@ -162,6 +164,7 @@ def _build_dataset(args: argparse.Namespace, entry):
     spec = RayEvalSpec(
         batch_size=args.batch_size,
         num_workers=args.workers,
+        num_total_samples=args.num_samples,
         kwargs=kwargs,
     )
     if len(inspect.signature(getter).parameters) == 0:

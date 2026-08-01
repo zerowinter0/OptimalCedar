@@ -85,6 +85,13 @@ def main():
     optimized = optimized.with_options(analyzed)
     optimization_time = time.perf_counter() - optimization_start
 
+    cache_warmup_time = 0.0
+    if args.cache:
+        cache_warmup_start = time.perf_counter()
+        for _ in optimized:
+            pass
+        cache_warmup_time = time.perf_counter() - cache_warmup_start
+
     measurement_start = time.perf_counter()
     summary = gen_util.benchmark_dataset(
         optimized, time_limit_s=args.benchmark_seconds
@@ -97,6 +104,7 @@ def main():
         "num_samples": args.num_samples,
         "profile_time_sec": profile_time,
         "optimization_time_sec": optimization_time,
+        "cache_warmup_time_sec": cache_warmup_time,
         "measured_benchmark_time_sec": measured_benchmark_time,
         "throughput_samples_per_sec": throughput,
         "measured_time_sec": args.num_samples / throughput if throughput > 0 else None,
