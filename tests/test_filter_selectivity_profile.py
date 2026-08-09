@@ -1,5 +1,7 @@
 from typing import List
 
+import pytest
+
 from cedar.client import DataSet
 from cedar.client import dataset as dataset_module
 from cedar.client.dataset import (
@@ -11,6 +13,7 @@ from cedar.config import CedarContext
 from cedar.pipes import (
     FilterPipe,
     InProcessPipeVariantContext,
+    MapperPipe,
     Pipe,
 )
 from cedar.sources import IterSource
@@ -193,3 +196,38 @@ def test_mutated_profile_pass_also_records_filter_selectivity(
     assert result["selectivities"][second_id] == 0.5
     assert tagged["first"].fn is first_filter
     assert tagged["second"].fn is second_filter
+
+
+def test_profile_releases_workload_resources_after_operator_failure(
+    monkeypatch,
+):
+    def fail(_value):
+        raise RuntimeError("operator failure")
+
+    class ReleasingFeature(Feature):
+        def __init__(self):
+            super().__init__()
+            self.release_count = 0
+
+        def _compose(self, source_pipes: List[Pipe]):
+            return MapperPipe(source_pipes[0], fail)
+
+        def release_profile_resources(self):
+            self.release_count += 1
+
+    feature = ReleasingFeature()
+    feature.apply(IterSource([1]))
+    dataset = object.__new__(DataSet)
+    dataset.ctx = CedarContext()
+    monkeypatch.setattr(dataset_module.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(RuntimeError, match="operator failure"):
+        dataset._profile_feature(
+            "feature",
+            feature,
+            n_samples=1,
+            mutation_dict=None,
+        )
+
+    assert feature.release_count == 1
+    assert not feature.loaded

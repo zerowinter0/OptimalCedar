@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_warmup_time_sec": 0.0,
+  "datajuicer_git": {
+    "commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+    "dirty": false
+  },
+  "entry": {
+    "backend": "native",
+    "cache_policy": "not_requested",
+    "execution_env": "optimalcedar-torch201-dev",
+    "implementation": "evaluation/pipelines/simclrv2/ray_dataset.py",
+    "reason": null,
+    "status": "supported",
+    "system": "ray",
+    "workload": "simclrv2"
+  },
+  "measured_time_sec": 34.900409072986804,
+  "num_samples": 9469,
+  "optimalcedar_git": {
+    "commit": "65ec839add7a972d9d62453d545fcc95128995bb",
+    "dirty": true
+  },
+  "schema_version": 1,
+  "setup_time_sec": 1.5000166019890457,
+  "system": "ray",
+  "throughput_samples_per_sec": 271.3148714159079,
+  "versions": {
+    "python": "3.10.12",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torch": "2.0.1+cu118"
+  },
+  "workers": 8,
+  "workload": "simclrv2"
+}

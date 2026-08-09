@@ -9,8 +9,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
-PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/paper_optimizer_w8/profiles}"
-MATRIX_OUTPUT_ROOT="${MATRIX_OUTPUT_ROOT:-${BASE_DIR}}"
+PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/paper_artifacts/optimizer/profiles}"
+MATRIX_OUTPUT_ROOT="${MATRIX_OUTPUT_ROOT:-${REPO_ROOT}/outputs/chapter6_experiments/optimizer_matrix}"
 RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
 CPU_BUDGET="${CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
@@ -28,9 +28,9 @@ usage() {
   cat <<'EOF'
 Usage: run_w8_plan_and_matrix.sh [--workloads workload[,workload...]]
 
-Default: run all workloads. Selected names: coco, commonvoice,
+Default: run all workloads. Selected names: alpaca_cot, redpajama_arxiv, coco, commonvoice,
 commonvoice_cache, llava_pretrain, redpajama_c4, simclrv2, simclrv2_cache,
-wikitext103, wikitext103_cache, stackexchange.
+wikitext103, wikitext103_cache, stackexchange, general_video_refine.
 
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
 dp_optimizer. OPTIMIZER_SET=paper runs the five optimizers in the current
@@ -193,11 +193,12 @@ write_metadata() {
     printf 'repeats=%s\n' "${REPEATS}"
     printf 'optimizer_plan_timeout_sec=%s\n' "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
     printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
+    printf 'execution_timeout_policy=skip_remaining_repeats_and_continue_matrix\n'
     printf 'cache=%s\n' "${cache_mode}"
     printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     printf 'dataset_kwargs=%s\n' "${kwargs}"
-    if [[ "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
+    if [[ "${workload}" == "alpaca_cot" || "${workload}" == "redpajama_arxiv" || "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
       printf 'data_juicer_reference_commit=%s\n' \
         "$(git -C data-juicer -c safe.directory="${REPO_ROOT}/data-juicer" rev-parse HEAD)"
     fi
@@ -210,6 +211,26 @@ write_metadata() {
     if [[ "${workload}" == "stackexchange" ]]; then
       printf 'scale_note=bounded_unique_redpajama_stackexchange_35000_source_for_10000_outputs\n'
       printf 'omitted_operator=document_simhash_deduplicator\n'
+    fi
+    if [[ "${workload}" == "alpaca_cot" ]]; then
+      printf 'data_source=QingyiSi/Alpaca-CoT@18add89e3b884703ec869a5c6e2bcf1412ee7edc/Chain-of-Thought/CoT_data.json\n'
+      printf 'operator_count=8\n'
+      printf 'scenario=instruction_reasoning\n'
+      printf 'omitted_operators=document_deduplicator,document_simhash_deduplicator\n'
+    fi
+    if [[ "${workload}" == "redpajama_arxiv" ]]; then
+      printf 'data_source=togethercomputer/RedPajama-Data-1T@398f92572e94f4793e41c22ab7ea2a788d9e7de4/arxiv_source_order_3gib_prefix\n'
+      printf 'operator_count=18\n'
+      printf 'scenario=scientific_latex_document_cleaning\n'
+      printf 'omitted_operator=document_simhash_deduplicator\n'
+    fi
+    if [[ "${workload}" == "general_video_refine" ]]; then
+      printf 'data_source=nisav/MSR-VTT@a9c822473969ee469e224da2187fda193c62e960\n'
+      printf 'data_juicer_recipe=datajuicer/data-juicer-hub@47fc34588b5d4258c13747cea37c2b63cf4e11b0/refined_recipes/video/general-video-refine-example.yaml\n'
+      printf 'operator_count=7\n'
+      printf 'scenario=general_video_text_quality_refinement\n'
+      printf 'gpu=single_RTX_A6000_shared_by_all_optimizers\n'
+      printf 'sample_construction=caption_round_then_numeric_video_id\n'
     fi
     if [[ "${workload}" == "wikitext103" || "${workload}" == "wikitext103_cache" ]]; then
       printf 'scale_note=reduced_protocol_100000_line_prefix\n'
@@ -273,6 +294,58 @@ generate_plan() {
     return "${status}"
   fi
   [[ -f "${TMP_PLAN}" ]] || {
+    # compare_optimizer_perf may enforce its own optimizer limit and return
+    # successfully with a structured unavailable result but no plan. Record
+    # that optimizer as unavailable and continue the matrix.
+    if [[ -s "${result}" ]] && python - "${result}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1]) as handle:
+    payload = json.load(handle)
+records = payload if isinstance(payload, list) else [payload]
+if not any(
+    isinstance(record, dict)
+    and (
+        record.get("workload_skipped") is True
+        or
+        record.get("status") in {"unavailable", "skipped"}
+        or record.get("skip_reason")
+        or any(
+            isinstance(run, dict) and run.get("skip_reason")
+            for run in record.get("runs", [])
+        )
+    )
+    for record in records
+):
+    raise SystemExit(1)
+PY
+    then
+      python - "${optimizer}" "${result}" \
+        "${root}/plans/${optimizer}.unavailable.json" <<'PY'
+import json
+import sys
+
+optimizer, result_path, output_path = sys.argv[1:]
+with open(result_path) as handle:
+    payload = json.load(handle)
+with open(output_path, "w") as handle:
+    json.dump(
+        {
+            "optimizer": optimizer,
+            "status": "unavailable",
+            "reason": "optimizer_reported_unavailable",
+            "plan_only_result": payload,
+        },
+        handle,
+        indent=2,
+    )
+    handle.write("\n")
+PY
+      echo "[$(date -Is)] UNAVAILABLE ${workload}/${optimizer}: optimizer returned no plan" \
+        | tee -a "${root}/nohup.log"
+      return 0
+    fi
     echo "Plan generation produced no ${TMP_PLAN}" >&2
     return 1
   }
@@ -405,6 +478,7 @@ run_workload() {
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local optimizer round offset i tag
   local -a available_optimizers=()
+  local -A execution_timed_out=()
 
   if ! workload_selected "${workload}"; then
     echo "[$(date -Is)] SKIP ${workload}: not selected by --workloads"
@@ -467,6 +541,27 @@ run_workload() {
       optimizer="${OPTIMIZERS[$(((offset + i) % ${#OPTIMIZERS[@]}))]}"
       [[ -f "${root}/plans/${optimizer}.yaml" ]] || continue
       tag="round${round}__${optimizer}"
+      if [[ -f "${root}/results/${tag}.timeout.json" ]]; then
+        execution_timed_out["${optimizer}"]=1
+        echo "[$(date -Is)] REUSE ${workload}/${tag} execution timeout" \
+          | tee -a "${root}/nohup.log"
+        continue
+      fi
+      if [[ -n "${execution_timed_out[${optimizer}]:-}" ]]; then
+        printf '{\n  "optimizer": "%s",\n  "repeat": %s,\n' \
+          "${optimizer}" "${round}" \
+          > "${root}/results/${tag}.skipped.json"
+        printf '  "status": "skipped_after_timeout",\n' \
+          >> "${root}/results/${tag}.skipped.json"
+        printf '  "skip_reason": "earlier_repeat_execution_timeout",\n' \
+          >> "${root}/results/${tag}.skipped.json"
+        printf '  "execution_timeout_sec": %s\n}\n' \
+          "${EXECUTION_TIMEOUT_SEC}" \
+          >> "${root}/results/${tag}.skipped.json"
+        echo "[$(date -Is)] SKIP ${workload}/${tag}: earlier repeat timed out" \
+          | tee -a "${root}/nohup.log"
+        continue
+      fi
       if [[ "${RESUME_EXISTING}" == "1" && \
             -f "${root}/results/${tag}.json" ]]; then
         echo "[$(date -Is)] REUSE ${workload}/${tag} result" \
@@ -490,11 +585,28 @@ run_workload() {
         unset CEDAR_CACHE_SHARD
       fi
       echo "[$(date -Is)] RUN ${workload}/${tag}" | tee -a "${root}/nohup.log"
-      if ! run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
-          "${root}/results/${tag}.json" \
-          "${root}/logs/${tag}.log" "${args[@]}"; then
-        echo "Execution failed or exceeded ${EXECUTION_TIMEOUT_SEC}s for ${workload}/${tag}" >&2
-        return 1
+      set +e
+      run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
+        "${root}/results/${tag}.json" \
+        "${root}/logs/${tag}.log" "${args[@]}"
+      local execution_status=$?
+      set -e
+      if [[ "${execution_status}" -eq 124 ]]; then
+        printf '{\n  "optimizer": "%s",\n  "repeat": %s,\n' \
+          "${optimizer}" "${round}" \
+          > "${root}/results/${tag}.timeout.json"
+        printf '  "status": "timeout",\n  "reason": "execution_timeout",\n' \
+          >> "${root}/results/${tag}.timeout.json"
+        printf '  "execution_timeout_sec": %s\n}\n' \
+          "${EXECUTION_TIMEOUT_SEC}" \
+          >> "${root}/results/${tag}.timeout.json"
+        execution_timed_out["${optimizer}"]=1
+        echo "[$(date -Is)] TIMEOUT ${workload}/${tag}: exceeded ${EXECUTION_TIMEOUT_SEC}s" \
+          | tee -a "${root}/nohup.log"
+        continue
+      elif [[ "${execution_status}" -ne 0 ]]; then
+        echo "Execution failed for ${workload}/${tag}; see ${root}/logs/${tag}.log" >&2
+        return "${execution_status}"
       fi
       validate_result "${root}/results/${tag}.json" "${samples}"
       echo "[$(date -Is)] DONE ${workload}/${tag}" | tee -a "${root}/nohup.log"
@@ -530,6 +642,18 @@ run_workload stackexchange \
   evaluation/pipelines/stackexchange/cedar_dataset.py \
   "${PROFILE_DIR}/stackexchange.yaml" 10000 off \
   "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl"
+run_workload alpaca_cot \
+  evaluation/pipelines/alpaca_cot/cedar_dataset.py \
+  "${PROFILE_DIR}/alpaca_cot.yaml" 20000 off \
+  "dataset_path=datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl"
+run_workload redpajama_arxiv \
+  evaluation/pipelines/redpajama_arxiv/cedar_dataset.py \
+  "${PROFILE_DIR}/redpajama_arxiv.yaml" 20000 off \
+  "dataset_path=datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl"
+run_workload general_video_refine \
+  evaluation/pipelines/general_video_refine/cedar_dataset.py \
+  "${PROFILE_DIR}/general_video_refine.yaml" 10000 off \
+  "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos"
 run_workload simclrv2 \
   evaluation/pipelines/simclrv2/cedar_dataset.py \
   "${PROFILE_DIR}/simclrv2.yaml" 9469 off ""

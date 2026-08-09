@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 import statistics
@@ -40,7 +39,6 @@ SERIES = [
     ("pytorch", "PyTorch", "#D55E00", "\\\\\\"),
     ("tensorflow", "tf.data", "#CC79A7", "---"),
     ("ray", "Ray Data", "#009E73", "xxx"),
-    ("datajuicer", "Data-Juicer", "#E69F00", "..."),
     ("plumber", "Plumber", "#56B4E9", "+++"),
     ("fastflow", "FastFlow", "#000000", "ooo"),
 ]
@@ -192,9 +190,6 @@ def build_report(run_root: Path, optimizer_tsv: Path) -> dict:
             "cell_timeout_sec": 3600,
             "excluded_workload": "pile_freelaw",
             "speedup_definition": "PICO execution time / system execution time",
-            "datajuicer_note": (
-                "retained-output throughput normalized from end-to-end wall time"
-            ),
         },
         "workloads": workloads,
     }
@@ -296,7 +291,7 @@ def render(report: dict, output_dir: Path) -> None:
     fig.text(
         0.995,
         0.005,
-        "| unsupported; × timeout/unavailable. Data-Juicer uses normalized retained-output throughput.",
+        "| unsupported; × timeout/unavailable.",
         ha="right",
         va="bottom",
         fontsize=5.8,
@@ -346,19 +341,6 @@ def write_tsv(report: dict, path: Path) -> None:
                 )
 
 
-def write_manifest(root: Path) -> None:
-    rows = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name == "MANIFEST.tsv":
-            continue
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        rows.append((digest, path.stat().st_size, path.relative_to(root)))
-    with (root / "MANIFEST.tsv").open("w", encoding="utf-8") as stream:
-        stream.write("sha256\tbytes\tpath\n")
-        for digest, size, relative in rows:
-            stream.write(f"{digest}\t{size}\t{relative}\n")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-root", type=Path, required=True)
@@ -372,7 +354,6 @@ def main() -> None:
     )
     write_tsv(report, args.output_dir / "cross_system_data.tsv")
     render(report, args.output_dir)
-    write_manifest(args.run_root)
     print(args.output_dir)
 
 

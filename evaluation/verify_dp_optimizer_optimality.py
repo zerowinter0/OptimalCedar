@@ -135,6 +135,16 @@ def _is_legal_order(
     return all(positions[pred] < positions[succ] for pred, succ in dependencies)
 
 
+def _effective_dependencies(
+    case: GeneratedCase,
+) -> Tuple[Tuple[int, int], ...]:
+    """Add the Cedar Feature sink invariant to generated dependencies."""
+    output = len(case.operators) - 1
+    return tuple(
+        sorted(set(case.dependencies) | {(i, output) for i in range(output)})
+    )
+
+
 def _partition_order(
     order: Tuple[int, ...], boundary_mask: int
 ) -> Tuple[Tuple[int, ...], ...]:
@@ -202,7 +212,7 @@ def exhaustive_oracle(
     legal_orders = 0
     enumerated_plans = 0
     for order in itertools.permutations(range(NUM_OPERATORS)):
-        if not _is_legal_order(order, case.dependencies):
+        if not _is_legal_order(order, _effective_dependencies(case)):
             continue
         legal_orders += 1
         for boundary_mask in range(1 << (NUM_OPERATORS - 1)):
@@ -413,10 +423,11 @@ def verify_case(
         parallel_stage_limit=parallel_stage_limit,
     )
 
-    if not _is_legal_order(dp_order, case.dependencies):
+    effective_dependencies = _effective_dependencies(case)
+    if not _is_legal_order(dp_order, effective_dependencies):
         raise AssertionError(
             f"DpOptimizer returned an illegal order: seed={case.seed}, "
-            f"order={dp_order}, dependencies={case.dependencies}"
+            f"order={dp_order}, dependencies={effective_dependencies}"
         )
     if not math.isclose(dp_cost, oracle.cost, rel_tol=rel_tol, abs_tol=abs_tol):
         raise AssertionError(
@@ -452,6 +463,12 @@ def main() -> None:
         type=Path,
         default=Path("evaluation/failed_dp_optimality_case.json"),
     )
+    parser.add_argument(
+        "--summary-json",
+        type=Path,
+        default=None,
+        help="Optional machine-readable aggregate result.",
+    )
     args = parser.parse_args()
 
     if args.num_cases <= 0:
@@ -459,6 +476,8 @@ def main() -> None:
 
     print(f"unconstrained_plan_count={unconstrained_plan_count()}")
     seed_rng = random.Random(args.seed)
+    total_legal_orders = 0
+    total_enumerated_plans = 0
     for case_index in range(args.num_cases):
         case_seed = seed_rng.randrange(0, 2**63)
         case = generate_case(case_seed, args.max_dependencies)
@@ -480,11 +499,34 @@ def main() -> None:
             f"enumerated_plans={result.oracle.enumerated_plans} "
             f"cost={result.dp_cost:.12f}"
         )
+        total_legal_orders += result.oracle.legal_orders
+        total_enumerated_plans += result.oracle.enumerated_plans
 
     print(
         f"PASS: DpOptimizer matched the exhaustive optimum in "
         f"all {args.num_cases} generated cases."
     )
+    if args.summary_json is not None:
+        args.summary_json.parent.mkdir(parents=True, exist_ok=True)
+        args.summary_json.write_text(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "num_operators": NUM_OPERATORS,
+                    "num_cases": args.num_cases,
+                    "seed": args.seed,
+                    "max_dependencies": args.max_dependencies,
+                    "backends": list(BACKENDS),
+                    "passes": ["reorder", "fusion", "offload"],
+                    "cache_enabled": False,
+                    "total_legal_orders": total_legal_orders,
+                    "total_enumerated_plans": total_enumerated_plans,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
 if __name__ == "__main__":
     main()

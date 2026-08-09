@@ -6,7 +6,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 CONTAINER_REPO=/workspace/OptimalCedar
-RUN_ROOT="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_cross_system_w8"
+RUN_ROOT="${RUN_ROOT:-${REPO_ROOT}/outputs/chapter6_experiments/cross_system_w8}"
 RUN_REL="${RUN_ROOT#${REPO_ROOT}/}"
 CONTAINER_RUN_ROOT="${CONTAINER_REPO}/${RUN_REL}"
 CEDAR_CONTAINER="${CEDAR_CONTAINER:-optimalcedar-torch201-dev}"
@@ -17,7 +17,6 @@ WORKERS=8
 CPU_BUDGET=64
 REPEATS=3
 RESUME="${RESUME:-0}"
-DATAJUICER_COMMIT=bb3d88aac183cc22b6f816262a812a9e5d5abb57
 
 WORKLOADS=(
   coco commonvoice commonvoice_cache llava_pretrain redpajama_c4
@@ -25,7 +24,7 @@ WORKLOADS=(
   redpajama_code pile_hackernews pile_pubmed_abstracts
   pile_uspto_backgrounds pile_europarl
 )
-SYSTEMS=(pytorch tensorflow ray datajuicer plumber fastflow)
+SYSTEMS=(pytorch tensorflow ray plumber fastflow)
 
 if [[ "${RESUME}" != 0 && "${RESUME}" != 1 ]]; then
   echo "RESUME must be 0 or 1" >&2
@@ -146,12 +145,6 @@ unsupported_reason() {
         return 0
       }
       ;;
-    datajuicer)
-      case "${workload}" in
-        llava_pretrain|redpajama_c4|stackexchange) ;;
-        *) echo "no semantically equivalent native Data-Juicer reference recipe"; return 0 ;;
-      esac
-      ;;
     plumber)
       case "${base}" in
         coco|commonvoice|simclrv2) ;;
@@ -202,6 +195,7 @@ run_native() {
   [[ -n "${IMAGE_ROOT}" ]] && args+=(--image-root "${IMAGE_ROOT}")
   echo "[$(date -Is)] RUN ${workload}/round${round}/${system} outputs=${samples}"
   docker exec -i -e TF_CPP_MIN_LOG_LEVEL=2 -e PYTHONWARNINGS=ignore \
+    -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 \
     "${CEDAR_CONTAINER}" bash -lc '
       cd /workspace/OptimalCedar
       source env/bin/activate
@@ -251,6 +245,7 @@ run_fastflow() {
   mkdir -p "$(dirname "${result}")"
   echo "[$(date -Is)] RUN ${workload}/round${round}/fastflow outputs=${samples}"
   docker exec -i -e PYTHONPATH="${CONTAINER_REPO}" -e COCO_SPLIT=train2017 \
+    -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 \
     -w "${CONTAINER_REPO}" "${FASTFLOW_CONTAINER}" \
     timeout --signal=TERM --kill-after=30s "${CELL_TIMEOUT_SEC}" \
     python evaluation/fastflow/examples/eval_app_runner.py \
@@ -275,66 +270,19 @@ PY
   record_exit "${workload}" "${round}" fastflow "${code}" "${result}"
 }
 
-run_datajuicer() {
-  local workload="$1" round="$2" samples="$3"
-  local result="${RUN_ROOT}/results/${workload}/round${round}__datajuicer.json"
-  local artifact="${RUN_ROOT}/artifacts/${workload}/round${round}__datajuicer.jsonl"
-  local container_artifact="${CONTAINER_RUN_ROOT}/artifacts/${workload}/round${round}__datajuicer.jsonl"
-  local log="${RUN_ROOT}/logs/${workload}__round${round}__datajuicer.log"
-  local container_name="optimalcedar-dj-${workload//_/-}-round${round}"
-  local np=8
-  [[ "${workload}" == llava_pretrain ]] && np=1
-  mkdir -p "$(dirname "${result}")" "$(dirname "${artifact}")"
-  echo "[$(date -Is)] RUN ${workload}/round${round}/datajuicer outputs=${samples}"
-  local start end code image_id
-  image_id="$(docker image inspect optimalcedar-datajuicer:v1.5.3-bb3d88aac1 --format '{{.Id}}')"
-  start="$(date +%s.%N)"
-  timeout --signal=TERM --kill-after=30s "${CELL_TIMEOUT_SEC}" \
-    docker compose -f "${REPO_ROOT}/docker-compose.baselines.yml" run --rm \
-      --name "${container_name}" \
-      -v "${RUN_ROOT}:${CONTAINER_RUN_ROOT}" datajuicer \
-      dj-process --config "/optimalcedar-configs/${workload}.yaml" \
-      --dataset_path "/workspace/OptimalCedar/${DATASET_PATH}" \
-      --export_path "${container_artifact}" --np "${np}" \
-      > "${log}" 2>&1
-  code=$?
-  # Killing the Compose client on timeout does not reliably stop its detached
-  # engine-side container. Remove only this explicitly named benchmark cell.
-  docker rm -f "${container_name}" >/dev/null 2>&1 || true
-  end="$(date +%s.%N)"
-  if [[ "${code}" -eq 0 && -s "${artifact}" ]]; then
-    cedar_exec python - "${container_artifact}" "${CONTAINER_RUN_ROOT}/results/${workload}/round${round}__datajuicer.json" \
-      "${workload}" "${samples}" "${start}" "${end}" "${image_id}" <<'PY' >> "${log}" 2>&1 || code=$?
-import json,sys
-artifact,result,workload=sys.argv[1:4]
-target=int(sys.argv[4]); wall=float(sys.argv[6])-float(sys.argv[5])
-image_id=sys.argv[7]
-with open(artifact,encoding="utf-8") as f: outputs=sum(1 for _ in f)
-if outputs<=0 or wall<=0: raise SystemExit("invalid Data-Juicer output")
-p={"schema_version":1,"system":"datajuicer","workload":workload,
-   "num_samples":target,"processed_outputs":outputs,"full_run_wall_time_sec":wall,
-   "measured_time_sec":wall*target/outputs,
-   "measurement_kind":"retained-output-throughput normalized from end-to-end wall time",
-   "datajuicer_commit":"bb3d88aac183cc22b6f816262a812a9e5d5abb57",
-   "container_image_id":image_id}
-open(result,"w").write(json.dumps(p,indent=2,sort_keys=True)+"\n")
-PY
-  fi
-  record_exit "${workload}" "${round}" datajuicer "${code}" "${result}"
-}
-
 cat > "${RUN_ROOT}/README.md" <<EOF
 # Formal cross-system results (W=8)
 
-This directory compares PICO with native PyTorch DataLoader, tf.data, Ray Data,
-Data-Juicer, Plumber, and FastFlow on the 15 workloads in the current optimizer
-figure. FreeLaw is excluded. Every supported cell has three round-robin repeats,
-an 8-worker setting, a 64-CPU budget, and the exact output count in
-\`../paper_optimizer_w8/figures/latest_optimizer_data.tsv\`.
+This directory combines all five Cedar optimizer results with native PyTorch
+DataLoader, tf.data, Ray Data, Plumber, and FastFlow on the 15
+workloads in the current optimizer figure. FreeLaw is excluded. Every supported
+cell has three round-robin repeats, an 8-worker setting, a 64-CPU budget, and
+the exact output count in
+\`../paper_artifacts/optimizer/figures/latest_optimizer_data.tsv\`. The primary figure,
+\`figures/optimizer_and_system_execution_time.pdf\`, reports absolute execution
+time in seconds. Every workload has an independent linear y-axis; the figure
+uses neither a speedup axis nor a logarithmic axis.
 
-Data-Juicer is available only for its three official equivalent recipes. Its
-reported time is retained-output throughput normalized from end-to-end wall
-time; the raw wall time and retained count are preserved in every JSON record.
 Unsupported cells and one-hour feasibility timeouts remain explicit in status/.
 Superseded attempts are preserved by failure class under invalidated_attempts/;
 the runner ignores that archive when resuming or plotting.
@@ -349,26 +297,12 @@ workers=${WORKERS}
 cpu_budget=${CPU_BUDGET}
 repeats=${REPEATS}
 cell_timeout_sec=${CELL_TIMEOUT_SEC}
-optimizer_source=evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/figures/latest_optimizer_data.tsv
-datajuicer_commit=${DATAJUICER_COMMIT}
-datajuicer_image_id=$(docker image inspect optimalcedar-datajuicer:v1.5.3-bb3d88aac1 --format '{{.Id}}' 2>/dev/null || echo unavailable)
+optimizer_source=evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/figures/latest_optimizer_data.tsv
 EOF
 
 if ! container_running "${CEDAR_CONTAINER}"; then
   echo "Cedar container is unavailable: ${CEDAR_CONTAINER}" >&2
   exit 1
-fi
-
-if [[ "$(git -C "${REPO_ROOT}/data-juicer" rev-parse HEAD)" != "${DATAJUICER_COMMIT}" ]]; then
-  echo "Data-Juicer checkout is not pinned to ${DATAJUICER_COMMIT}" >&2
-  exit 1
-fi
-if docker image inspect optimalcedar-datajuicer:v1.5.3-bb3d88aac1 >/dev/null 2>&1; then
-  image_revision="$(docker image inspect optimalcedar-datajuicer:v1.5.3-bb3d88aac1 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
-  if [[ "${image_revision}" != "${DATAJUICER_COMMIT}" ]]; then
-    echo "Data-Juicer image revision does not match the pinned checkout" >&2
-    exit 1
-  fi
 fi
 
 cedar_exec python -m evaluation.baselines.run --validate > "${RUN_ROOT}/baseline_validation.json" || exit 1
@@ -395,12 +329,6 @@ for ((round=1; round<=REPEATS; round++)); do
       case "${system}" in
         pytorch|tensorflow|ray)
           run_native "${workload}" "${round}" "${system}" "${samples}" ;;
-        datajuicer)
-          if docker image inspect optimalcedar-datajuicer:v1.5.3-bb3d88aac1 >/dev/null 2>&1; then
-            run_datajuicer "${workload}" "${round}" "${samples}"
-          else
-            write_status "${workload}" "${round}" "${system}" environment_unavailable "pinned Data-Juicer image is unavailable"
-          fi ;;
         plumber)
           if container_running "${PLUMBER_CONTAINER}"; then
             run_plumber "${workload}" "${round}" "${samples}"
@@ -418,9 +346,12 @@ for ((round=1; round<=REPEATS; round++)); do
   done
 done
 
-cedar_exec python evaluation/chapter6_experiments/plot_paper_cross_system_speedup.py \
-  --run-root "${CONTAINER_RUN_ROOT}" \
-  --optimizer-tsv "${CONTAINER_REPO}/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/figures/latest_optimizer_data.tsv" \
-  --output-dir "${CONTAINER_RUN_ROOT}/figures"
+if ! cedar_exec python evaluation/chapter6_experiments/plot_paper_cross_system_absolute.py \
+    --run-root "${CONTAINER_RUN_ROOT}" \
+    --optimizer-tsv "${CONTAINER_REPO}/evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/figures/latest_optimizer_data.tsv" \
+    --output-dir "${CONTAINER_RUN_ROOT}/figures"; then
+  echo "plot_or_validation_failed" > "${RUN_ROOT}/STATUS"
+  exit 1
+fi
 echo "complete" > "${RUN_ROOT}/STATUS"
 echo "[$(date -Is)] Formal cross-system matrix complete: ${RUN_ROOT}"

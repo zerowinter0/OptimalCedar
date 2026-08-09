@@ -1,0 +1,11 @@
+{
+  "cache_warmup_time_sec": 0.0,
+  "measured_benchmark_time_sec": 7.705028573982418,
+  "measured_time_sec": 379.2086362838745,
+  "num_samples": 50000,
+  "optimization_time_sec": 0.10873206704854965,
+  "profile_time_sec": 10.469567505992018,
+  "schema_version": 1,
+  "system": "plumber",
+  "throughput_samples_per_sec": 131.85353711873307
+}

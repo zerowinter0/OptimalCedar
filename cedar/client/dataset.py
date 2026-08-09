@@ -1739,57 +1739,63 @@ class DataSet:
             source_pipes={f_name: source_pipe},
         )
 
-        n_batches = 0
-        for x in dataset_iter:
-            # Warm up time
-            if n_batches == 0:
-                start_time = time.time()
-            n_batches += 1
-            curr_time = time.time()
+        try:
+            n_batches = 0
+            for x in dataset_iter:
+                # Warm up time
+                if n_batches == 0:
+                    start_time = time.time()
+                n_batches += 1
+                curr_time = time.time()
 
-            if n_samples is not None:
-                if n_batches * b_sz >= n_samples:
+                if n_samples is not None:
+                    if n_batches * b_sz >= n_samples:
+                        break
+                elif (curr_time - start_time) >= PROFILE_TIME_SEC:
                     break
-            elif (curr_time - start_time) >= PROFILE_TIME_SEC:
-                break
-        end_time = time.time()
+            end_time = time.time()
 
-        throughput_samples_per_sec = (n_batches * b_sz) / (
-            end_time - start_time
-        )
-        # Per-pipe latencies
-        pipe_latencies = profiler.calculate_avg_latency_per_sample()
-        wall_pipe_latencies = profiler.calculate_avg_wall_latency_per_sample()
-        input_sizes, output_sizes = profiler.calculate_avg_data_size()
-
-        # A backend profile mutates exactly one logical operator.  Read the
-        # worker-side timing accumulator before reset tears down its service.
-        # This measures only operator execution; queueing and serialization
-        # remain in the separately calibrated boundary model.
-        backend_compute = None
-        if mutation_dict is not None and len(mutation_dict) == 1:
-            profiled_p_id = next(iter(mutation_dict))
-            physical_pipe = feature_to_profile.physical_pipes.get(
-                profiled_p_id
+            throughput_samples_per_sec = (n_batches * b_sz) / (
+                end_time - start_time
             )
-            if physical_pipe is not None:
-                variant = physical_pipe.get_variant()
-                service = getattr(variant, "service", None)
-                if service is None:
-                    service = getattr(
-                        getattr(variant, "variant_ctx", None),
-                        "service",
-                        None,
-                    )
-                stats_fn = getattr(
-                    service, "get_backend_compute_stats", None
-                )
-                if stats_fn is not None:
-                    backend_compute = stats_fn()
+            # Per-pipe latencies
+            pipe_latencies = profiler.calculate_avg_latency_per_sample()
+            wall_pipe_latencies = (
+                profiler.calculate_avg_wall_latency_per_sample()
+            )
+            input_sizes, output_sizes = profiler.calculate_avg_data_size()
 
-        # Reset the feature and init
-        feature_to_profile.reset()
-        time.sleep(5)  # Sleep in case we need some time to shutdown
+            # A backend profile mutates exactly one logical operator.  Read
+            # worker-side timings before reset tears down its service.
+            backend_compute = None
+            if mutation_dict is not None and len(mutation_dict) == 1:
+                profiled_p_id = next(iter(mutation_dict))
+                physical_pipe = feature_to_profile.physical_pipes.get(
+                    profiled_p_id
+                )
+                if physical_pipe is not None:
+                    variant = physical_pipe.get_variant()
+                    service = getattr(variant, "service", None)
+                    if service is None:
+                        service = getattr(
+                            getattr(variant, "variant_ctx", None),
+                            "service",
+                            None,
+                        )
+                    stats_fn = getattr(
+                        service, "get_backend_compute_stats", None
+                    )
+                    if stats_fn is not None:
+                        backend_compute = stats_fn()
+        finally:
+            # Backend profiling repeatedly rebuilds the same Feature. Besides
+            # stopping Cedar workers, give the workload a chance to clear
+            # process-global accelerator caches before the next trial. This
+            # must also run after an operator exception or CUDA OOM.
+            if feature_to_profile.loaded:
+                feature_to_profile.reset()
+            feature_to_profile.release_profile_resources()
+            time.sleep(5)  # Allow worker shutdown and CUDA frees to settle.
 
         result = {
             "latencies": pipe_latencies,

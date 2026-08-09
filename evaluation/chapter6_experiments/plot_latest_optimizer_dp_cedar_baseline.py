@@ -17,14 +17,14 @@ from matplotlib.ticker import FixedLocator, FuncFormatter
 CORE = [
     ("coco", "COCO"),
     ("commonvoice", "CV"),
-    ("commonvoice_cache", "CV-C"),
+    ("commonvoice_cache", "CV [Cache]"),
     ("llava_pretrain", "LLaVA"),
     ("redpajama_c4", "RP-C4"),
     ("stackexchange", "StackEx"),
     ("simclrv2", "SimCLR"),
-    ("simclrv2_cache", "SimCLR-C"),
+    ("simclrv2_cache", "SimCLR [Cache]"),
     ("wikitext103", "Wiki"),
-    ("wikitext103_cache", "Wiki-C"),
+    ("wikitext103_cache", "Wiki [Cache]"),
 ]
 DATA_PIPELINES = [
     ("redpajama_code", "RP-Code"),
@@ -296,6 +296,29 @@ def legend_handles():
     return handles
 
 
+def overhead_legend_handles():
+    handles = [
+        Patch(facecolor=color, edgecolor="#333333", hatch=hatch, label=label)
+        for _, label, color, hatch in OPTIMIZERS
+    ]
+    handles.append(
+        Patch(
+            facecolor="#FDE0DD",
+            edgecolor="#C62828",
+            hatch="////",
+            label="timeout (300 s cap)",
+        )
+    )
+    return handles
+
+
+def workload_tick_labels(workloads):
+    return [
+        f"{label}\n({PIPELINE_OPERATOR_COUNTS[workload]} ops)"
+        for workload, label in workloads
+    ]
+
+
 def plotted_workloads(data: dict):
     """Return valid workloads ordered by increasing logical operator count."""
     valid = [item for item in ALL if positive(data[item[0]][BASELINE]["mean"])]
@@ -336,7 +359,7 @@ def draw_execution_panel(ax, data: dict, workloads, title: str) -> None:
     ax.set_xlim(-0.55, len(workloads) - 0.45)
     data_upper = max(plotted_upper_bounds, default=0.0)
     ax.set_ylim(0, max(3.05, data_upper * 1.12))
-    ax.set_xticks(centers, [label for _, label in workloads], rotation=32)
+    ax.set_xticks(centers, workload_tick_labels(workloads), rotation=32)
     for tick in ax.get_xticklabels():
         tick.set_ha("right")
     ax.set_ylabel("Execution speedup\nvs. DP-Cedar")
@@ -375,20 +398,28 @@ def draw_overhead_panel(ax, data: dict, workloads, title: str) -> None:
             setup = item["setup"]
             x = idx + (series_idx - (len(OPTIMIZERS) - 1) / 2) * width
             if positive(setup):
-                timeout = "timeout" in item["status"]
+                timeout = (
+                    "timeout" in item["status"]
+                    or item["status"] == "unavailable"
+                )
                 ax.bar(
-                    x, setup, width=width * 0.92, color=color,
-                    edgecolor="#D55E00" if timeout else "#333333",
-                    linewidth=1.0 if timeout else 0.45, hatch=hatch, zorder=3,
+                    x,
+                    setup,
+                    width=width * 0.92,
+                    color="#FDE0DD" if timeout else color,
+                    edgecolor="#C62828" if timeout else "#333333",
+                    linewidth=1.0 if timeout else 0.45,
+                    hatch="////" if timeout else hatch,
+                    zorder=3,
                 )
                 if timeout:
-                    ax.text(x, setup * 1.08, "TO", ha="center", color="#D55E00", fontsize=5.5, fontweight="bold")
+                    ax.text(x, setup * 1.08, "TO", ha="center", color="#8E0000", fontsize=5.5, fontweight="bold")
     ax.set_yscale("log")
     ax.set_ylim(1, 520)
     ax.yaxis.set_major_locator(FixedLocator([1, 3, 10, 30, 100, 300]))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _p: f"{y:g}"))
     ax.set_xlim(-0.55, len(workloads) - 0.45)
-    ax.set_xticks(centers, [label for _, label in workloads], rotation=32)
+    ax.set_xticks(centers, workload_tick_labels(workloads), rotation=32)
     for tick in ax.get_xticklabels():
         tick.set_ha("right")
     ax.set_ylabel("Optimization/setup (s)")
@@ -407,7 +438,7 @@ def overhead_figure(data: dict, output_dir: Path) -> None:
     )
     ax.tick_params(axis="x", labelsize=6.2, pad=1)
     ax.legend(
-        handles=legend_handles()[:6], loc="upper center", bbox_to_anchor=(0.5, 1.3),
+        handles=overhead_legend_handles(), loc="upper center", bbox_to_anchor=(0.5, 1.3),
         ncol=6, frameon=False, columnspacing=1.0, handlelength=1.5,
     )
     fig.text(

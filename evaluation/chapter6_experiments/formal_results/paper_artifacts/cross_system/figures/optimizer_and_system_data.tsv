@@ -1,0 +1,121 @@
+workload	entity	status	mean_execution_sec	sd_execution_sec	repeats	samples	measurement_kind	reasons
+commonvoice	optimizer:optimizer	success	719.1355230140034	3.157050185795409	3	160000	exact measured execution	
+commonvoice	optimizer:dj_optimizer	success	731.7015467713354	2.501640444022677	3	160000	exact measured execution	
+commonvoice	optimizer:dp_cedar_optimizer	success	719.451318833686	1.702232284221945	3	160000	exact measured execution	
+commonvoice	optimizer:pecan_optimizer	success	720.3641337756999	1.23263313832176	3	160000	exact measured execution	
+commonvoice	optimizer:dp_optimizer	success	607.0546370523322	4.545979323664313	3	160000	exact measured execution	
+commonvoice	system:pytorch	success	1596.4756473783248	11.261812167373023	3	160000	exact measured execution	
+commonvoice	system:tensorflow	success	3127.880402078697	33.21971099411867	3	160000	exact measured execution	
+commonvoice	system:ray	success	777.2682500809897	3.049168599109866	3	160000	exact measured execution	
+commonvoice	system:plumber	success	8732.884536017771	358.7445058532956	3	160000	exact measured execution	
+commonvoice	system:fastflow	infeasible_timeout			0	160000		execution exceeded 3600s
+commonvoice_cache	optimizer:optimizer	success	119.95183106267359	50.70790143808192	3	160000	exact measured execution	
+commonvoice_cache	optimizer:dj_optimizer	success	88.87183528201422	1.2426467614595433	3	160000	exact measured execution	
+commonvoice_cache	optimizer:dp_cedar_optimizer	success	89.1082414299987	0.8070446226762225	3	160000	exact measured execution	
+commonvoice_cache	optimizer:pecan_optimizer	success	89.62054496365211	0.47020909370237557	3	160000	exact measured execution	
+commonvoice_cache	optimizer:dp_optimizer	success	89.66697516498	2.7030717543923615	3	160000	exact measured execution	
+commonvoice_cache	system:pytorch	success	1594.047713812363	6.360527954456741	3	160000	exact measured execution	
+commonvoice_cache	system:tensorflow	infeasible_timeout			0	160000		execution exceeded 3600s
+commonvoice_cache	system:ray	success	36.86863710735148	1.6599248155588717	3	160000	exact measured execution	
+commonvoice_cache	system:plumber	success	8607.435711772363	302.4411317985411	3	160000	exact measured execution	
+commonvoice_cache	system:fastflow	infeasible_timeout			0	160000		execution exceeded 3600s
+simclrv2	optimizer:optimizer	success	13.094985500676557	0.3966321783157403	3	9469	exact measured execution	
+simclrv2	optimizer:dj_optimizer	success	31.662489829352126	0.40150329073265206	3	9469	exact measured execution	
+simclrv2	optimizer:dp_cedar_optimizer	success	12.887886019675838	0.598892813077004	3	9469	exact measured execution	
+simclrv2	optimizer:pecan_optimizer	success	13.197919136359511	0.31662794896296403	3	9469	exact measured execution	
+simclrv2	optimizer:dp_optimizer	success	12.603526976696836	0.4068472545433051	3	9469	exact measured execution	
+simclrv2	system:pytorch	success	42.02129420964047	0.8963951337361913	3	9469	exact measured execution	
+simclrv2	system:tensorflow	success	21.45897125968865	0.30377499615289566	3	9469	exact measured execution	
+simclrv2	system:ray	success	35.28634492629984	0.6192784578270576	3	9469	exact measured execution	
+simclrv2	system:plumber	success	61.88931715138754	0.4581166302598129	3	9469	exact measured execution	
+simclrv2	system:fastflow	infeasible_timeout			0	9469		execution exceeded 3600s
+simclrv2_cache	optimizer:optimizer	success	14.038195609988179	0.6951219108167177	3	9469	exact measured execution	
+simclrv2_cache	optimizer:dj_optimizer	success	30.471317729679868	0.30229517729125555	3	9469	exact measured execution	
+simclrv2_cache	optimizer:dp_cedar_optimizer	success	14.23022334165095	0.23967833379715203	3	9469	exact measured execution	
+simclrv2_cache	optimizer:pecan_optimizer	success	13.939798516687006	0.046585708118429416	3	9469	exact measured execution	
+simclrv2_cache	optimizer:dp_optimizer	success	10.898338813645145	0.13064812539408935	3	9469	exact measured execution	
+simclrv2_cache	system:pytorch	success	41.97267907997593	0.2684281495670703	3	9469	exact measured execution	
+simclrv2_cache	system:tensorflow	success	0.7536921733214209	0.02970896869942793	3	9469	exact measured execution	
+simclrv2_cache	system:ray	success	1.7631786809846137	0.12066780532251256	3	9469	exact measured execution	
+simclrv2_cache	system:plumber	success	60.868447512149814	1.2827366563779052	3	9469	exact measured execution	
+simclrv2_cache	system:fastflow	infeasible_timeout			0	9469		execution exceeded 3600s
+wikitext103	optimizer:optimizer	success	58.808084306986224	1.0012665225690631	3	100000	exact measured execution	
+wikitext103	optimizer:dj_optimizer	success	58.835624471345604	1.054289371060103	3	100000	exact measured execution	
+wikitext103	optimizer:dp_cedar_optimizer	success	61.526848201989196	1.3182776837678845	3	100000	exact measured execution	
+wikitext103	optimizer:pecan_optimizer	success	60.47692970101101	1.0259827022511436	3	100000	exact measured execution	
+wikitext103	optimizer:dp_optimizer	success	60.40201793533439	0.5137722643522669	3	100000	exact measured execution	
+wikitext103	system:pytorch	success	86.61794304836076	1.3566291319029686	3	100000	exact measured execution	
+wikitext103	system:tensorflow	success	235.99203774670605	3.112817071378684	3	100000	exact measured execution	
+wikitext103	system:ray	success	103.61530012326936	4.158162390376853	3	100000	exact measured execution	
+wikitext103	system:plumber	unsupported			0	100000		TextLineDataset FlatMap source lacks Plumber byte-ratio metadata
+wikitext103	system:fastflow	success	294.9229172029688	1.7975542587255047	3	100000	exact measured execution	
+wikitext103_cache	optimizer:optimizer	success	56.19857123135201	6.3943085124245975	3	100000	exact measured execution	
+wikitext103_cache	optimizer:dj_optimizer	success	57.234703127023145	2.951642709311836	3	100000	exact measured execution	
+wikitext103_cache	optimizer:dp_cedar_optimizer	success	54.761588258688185	5.618286549808744	3	100000	exact measured execution	
+wikitext103_cache	optimizer:pecan_optimizer	success	55.21588908066042	5.3973762148910716	3	100000	exact measured execution	
+wikitext103_cache	optimizer:dp_optimizer	success	61.10514593665721	8.350080813742098	3	100000	exact measured execution	
+wikitext103_cache	system:pytorch	success	87.20564309166123	0.5231643839207845	3	100000	exact measured execution	
+wikitext103_cache	system:tensorflow	success	233.69221489469055	5.8214953071041124	3	100000	exact measured execution	
+wikitext103_cache	system:ray	success	19.786292378635455	0.09514297242488459	3	100000	exact measured execution	
+wikitext103_cache	system:plumber	unsupported			0	100000		TextLineDataset FlatMap source lacks Plumber byte-ratio metadata
+wikitext103_cache	system:fastflow	success	291.8523140273367	2.99468236814178	3	100000	exact measured execution	
+redpajama_c4	optimizer:optimizer	success	337.4808887130348	0.5759861489324833	3	20000	exact measured execution	
+redpajama_c4	optimizer:dj_optimizer	success	329.3912725873136	1.6672590852907523	3	20000	exact measured execution	
+redpajama_c4	optimizer:dp_cedar_optimizer	success	335.98405458500685	0.5666665879235088	3	20000	exact measured execution	
+redpajama_c4	optimizer:pecan_optimizer	success	329.3078303230189	2.2539365483169345	3	20000	exact measured execution	
+redpajama_c4	optimizer:dp_optimizer	success	346.8042699150198	1.2054103236433609	3	20000	exact measured execution	
+redpajama_c4	system:pytorch	success	746.1906836566437	1.9935665946207106	3	20000	exact measured execution	
+redpajama_c4	system:tensorflow	unsupported			0	20000		tf.py_function is GIL-bound for this opaque callback pipeline at W=8
+redpajama_c4	system:ray	success	2496.319352027999	2.018655093292558	3	20000	exact measured execution	
+redpajama_c4	system:plumber	unsupported			0	20000		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+redpajama_c4	system:fastflow	unsupported			0	20000		opaque callbacks cannot be serialized by tf.data service/FastFlow
+pile_hackernews	optimizer:optimizer	optimizer_timeout			0	20000	exact measured execution	
+pile_hackernews	optimizer:dj_optimizer	success	1308.2898613186553	6.215713366443661	3	20000	exact measured execution	
+pile_hackernews	optimizer:dp_cedar_optimizer	success	1292.0863970946714	2.143826484435459	3	20000	exact measured execution	
+pile_hackernews	optimizer:pecan_optimizer	success	1303.5993279080042	6.052610095940053	3	20000	exact measured execution	
+pile_hackernews	optimizer:dp_optimizer	success	467.7318519193407	1.4370849785759365	3	20000	exact measured execution	
+pile_hackernews	system:pytorch	success	3308.668174485676	14.180711640925196	3	20000	exact measured execution	
+pile_hackernews	system:tensorflow	infeasible_timeout			0	20000		execution exceeded 3600s
+pile_hackernews	system:ray	success	1659.3557576747069	4.396365087227584	3	20000	exact measured execution	
+pile_hackernews	system:plumber	unsupported			0	20000		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+pile_hackernews	system:fastflow	unsupported			0	20000		opaque callbacks cannot be serialized by tf.data service/FastFlow
+stackexchange	optimizer:optimizer	unavailable			0	10000	exact measured execution	
+stackexchange	optimizer:dj_optimizer	success	281.67547959364794	1.7278678437053956	3	10000	exact measured execution	
+stackexchange	optimizer:dp_cedar_optimizer	success	612.1751316493416	1.9403231507291672	3	10000	exact measured execution	
+stackexchange	optimizer:pecan_optimizer	success	392.9929485859854	0.529506690816497	3	10000	exact measured execution	
+stackexchange	optimizer:dp_optimizer	success	196.1246020690111	0.3840592913313179	3	10000	exact measured execution	
+stackexchange	system:pytorch	success	650.0498220930264	1.9210061505077483	3	10000	exact measured execution	
+stackexchange	system:tensorflow	infeasible_timeout			0	10000		execution exceeded 3600s
+stackexchange	system:ray	success	432.09729409827077	0.6365157043557831	3	10000	exact measured execution	
+stackexchange	system:plumber	unsupported			0	10000		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+stackexchange	system:fastflow	unsupported			0	10000		opaque callbacks cannot be serialized by tf.data service/FastFlow
+pile_pubmed_abstracts	optimizer:optimizer	optimizer_timeout			0	20000	exact measured execution	
+pile_pubmed_abstracts	optimizer:dj_optimizer	success	304.49832570699317	1.171135500624652	3	20000	exact measured execution	
+pile_pubmed_abstracts	optimizer:dp_cedar_optimizer	success	303.68026134665706	0.46825700774480267	3	20000	exact measured execution	
+pile_pubmed_abstracts	optimizer:pecan_optimizer	success	304.4615715396649	0.989823252420774	3	20000	exact measured execution	
+pile_pubmed_abstracts	optimizer:dp_optimizer	success	201.51745070299754	0.3809615088284026	3	20000	exact measured execution	
+pile_pubmed_abstracts	system:pytorch	success	374.5965387816541	0.4311696341026924	3	20000	exact measured execution	
+pile_pubmed_abstracts	system:tensorflow	infeasible_timeout			0	20000		execution exceeded 3600s
+pile_pubmed_abstracts	system:ray	success	383.70090342235443	0.5376637057369973	3	20000	exact measured execution	
+pile_pubmed_abstracts	system:plumber	unsupported			0	20000		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+pile_pubmed_abstracts	system:fastflow	unsupported			0	20000		opaque callbacks cannot be serialized by tf.data service/FastFlow
+pile_uspto_backgrounds	optimizer:optimizer	optimizer_timeout			0	20000	exact measured execution	
+pile_uspto_backgrounds	optimizer:dj_optimizer	success	829.2515775853439	4.153244473311381	3	20000	exact measured execution	
+pile_uspto_backgrounds	optimizer:dp_cedar_optimizer	success	916.6739054836798	7.416243591569622	3	20000	exact measured execution	
+pile_uspto_backgrounds	optimizer:pecan_optimizer	success	890.2178617726507	3.254895034214414	3	20000	exact measured execution	
+pile_uspto_backgrounds	optimizer:dp_optimizer	success	338.41713131899206	0.5640004822477153	3	20000	exact measured execution	
+pile_uspto_backgrounds	system:pytorch	success	1467.803496077967	4.809939153375674	3	20000	exact measured execution	
+pile_uspto_backgrounds	system:tensorflow	infeasible_timeout			0	20000		execution exceeded 3600s
+pile_uspto_backgrounds	system:ray	success	1053.0019008012798	2.721517806918395	3	20000	exact measured execution	
+pile_uspto_backgrounds	system:plumber	unsupported			0	20000		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+pile_uspto_backgrounds	system:fastflow	unsupported			0	20000		opaque callbacks cannot be serialized by tf.data service/FastFlow
+pile_europarl	optimizer:optimizer	optimizer_timeout			0	2500	exact measured execution	
+pile_europarl	optimizer:dj_optimizer	success	1836.5129603586781	2.917278286194731	3	2500	exact measured execution	
+pile_europarl	optimizer:dp_cedar_optimizer	success	3078.8975189783378	7.027527305481273	3	2500	exact measured execution	
+pile_europarl	optimizer:pecan_optimizer	success	2404.871716980939	4.564078394577783	3	2500	exact measured execution	
+pile_europarl	optimizer:dp_optimizer	success	1227.8185459069598	2.321354611157238	3	2500	exact measured execution	
+pile_europarl	system:pytorch	infeasible_timeout			0	2500		execution exceeded 3600s
+pile_europarl	system:tensorflow	infeasible_timeout			0	2500		execution exceeded 3600s
+pile_europarl	system:ray	infeasible_timeout			0	2500		execution exceeded 3600s
+pile_europarl	system:plumber	unsupported			0	2500		opaque Python callbacks cannot be modeled and safely reconstructed by Plumber
+pile_europarl	system:fastflow	unsupported			0	2500		opaque callbacks cannot be serialized by tf.data service/FastFlow

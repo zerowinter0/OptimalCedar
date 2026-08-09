@@ -1,0 +1,10 @@
+{
+  "measured_benchmark_time_sec": 7.930193136096932,
+  "measured_time_sec": 386.4345312118531,
+  "num_samples": 50000,
+  "optimization_time_sec": 0.1079136619810015,
+  "profile_time_sec": 10.461440659011714,
+  "schema_version": 1,
+  "system": "plumber",
+  "throughput_samples_per_sec": 129.38802296782518
+}

@@ -1,0 +1,23 @@
+{
+  "protocol": {
+    "cpu_budget": 64,
+    "local_workers": 8,
+    "plan_timeout_sec": 300
+  },
+  "workloads": [
+    {
+      "workload": "alpaca_cot",
+      "label": "Alpaca-CoT",
+      "operators": 8,
+      "cedar": {"seconds": 2.757465475006029, "timeout": false},
+      "pico": {"seconds": 2.7377135660499334, "timeout": false}
+    },
+    {
+      "workload": "redpajama_arxiv",
+      "label": "ArXiv",
+      "operators": 18,
+      "cedar": {"seconds": 300.0, "timeout": true},
+      "pico": {"seconds": 11.266496462980285, "timeout": false}
+    }
+  ]
+}

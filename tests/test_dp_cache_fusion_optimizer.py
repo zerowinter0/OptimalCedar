@@ -206,6 +206,28 @@ def test_single_smp_stage_pays_placement_dependent_boundary_cost():
     ) == 0.0
 
 
+def test_unfixed_output_pipe_is_always_constrained_to_remain_last():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = _profile_for(feature)
+    optimizer.options = OptimizerOptions(
+        enable_reorder=True, enable_offload=False
+    )
+    optimizer._validate_stats()
+    optimizer._init_stats()
+
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    output_p_id = optimizer._get_output_p_id(optimizer.physical_plan.graph)
+    output_idx = inner_ops.index(output_p_id)
+    assert set(optimizer._dp_pred_indices[output_idx]) == (
+        set(range(len(inner_ops))) - {output_idx}
+    )
+
+
 def test_profiled_boundary_model_overrides_compatibility_constant():
     feature = TwoMapFeature()
     feature.apply(IterSource([1, 2, 3]))

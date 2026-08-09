@@ -7,7 +7,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
 FORMAL_DIR="${BASE_DIR}/formal_results"
-ARCHIVE_ROOT="${FORMAL_DIR}/paper_optimizer_w8"
+ARCHIVE_ROOT="${FORMAL_DIR}/paper_artifacts/optimizer"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${BASE_DIR}/paper_dp_no_wall_clock_w8_run}"
 PROFILE_DIR="${OUTPUT_ROOT}/profiles"
 WORKLOAD_ROOT="${OUTPUT_ROOT}/workloads"

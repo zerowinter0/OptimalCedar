@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_warmup_time_sec": 0.0,
+  "datajuicer_git": {
+    "commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+    "dirty": false
+  },
+  "entry": {
+    "backend": "native",
+    "cache_policy": "not_requested",
+    "execution_env": "optimalcedar-torch201-dev",
+    "implementation": "evaluation/pipelines/coco/tf_dataset.py",
+    "reason": null,
+    "status": "supported",
+    "system": "tensorflow",
+    "workload": "coco"
+  },
+  "measured_time_sec": 447.6411577400286,
+  "num_samples": 50000,
+  "optimalcedar_git": {
+    "commit": "40b29cbd5b41c0c7079c629c3e6e5d05b29a00ba",
+    "dirty": true
+  },
+  "schema_version": 1,
+  "setup_time_sec": 19.76501759502571,
+  "system": "tensorflow",
+  "throughput_samples_per_sec": 111.6966104109621,
+  "versions": {
+    "python": "3.10.12",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torch": "2.0.1+cu118"
+  },
+  "workers": 8,
+  "workload": "coco"
+}

@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "num_operators": 6,
+  "num_cases": 100,
+  "seed": 20260715,
+  "max_dependencies": 4,
+  "backends": [
+    "INPROCESS",
+    "SMP",
+    "RAY"
+  ],
+  "passes": [
+    "reorder",
+    "fusion",
+    "offload"
+  ],
+  "cache_enabled": false,
+  "total_legal_orders": 4862,
+  "total_enumerated_plans": 14936064
+}

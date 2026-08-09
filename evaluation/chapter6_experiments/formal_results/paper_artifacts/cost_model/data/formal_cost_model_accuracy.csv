@@ -1,0 +1,12 @@
+workload,label,unique_plans,execution_measurements,cedar_coverage,cedar_spearman,cedar_regret,cedar_top1,dp_coverage,dp_spearman,dp_regret,dp_top1
+coco,COCO,3,15,1.0,0.5,0.07304242589170218,False,1.0,1.0,0.0,True
+commonvoice,CV,4,15,1.0,0.316227766016838,0.0,True,1.0,0.9486832980505139,0.0,True
+commonvoice_cache,CV [Cache],4,15,1.0,,0.0,True,1.0,,0.0,True
+simclrv2,SimCLR,5,15,1.0,0.8944271909999159,0.0,True,1.0,0.8944271909999159,0.0,True
+simclrv2_cache,SimCLR [Cache],5,15,1.0,0.9746794344808963,0.0,True,1.0,0.9746794344808963,0.0,True
+wikitext103,Wiki,3,15,1.0,-0.5,0.012500626683069838,False,1.0,0.5,0.0,True
+wikitext103_cache,Wiki [Cache],2,15,1.0,,0.0,True,0.5,,,
+llava_pretrain,LLaVA,4,12,1.0,0.19999999999999998,0.05287779738796128,False,1.0,-1.0,0.059455297208156344,False
+redpajama_c4,RP-C4,4,15,1.0,0.19999999999999998,0.022546203407064702,False,1.0,-1.0,0.05313095523674183,False
+stackexchange,StackEx,4,12,1.0,-0.7999999999999999,2.1213581834773243,False,1.0,0.7999999999999999,0.0,True
+pile_europarl,EuroParl,4,12,1.0,0.39999999999999997,0.9586540087684685,False,1.0,1.0,0.0,True

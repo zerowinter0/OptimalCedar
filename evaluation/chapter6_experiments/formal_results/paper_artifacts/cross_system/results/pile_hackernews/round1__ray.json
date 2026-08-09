@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_warmup_time_sec": 0.0,
+  "datajuicer_git": {
+    "commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+    "dirty": false
+  },
+  "entry": {
+    "backend": "native_python_operators",
+    "cache_policy": "not_requested",
+    "execution_env": "optimalcedar-torch201-dev",
+    "implementation": "evaluation/pipelines/pile_hackernews/ray_dataset.py",
+    "reason": null,
+    "status": "supported",
+    "system": "ray",
+    "workload": "pile_hackernews"
+  },
+  "measured_time_sec": 1660.5829933569767,
+  "num_samples": 20000,
+  "optimalcedar_git": {
+    "commit": "65ec839add7a972d9d62453d545fcc95128995bb",
+    "dirty": true
+  },
+  "schema_version": 1,
+  "setup_time_sec": 0.5201587319606915,
+  "system": "ray",
+  "throughput_samples_per_sec": 12.043962921460913,
+  "versions": {
+    "python": "3.10.12",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torch": "2.0.1+cu118"
+  },
+  "workers": 8,
+  "workload": "pile_hackernews"
+}

@@ -10,7 +10,14 @@ from evaluation.verify_dp_optimizer_optimality import (
     generate_case,
     verify_case,
 )
-from cedar.compose.dp_optimizer import DpOptimizer, _BlockCostIndex
+from cedar.compose.dp_optimizer import (
+    BlockCandidate,
+    DpOptimizer,
+    DpStateSummary,
+    ExtensibleDpSearch,
+    TransitionChoice,
+    _BlockCostIndex,
+)
 from cedar.compose import constants
 from cedar.compose.my_optimizer import MyOptimizer
 from cedar.compose.optimizer import OptimizerOptions, PipeDesc
@@ -98,6 +105,75 @@ def test_old_profile_keeps_exact_size_only_work_product():
     assert [
         optimizer._dp_work_prod(mask) for mask in range(4)
     ] == optimizer._dp_r_prod
+
+
+def test_search_drops_resource_coordinate_without_strict_limit():
+    """Resource counts must not split states when they cannot affect plans."""
+
+    observed_parallel_cpus = []
+
+    class OptimizerStub:
+        _dp_pred_indices = [[]]
+        _dp_r_prod = [1.0, 1.0]
+
+        def _dp_parallel_stage_cpu_limit(self):
+            return None
+
+        def _dp_valid_single_last(self, prev_mask, idx):
+            return prev_mask == 0 and idx == 0
+
+        def _dp_stage_boundary_cost(self, prev_mask, block):
+            return 0.0
+
+        def _dp_regular_transition_cost(self, prev_mask, block):
+            return block.cost + self._dp_stage_boundary_cost(prev_mask, block)
+
+        def _dp_parallel_stage_cpu_cost(self, variant):
+            return 8
+
+    class ProviderStub:
+        def candidates_for(self, mask):
+            if mask != 1:
+                return []
+            return [
+                BlockCandidate(
+                    mask=1,
+                    order=(0,),
+                    variant=PipeVariantType.RAY,
+                    cost=1.0,
+                    materializes_fusion=False,
+                )
+            ]
+
+    class PolicyStub:
+        def initial_state(self):
+            return DpStateSummary(parallel_stage_cpus=7)
+
+        def transitions(
+            self,
+            prev_mask,
+            next_mask,
+            prev_state,
+            regular_cost,
+            block,
+            next_parallel_stage_cpus=None,
+        ):
+            observed_parallel_cpus.append(next_parallel_stage_cpus)
+            yield TransitionChoice(
+                state=DpStateSummary(
+                    parallel_stage_cpus=next_parallel_stage_cpus
+                ),
+                extra_cost=regular_cost,
+            )
+
+    optimizer = OptimizerStub()
+    result = ExtensibleDpSearch(
+        optimizer, [0], ProviderStub(), PolicyStub()
+    ).run()
+
+    assert result.cost == 1.0
+    assert observed_parallel_cpus == [0]
+    assert optimizer._dp_last_search_stats["retained_states"] == 2
 
 
 def _block_objective(order, ratios, costs, input_sizes):

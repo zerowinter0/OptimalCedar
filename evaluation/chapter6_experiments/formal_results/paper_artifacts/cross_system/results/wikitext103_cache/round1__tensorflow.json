@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_warmup_time_sec": 241.35594450496137,
+  "datajuicer_git": {
+    "commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+    "dirty": false
+  },
+  "entry": {
+    "backend": "tf_py_function",
+    "cache_policy": "tf_data_file_cache_final_output",
+    "execution_env": "optimalcedar-torch201-dev",
+    "implementation": "evaluation/pipelines/wikitext103/tf_dataset.py",
+    "reason": null,
+    "status": "supported",
+    "system": "tensorflow",
+    "workload": "wikitext103_cache"
+  },
+  "measured_time_sec": 234.00726120499894,
+  "num_samples": 100000,
+  "optimalcedar_git": {
+    "commit": "65ec839add7a972d9d62453d545fcc95128995bb",
+    "dirty": true
+  },
+  "schema_version": 1,
+  "setup_time_sec": 4.863724892958999,
+  "system": "tensorflow",
+  "throughput_samples_per_sec": 427.3371667402933,
+  "versions": {
+    "python": "3.10.12",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torch": "2.0.1+cu118"
+  },
+  "workers": 8,
+  "workload": "wikitext103_cache"
+}

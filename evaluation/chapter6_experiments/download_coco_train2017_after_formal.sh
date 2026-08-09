@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-HOST_REPO="/home/xieruiyang/OptimalCedar"
-CONTAINER_REPO="/workspace/OptimalCedar"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_REPO="${HOST_REPO:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 CEDAR_CONTAINER="${CEDAR_CONTAINER:-optimalcedar-torch201-dev}"
 FORMAL_PID_FILE="${HOST_REPO}/evaluation/chapter6_experiments/formal_results/scaled_reuse_plan_formal.pid"
 URL="https://huggingface.co/datasets/pcuenq/coco-2017-mirror/resolve/main/train2017.zip?download=true"

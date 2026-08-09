@@ -280,6 +280,83 @@ class BlockCandidateProvider:
         self._candidates_by_mask[mask] = candidates
         return candidates
 
+    def candidate_for_order(
+        self,
+        order: Iterable[int],
+        variant: PipeVariantType,
+    ) -> BlockCandidate:
+        """Build the exact DP block cost for one materialized block order.
+
+        ``candidates_for`` returns only the best internal order for a mask.
+        Cost-model validation must instead replay the order stored in a fixed
+        physical plan.  This method uses the same per-byte backend costs and
+        work-product recurrence as ``_BlockCostIndex`` without re-optimizing
+        the block's order.
+        """
+        ordered = tuple(order)
+        if not ordered or len(set(ordered)) != len(ordered):
+            raise ValueError("A DP block must contain unique operators.")
+        if any(idx < 0 or idx >= self.n for idx in ordered):
+            raise ValueError("A DP block references an unknown operator.")
+        if variant not in self._variant_indexes:
+            raise ValueError(f"Variant {variant.name} is outside the DP search space.")
+
+        mask = 0
+        for idx in ordered:
+            mask |= 1 << idx
+        is_multi = len(ordered) > 1
+        if is_multi:
+            if not self.optimizer.options.enable_fusion:
+                raise ValueError("A fused plan is outside the disabled fusion space.")
+            if not all(self._fusion_allowed_flags[idx] for idx in ordered):
+                raise ValueError("The materialized block contains a non-fusable operator.")
+            if not self.optimizer._dp_has_supported_fusion_cost(variant):
+                raise ValueError(
+                    f"DP has no supported fused-block cost for {variant.name}."
+                )
+            if any(
+                not self.optimizer._pipe_can_materialize_fusion(
+                    self.inner_ops[idx], variant
+                )
+                for idx in ordered
+            ):
+                raise ValueError("The materialized fusion cannot use this variant.")
+
+        index = self._variant_indexes[variant]
+        if is_multi and variant in self._fused_variant_indexes:
+            index = self._fused_variant_indexes[variant]
+        local_mask = 0
+        normalized_cost = 0.0
+        for idx in ordered:
+            if index.per_byte[idx] == float("inf"):
+                raise ValueError(
+                    f"Operator {self.inner_ops[idx]} has no {variant.name} cost."
+                )
+            # Enforce the exact internal topological order rather than merely
+            # checking that the block mask has some legal topological order.
+            if not self.optimizer._dp_valid_single_last(local_mask, idx):
+                # External predecessors are checked by the outer replay, so
+                # defer this check when the missing predecessor is outside
+                # the current block.
+                missing_internal = [
+                    predecessor
+                    for predecessor in self.optimizer._dp_pred_indices[idx]
+                    if mask & (1 << predecessor)
+                    and not local_mask & (1 << predecessor)
+                ]
+                if missing_internal:
+                    raise ValueError("The fused block order violates dependencies.")
+            normalized_cost += _work_prod(self.optimizer, local_mask) * index.per_byte[idx]
+            local_mask |= 1 << idx
+
+        return BlockCandidate(
+            mask=mask,
+            order=ordered,
+            variant=variant,
+            cost=normalized_cost * index.source_size,
+            materializes_fusion=is_multi,
+        )
+
     def _calculate_all_fusion_allowed(self) -> List[bool]:
         opt = self.optimizer
         all_allowed = [False] * self.full_mask
@@ -515,24 +592,26 @@ class ExtensibleDpSearch:
             if not self._block_can_follow(prev_mask, block):
                 continue
 
-            operator_cost = (
-                _work_prod(self.optimizer, prev_mask) * block.cost
-            )
-            boundary_cost = self.optimizer._dp_stage_boundary_cost(
+            regular_cost = self.optimizer._dp_regular_transition_cost(
                 prev_mask, block
             )
-            regular_cost = operator_cost + boundary_cost
             for prev_state, prev_cost in dp[prev_mask].items():
-                next_parallel_stage_cpus = (
-                    prev_state.parallel_stage_cpus
-                    + self.optimizer._dp_parallel_stage_cpu_cost(block.variant)
-                )
-                if (
-                    self.parallel_stage_cpu_limit is not None
-                    and next_parallel_stage_cpus
-                    > self.parallel_stage_cpu_limit
-                ):
-                    continue
+                if self.parallel_stage_cpu_limit is None:
+                    # Resource use cannot affect feasibility or any future
+                    # transition when strict matching is disabled. Collapse
+                    # this otherwise irrelevant state coordinate so plans
+                    # with different accumulated stage widths can dominate
+                    # one another by score.
+                    next_parallel_stage_cpus = 0
+                else:
+                    next_parallel_stage_cpus = (
+                        prev_state.parallel_stage_cpus
+                        + self.optimizer._dp_parallel_stage_cpu_cost(
+                            block.variant
+                        )
+                    )
+                    if next_parallel_stage_cpus > self.parallel_stage_cpu_limit:
+                        continue
                 for choice in self.cache_policy.transitions(
                     prev_mask,
                     next_mask,
@@ -631,6 +710,184 @@ class DpOptimizer(MyOptimizer):
     subset-DP engine itself.
     """
 
+    def _dp_regular_transition_cost(
+        self, prev_mask: int, block: BlockCandidate
+    ) -> float:
+        """Return the one authoritative non-cache DP transition cost."""
+        return (
+            _work_prod(self, prev_mask) * block.cost
+            + self._dp_stage_boundary_cost(prev_mask, block)
+        )
+
+    def _dp_blocks_from_physical_plan(
+        self,
+        plan: PhysicalPlan,
+        inner_ops: List[int],
+    ) -> List[Tuple[Tuple[int, ...], PipeVariantType, bool]]:
+        """Recover DP blocks and cache placement from a linear physical plan."""
+        if not plan.validate():
+            raise ValueError("Cannot score an invalid physical plan.")
+        if not inner_ops:
+            return []
+
+        predecessors = {child for children in plan.graph.values() for child in children}
+        sources = [p_id for p_id in plan.graph if p_id not in predecessors]
+        if len(sources) != 1:
+            raise ValueError("DP objective scoring requires one linear source.")
+        path: List[int] = []
+        current = sources[0]
+        visited = set()
+        while True:
+            if current in visited:
+                raise ValueError("Physical plan contains a cycle.")
+            visited.add(current)
+            path.append(current)
+            successors = plan.graph.get(current, set())
+            if not successors:
+                break
+            if len(successors) != 1:
+                raise ValueError("DP objective scoring requires a linear plan.")
+            current = next(iter(successors))
+        if len(visited) != len(plan.graph):
+            raise ValueError("Physical plan contains nodes outside its main path.")
+
+        index_by_pipe = {p_id: idx for idx, p_id in enumerate(inner_ops)}
+        blocks: List[List[Any]] = []
+        source_id = path[0]
+        for p_id in path:
+            if p_id == source_id:
+                continue
+            desc = plan.pipe_descs[p_id]
+            if desc.name == "ObjectDiskCachePipe":
+                if not blocks or blocks[-1][2]:
+                    raise ValueError("Cache must follow exactly one DP block.")
+                blocks[-1][2] = True
+                continue
+            if p_id in index_by_pipe:
+                order = (index_by_pipe[p_id],)
+            elif desc.fused_pipes and len(desc.fused_pipes) > 1:
+                try:
+                    order = tuple(index_by_pipe[item] for item in desc.fused_pipes)
+                except KeyError as exc:
+                    raise ValueError(
+                        "Fused plan references an operator outside DP metadata."
+                    ) from exc
+            else:
+                # Prefetch and other zero-cost optimizer nodes are inserted
+                # after DP search and are intentionally outside its objective.
+                if self._is_optimizer_pipe(p_id, plan):
+                    continue
+                raise ValueError(f"Plan pipe {p_id} is outside DP metadata.")
+            variant = desc.variant_type or PipeVariantType.INPROCESS
+            blocks.append([order, variant, False])
+
+        flattened = [idx for order, _, _ in blocks for idx in order]
+        if len(flattened) != len(inner_ops) or set(flattened) != set(
+            range(len(inner_ops))
+        ):
+            raise ValueError("Physical plan does not cover every DP operator once.")
+        return [
+            (tuple(order), variant, bool(cache_after))
+            for order, variant, cache_after in blocks
+        ]
+
+    def _replay_dp_objective(
+        self,
+        block_specs: Iterable[
+            Tuple[Tuple[int, ...], PipeVariantType, bool]
+        ],
+        inner_ops: List[int],
+    ) -> float:
+        provider = BlockCandidateProvider(self, inner_ops)
+        provider.prepare()
+        cache_policy = CacheTransitionPolicy(self, inner_ops)
+        search = ExtensibleDpSearch(
+            optimizer=self,
+            inner_ops=inner_ops,
+            block_provider=provider,
+            cache_policy=cache_policy,
+        )
+        state = cache_policy.initial_state()
+        cost = 0.0
+        prev_mask = 0
+        for order, variant, wants_cache in block_specs:
+            block = provider.candidate_for_order(order, variant)
+            if block.mask & prev_mask:
+                raise ValueError("DP replay contains a duplicate operator.")
+            next_mask = prev_mask | block.mask
+            if not search._block_can_follow(prev_mask, block):
+                raise ValueError("Materialized block is infeasible in DP search.")
+
+            if search.parallel_stage_cpu_limit is None:
+                next_parallel_stage_cpus = 0
+            else:
+                next_parallel_stage_cpus = (
+                    state.parallel_stage_cpus
+                    + self._dp_parallel_stage_cpu_cost(block.variant)
+                )
+                if next_parallel_stage_cpus > search.parallel_stage_cpu_limit:
+                    raise ValueError("Materialized plan exceeds the DP CPU budget.")
+
+            regular_cost = self._dp_regular_transition_cost(prev_mask, block)
+            choices = list(
+                cache_policy.transitions(
+                    prev_mask,
+                    next_mask,
+                    state,
+                    regular_cost,
+                    block,
+                    next_parallel_stage_cpus,
+                )
+            )
+            matching = [
+                choice
+                for choice in choices
+                if (choice.cache_after_idx is not None) == wants_cache
+            ]
+            if len(matching) != 1:
+                raise ValueError("Materialized cache placement is infeasible in DP search.")
+            choice = matching[0]
+            cost = choice.extra_cost if choice.replaces_prefix_cost else cost + choice.extra_cost
+            state = choice.state
+            prev_mask = next_mask
+
+        if prev_mask != (1 << len(inner_ops)) - 1:
+            raise ValueError("DP replay did not reach the complete operator set.")
+        return cost
+
+    def calculate_dp_objective_cost(
+        self,
+        plan: Optional[PhysicalPlan] = None,
+        search_result: Optional[SearchResult] = None,
+        inner_ops: Optional[List[int]] = None,
+    ) -> float:
+        """Score a plan with exactly the objective used by DP transitions.
+
+        Exactly one of ``plan`` and ``search_result`` must be supplied.  The
+        optimizer must already have loaded its profile and prepared DP
+        metadata.  Unsupported or infeasible materialized plans raise instead
+        of receiving a misleading cost from a different search space.
+        """
+        if (plan is None) == (search_result is None):
+            raise ValueError("Supply exactly one of plan or search_result.")
+        ops = list(inner_ops if inner_ops is not None else self._dp_inner_ops)
+        if not ops or self._dp_inner_ops != ops:
+            raise RuntimeError("DP metadata is not prepared for these operators.")
+        if search_result is not None:
+            block_specs = []
+            for block in search_result.blocks:
+                variant = search_result.variants_by_idx.get(
+                    block[0], PipeVariantType.INPROCESS
+                )
+                wants_cache = (
+                    search_result.cache_after_idx is not None
+                    and block[-1] == search_result.cache_after_idx
+                )
+                block_specs.append((tuple(block), variant, wants_cache))
+        else:
+            block_specs = self._dp_blocks_from_physical_plan(plan, ops)
+        return self._replay_dp_objective(block_specs, ops)
+
     def run(
         self, profiled_data: Union[str, Dict[str, Any]], options: OptimizerOptions
     ) -> PhysicalPlan:
@@ -665,24 +922,27 @@ class DpOptimizer(MyOptimizer):
             self._insert_prefetch()
 
         try:
-            caching_on = self._get_cache_pid(self.physical_plan) is not None
-            fused_blocks = [
-                list(desc.fused_pipes)
-                for desc in self.physical_plan.pipe_descs.values()
-                if getattr(desc, "fused_pipes", None)
-                and len(getattr(desc, "fused_pipes", [])) > 1
-            ]
-            fused_pipes = fused_blocks if fused_blocks else None
-            optimized_cost = self.calculate_cost(
-                self.physical_plan.graph,
-                physical_specs=self.physical_plan.pipe_descs,
-                fused_pipes=fused_pipes,
-                caching_on=caching_on,
-                plan=self.physical_plan,
+            optimized_cost = self.calculate_dp_objective_cost(
+                plan=self.physical_plan
             )
-            logger.info("[DpOptimizer] Optimized plan cost = %s", optimized_cost)
+            search_cost = getattr(self, "_last_dp_state_cost", None)
+            if search_cost is not None and not math.isclose(
+                optimized_cost, search_cost, rel_tol=1e-10, abs_tol=1e-10
+            ):
+                raise RuntimeError(
+                    "Materialized plan objective diverged from DP search: "
+                    f"search={search_cost}, plan={optimized_cost}"
+                )
+            self._last_dp_state_cost = optimized_cost
+            logger.info(
+                "[DpOptimizer] Optimized DP objective cost = %s",
+                optimized_cost,
+            )
         except Exception as e:
-            logger.info("[DpOptimizer] Failed to calculate optimized plan cost: %s", e)
+            logger.error(
+                "[DpOptimizer] Failed to replay optimized DP objective: %s", e
+            )
+            raise
 
         self._log_optimized_pipeline(tag="DpOptimizer")
         return self.physical_plan
@@ -747,7 +1007,19 @@ class DpOptimizer(MyOptimizer):
             cache_policy=cache_policy,
         )
         result = search.run()
-        self._last_dp_state_cost = result.cost
+        replayed_cost = self.calculate_dp_objective_cost(
+            search_result=result,
+            inner_ops=inner_ops,
+        )
+        if not math.isclose(
+            replayed_cost, result.cost, rel_tol=1e-10, abs_tol=1e-10
+        ):
+            raise RuntimeError(
+                "DP objective replay diverged from search: "
+                f"search={result.cost}, replay={replayed_cost}"
+            )
+        self._last_dp_state_cost = replayed_cost
+        self._last_dp_search_result = result
 
         self._store_pending_fusions_from_blocks(
             blocks_in_idx_order=result.blocks,
@@ -760,7 +1032,7 @@ class DpOptimizer(MyOptimizer):
             if p_id in self.physical_plan.pipe_descs:
                 self.physical_plan.pipe_descs[p_id].variant_type = vt
 
-        logger.info("[DpOptimizer] DP state cost (inner ops only): %s", result.cost)
+        logger.info("[DpOptimizer] DP objective cost (inner ops only): %s", replayed_cost)
         logger.info(
             "[DpOptimizer] DP objective: %s",
             "additive_work",

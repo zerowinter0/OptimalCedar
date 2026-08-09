@@ -2,7 +2,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RESULT_ROOT="${CH6_RESULT_ROOT:-${REPO_ROOT}/evaluation/chapter6_experiments/formal_results}"
+RESULT_ROOT="${CH6_RESULT_ROOT:-${REPO_ROOT}/outputs/chapter6_experiments}"
 PROFILE_ROOT="${CH6_PROFILE_ROOT:-${RESULT_ROOT}/profiles}"
 RUN_ID="${CH6_PROFILE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 RUN_ROOT="${RESULT_ROOT}/profile_runs/${RUN_ID}"
@@ -22,8 +22,8 @@ Usage: run_formal_profiles.sh [--workloads workload[,workload...]]
 
 Default: profile all formal workloads.  The filter is useful when a dataset
 changes and only its profile must be regenerated under the same protocol.
-Data-Juicer candidates: pile_europarl, redpajama_code, pile_hackernews,
-pile_pubmed_abstracts, pile_freelaw, pile_uspto_backgrounds.
+Data-Juicer candidates: alpaca_cot, redpajama_arxiv, pile_europarl, redpajama_code, pile_hackernews,
+pile_pubmed_abstracts, pile_freelaw, pile_uspto_backgrounds, general_video_refine.
 EOF
 }
 
@@ -285,6 +285,14 @@ run_selected_profile redpajama_c4 evaluation/pipelines/redpajama_c4/cedar_datase
   "dataset_path=datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl" || failures+=(redpajama_c4)
 run_selected_profile stackexchange evaluation/pipelines/stackexchange/cedar_dataset.py \
   "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl" || failures+=(stackexchange)
+run_selected_profile alpaca_cot evaluation/pipelines/alpaca_cot/cedar_dataset.py \
+  "dataset_path=datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl" || failures+=(alpaca_cot)
+run_selected_profile redpajama_arxiv evaluation/pipelines/redpajama_arxiv/cedar_dataset.py \
+  "dataset_path=datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl" || failures+=(redpajama_arxiv)
+run_selected_profile general_video_refine \
+  evaluation/pipelines/general_video_refine/cedar_dataset.py \
+  "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos" \
+  || failures+=(general_video_refine)
 run_selected_profile pile_europarl evaluation/pipelines/pile_europarl/cedar_dataset.py \
   "dataset_path=datasets/pile_europarl/pile-europarl-raw.jsonl" || failures+=(pile_europarl)
 run_selected_profile redpajama_code evaluation/pipelines/redpajama_code/cedar_dataset.py \

@@ -566,6 +566,19 @@ class Feature(abc.ABC):
             self.loaded = False
             self._has_changed_dataflow_flag = True
 
+    def release_profile_resources(self) -> None:
+        """Release workload-owned resources between profiling trials.
+
+        Most Cedar operators own only ordinary Python objects and therefore
+        need no action here. Workloads backed by process-global model caches
+        may override this hook so repeated backend trials do not retain a new
+        copy of every accelerator model for the lifetime of the profiler.
+        The hook is deliberately profiling-only: normal execution keeps model
+        caches warm for the duration of an epoch.
+        """
+
+        return None
+
     def _apply(self) -> None:
         self.output_pipe = self._compose(self.source_pipes)
 

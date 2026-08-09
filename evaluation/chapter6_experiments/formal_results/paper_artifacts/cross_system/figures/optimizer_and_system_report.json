@@ -1,0 +1,2194 @@
+{
+  "schema_version": 1,
+  "protocol": {
+    "workers": 8,
+    "cpu_budget": 64,
+    "repeats": 3,
+    "cell_timeout_sec": 3600,
+    "metric": "absolute execution time in seconds",
+    "excluded_workload": "pile_freelaw",
+    "operator_count_excludes_source": true,
+    "displayed_workloads": [
+      {
+        "workload": "commonvoice",
+        "label": "CV",
+        "operator_count": 7
+      },
+      {
+        "workload": "commonvoice_cache",
+        "label": "CV [Cache]",
+        "operator_count": 7
+      },
+      {
+        "workload": "simclrv2",
+        "label": "SimCLR",
+        "operator_count": 9
+      },
+      {
+        "workload": "simclrv2_cache",
+        "label": "SimCLR [Cache]",
+        "operator_count": 9
+      },
+      {
+        "workload": "wikitext103",
+        "label": "Wiki",
+        "operator_count": 9
+      },
+      {
+        "workload": "wikitext103_cache",
+        "label": "Wiki [Cache]",
+        "operator_count": 9
+      },
+      {
+        "workload": "redpajama_c4",
+        "label": "RP-C4",
+        "operator_count": 17
+      },
+      {
+        "workload": "pile_hackernews",
+        "label": "HN",
+        "operator_count": 18
+      },
+      {
+        "workload": "stackexchange",
+        "label": "StackEx",
+        "operator_count": 19
+      },
+      {
+        "workload": "pile_pubmed_abstracts",
+        "label": "PubMed",
+        "operator_count": 19
+      },
+      {
+        "workload": "pile_uspto_backgrounds",
+        "label": "USPTO",
+        "operator_count": 19
+      },
+      {
+        "workload": "pile_europarl",
+        "label": "EuroParl",
+        "operator_count": 19
+      }
+    ]
+  },
+  "workloads": {
+    "commonvoice": {
+      "samples": 160000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 719.1355230140034,
+          "sd_execution_sec": 3.157050185795409,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 731.7015467713354,
+          "sd_execution_sec": 2.501640444022677,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 719.451318833686,
+          "sd_execution_sec": 1.702232284221945,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 720.3641337756999,
+          "sd_execution_sec": 1.23263313832176,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 607.0546370523322,
+          "sd_execution_sec": 4.545979323664313,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 1596.4756473783248,
+          "sd_execution_sec": 11.261812167373023,
+          "execution_times_sec": [
+            1583.8043128059944,
+            1600.2802331940038,
+            1605.3423961349763
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "success",
+          "mean_execution_sec": 3127.880402078697,
+          "sd_execution_sec": 33.21971099411867,
+          "execution_times_sec": [
+            3160.815497572068,
+            3128.4424994300352,
+            3094.383209233987
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round1__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round2__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round3__tensorflow.json"
+          ]
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 777.2682500809897,
+          "sd_execution_sec": 3.049168599109866,
+          "execution_times_sec": [
+            774.3808904070174,
+            776.9669958989834,
+            780.4568639369681
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "success",
+          "mean_execution_sec": 8732.884536017771,
+          "sd_execution_sec": 358.7445058532956,
+          "execution_times_sec": [
+            8379.285959828821,
+            9096.56254325326,
+            8722.805104971234
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round1__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round2__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice/round3__plumber.json"
+          ]
+        },
+        "system:fastflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 160000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "commonvoice_cache": {
+      "samples": 160000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 119.95183106267359,
+          "sd_execution_sec": 50.70790143808192,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 88.87183528201422,
+          "sd_execution_sec": 1.2426467614595433,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 89.1082414299987,
+          "sd_execution_sec": 0.8070446226762225,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 89.62054496365211,
+          "sd_execution_sec": 0.47020909370237557,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 89.66697516498,
+          "sd_execution_sec": 2.7030717543923615,
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "enlarged W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 1594.047713812363,
+          "sd_execution_sec": 6.360527954456741,
+          "execution_times_sec": [
+            1595.0374894910492,
+            1587.2503206030233,
+            1599.8553313430166
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 160000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 36.86863710735148,
+          "sd_execution_sec": 1.6599248155588717,
+          "execution_times_sec": [
+            38.67529030004516,
+            36.51970529300161,
+            35.410915729007684
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "success",
+          "mean_execution_sec": 8607.435711772363,
+          "sd_execution_sec": 302.4411317985411,
+          "execution_times_sec": [
+            8934.040520134873,
+            8337.046368287341,
+            8551.220246894874
+          ],
+          "repeats": 3,
+          "samples": 160000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round1__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round2__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/commonvoice_cache/round3__plumber.json"
+          ]
+        },
+        "system:fastflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 160000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "simclrv2": {
+      "samples": 9469,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 13.094985500676557,
+          "sd_execution_sec": 0.3966321783157403,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 31.662489829352126,
+          "sd_execution_sec": 0.40150329073265206,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 12.887886019675838,
+          "sd_execution_sec": 0.598892813077004,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 13.197919136359511,
+          "sd_execution_sec": 0.31662794896296403,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 12.603526976696836,
+          "sd_execution_sec": 0.4068472545433051,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; no wall-clock correction; three repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/dp_no_wall_clock"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 42.02129420964047,
+          "sd_execution_sec": 0.8963951337361913,
+          "execution_times_sec": [
+            42.027259105001576,
+            41.12193151295651,
+            42.914692010963336
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "success",
+          "mean_execution_sec": 21.45897125968865,
+          "sd_execution_sec": 0.30377499615289566,
+          "execution_times_sec": [
+            21.67002889199648,
+            21.110810509999283,
+            21.59607437707018
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round1__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round2__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round3__tensorflow.json"
+          ]
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 35.28634492629984,
+          "sd_execution_sec": 0.6192784578270576,
+          "execution_times_sec": [
+            34.900409072986804,
+            36.000653380993754,
+            34.957972324918956
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "success",
+          "mean_execution_sec": 61.88931715138754,
+          "sd_execution_sec": 0.4581166302598129,
+          "execution_times_sec": [
+            61.50682271361351,
+            62.39702029252053,
+            61.764108448028566
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round1__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round2__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2/round3__plumber.json"
+          ]
+        },
+        "system:fastflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 9469,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "simclrv2_cache": {
+      "samples": 9469,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 14.038195609988179,
+          "sd_execution_sec": 0.6951219108167177,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 30.471317729679868,
+          "sd_execution_sec": 0.30229517729125555,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 14.23022334165095,
+          "sd_execution_sec": 0.23967833379715203,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 13.939798516687006,
+          "sd_execution_sec": 0.046585708118429416,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 10.898338813645145,
+          "sd_execution_sec": 0.13064812539408935,
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; no wall-clock correction; three repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/dp_no_wall_clock"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 41.97267907997593,
+          "sd_execution_sec": 0.2684281495670703,
+          "execution_times_sec": [
+            42.01521287497599,
+            41.68552343000192,
+            42.21730093494989
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "success",
+          "mean_execution_sec": 0.7536921733214209,
+          "sd_execution_sec": 0.02970896869942793,
+          "execution_times_sec": [
+            0.7846770249307156,
+            0.7254491769708693,
+            0.750950318062678
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round1__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round2__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round3__tensorflow.json"
+          ]
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 1.7631786809846137,
+          "sd_execution_sec": 0.12066780532251256,
+          "execution_times_sec": [
+            1.8145919729722664,
+            1.6253193520242348,
+            1.8496247179573402
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "success",
+          "mean_execution_sec": 60.868447512149814,
+          "sd_execution_sec": 1.2827366563779052,
+          "execution_times_sec": [
+            60.19130505204201,
+            62.347861367702485,
+            60.06617611670494
+          ],
+          "repeats": 3,
+          "samples": 9469,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round1__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round2__plumber.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/simclrv2_cache/round3__plumber.json"
+          ]
+        },
+        "system:fastflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 9469,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "wikitext103": {
+      "samples": 100000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 58.808084306986224,
+          "sd_execution_sec": 1.0012665225690631,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 58.835624471345604,
+          "sd_execution_sec": 1.054289371060103,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 61.526848201989196,
+          "sd_execution_sec": 1.3182776837678845,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 60.47692970101101,
+          "sd_execution_sec": 1.0259827022511436,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 60.40201793533439,
+          "sd_execution_sec": 0.5137722643522669,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 86.61794304836076,
+          "sd_execution_sec": 1.3566291319029686,
+          "execution_times_sec": [
+            86.1064752790844,
+            88.15595737902913,
+            85.59139648696873
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "success",
+          "mean_execution_sec": 235.99203774670605,
+          "sd_execution_sec": 3.112817071378684,
+          "execution_times_sec": [
+            235.53434834000655,
+            239.3083604540443,
+            233.1334044460673
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round1__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round2__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round3__tensorflow.json"
+          ]
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 103.61530012326936,
+          "sd_execution_sec": 4.158162390376853,
+          "execution_times_sec": [
+            100.58174699894153,
+            108.3551933519775,
+            101.90896001888905
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 100000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "TextLineDataset FlatMap source lacks Plumber byte-ratio metadata"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "success",
+          "mean_execution_sec": 294.9229172029688,
+          "sd_execution_sec": 1.7975542587255047,
+          "execution_times_sec": [
+            296.9954372779466,
+            293.7881852549035,
+            293.9851290760562
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round1__fastflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round2__fastflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103/round3__fastflow.json"
+          ]
+        }
+      }
+    },
+    "wikitext103_cache": {
+      "samples": 100000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 56.19857123135201,
+          "sd_execution_sec": 6.3943085124245975,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 57.234703127023145,
+          "sd_execution_sec": 2.951642709311836,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 54.761588258688185,
+          "sd_execution_sec": 5.618286549808744,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 55.21588908066042,
+          "sd_execution_sec": 5.3973762148910716,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 61.10514593665721,
+          "sd_execution_sec": 8.350080813742098,
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 87.20564309166123,
+          "sd_execution_sec": 0.5231643839207845,
+          "execution_times_sec": [
+            86.60562590800691,
+            87.4449433060363,
+            87.5663600609405
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "success",
+          "mean_execution_sec": 233.69221489469055,
+          "sd_execution_sec": 5.8214953071041124,
+          "execution_times_sec": [
+            234.00726120499894,
+            227.7195935479831,
+            239.34978993108962
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round1__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round2__tensorflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round3__tensorflow.json"
+          ]
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 19.786292378635455,
+          "sd_execution_sec": 0.09514297242488459,
+          "execution_times_sec": [
+            19.739310437929817,
+            19.89578746596817,
+            19.723779232008383
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 100000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "TextLineDataset FlatMap source lacks Plumber byte-ratio metadata"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "success",
+          "mean_execution_sec": 291.8523140273367,
+          "sd_execution_sec": 2.99468236814178,
+          "execution_times_sec": [
+            292.6080481780227,
+            294.3967357649235,
+            288.552158139064
+          ],
+          "repeats": 3,
+          "samples": 100000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round1__fastflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round2__fastflow.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/wikitext103_cache/round3__fastflow.json"
+          ]
+        }
+      }
+    },
+    "redpajama_c4": {
+      "samples": 20000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "success",
+          "mean_execution_sec": 337.4808887130348,
+          "sd_execution_sec": 0.5759861489324833,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 329.3912725873136,
+          "sd_execution_sec": 1.6672590852907523,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 335.98405458500685,
+          "sd_execution_sec": 0.5666665879235088,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 329.3078303230189,
+          "sd_execution_sec": 2.2539365483169345,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 346.8042699150198,
+          "sd_execution_sec": 1.2054103236433609,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 746.1906836566437,
+          "sd_execution_sec": 1.9935665946207106,
+          "execution_times_sec": [
+            748.1146337949904,
+            744.1341220600298,
+            746.3232951149112
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "tf.py_function is GIL-bound for this opaque callback pipeline at W=8"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 2496.319352027999,
+          "sd_execution_sec": 2.018655093292558,
+          "execution_times_sec": [
+            2498.431625899975,
+            2496.116850086022,
+            2494.4095800979994
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/redpajama_c4/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "pile_hackernews": {
+      "samples": 20000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "optimizer_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 1308.2898613186553,
+          "sd_execution_sec": 6.215713366443661,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 1292.0863970946714,
+          "sd_execution_sec": 2.143826484435459,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 1303.5993279080042,
+          "sd_execution_sec": 6.052610095940053,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 467.7318519193407,
+          "sd_execution_sec": 1.4370849785759365,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 3308.668174485676,
+          "sd_execution_sec": 14.180711640925196,
+          "execution_times_sec": [
+            3292.4341870230855,
+            3314.931571458932,
+            3318.6387649750104
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 1659.3557576747069,
+          "sd_execution_sec": 4.396365087227584,
+          "execution_times_sec": [
+            1660.5829933569767,
+            1654.4761762360577,
+            1663.008103431086
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_hackernews/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "stackexchange": {
+      "samples": 10000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "unavailable",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "repeats": 0,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 281.67547959364794,
+          "sd_execution_sec": 1.7278678437053956,
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 612.1751316493416,
+          "sd_execution_sec": 1.9403231507291672,
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 392.9929485859854,
+          "sd_execution_sec": 0.529506690816497,
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 196.1246020690111,
+          "sd_execution_sec": 0.3840592913313179,
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "fixed W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 650.0498220930264,
+          "sd_execution_sec": 1.9210061505077483,
+          "execution_times_sec": [
+            648.3853924460709,
+            652.1518873380264,
+            649.6121864949819
+          ],
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 10000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 432.09729409827077,
+          "sd_execution_sec": 0.6365157043557831,
+          "execution_times_sec": [
+            432.83207225089427,
+            431.71480397193227,
+            431.7450060719857
+          ],
+          "repeats": 3,
+          "samples": 10000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/stackexchange/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 10000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 10000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "pile_pubmed_abstracts": {
+      "samples": 20000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "optimizer_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 304.49832570699317,
+          "sd_execution_sec": 1.171135500624652,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 303.68026134665706,
+          "sd_execution_sec": 0.46825700774480267,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 304.4615715396649,
+          "sd_execution_sec": 0.989823252420774,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 201.51745070299754,
+          "sd_execution_sec": 0.3809615088284026,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 374.5965387816541,
+          "sd_execution_sec": 0.4311696341026924,
+          "execution_times_sec": [
+            374.2090463140048,
+            375.0610144819366,
+            374.5195555490209
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 383.70090342235443,
+          "sd_execution_sec": 0.5376637057369973,
+          "execution_times_sec": [
+            383.3236829210073,
+            383.4624764609616,
+            384.31655088509433
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_pubmed_abstracts/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "pile_uspto_backgrounds": {
+      "samples": 20000,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "optimizer_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 829.2515775853439,
+          "sd_execution_sec": 4.153244473311381,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 916.6739054836798,
+          "sd_execution_sec": 7.416243591569622,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 890.2178617726507,
+          "sd_execution_sec": 3.254895034214414,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 338.41713131899206,
+          "sd_execution_sec": 0.5640004822477153,
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "success",
+          "mean_execution_sec": 1467.803496077967,
+          "sd_execution_sec": 4.809939153375674,
+          "execution_times_sec": [
+            1467.0701189589454,
+            1472.938007322955,
+            1463.4023619520012
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round1__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round2__pytorch.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round3__pytorch.json"
+          ]
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "success",
+          "mean_execution_sec": 1053.0019008012798,
+          "sd_execution_sec": 2.721517806918395,
+          "execution_times_sec": [
+            1054.5220393459313,
+            1049.8599114469253,
+            1054.6237516109832
+          ],
+          "repeats": 3,
+          "samples": 20000,
+          "measurement_kind": "exact measured execution",
+          "round_statuses": [
+            "success",
+            "success",
+            "success"
+          ],
+          "reasons": [],
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round1__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round2__ray.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/cross_system/results/pile_uspto_backgrounds/round3__ray.json"
+          ]
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 20000,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    },
+    "pile_europarl": {
+      "samples": 2500,
+      "entities": {
+        "optimizer:optimizer": {
+          "status": "optimizer_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dj_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 1836.5129603586781,
+          "sd_execution_sec": 2.917278286194731,
+          "repeats": 3,
+          "samples": 2500,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_cedar_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 3078.8975189783378,
+          "sd_execution_sec": 7.027527305481273,
+          "repeats": 3,
+          "samples": 2500,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:pecan_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 2404.871716980939,
+          "sd_execution_sec": 4.564078394577783,
+          "repeats": 3,
+          "samples": 2500,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "optimizer:dp_optimizer": {
+          "status": "success",
+          "mean_execution_sec": 1227.8185459069598,
+          "sd_execution_sec": 2.321354611157238,
+          "repeats": 3,
+          "samples": 2500,
+          "measurement_kind": "exact measured execution",
+          "protocol": "candidate W=8; three round-robin repeats",
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json"
+          ],
+          "reasons": []
+        },
+        "system:pytorch": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:tensorflow": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:ray": {
+          "status": "infeasible_timeout",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": null,
+          "round_statuses": [
+            "infeasible_timeout",
+            "infeasible_timeout",
+            "infeasible_timeout"
+          ],
+          "reasons": [
+            "execution exceeded 3600s"
+          ],
+          "sources": []
+        },
+        "system:plumber": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque Python callbacks cannot be modeled and safely reconstructed by Plumber"
+          ],
+          "sources": []
+        },
+        "system:fastflow": {
+          "status": "unsupported",
+          "mean_execution_sec": null,
+          "sd_execution_sec": null,
+          "execution_times_sec": [],
+          "repeats": 0,
+          "samples": 2500,
+          "measurement_kind": null,
+          "round_statuses": [
+            "unsupported",
+            "unsupported",
+            "unsupported"
+          ],
+          "reasons": [
+            "opaque callbacks cannot be serialized by tf.data service/FastFlow"
+          ],
+          "sources": []
+        }
+      }
+    }
+  }
+}

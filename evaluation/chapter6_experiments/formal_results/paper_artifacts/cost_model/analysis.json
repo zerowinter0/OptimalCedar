@@ -1,0 +1,1403 @@
+{
+  "protocol": {
+    "archive": "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8",
+    "cpu_budget": 64,
+    "deduplication": "canonical physical-plan SHA-256 within workload",
+    "execution_rerun": false,
+    "local_workers": 8,
+    "runtime": "mean of all three-round records producing the canonical plan"
+  },
+  "workloads": {
+    "coco": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 536.4751455420994,
+          "dp_objective_cost": 518.2358507435632,
+          "execution_times_sec": [
+            909.3428193569998,
+            907.1141305789934,
+            904.4056670490536
+          ],
+          "mean_runtime_sec": 906.9542056616823,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            50000,
+            50000,
+            50000
+          ],
+          "runtime_sd_sec": 2.4724583337940054,
+          "sha256": "973b05f81194208f7ee52bed3429b1bde3acc2ccfbd486a80f8c77934980961f",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/coco/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 241.30664880534047,
+          "dp_objective_cost": 86.0209713152719,
+          "execution_times_sec": [
+            547.6014558169991,
+            560.8427263539634,
+            550.8903121780022,
+            586.6869746180018,
+            545.5157732920488,
+            551.1728287030128,
+            570.387058384018,
+            577.8040562390233,
+            551.8686867729994
+          ],
+          "mean_runtime_sec": 560.3077635953409,
+          "optimizers": [
+            "dp_cedar_optimizer",
+            "optimizer",
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            50000,
+            50000,
+            50000,
+            50000,
+            50000,
+            50000,
+            50000,
+            50000,
+            50000
+          ],
+          "runtime_sd_sec": 14.694676237632144,
+          "sha256": "c52fca5ca79715ac3f1d3b8242df4b622ac87a8c37a5fadc07aee42fe93e8c4f",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/coco/dp_cedar_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/coco/optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/coco/pecan_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 384.08106814804336,
+          "dp_objective_cost": 49.28795365508443,
+          "execution_times_sec": [
+            507.30932661599945,
+            527.1254028800176,
+            532.0674424839672
+          ],
+          "mean_runtime_sec": 522.1673906599948,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            50000,
+            50000,
+            50000
+          ],
+          "runtime_sd_sec": 13.102575670964505,
+          "sha256": "92fde23b528d35101b3190b8643accefe466471dac09948b2a0d6d99b1ec6458",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/dp_no_wall_clock/coco/plans/dp_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "COCO",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 3,
+          "selected_candidate": "p2",
+          "selection_regret": 0.07304242589170218,
+          "spearman_rho": 0.5,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 3,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 1.0,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 3
+    },
+    "commonvoice": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 24.52606614211729,
+          "dp_objective_cost": 18.07992345674543,
+          "execution_times_sec": [
+            734.4704284010222,
+            731.0299704609788,
+            729.6042414520052
+          ],
+          "mean_runtime_sec": 731.7015467713354,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 2.501640444022677,
+          "sha256": "2f287462cac09a12e8da9cc07ae386a7c43d0926683686b95b44714454ac963e",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 25.44548246114787,
+          "dp_objective_cost": 17.75592148276547,
+          "execution_times_sec": [
+            717.9607328060083,
+            721.3062107480364,
+            719.0870129470131
+          ],
+          "mean_runtime_sec": 719.451318833686,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 1.702232284221945,
+          "sha256": "9a05bee2226ebea6a2c555bf9c3eb90a375336b162db31342eadf5d9fb9b25d7",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 10.051852492521526,
+          "dp_objective_cost": 14.232945639621088,
+          "execution_times_sec": [
+            601.8667372709606,
+            610.3415515200468,
+            608.9556223659893
+          ],
+          "mean_runtime_sec": 607.0546370523322,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 4.545979323664313,
+          "sha256": "05d0e148156f2b7bfbc693d283843da390272349ac306a22755bd35f2776f8bf",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 25.44548246114787,
+          "dp_objective_cost": 17.75592148276547,
+          "execution_times_sec": [
+            721.7312394609908,
+            715.6209875540226,
+            720.0543420269969,
+            718.9851765450439,
+            720.7482565810205,
+            721.3589682010352
+          ],
+          "mean_runtime_sec": 719.7498283948516,
+          "optimizers": [
+            "optimizer",
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000,
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 2.2466387010053106,
+          "sha256": "a572e272d0ec9eefd8335bc70d1e952c43116e5cf65d52aff5d8fc31bb895825",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice/optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "CV",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.316227766016838,
+          "top1_correct": true
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.9486832980505139,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 4
+    },
+    "commonvoice_cache": {
+      "cache": true,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 10.403225031940348,
+          "dp_objective_cost": 1.3004031289925433,
+          "execution_times_sec": [
+            87.98284806404263,
+            88.34090730600292,
+            90.2917504759971
+          ],
+          "mean_runtime_sec": 88.87183528201422,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 1.2426467614595433,
+          "sha256": "1b417836aec687f6772a1b6e273624eed2a37c9c89571f1a076917086b46acb6",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice_cache/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 10.403225031940348,
+          "dp_objective_cost": 1.3004031289925433,
+          "execution_times_sec": [
+            89.13126456999453,
+            88.28993157402147,
+            89.90352814598009
+          ],
+          "mean_runtime_sec": 89.1082414299987,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 0.8070446226762225,
+          "sha256": "0f49a31912da952a7ec4f32639f185e7578efba54694b7f40071db287c627306",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice_cache/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 10.403225031940348,
+          "dp_objective_cost": 1.3004031289925433,
+          "execution_times_sec": [
+            92.7433046149672,
+            87.67192451795563,
+            88.58569636201719
+          ],
+          "mean_runtime_sec": 89.66697516498,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 2.7030717543923615,
+          "sha256": "fb61901bf2806f71616eaf6af0bce92fbb92f5faa68faf5f6d1516067c04b3a4",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice_cache/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 10.403225031940348,
+          "dp_objective_cost": 1.3004031289925433,
+          "execution_times_sec": [
+            90.99787672102684,
+            178.50309398199897,
+            90.35452248499496,
+            89.08648534299573,
+            89.80282907799119,
+            89.97232046996942
+          ],
+          "mean_runtime_sec": 104.78618801316286,
+          "optimizers": [
+            "optimizer",
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            160000,
+            160000,
+            160000,
+            160000,
+            160000,
+            160000
+          ],
+          "runtime_sd_sec": 36.119261078607636,
+          "sha256": "d3310c5aeed87d770f5e5fc3c1621317a84b2bfab11b3083274dbe4ce04b2243",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice_cache/optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/enlarged_core/plans/commonvoice_cache/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "CV [Cache]",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p1",
+          "num_scored": 4,
+          "selected_candidate": "p1",
+          "selection_regret": 0.0,
+          "spearman_rho": null,
+          "top1_correct": true
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p1",
+          "num_scored": 4,
+          "selected_candidate": "p1",
+          "selection_regret": 0.0,
+          "spearman_rho": null,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 4
+    },
+    "llava_pretrain": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 5.292784816368547,
+          "dp_objective_cost": 12.535451460691846,
+          "execution_times_sec": [
+            80.85007347801002,
+            80.64526463701623,
+            79.19627922098152
+          ],
+          "mean_runtime_sec": 80.23053911200259,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            5000,
+            5000,
+            5000
+          ],
+          "runtime_sd_sec": 0.90153025848747,
+          "sha256": "844eaca997e7c2a25db41006ab9c19457c1456988ad634e694de71bc890e735f",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/llava_pretrain/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 4.683287119591777,
+          "dp_objective_cost": 10.628665986384519,
+          "execution_times_sec": [
+            84.1994340949459,
+            84.84215627098456,
+            84.01059533999069
+          ],
+          "mean_runtime_sec": 84.35072856864038,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            5000,
+            5000,
+            5000
+          ],
+          "runtime_sd_sec": 0.4359368174594998,
+          "sha256": "f8318f6d70b7fba53b6e9f358e91ee5cfc689a33de629d68d7afd6994c1d5827",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/llava_pretrain/plans/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 11.828528390984168,
+          "dp_objective_cost": 4.16110385034694,
+          "execution_times_sec": [
+            85.42825586895924,
+            84.79817251599161,
+            84.40661571698729
+          ],
+          "mean_runtime_sec": 84.87768136731272,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            5000,
+            5000,
+            5000
+          ],
+          "runtime_sd_sec": 0.5154399995238232,
+          "sha256": "4cae9f2713e4b906c0aa10df3ed7638174850b054e128cc181ac1d1267193cfb",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/llava_pretrain/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 5.982180651908368,
+          "dp_objective_cost": 14.2655870996223,
+          "execution_times_sec": [
+            80.09061742102494,
+            80.251146463037,
+            80.00159441801952
+          ],
+          "mean_runtime_sec": 80.11445276736049,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            5000,
+            5000,
+            5000
+          ],
+          "runtime_sd_sec": 0.12647192808802765,
+          "sha256": "bc0d1c69cef405b5e2ae33405b2ce5fb48063dac6ccf6b0f52d5664cea2253c3",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/llava_pretrain/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "LLaVA",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p4",
+          "num_scored": 4,
+          "selected_candidate": "p2",
+          "selection_regret": 0.05287779738796128,
+          "spearman_rho": 0.19999999999999998,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p4",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.059455297208156344,
+          "spearman_rho": -1.0,
+          "top1_correct": false
+        }
+      },
+      "num_execution_measurements": 12,
+      "num_unique_candidates": 4
+    },
+    "pile_europarl": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 1456.1539580956414,
+          "dp_objective_cost": 332.7981479378095,
+          "execution_times_sec": [
+            1837.251230443013,
+            1833.2974714100128,
+            1838.9901792230085
+          ],
+          "mean_runtime_sec": 1836.5129603586781,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            2500,
+            2500,
+            2500
+          ],
+          "runtime_sd_sec": 2.917278286194731,
+          "sha256": "b7ca9fb02f1fc0b2ccba4ae1ea38778cad4efc1e531a25804099e209fff435cb",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal/pile_europarl/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 6928.217783707893,
+          "dp_objective_cost": 25765.18869233412,
+          "execution_times_sec": [
+            3078.538772828062,
+            3086.0975484279916,
+            3072.0562356789596
+          ],
+          "mean_runtime_sec": 3078.8975189783378,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            2500,
+            2500,
+            2500
+          ],
+          "runtime_sd_sec": 7.027527305481273,
+          "sha256": "fde3123a89ba6c7a5e4949afe90aaa0e5781723ccd62adb847c4cd91f9138881",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal/pile_europarl/plans/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 1359.0879320184647,
+          "dp_objective_cost": 308.02490475139615,
+          "execution_times_sec": [
+            1226.0652575659333,
+            1230.451086494024,
+            1226.939293660922
+          ],
+          "mean_runtime_sec": 1227.8185459069598,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            2500,
+            2500,
+            2500
+          ],
+          "runtime_sd_sec": 2.321354611157238,
+          "sha256": "9838302116f1821546c624f8810b5b46ba341630a5847884b06c05bfd091ae11",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal/pile_europarl/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 1215.4051717622158,
+          "dp_objective_cost": 365.06183808653566,
+          "execution_times_sec": [
+            2406.7465558859985,
+            2408.1998040518956,
+            2399.6687910049222
+          ],
+          "mean_runtime_sec": 2404.871716980939,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            2500,
+            2500,
+            2500
+          ],
+          "runtime_sd_sec": 4.564078394577783,
+          "sha256": "9bf7e153240ecaf1c77b6f07c0b769252fdc2d9f03083699d10450ed5d04615a",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/europarl_formal/pile_europarl/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "EuroParl",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p4",
+          "selection_regret": 0.9586540087684685,
+          "spearman_rho": 0.39999999999999997,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 1.0,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 12,
+      "num_unique_candidates": 4
+    },
+    "redpajama_c4": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 34.3232940502119,
+          "dp_objective_cost": 154.3841140404768,
+          "execution_times_sec": [
+            331.2816673319903,
+            328.76160435698694,
+            328.1305460729636
+          ],
+          "mean_runtime_sec": 329.3912725873136,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            20000,
+            20000,
+            20000
+          ],
+          "runtime_sd_sec": 1.6672590852907523,
+          "sha256": "821274b3a7ddc67f05707bcee6d6ed684647a8659cc43769f420aeb9197febf1",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/redpajama_c4/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 31.07352187322729,
+          "dp_objective_cost": 141.6108151869666,
+          "execution_times_sec": [
+            336.6369374570204,
+            335.61994368600426,
+            335.69528261199594,
+            337.0468532300438,
+            338.134335078008,
+            337.2614778310526
+          ],
+          "mean_runtime_sec": 336.73247164902085,
+          "optimizers": [
+            "dp_cedar_optimizer",
+            "optimizer"
+          ],
+          "output_counts": [
+            20000,
+            20000,
+            20000,
+            20000,
+            20000,
+            20000
+          ],
+          "runtime_sd_sec": 0.966075643156955,
+          "sha256": "0e07fe3fa4d0fdfe3b302a3c4e90599eda4601f68bedba703aa8d2c781220407",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/redpajama_c4/plans/dp_cedar_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/redpajama_c4/plans/optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 142.9987595882478,
+          "dp_objective_cost": 21.44751770378321,
+          "execution_times_sec": [
+            348.1078767559957,
+            346.57492471905425,
+            345.7300082700094
+          ],
+          "mean_runtime_sec": 346.8042699150198,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            20000,
+            20000,
+            20000
+          ],
+          "runtime_sd_sec": 1.2054103236433609,
+          "sha256": "290039b1d702b1e13481def4021c37883339f7867d0b90677690ee0c37068ecc",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/redpajama_c4/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 34.39295672200983,
+          "dp_objective_cost": 155.67867135535573,
+          "execution_times_sec": [
+            330.7541100520175,
+            330.4585731050465,
+            326.7108078119927
+          ],
+          "mean_runtime_sec": 329.3078303230189,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            20000,
+            20000,
+            20000
+          ],
+          "runtime_sd_sec": 2.2539365483169345,
+          "sha256": "1e9f2a5f55fc34e4ae89cbf080dd488a15067b3225c533a8467b7a55b8fcc93c",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/redpajama_c4/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "RP-C4",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p4",
+          "num_scored": 4,
+          "selected_candidate": "p2",
+          "selection_regret": 0.022546203407064702,
+          "spearman_rho": 0.19999999999999998,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p4",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.05313095523674183,
+          "spearman_rho": -1.0,
+          "top1_correct": false
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 4
+    },
+    "simclrv2": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 43.819501249091665,
+          "dp_objective_cost": 39.72161460612886,
+          "execution_times_sec": [
+            31.200415698054712,
+            31.926245626003947,
+            31.860808163997717
+          ],
+          "mean_runtime_sec": 31.662489829352126,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.40150329073265206,
+          "sha256": "eb69e6e3fa396881aff8504c371e3b8709724adbab61814b88e24bf24b5ba6b1",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 27.945728605231228,
+          "dp_objective_cost": 3.832307070379359,
+          "execution_times_sec": [
+            12.77922489203047,
+            13.533670022967272,
+            12.35076314402977
+          ],
+          "mean_runtime_sec": 12.887886019675838,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.598892813077004,
+          "sha256": "ecb9a4c445ea99f66c6fa55d7abba0dfcb713cc6bc686e64e8bd2b29c73e0276",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2/plans/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 26.325033177562133,
+          "dp_objective_cost": 3.5886386026706023,
+          "execution_times_sec": [
+            12.223135638982058,
+            12.55497275304515,
+            13.032472538063303
+          ],
+          "mean_runtime_sec": 12.603526976696836,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.4068472545433051,
+          "sha256": "7717c0cb7aee74598c251e4e6c2104a5d2a05d53db6e972e3f0aa1b48529fc5e",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/dp_no_wall_clock/simclrv2/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 27.945728605231228,
+          "dp_objective_cost": 3.832307070379359,
+          "execution_times_sec": [
+            13.422693761007395,
+            13.208209982025437,
+            12.65405275899684
+          ],
+          "mean_runtime_sec": 13.094985500676557,
+          "optimizers": [
+            "optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.3966321783157403,
+          "sha256": "584c947848e8e4c36b5af2f3ac10027fb962876cd4fcd09274f6e676169c2798",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2/plans/optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p5",
+          "cedar_cost": 27.945728605231228,
+          "dp_objective_cost": 3.832307070379359,
+          "execution_times_sec": [
+            13.556566365004983,
+            12.957094448036514,
+            13.080096596037038
+          ],
+          "mean_runtime_sec": 13.197919136359511,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.31662794896296403,
+          "sha256": "6339a2d9e299fba73d919e793be3c335a043a5bae2999a15113fd5d0c37626a0",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "SimCLR",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 5,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.8944271909999159,
+          "top1_correct": true
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 5,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.8944271909999159,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 5
+    },
+    "simclrv2_cache": {
+      "cache": true,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 17.33236975524779,
+          "dp_objective_cost": 22.787079905984985,
+          "execution_times_sec": [
+            30.508753438014537,
+            30.753151534998324,
+            30.152048216026742
+          ],
+          "mean_runtime_sec": 30.471317729679868,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.30229517729125555,
+          "sha256": "d6b2788a5a2db8dcde2f78d5446bbb4c934af7caa27035a780ab7110b0c3ed59",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2_cache/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 4.76143688571238,
+          "dp_objective_cost": 1.5041654468589964,
+          "execution_times_sec": [
+            14.430029587994795,
+            13.964477517001797,
+            14.29616291995626
+          ],
+          "mean_runtime_sec": 14.23022334165095,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.23967833379715203,
+          "sha256": "fcbc0aadc19f93ae4c6d8c0df1b76412cdcd1ce62c1ac26d326077e3ddd9b95e",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2_cache/plans/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 3.0545935680605236,
+          "dp_objective_cost": 0.788764213932508,
+          "execution_times_sec": [
+            10.88498837791849,
+            10.774878498050384,
+            11.03514956496656
+          ],
+          "mean_runtime_sec": 10.898338813645145,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.13064812539408935,
+          "sha256": "a854e4cb14238b5b044579a43f0d2a6b468c695b0b3b67722ee6bf5d75ffe3c3",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/dp_no_wall_clock/simclrv2_cache/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 4.76143688571238,
+          "dp_objective_cost": 1.5041654468589964,
+          "execution_times_sec": [
+            13.55669715598924,
+            14.835104795987718,
+            13.722784877987579
+          ],
+          "mean_runtime_sec": 14.038195609988179,
+          "optimizers": [
+            "optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.6951219108167177,
+          "sha256": "d6378cf594d33017d56920e1486637a337584c3c3ffcd142e1e8ceb882ddc996",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2_cache/plans/optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p5",
+          "cedar_cost": 4.359676193322253,
+          "dp_objective_cost": 1.1967336675500395,
+          "execution_times_sec": [
+            13.92566656699637,
+            13.9918138430221,
+            13.901915140042547
+          ],
+          "mean_runtime_sec": 13.939798516687006,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            9469,
+            9469,
+            9469
+          ],
+          "runtime_sd_sec": 0.046585708118429416,
+          "sha256": "8b6329506dc26b0318ad19354fc996be2996a0b462f5a6c303e4ab050a1afcc6",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/simclrv2_cache/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "SimCLR [Cache]",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 5,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.9746794344808963,
+          "top1_correct": true
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 5,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.9746794344808963,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 5
+    },
+    "stackexchange": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 39.27376887134453,
+          "dp_objective_cost": 174.57138928941157,
+          "execution_times_sec": [
+            283.6550935849664,
+            280.47032724897144,
+            280.90101794700604
+          ],
+          "mean_runtime_sec": 281.67547959364794,
+          "optimizers": [
+            "dj_optimizer"
+          ],
+          "output_counts": [
+            10000,
+            10000,
+            10000
+          ],
+          "runtime_sd_sec": 1.7278678437053956,
+          "sha256": "dd17beee7ebf716d1addf15eccb7955cc7480ee76f58c980b5f0cb123cdec4d5",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/stackexchange/plans/dj_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 38.405945285725885,
+          "dp_objective_cost": 180.57765256229152,
+          "execution_times_sec": [
+            614.4135537580005,
+            610.97253128601,
+            611.1393099040142
+          ],
+          "mean_runtime_sec": 612.1751316493416,
+          "optimizers": [
+            "dp_cedar_optimizer"
+          ],
+          "output_counts": [
+            10000,
+            10000,
+            10000
+          ],
+          "runtime_sd_sec": 1.9403231507291672,
+          "sha256": "5e7fb24c6bd89da050017fec8dcd02397c5ae2b475c5dc63f12514d86b2151b8",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/stackexchange/plans/dp_cedar_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 332.71844467513944,
+          "dp_objective_cost": 44.551269303756506,
+          "execution_times_sec": [
+            195.69822211400606,
+            196.44339337100973,
+            196.23219072201755
+          ],
+          "mean_runtime_sec": 196.1246020690111,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            10000,
+            10000,
+            10000
+          ],
+          "runtime_sd_sec": 0.3840592913313179,
+          "sha256": "40cc46f978e8eb5b750a94e9540e4def97c49e5c40edce31c13c6fd1fdc52fd8",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/stackexchange/plans/dp_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p4",
+          "cedar_cost": 42.7966032800364,
+          "dp_objective_cost": 200.57577492044618,
+          "execution_times_sec": [
+            393.551182243973,
+            392.4978254539892,
+            392.9298380599939
+          ],
+          "mean_runtime_sec": 392.9929485859854,
+          "optimizers": [
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            10000,
+            10000,
+            10000
+          ],
+          "runtime_sd_sec": 0.529506690816497,
+          "sha256": "fcff52d0751d9d366c28481e956a6b03a6adaf1fe5562c7dba2f1f5abb86eb70",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/stackexchange/plans/pecan_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "StackEx",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p2",
+          "selection_regret": 2.1213581834773243,
+          "spearman_rho": -0.7999999999999999,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p3",
+          "num_scored": 4,
+          "selected_candidate": "p3",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.7999999999999999,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 12,
+      "num_unique_candidates": 4
+    },
+    "wikitext103": {
+      "cache": false,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 0.9202367606631704,
+          "dp_objective_cost": 0.4886139144074867,
+          "execution_times_sec": [
+            59.51350343902595,
+            57.620964622998144,
+            59.37240535201272,
+            59.29222839802969,
+            61.070899721002206,
+            61.06766098400112
+          ],
+          "mean_runtime_sec": 59.65627708617831,
+          "optimizers": [
+            "dj_optimizer",
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000
+          ],
+          "runtime_sd_sec": 1.2937663971434892,
+          "sha256": "fcdeebde7b0e2058b18f06a60203beeeebc98ff1a48631bfe249a03b92b43b3f",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103/plans/dj_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103/plans/pecan_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 0.9203636359903588,
+          "dp_objective_cost": 0.48879389644527044,
+          "execution_times_sec": [
+            60.80739304097369,
+            63.0483176879934,
+            60.72483387700049,
+            58.86870262096636,
+            59.77766450098716,
+            57.77788579900516
+          ],
+          "mean_runtime_sec": 60.167466254487714,
+          "optimizers": [
+            "dp_cedar_optimizer",
+            "optimizer"
+          ],
+          "output_counts": [
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000
+          ],
+          "runtime_sd_sec": 1.8203459603401495,
+          "sha256": "a19e40d4d0d08757c381f961149cc8981126061ec69df54843595ae1b7e88fc0",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103/plans/dp_cedar_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103/plans/optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p3",
+          "cedar_cost": 0.9201841823487463,
+          "dp_objective_cost": 0.48867440049696986,
+          "execution_times_sec": [
+            60.799932087014895,
+            59.821996317012236,
+            60.58412540197605
+          ],
+          "mean_runtime_sec": 60.40201793533439,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            100000,
+            100000,
+            100000
+          ],
+          "runtime_sd_sec": 0.5137722643522669,
+          "sha256": "74b12b09f1801cbc2eab06aad7afab478f5bc98f279c49a20c99a250e23fde02",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103/plans/dp_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "Wiki",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p1",
+          "num_scored": 3,
+          "selected_candidate": "p3",
+          "selection_regret": 0.012500626683069838,
+          "spearman_rho": -0.5,
+          "top1_correct": false
+        },
+        "dp": {
+          "coverage": 1.0,
+          "fastest_candidate": "p1",
+          "num_scored": 3,
+          "selected_candidate": "p1",
+          "selection_regret": 0.0,
+          "spearman_rho": 0.5,
+          "top1_correct": true
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 3
+    },
+    "wikitext103_cache": {
+      "cache": true,
+      "candidates": [
+        {
+          "candidate_id": "p1",
+          "cedar_cost": 0.03403044723594739,
+          "dp_objective_error": "ValueError: Materialized cache placement is infeasible in DP search.",
+          "execution_times_sec": [
+            59.382400806993246,
+            53.86896844999865,
+            58.452740124077536,
+            51.08526224998059,
+            51.97064615902491,
+            61.22885636705905,
+            58.71557289798511,
+            60.95136878604535,
+            48.92877201002557,
+            55.62659881799482,
+            60.396177918999456,
+            49.62489050498698
+          ],
+          "mean_runtime_sec": 55.85268792443094,
+          "optimizers": [
+            "dj_optimizer",
+            "dp_cedar_optimizer",
+            "optimizer",
+            "pecan_optimizer"
+          ],
+          "output_counts": [
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000,
+            100000
+          ],
+          "runtime_sd_sec": 4.5872274968191284,
+          "sha256": "06209ddc0d3e229595b351f92ea5867a804c5bf683f018ec4ef047993c6da35a",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103_cache/plans/dj_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103_cache/plans/dp_cedar_optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103_cache/plans/optimizer.yaml",
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103_cache/plans/pecan_optimizer.yaml"
+          ]
+        },
+        {
+          "candidate_id": "p2",
+          "cedar_cost": 1.0315461461082198,
+          "dp_objective_cost": 0.45356092824388494,
+          "execution_times_sec": [
+            70.52460572100244,
+            54.61238978995243,
+            58.17844229901675
+          ],
+          "mean_runtime_sec": 61.10514593665721,
+          "optimizers": [
+            "dp_optimizer"
+          ],
+          "output_counts": [
+            100000,
+            100000,
+            100000
+          ],
+          "runtime_sd_sec": 8.350080813742098,
+          "sha256": "a8c7c9941f47a6c1a05367cd5354c1f16c757d5d8fd68281374ae50af573a1ee",
+          "source_plans": [
+            "evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/data/standard_core/workloads/wikitext103_cache/plans/dp_optimizer.yaml"
+          ]
+        }
+      ],
+      "label": "Wiki [Cache]",
+      "models": {
+        "cedar": {
+          "coverage": 1.0,
+          "fastest_candidate": "p1",
+          "num_scored": 2,
+          "selected_candidate": "p1",
+          "selection_regret": 0.0,
+          "spearman_rho": null,
+          "top1_correct": true
+        },
+        "dp": {
+          "coverage": 0.5,
+          "num_scored": 1
+        }
+      },
+      "num_execution_measurements": 15,
+      "num_unique_candidates": 2
+    }
+  }
+}

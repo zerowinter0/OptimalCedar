@@ -183,5 +183,5 @@ cython_debug/
 # Single canonical paper archive: exact profiles, plans, measured results,
 # source tables, figures, documentation, and checksums are all tracked here.
 /evaluation/chapter6_experiments/formal_results/*
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/
-!/evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/**
+!/evaluation/chapter6_experiments/formal_results/paper_artifacts/
+!/evaluation/chapter6_experiments/formal_results/paper_artifacts/**

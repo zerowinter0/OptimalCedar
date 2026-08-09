@@ -1,0 +1,13 @@
+{
+  "cedar_macro_spearman": 0.24281493238862784,
+  "cedar_mean_regret_percent": 36.010880506839904,
+  "cedar_top1": 3,
+  "dp_macro_spearman": 0.4575322137257029,
+  "dp_mean_regret_percent": 1.2509583604988685,
+  "dp_top1": 7,
+  "execution_measurements_in_main_comparison": 126,
+  "informative_workloads": 9,
+  "total_execution_measurements_audited": 156,
+  "total_unique_plans_audited": 42,
+  "unique_plans_in_main_comparison": 36
+}

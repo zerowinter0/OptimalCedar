@@ -786,6 +786,22 @@ class MyOptimizer(Optimizer):
                     v_idx = idx_of[v]
                     pred_indices[v_idx].append(u_idx)
 
+        # The sink Pipe is part of ``inner_ops`` so it can still receive a
+        # physical Variant or participate in a legal final fusion block.  It
+        # must nevertheless remain the sink after reordering, even when the
+        # application did not annotate it with ``fix()``.  Without these
+        # edges a cheap terminal mapper can move into the middle of the graph
+        # and change which Pipe is returned to the consumer.
+        output_p_id = self._get_output_p_id(self.physical_plan.graph)
+        if output_p_id in idx_of:
+            output_idx = idx_of[output_p_id]
+            for predecessor_idx in range(n):
+                if (
+                    predecessor_idx != output_idx
+                    and predecessor_idx not in pred_indices[output_idx]
+                ):
+                    pred_indices[output_idx].append(predecessor_idx)
+
         # 固定算子约束：对 `.fix()` 的算子，禁止其与其他算子交换位置。
         #
         # 语义：fixed pipe 的位置不可移动，等价于：

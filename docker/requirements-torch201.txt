@@ -25,6 +25,13 @@ fasttext==0.9.3
 ftfy==6.3.1
 kenlm==0.3.0
 sentencepiece==0.2.1
+av==13.1.0
+opencv-contrib-python==4.10.0.84
+simple-aesthetics-predictor==0.1.2
+loguru==0.7.3
+httpx==0.28.1
+wget==3.2
+accelerate==0.30.1
 datasets==2.19.2
 librosa
 langdetect

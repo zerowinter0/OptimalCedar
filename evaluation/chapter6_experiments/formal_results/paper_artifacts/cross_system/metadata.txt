@@ -1,0 +1,9 @@
+protocol=formal_cross_system_w8_three_repeat
+workloads=coco commonvoice commonvoice_cache llava_pretrain redpajama_c4 stackexchange simclrv2 simclrv2_cache wikitext103 wikitext103_cache redpajama_code pile_hackernews pile_pubmed_abstracts pile_uspto_backgrounds pile_europarl
+systems=pytorch tensorflow ray plumber fastflow
+excluded_workload=pile_freelaw
+workers=8
+cpu_budget=64
+repeats=3
+cell_timeout_sec=3600
+optimizer_source=evaluation/chapter6_experiments/formal_results/paper_optimizer_w8/figures/latest_optimizer_data.tsv

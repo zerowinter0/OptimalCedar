@@ -1,0 +1,11 @@
+{
+  "epoch_times_sec": [
+    296.9954372779466
+  ],
+  "measured_time_sec": 296.9954372779466,
+  "num_samples": 100000,
+  "offloading_type": "ff",
+  "schema_version": 1,
+  "system": "fastflow",
+  "workload": "wikitext103"
+}

@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-HOST_REPO="/home/xieruiyang/OptimalCedar"
 CEDAR_CONTAINER="${CEDAR_CONTAINER:-optimalcedar-torch201-dev}"
-SCRIPT_DIR="${HOST_REPO}/evaluation/chapter6_experiments"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_REPO="${HOST_REPO:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 COCO_READY="${HOST_REPO}/datasets/coco/train2017.download.json"
 CV_DATA_REL="datasets/commonvoice/cv15_en_train_5shards"
 CV_ARCHIVE_REL="datasets/commonvoice/cv15_en_train_5shards_archives"

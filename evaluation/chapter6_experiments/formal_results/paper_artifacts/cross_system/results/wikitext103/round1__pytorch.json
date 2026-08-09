@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_warmup_time_sec": 0.0,
+  "datajuicer_git": {
+    "commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+    "dirty": false
+  },
+  "entry": {
+    "backend": "native_python_operators",
+    "cache_policy": "not_requested",
+    "execution_env": "optimalcedar-torch201-dev",
+    "implementation": "evaluation/pipelines/wikitext103/torch_dataset.py",
+    "reason": null,
+    "status": "supported",
+    "system": "pytorch",
+    "workload": "wikitext103"
+  },
+  "measured_time_sec": 86.1064752790844,
+  "num_samples": 100000,
+  "optimalcedar_git": {
+    "commit": "65ec839add7a972d9d62453d545fcc95128995bb",
+    "dirty": true
+  },
+  "schema_version": 1,
+  "setup_time_sec": 2.275031932978891,
+  "system": "pytorch",
+  "throughput_samples_per_sec": 1161.3528445553547,
+  "versions": {
+    "python": "3.10.12",
+    "ray": "2.7.0",
+    "tensorflow": "2.14.0",
+    "torch": "2.0.1+cu118"
+  },
+  "workers": 8,
+  "workload": "wikitext103"
+}
