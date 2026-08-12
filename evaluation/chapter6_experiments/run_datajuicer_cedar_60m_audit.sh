@@ -10,6 +10,7 @@ PROFILE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_a
 
 cd "${REPO_ROOT}"
 source env/bin/activate
+export DJ_CANDIDATE_DIVERSE_PROTOCOL="evaluation/chapter6_experiments/DATA_JUICER_DIVERSE_WORKLOADS.md"
 
 run_audit_batch() {
   local run_id="$1" workloads="$2" outputs="$3"
