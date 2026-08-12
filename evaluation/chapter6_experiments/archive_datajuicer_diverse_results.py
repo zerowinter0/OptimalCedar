@@ -268,6 +268,8 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             / "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
             "video_self_evolution.json": repo
             / "datasets/general_video_refine/dataset_metadata.json",
+            "general_video_refine.json": repo
+            / "datasets/general_video_refine/dataset_metadata.json",
         }
         for name, source in source_metadata.items():
             _copy_json_without_repo_absolute_paths(
@@ -313,14 +315,9 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
                 )
         if "general_video_refine" in selected:
             _copy_evidence_tree(
-                repo
-                / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine",
-                staging / "evidence/general_video_refine/competitors",
-            )
-            _copy_evidence_tree(
-                repo
-                / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine",
-                staging / "evidence/general_video_refine/corrected_dp",
+                root
+                / "general_video_refine_formal_7500/general_video_refine",
+                staging / "evidence/general_video_refine/formal_round_robin",
             )
 
         # Preserve every fresh screen, including candidates omitted from the
@@ -335,6 +332,10 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             / "screening_matrix/redpajama_arxiv",
             "video_self_evolution": root
             / "video_self_evolution_screening/video_self_evolution",
+            "general_video_refine_historical_competitors": repo
+            / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine",
+            "general_video_refine_historical_corrected_dp": repo
+            / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine",
         }
         for name, source in screening_roots.items():
             if source.is_dir():

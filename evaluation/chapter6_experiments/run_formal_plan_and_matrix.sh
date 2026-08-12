@@ -24,6 +24,7 @@ COCO_SAMPLES="${COCO_SAMPLES:-5000}"
 COCO_DATASET_KWARGS="${COCO_DATASET_KWARGS:-split=val2017}"
 ALPACA_COT_SAMPLES="${ALPACA_COT_SAMPLES:-20000}"
 REDPAJAMA_ARXIV_SAMPLES="${REDPAJAMA_ARXIV_SAMPLES:-20000}"
+GENERAL_VIDEO_REFINE_SAMPLES="${GENERAL_VIDEO_REFINE_SAMPLES:-10000}"
 VIDEO_SELF_EVOLUTION_SAMPLES="${VIDEO_SELF_EVOLUTION_SAMPLES:-5000}"
 SELECTED_WORKLOADS="all"
 
@@ -145,7 +146,7 @@ if [[ "${PLAN_ONLY}" != "0" && "${PLAN_ONLY}" != "1" ]]; then
   echo "PLAN_ONLY must be 0 or 1." >&2
   exit 2
 fi
-for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES; do
+for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES; do
   sample_value="${!sample_setting}"
   if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
     echo "${sample_setting} must be a positive integer: ${sample_value}" >&2
@@ -696,7 +697,8 @@ run_workload redpajama_arxiv \
   "dataset_path=datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl"
 run_workload general_video_refine \
   evaluation/pipelines/general_video_refine/cedar_dataset.py \
-  "${PROFILE_DIR}/general_video_refine.yaml" 10000 off \
+  "${PROFILE_DIR}/general_video_refine.yaml" \
+  "${GENERAL_VIDEO_REFINE_SAMPLES}" off \
   "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos"
 run_workload video_self_evolution \
   evaluation/pipelines/video_self_evolution/cedar_dataset.py \

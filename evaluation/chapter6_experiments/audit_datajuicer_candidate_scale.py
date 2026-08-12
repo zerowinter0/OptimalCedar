@@ -41,6 +41,15 @@ CANDIDATES = {
         "target_outputs": 5_000,
         "video_root": "datasets/general_video_refine/videos",
     },
+    "general_video_refine": {
+        "source": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
+        "metadata": "datasets/general_video_refine/dataset_metadata.json",
+        "metadata_bytes_key": "output_bytes",
+        "metadata_sha256_key": "output_sha256",
+        "metadata_records_key": "video_caption_pair_count",
+        "target_outputs": 7_500,
+        "video_root": "datasets/general_video_refine/videos",
+    },
 }
 
 

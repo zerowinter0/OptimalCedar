@@ -530,21 +530,18 @@ def main() -> None:
     )
     video_old = repo / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/results"
     video_dp = repo / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine/results"
+    video_fallback = root / "general_video_refine_formal_7500/general_video_refine/results"
     ledger["general_video_refine"] = _summarize_matrix(
-        "general_video_refine", 10000,
-        {
-            name: [
-                video_dp
-                if name == "dp_optimizer"
-                else video_old
-            ]
-            for name in OPTIMIZERS
-        },
-        {
-            "competitors": str(video_old),
-            "corrected_dp": str(video_dp),
-        },
+        "general_video_refine", 7500,
+        {name: [video_fallback] for name in OPTIMIZERS},
+        str(video_fallback.parent),
     )
+    ledger["general_video_refine"]["historical_cross_run_screening"] = {
+        "competitors": str(video_old),
+        "corrected_dp": str(video_dp),
+        "requested_outputs": 10000,
+        "used_as_formal_speedup_evidence": False,
+    }
     video_self_results = root / "video_self_evolution_formal/video_self_evolution/results"
     ledger["video_self_evolution"] = _summarize_matrix(
         "video_self_evolution", 5000,

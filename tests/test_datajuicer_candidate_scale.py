@@ -3,10 +3,20 @@ import json
 import pytest
 
 from evaluation.chapter6_experiments.audit_datajuicer_candidate_scale import (
+    CANDIDATES,
     _prefix_stats,
     _sha256,
     _video_prefix_files,
 )
+
+
+def test_video_formal_targets_record_distinct_substantive_prefixes():
+    assert CANDIDATES["video_self_evolution"]["target_outputs"] == 5_000
+    assert CANDIDATES["general_video_refine"]["target_outputs"] == 7_500
+    assert (
+        CANDIDATES["general_video_refine"]["source"]
+        == CANDIDATES["video_self_evolution"]["source"]
+    )
 
 
 def test_prefix_stats_uses_exact_source_order_bytes(tmp_path):

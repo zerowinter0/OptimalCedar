@@ -62,7 +62,7 @@ successful repetitions.
 | `pile_pubmed_abstracts` | biomedical abstracts | 19 | implemented; formal result available |
 | `pile_uspto_backgrounds` | patent/legal-technical text | 19 | implemented; formal result available |
 | `llava_pretrain` | image-text refinement | 16 | implemented; formal result available |
-| `general_video_refine` | video-text filtering | 10 | implemented; corrected DP result available |
+| `general_video_refine` | video-text filtering | 10 | implemented; historical screen available; conditional fresh matrix |
 | `video_self_evolution` | video self-evolution filtering | 8 | implemented as a same-family replacement candidate; queued screening |
 | `bloom_oscar` | multilingual web text | 17 | implemented, but the official OSCAR source is unavailable locally; fallback only |
 
@@ -88,7 +88,7 @@ successful repetitions.
    workload-independent execution property and passes existing-plan regression
    checks unless a workload opts into new metadata.
 
-## Existing formal evidence
+## Existing and screening evidence
 
 Speedup is fastest non-DP execution time divided by DP execution time.
 
@@ -98,14 +98,18 @@ Speedup is fastest non-DP execution time divided by DP execution time.
 | `pile_hackernews` | 2.762x | yes |
 | `pile_pubmed_abstracts` | 1.507x | yes |
 | `pile_uspto_backgrounds` | 2.450x | yes |
-| `redpajama_code` | 0.906x | no |
+| `redpajama_code` | 1.675x | yes; fresh six-optimizer screen, formal matrix running |
 | `llava_pretrain` | 0.883x | no |
 | `general_video_refine` | 0.980x | no; corrected DP is within 2.1% of Data-Juicer |
 
-The video comparison uses the corrected three-run DP mean (2926.480 s) and
-the existing three-run Data-Juicer mean (2866.715 s). A fresh complete
-round-robin matrix is required before using that cross-run comparison as a
-paper claim.
+The general-video comparison uses the corrected three-run DP mean (2926.480
+s) and the existing three-run Data-Juicer mean (2866.715 s). Because those
+runs were not interleaved in one round-robin matrix, the 0.980x value is used
+only for screening. If video self-evolution does not yield a valid formal win,
+general-video is rerun at 7,500 outputs with all six optimizers and three
+round-robin repetitions before it can enter the final paper set. The 7,500
+source prefix covers 7,500 distinct videos (1,643,624,063 bytes); scaling from
+10,000 provides headroom for the historically slowest plan under 3,600 s.
 
 ## Fresh screening ledger
 
@@ -149,6 +153,7 @@ first 5,000 source records deliberately reference 5,000 different files.
 | `redpajama_arxiv` | 52,552 records / 3,221,193,432 B | 2,500 outputs | 157,411,194 B |
 | `alpaca_cot` | 74,771 records / 33,895,084 B | 65,000 outputs | 28,571,798 B (86.9% of records) |
 | `video_self_evolution` | 200,000 captions / 10,000 videos | 5,000 outputs | 5,000 distinct files / 1,093,920,286 B |
+| `general_video_refine` fallback | 200,000 captions / 10,000 videos | 7,500 outputs | 7,500 distinct files / 1,643,624,063 B |
 
 Thus the smaller record count for long-document and video workloads does not
 turn them into fixture-scale tests. Sample targets vary because the unit cost
