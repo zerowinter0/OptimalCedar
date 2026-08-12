@@ -1,10 +1,20 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from cedar.sources import IterSource
 
 from evaluation.pipelines.alpaca_cot.cedar_dataset import (
     AlpacaCotFeature,
     parse_and_format,
+)
+from evaluation.pipelines.alpaca_cot.validate_recipe import validate
+
+
+HUB_RECIPE = Path(
+    "data-juicer-hub/refined_recipes/alpaca_cot/"
+    "alpaca-cot-en-refine.yaml"
 )
 
 
@@ -38,3 +48,16 @@ def test_alpaca_cot_has_eight_reported_cedar_operators():
         "sync_text",
         "extract_text",
     }
+
+
+@pytest.mark.skipif(not HUB_RECIPE.is_file(), reason="Hub checkout not present")
+def test_alpaca_cot_matches_pinned_hub_recipe():
+    observed = validate(HUB_RECIPE)
+
+    assert [item["operator"] for item in observed] == [
+        "alphanumeric_filter",
+        "character_repetition_filter",
+        "flagged_words_filter",
+        "maximum_line_length_filter",
+        "text_length_filter",
+    ]

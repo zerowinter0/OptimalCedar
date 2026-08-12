@@ -74,3 +74,16 @@ frame-text similarity, and aesthetics as CUDA-resource pipes. Parse,
 video-root resolution, and output projection are fixed Cedar adapters and are
 not counted as Hub filters. The executable verifier is
 `evaluation/pipelines/video_self_evolution/validate_recipe.py`.
+
+## Diverse text candidates
+
+The fresh Alpaca-CoT and RedPajama-ArXiv migrations are checked directly
+against the same pinned Hub checkout by
+`evaluation/pipelines/alpaca_cot/validate_recipe.py` and
+`evaluation/pipelines/redpajama_arxiv/validate_recipe.py`. The shared verifier
+walks each actual Cedar DAG from source to sink and compares the instantiated
+operator class, recipe order, and every explicitly configured YAML argument.
+It permits only the declared Cedar parse/projection adapters and the
+cross-record `document_deduplicator`/`document_simhash_deduplicator` boundary.
+At revision `47fc345`, the checks cover all five Alpaca-CoT per-record filters
+and all fifteen RP-ArXiv per-record mappers and filters.
