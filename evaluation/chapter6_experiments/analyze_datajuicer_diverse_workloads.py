@@ -470,6 +470,9 @@ def main() -> None:
     classification = json.loads(
         (root / "recipe_classification.json").read_text(encoding="utf-8")
     )
+    data_scale = json.loads(
+        (root / "data_scale.json").read_text(encoding="utf-8")
+    )
     if classification.get("recipe_count") != len(
         classification.get("recipes", [])
     ):
@@ -568,6 +571,7 @@ def main() -> None:
             },
         },
         "selected_workloads": selected,
+        "data_scale": data_scale,
         "ledger": ledger,
         "summary": {
             "selected_count": len(selected),

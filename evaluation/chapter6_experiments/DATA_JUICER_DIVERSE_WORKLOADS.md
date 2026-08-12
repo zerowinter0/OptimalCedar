@@ -132,17 +132,17 @@ exhaustion; its projected execution remains well below 3,600 seconds.
 ## Formal data-scale evidence
 
 The following values are derived from the frozen local files. For text, the
-byte figure is the target output count multiplied by the source's mean record
-size. It is therefore a lower bound on bytes parsed before filtering: producing
-the requested retained outputs can only require scanning the same amount or
-more. For video, the first 5,000 source records deliberately reference 5,000
-different files.
+byte figure is the exact byte length of the first N source-order JSONL records,
+where N is the formal output target. Because these pipelines do not expand one
+input into multiple outputs, producing N retained outputs must parse at least
+those N input records and can only scan more after filtering. For video, the
+first 5,000 source records deliberately reference 5,000 different files.
 
 | Workload | Frozen source | Formal target | Minimum input represented by target |
 |---|---:|---:|---:|
-| `redpajama_code` | 50,000 records / 391,228,525 B | 20,000 outputs | 156,491,410 B (40.0% of records) |
-| `redpajama_arxiv` | 52,552 records / 3,221,193,432 B | 2,500 outputs | 153,238,384 B |
-| `alpaca_cot` | 74,771 records / 33,895,084 B | 65,000 outputs | 29,465,708 B (86.9% of records) |
+| `redpajama_code` | 50,000 records / 391,228,525 B | 20,000 outputs | 155,929,345 B (40.0% of records) |
+| `redpajama_arxiv` | 52,552 records / 3,221,193,432 B | 2,500 outputs | 157,411,194 B |
+| `alpaca_cot` | 74,771 records / 33,895,084 B | 65,000 outputs | 28,571,798 B (86.9% of records) |
 | `video_self_evolution` | 200,000 captions / 10,000 videos | 5,000 outputs | 5,000 distinct files / 1,093,920,286 B |
 
 Thus the smaller record count for long-document and video workloads does not

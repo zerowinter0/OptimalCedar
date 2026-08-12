@@ -1,0 +1,43 @@
+{
+  "definition": "Exact first-N source-order input prefix for N formal retained outputs; because no pipeline expands records, actual scanning is at least this large.",
+  "workloads": {
+    "redpajama_code": {
+      "source": "datasets/redpajama_code/redpajama-github-raw-50000.jsonl",
+      "metadata": "datasets/redpajama_code/redpajama-github-raw-50000.metadata.json",
+      "source_records": 50000,
+      "source_bytes": 391228525,
+      "formal_output_target": 20000,
+      "minimum_prefix_jsonl_bytes": 155929345,
+      "target_to_source_record_fraction": 0.4
+    },
+    "redpajama_arxiv": {
+      "source": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl",
+      "metadata": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.metadata.json",
+      "source_records": 52552,
+      "source_bytes": 3221193432,
+      "formal_output_target": 2500,
+      "minimum_prefix_jsonl_bytes": 157411194,
+      "target_to_source_record_fraction": 0.0475719287562795
+    },
+    "alpaca_cot": {
+      "source": "datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl",
+      "metadata": "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
+      "source_records": 74771,
+      "source_bytes": 33895084,
+      "formal_output_target": 65000,
+      "minimum_prefix_jsonl_bytes": 28571798,
+      "target_to_source_record_fraction": 0.869320993433283
+    },
+    "video_self_evolution": {
+      "source": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
+      "metadata": "datasets/general_video_refine/dataset_metadata.json",
+      "source_records": 200000,
+      "source_bytes": 31419873,
+      "formal_output_target": 5000,
+      "minimum_prefix_jsonl_bytes": 787306,
+      "target_to_source_record_fraction": 0.025,
+      "minimum_distinct_video_files": 5000,
+      "minimum_distinct_video_bytes": 1093920286
+    }
+  }
+}

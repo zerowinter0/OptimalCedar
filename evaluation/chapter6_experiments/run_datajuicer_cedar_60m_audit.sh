@@ -47,6 +47,8 @@ run_audit_batch heldout_20000 \
 
 bash evaluation/chapter6_experiments/run_datajuicer_two_stage_modal_audit.sh
 
+python evaluation/chapter6_experiments/audit_datajuicer_candidate_scale.py \
+  --output "${BASE_ROOT}/data_scale.json"
 python evaluation/chapter6_experiments/analyze_datajuicer_diverse_workloads.py \
   --root "${BASE_ROOT}" \
   --json-output "${BASE_ROOT}/final_selection.json" \

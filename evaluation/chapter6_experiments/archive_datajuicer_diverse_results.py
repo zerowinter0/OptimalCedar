@@ -91,6 +91,7 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             "final_selection.md",
             "recipe_classification.json",
             "recipe_classification.tsv",
+            "data_scale.json",
         ):
             _copy_file(root / name, staging / name)
         _copy_file(
