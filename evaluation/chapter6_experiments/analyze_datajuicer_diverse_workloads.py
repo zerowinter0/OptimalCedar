@@ -97,6 +97,32 @@ def _summarize_matrix(
         )
         for optimizer in OPTIMIZERS
     }
+    dp = runs["dp_optimizer"]
+    competitors = {
+        optimizer: run["mean_execution_time_sec"]
+        for optimizer, run in runs.items()
+        if optimizer != "dp_optimizer"
+        and run["valid"]
+        and run["within_execution_limit"]
+    }
+    valid = dp["valid"] and dp["within_execution_limit"] and bool(competitors)
+    best = min(competitors, key=competitors.get) if valid else None
+    best_time = competitors.get(best) if best else None
+    speedup = best_time / dp["mean_execution_time_sec"] if valid else None
+    return {
+        "workload": workload,
+        "expected_samples": expected_samples,
+        "evidence": evidence,
+        "runs": runs,
+        "valid": valid,
+        "best_other_optimizer": best,
+        "best_other_execution_time_sec": best_time,
+        "dp_execution_time_sec": dp["mean_execution_time_sec"],
+        "dp_speedup_over_best_other": speedup,
+        "dp_at_least_20pct_faster": bool(
+            speedup is not None and speedup >= THRESHOLD
+        ),
+    }
 
 
 def _screening_summary(
@@ -128,30 +154,6 @@ def _screening_summary(
         "dp_at_least_20pct_faster": bool(
             speedup is not None and speedup >= THRESHOLD
         ),
-    }
-    dp = runs["dp_optimizer"]
-    competitors = {
-        optimizer: run["mean_execution_time_sec"]
-        for optimizer, run in runs.items()
-        if optimizer != "dp_optimizer"
-        and run["valid"]
-        and run["within_execution_limit"]
-    }
-    valid = dp["valid"] and dp["within_execution_limit"] and bool(competitors)
-    best = min(competitors, key=competitors.get) if valid else None
-    best_time = competitors.get(best) if best else None
-    speedup = best_time / dp["mean_execution_time_sec"] if valid else None
-    return {
-        "workload": workload,
-        "expected_samples": expected_samples,
-        "evidence": evidence,
-        "runs": runs,
-        "valid": valid,
-        "best_other_optimizer": best,
-        "best_other_execution_time_sec": best_time,
-        "dp_execution_time_sec": dp["mean_execution_time_sec"],
-        "dp_speedup_over_best_other": speedup,
-        "dp_at_least_20pct_faster": bool(speedup is not None and speedup >= THRESHOLD),
     }
 
 

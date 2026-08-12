@@ -2,6 +2,7 @@ import pytest
 
 from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
     _selection,
+    _summarize_matrix,
 )
 
 
@@ -36,6 +37,52 @@ def _base_ledger():
         }
     )
     return ledger
+
+
+def _write_result(root, round_number, optimizer, seconds, samples=100):
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"round{round_number}__{optimizer}.json").write_text(
+        '{"epoch_run_times": ['
+        + str(seconds)
+        + '], "epoch_num_samples": ['
+        + str(samples)
+        + "]}\n",
+        encoding="utf-8",
+    )
+
+
+def test_summarize_matrix_uses_three_round_means_and_fastest_competitor(
+    tmp_path,
+):
+    results = tmp_path / "results"
+    for round_number, dp_seconds in enumerate((10.0, 11.0, 9.0), start=1):
+        _write_result(
+            results, round_number, "dp_optimizer", dp_seconds
+        )
+        _write_result(
+            results, round_number, "dj_optimizer", 15.0
+        )
+        _write_result(
+            results, round_number, "optimizer", 20.0
+        )
+
+    summary = _summarize_matrix(
+        "example",
+        100,
+        {
+            "optimizer": [results],
+            "dj_optimizer": [results],
+            "dp_optimizer": [results],
+        },
+        "test evidence",
+    )
+
+    assert summary["valid"] is True
+    assert summary["dp_execution_time_sec"] == pytest.approx(10.0)
+    assert summary["best_other_optimizer"] == "dj_optimizer"
+    assert summary["best_other_execution_time_sec"] == pytest.approx(15.0)
+    assert summary["dp_speedup_over_best_other"] == pytest.approx(1.5)
+    assert summary["dp_at_least_20pct_faster"] is True
 
 
 def test_selection_fallback_has_six_workloads_and_one_third_nonwins():
