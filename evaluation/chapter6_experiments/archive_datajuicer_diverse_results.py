@@ -31,6 +31,33 @@ def _copy_file(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def _relativize_json_paths(value, repo: Path):
+    if isinstance(value, dict):
+        return {
+            key: _relativize_json_paths(item, repo)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_relativize_json_paths(item, repo) for item in value]
+    if isinstance(value, str):
+        try:
+            return str(Path(value).relative_to(repo))
+        except ValueError:
+            return value
+    return value
+
+
+def _copy_json_without_repo_absolute_paths(
+    source: Path, destination: Path, repo: Path
+) -> None:
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload = _relativize_json_paths(payload, repo)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def _copy_evidence_tree(source: Path, destination: Path) -> None:
     if not source.is_dir():
         raise FileNotFoundError(source)
@@ -119,7 +146,9 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             / "datasets/general_video_refine/dataset_metadata.json",
         }
         for name, source in source_metadata.items():
-            _copy_file(source, staging / "source_metadata" / name)
+            _copy_json_without_repo_absolute_paths(
+                source, staging / "source_metadata" / name, repo
+            )
 
         canonical_profiles = (
             repo

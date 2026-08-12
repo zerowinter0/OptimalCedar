@@ -5,6 +5,7 @@ import pytest
 from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
     _diversity_summary,
     _pile_summaries,
+    _relativize_paths,
     _selection,
     _summarize_matrix,
 )
@@ -276,3 +277,21 @@ def test_reported_cedar_counts_match_current_logical_features():
 
     assert WORKLOAD_META["redpajama_code"][3] == 17
     assert WORKLOAD_META["llava_pretrain"][3] == 16
+
+
+def test_relativize_paths_removes_repository_absolute_paths(tmp_path):
+    report = {
+        "source": str(tmp_path / "outputs/result.json"),
+        "nested": [
+            {"evidence": str(tmp_path / "evaluation/evidence.json")},
+            "not/a/repository/absolute/path",
+        ],
+    }
+
+    assert _relativize_paths(report, tmp_path) == {
+        "source": "outputs/result.json",
+        "nested": [
+            {"evidence": "evaluation/evidence.json"},
+            "not/a/repository/absolute/path",
+        ],
+    }

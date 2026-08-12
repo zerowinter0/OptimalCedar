@@ -123,7 +123,7 @@ def _summarize_matrix(
     workload: str,
     expected_samples: int,
     roots_by_optimizer: dict[str, list[Path]],
-    evidence: str,
+    evidence: Any,
 ) -> dict[str, Any]:
     runs = {
         optimizer: _optimizer_measurement(
@@ -401,6 +401,22 @@ def _diversity_summary(selected: list[str]) -> dict[str, Any]:
     }
 
 
+def _relativize_paths(value: Any, repo: Path) -> Any:
+    """Replace repository-local absolute paths in a report recursively."""
+    if isinstance(value, dict):
+        return {
+            key: _relativize_paths(item, repo) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_relativize_paths(item, repo) for item in value]
+    if isinstance(value, str):
+        try:
+            return str(Path(value).relative_to(repo))
+        except ValueError:
+            return value
+    return value
+
+
 def _render(report: dict[str, Any]) -> str:
     lines = [
         "# Data-Juicer diverse-workload result",
@@ -512,7 +528,10 @@ def main() -> None:
             ]
             for name in OPTIMIZERS
         },
-        f"competitors={video_old}; corrected_DP={video_dp}",
+        {
+            "competitors": str(video_old),
+            "corrected_dp": str(video_dp),
+        },
     )
     video_self_results = root / "video_self_evolution_formal/video_self_evolution/results"
     ledger["video_self_evolution"] = _summarize_matrix(
@@ -583,6 +602,7 @@ def main() -> None:
     }
     args.json_output.parent.mkdir(parents=True, exist_ok=True)
     args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
+    report = _relativize_paths(report, repo.resolve())
     args.json_output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     args.markdown_output.write_text(_render(report), encoding="utf-8")
     print(args.markdown_output)
