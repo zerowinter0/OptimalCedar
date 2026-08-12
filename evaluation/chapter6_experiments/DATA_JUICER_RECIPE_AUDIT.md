@@ -60,3 +60,17 @@ The local `StopwordsFilter` tests only the configured lower bound, while the
 frozen implementation also applies its default upper bound of `1.0`. Both
 implementations cap the computed ratio at `1.0`, so these predicates are
 equivalent for the registered FreeLaw arguments.
+
+## Video self-evolution replacement candidate
+
+The diverse-workload extension additionally audits
+`refined_recipes/video/data-juicer-sandbox-self-evolution.yaml` from the same
+Hub revision. Its SHA-256 is
+`a593d79ca1cbe3acabb4432b96638a8a04f2efe0e7442a7449f233d9872e2b78`.
+The Cedar migration preserves the five operators, order, and predicate
+arguments exactly. The recipe's `mem_required` values are scheduler hints, not
+predicate arguments; Cedar represents the same distinction by marking NSFW,
+frame-text similarity, and aesthetics as CUDA-resource pipes. Parse,
+video-root resolution, and output projection are fixed Cedar adapters and are
+not counted as Hub filters. The executable verifier is
+`evaluation/pipelines/video_self_evolution/validate_recipe.py`.

@@ -15,13 +15,16 @@ RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
 CPU_BUDGET="${CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
 REPEATS="${REPEATS:-1}"
-OPTIMIZER_PLAN_TIMEOUT_SEC="${OPTIMIZER_PLAN_TIMEOUT_SEC:-300}"
+OPTIMIZER_PLAN_TIMEOUT_SEC="${OPTIMIZER_PLAN_TIMEOUT_SEC:-3600}"
 EXECUTION_TIMEOUT_SEC="${EXECUTION_TIMEOUT_SEC:-3600}"
 RESUME_EXISTING="${RESUME_EXISTING:-0}"
 OPTIMIZER_SET="${OPTIMIZER_SET:-all}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
 COCO_SAMPLES="${COCO_SAMPLES:-5000}"
 COCO_DATASET_KWARGS="${COCO_DATASET_KWARGS:-split=val2017}"
+ALPACA_COT_SAMPLES="${ALPACA_COT_SAMPLES:-20000}"
+REDPAJAMA_ARXIV_SAMPLES="${REDPAJAMA_ARXIV_SAMPLES:-20000}"
+VIDEO_SELF_EVOLUTION_SAMPLES="${VIDEO_SELF_EVOLUTION_SAMPLES:-5000}"
 SELECTED_WORKLOADS="all"
 
 usage() {
@@ -30,7 +33,8 @@ Usage: run_w8_plan_and_matrix.sh [--workloads workload[,workload...]]
 
 Default: run all workloads. Selected names: alpaca_cot, redpajama_arxiv, coco, commonvoice,
 commonvoice_cache, llava_pretrain, redpajama_c4, simclrv2, simclrv2_cache,
-wikitext103, wikitext103_cache, stackexchange, general_video_refine.
+wikitext103, wikitext103_cache, stackexchange, general_video_refine,
+video_self_evolution.
 
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
 dp_optimizer. OPTIMIZER_SET=paper runs the five optimizers in the current
@@ -131,6 +135,13 @@ if [[ "${PLAN_ONLY}" != "0" && "${PLAN_ONLY}" != "1" ]]; then
   echo "PLAN_ONLY must be 0 or 1." >&2
   exit 2
 fi
+for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES; do
+  sample_value="${!sample_setting}"
+  if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "${sample_setting} must be a positive integer: ${sample_value}" >&2
+    exit 2
+  fi
+done
 
 ray_healthy() {
   timeout 20s python - "${RAY_ADDRESS}" <<'PY' >/dev/null 2>&1
@@ -198,7 +209,7 @@ write_metadata() {
     printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     printf 'dataset_kwargs=%s\n' "${kwargs}"
-    if [[ "${workload}" == "alpaca_cot" || "${workload}" == "redpajama_arxiv" || "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
+    if [[ "${workload}" == "alpaca_cot" || "${workload}" == "redpajama_arxiv" || "${workload}" == "video_self_evolution" || "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
       printf 'data_juicer_reference_commit=%s\n' \
         "$(git -C data-juicer -c safe.directory="${REPO_ROOT}/data-juicer" rev-parse HEAD)"
     fi
@@ -232,6 +243,16 @@ write_metadata() {
       printf 'gpu=single_RTX_A6000_shared_by_all_optimizers\n'
       printf 'sample_construction=caption_round_then_numeric_video_id\n'
     fi
+    if [[ "${workload}" == "video_self_evolution" ]]; then
+      printf 'data_source=nisav/MSR-VTT@a9c822473969ee469e224da2187fda193c62e960\n'
+      printf 'data_juicer_hub_recipe=refined_recipes/video/data-juicer-sandbox-self-evolution.yaml\n'
+      printf 'data_juicer_hub_commit=47fc34588b5d4258c13747cea37c2b63cf4e11b0\n'
+      printf 'cedar_operator_count=8\n'
+      printf 'official_filter_count=5\n'
+      printf 'scenario=video_text_self_evolution_filtering\n'
+      printf 'gpu=single_RTX_A6000_shared_by_all_optimizers\n'
+      printf 'sample_construction=caption_round_then_numeric_video_id\n'
+    fi
     if [[ "${workload}" == "wikitext103" || "${workload}" == "wikitext103_cache" ]]; then
       printf 'scale_note=reduced_protocol_100000_line_prefix\n'
     fi
@@ -259,6 +280,7 @@ generate_plan() {
     --match_profile_resources
     --cpu_budget "${CPU_BUDGET}"
     --fixed_local_workers_ablation "${LOCAL_WORKERS}"
+    --optimizer_time_limit_sec "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
     --disable_cedar_runtime_timeout
     --plan_only
     --optimizers "${optimizer}"
@@ -644,15 +666,20 @@ run_workload stackexchange \
   "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl"
 run_workload alpaca_cot \
   evaluation/pipelines/alpaca_cot/cedar_dataset.py \
-  "${PROFILE_DIR}/alpaca_cot.yaml" 20000 off \
+  "${PROFILE_DIR}/alpaca_cot.yaml" "${ALPACA_COT_SAMPLES}" off \
   "dataset_path=datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl"
 run_workload redpajama_arxiv \
   evaluation/pipelines/redpajama_arxiv/cedar_dataset.py \
-  "${PROFILE_DIR}/redpajama_arxiv.yaml" 20000 off \
+  "${PROFILE_DIR}/redpajama_arxiv.yaml" "${REDPAJAMA_ARXIV_SAMPLES}" off \
   "dataset_path=datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl"
 run_workload general_video_refine \
   evaluation/pipelines/general_video_refine/cedar_dataset.py \
   "${PROFILE_DIR}/general_video_refine.yaml" 10000 off \
+  "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos"
+run_workload video_self_evolution \
+  evaluation/pipelines/video_self_evolution/cedar_dataset.py \
+  "${PROFILE_DIR}/video_self_evolution.yaml" \
+  "${VIDEO_SELF_EVOLUTION_SAMPLES}" off \
   "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos"
 run_workload simclrv2 \
   evaluation/pipelines/simclrv2/cedar_dataset.py \

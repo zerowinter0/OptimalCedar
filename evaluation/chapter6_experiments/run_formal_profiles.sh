@@ -22,7 +22,7 @@ Usage: run_formal_profiles.sh [--workloads workload[,workload...]]
 
 Default: profile all formal workloads.  The filter is useful when a dataset
 changes and only its profile must be regenerated under the same protocol.
-Data-Juicer candidates: alpaca_cot, redpajama_arxiv, pile_europarl, redpajama_code, pile_hackernews,
+Data-Juicer candidates: alpaca_cot, redpajama_arxiv, video_self_evolution, pile_europarl, redpajama_code, pile_hackernews,
 pile_pubmed_abstracts, pile_freelaw, pile_uspto_backgrounds, general_video_refine.
 EOF
 }
@@ -293,6 +293,10 @@ run_selected_profile general_video_refine \
   evaluation/pipelines/general_video_refine/cedar_dataset.py \
   "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos" \
   || failures+=(general_video_refine)
+run_selected_profile video_self_evolution \
+  evaluation/pipelines/video_self_evolution/cedar_dataset.py \
+  "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos" \
+  || failures+=(video_self_evolution)
 run_selected_profile pile_europarl evaluation/pipelines/pile_europarl/cedar_dataset.py \
   "dataset_path=datasets/pile_europarl/pile-europarl-raw.jsonl" || failures+=(pile_europarl)
 run_selected_profile redpajama_code evaluation/pipelines/redpajama_code/cedar_dataset.py \

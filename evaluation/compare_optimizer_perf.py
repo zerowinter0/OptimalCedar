@@ -62,7 +62,7 @@ REQUIRED_PROFILE_KEYS = {
     "disk_info": {"read_latency", "write_latency"},
 }
 
-OPTIMIZER_TIME_LIMIT_SEC = 5 * 60
+DEFAULT_OPTIMIZER_TIME_LIMIT_SEC = 5 * 60
 OPTIMIZER_RSS_LIMIT_BYTES = 405078136832
 
 
@@ -602,7 +602,7 @@ def _summarize_optimizer_overhead(
         "workload_skipped": True,
         "skip_reason": error.reason,
         "optimizer_overhead_too_high": True,
-        "optimizer_time_limit_sec": OPTIMIZER_TIME_LIMIT_SEC,
+        "optimizer_time_limit_sec": args.optimizer_time_limit_sec,
         "optimizer_rss_limit_bytes": OPTIMIZER_RSS_LIMIT_BYTES,
         "cedar_runs_last": False,
         "cedar_reorder_timeout_sec": args.cedar_reorder_timeout_sec,
@@ -745,7 +745,7 @@ def _run_one(
         setup_start = time.perf_counter()
         try:
             with _optimizer_resource_guard(
-                OPTIMIZER_TIME_LIMIT_SEC,
+                args.optimizer_time_limit_sec,
                 OPTIMIZER_RSS_LIMIT_BYTES,
             ):
                 if args.calculate_plan_cost:
@@ -1163,6 +1163,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--optimizer_time_limit_sec",
+        type=int,
+        default=DEFAULT_OPTIMIZER_TIME_LIMIT_SEC,
+        help=(
+            "Wall-clock limit for optimizer setup/plan generation. Formal "
+            "runners pass the same value as their outer plan timeout."
+        ),
+    )
+    parser.add_argument(
         "--cedar_reorder_timeout_sec",
         type=float,
         default=None,
@@ -1234,6 +1243,8 @@ def main() -> None:
             )
     if args.cedar_timeout_multiplier <= 0:
         raise ValueError("--cedar_timeout_multiplier must be > 0")
+    if args.optimizer_time_limit_sec <= 0:
+        raise ValueError("--optimizer_time_limit_sec must be > 0")
     if (
         args.cedar_reorder_timeout_sec is not None
         and args.cedar_reorder_timeout_sec <= 0
@@ -1366,7 +1377,7 @@ def main() -> None:
         "cpu_budget": (
             args.cpu_budget if args.match_profile_resources else None
         ),
-        "optimizer_time_limit_sec": OPTIMIZER_TIME_LIMIT_SEC,
+        "optimizer_time_limit_sec": args.optimizer_time_limit_sec,
         "optimizer_rss_limit_bytes": OPTIMIZER_RSS_LIMIT_BYTES,
         "cedar_runs_last": False,
         "execution_order_policy": "round_robin",

@@ -47,6 +47,24 @@ def test_video_adapter_is_lazily_serializable(monkeypatch):
     assert cloned._operator is None
 
 
+def test_video_adapter_supports_operator_without_rank_argument(monkeypatch):
+    calls = []
+
+    class FakeFilter:
+        def compute_stats_single(self, sample, context=False):
+            calls.append(context)
+            return sample
+
+        def process_single(self, sample):
+            return True
+
+    monkeypatch.setattr(ops, "_operator_class", lambda _: FakeFilter)
+    assert ops.DataJuicerVideoFilter("fake")(
+        {"text": "x", "videos": [], ops.FIELDS_STATS: {}}
+    )
+    assert calls == [False]
+
+
 def test_project_output_removes_internal_stats():
     sample = {
         "video_id": "video1",

@@ -15,19 +15,14 @@ CPU_BUDGET=64
 LOCAL_WORKERS=8
 REPEATS="${DJ_CANDIDATE_REPEATS:-3}"
 OUTPUTS="${DJ_CANDIDATE_OUTPUTS:-20000}"
-OPTIMIZER_TIMEOUT_SEC="${DJ_OPTIMIZER_TIMEOUT_SEC:-300}"
+OPTIMIZER_TIMEOUT_SEC="${DJ_OPTIMIZER_TIMEOUT_SEC:-3600}"
 EXECUTION_TIMEOUT_SEC="${DJ_EXECUTION_TIMEOUT_SEC:-3600}"
 PROFILE_TIMEOUT_SEC="${DJ_PROFILE_TIMEOUT_SEC:-3600}"
 RESUME_RUN="${DJ_CANDIDATE_RESUME:-0}"
 REUSE_PROFILE_RUN_ID="${DJ_REUSE_PROFILE_RUN_ID:-}"
 REUSE_EXISTING_PROFILES="${DJ_REUSE_EXISTING_PROFILES:-0}"
-OPTIMIZERS=(
-  optimizer
-  dj_optimizer
-  dp_cedar_optimizer
-  dp_optimizer
-  pecan_optimizer
-)
+OPTIMIZERS_CSV="${DJ_CANDIDATE_OPTIMIZERS:-optimizer,dj_optimizer,dp_cedar_optimizer,dp_optimizer,pecan_optimizer}"
+IFS=',' read -r -a OPTIMIZERS <<< "${OPTIMIZERS_CSV}"
 WORKLOADS_CSV="${DJ_CANDIDATE_WORKLOADS:-pile_europarl,redpajama_code}"
 IFS=',' read -r -a WORKLOADS <<< "${WORKLOADS_CSV}"
 
@@ -46,6 +41,18 @@ if [[ "${REUSE_EXISTING_PROFILES}" != "0" && \
   echo "DJ_REUSE_EXISTING_PROFILES must be 0 or 1." >&2
   exit 2
 fi
+if (( ${#OPTIMIZERS[@]} == 0 )); then
+  echo "DJ_CANDIDATE_OPTIMIZERS must select at least one optimizer." >&2
+  exit 2
+fi
+DP_SELECTED=0
+for optimizer in "${OPTIMIZERS[@]}"; do
+  case "${optimizer}" in
+    optimizer|dj_optimizer|dp_cedar_optimizer|dp_optimizer|pecan_optimizer) ;;
+    *) echo "Unknown optimizer in DJ_CANDIDATE_OPTIMIZERS: ${optimizer}" >&2; exit 2 ;;
+  esac
+  [[ "${optimizer}" == "dp_optimizer" ]] && DP_SELECTED=1
+done
 for numeric_setting in REPEATS OUTPUTS OPTIMIZER_TIMEOUT_SEC \
   EXECUTION_TIMEOUT_SEC PROFILE_TIMEOUT_SEC; do
   numeric_value="${!numeric_setting}"
@@ -331,6 +338,7 @@ generate_plan() {
     --match_profile_resources
     --cpu_budget "${CPU_BUDGET}"
     --fixed_local_workers_ablation "${LOCAL_WORKERS}"
+    --optimizer_time_limit_sec "${OPTIMIZER_TIMEOUT_SEC}"
     --plan_only
     --optimizers "${optimizer}"
     --results_path "${result}"
@@ -540,7 +548,8 @@ for workload in "${FEASIBLE_WORKLOADS[@]}"; do
     generate_plan "${workload}" "${optimizer}"
   done
 
-  if [[ ! -f "${workload_root}/plans/dp_optimizer.yaml" ]]; then
+  if [[ "${DP_SELECTED}" == "1" &&
+        ! -f "${workload_root}/plans/dp_optimizer.yaml" ]]; then
     write_status "${workload}" "candidate_failure" \
       "candidate_failed" \
       "DP did not produce a valid plan; ${REPEATS} successful DP repeats are impossible"
@@ -548,11 +557,30 @@ for workload in "${FEASIBLE_WORKLOADS[@]}"; do
     continue
   fi
 
+  declare -A execution_timed_out=()
   for ((round = 1; round <= REPEATS; round++)); do
     offset=$(((round - 1) % ${#OPTIMIZERS[@]}))
     for ((i = 0; i < ${#OPTIMIZERS[@]}; i++)); do
       optimizer="${OPTIMIZERS[$(((offset + i) % ${#OPTIMIZERS[@]}))]}"
+      if [[ "${execution_timed_out[${optimizer}]:-0}" == "1" ]]; then
+        write_status "${workload}" "round${round}__${optimizer}" \
+          "skipped_after_timeout" \
+          "earlier repeat exceeded ${EXECUTION_TIMEOUT_SEC}s"
+        continue
+      fi
       execute_plan "${workload}" "${optimizer}" "${round}"
+      status_path="${workload_root}/status/round${round}__${optimizer}.json"
+      if [[ -f "${status_path}" ]] && python - "${status_path}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    status = json.load(stream)
+raise SystemExit(0 if status.get("status") == "infeasible_timeout" else 1)
+PY
+      then
+        execution_timed_out["${optimizer}"]=1
+      fi
       if [[ -f "${workload_root}/status/source_infeasible.json" ]]; then
         break 2
       fi
@@ -568,17 +596,19 @@ for workload in "${FEASIBLE_WORKLOADS[@]}"; do
   done
 done
 
-python "${BASE_DIR}/analyze_dp_20pct_goal.py" \
-  --candidate-root "${RUN_ROOT}" \
-  --expected-repeats "${REPEATS}" \
-  --expected-samples "${OUTPUTS}" \
-  --execution-timeout-sec "${EXECUTION_TIMEOUT_SEC}" \
-  --json-output "${RUN_ROOT}/dp_20pct_report.json" \
-  --markdown-output "${RUN_ROOT}/dp_20pct_report.md"
-printf '%s\n' "${RUN_ROOT}" > \
-  "${FORMAL_ROOT}/datajuicer_candidates_latest_run.txt"
-cp -p "${RUN_ROOT}/dp_20pct_report.json" \
-  "${FORMAL_ROOT}/datajuicer_candidates_latest.json"
-cp -p "${RUN_ROOT}/dp_20pct_report.md" \
-  "${FORMAL_ROOT}/datajuicer_candidates_latest.md"
+if [[ "${DP_SELECTED}" == "1" ]]; then
+  python "${BASE_DIR}/analyze_dp_20pct_goal.py" \
+    --candidate-root "${RUN_ROOT}" \
+    --expected-repeats "${REPEATS}" \
+    --expected-samples "${OUTPUTS}" \
+    --execution-timeout-sec "${EXECUTION_TIMEOUT_SEC}" \
+    --json-output "${RUN_ROOT}/dp_20pct_report.json" \
+    --markdown-output "${RUN_ROOT}/dp_20pct_report.md"
+  printf '%s\n' "${RUN_ROOT}" > \
+    "${FORMAL_ROOT}/datajuicer_candidates_latest_run.txt"
+  cp -p "${RUN_ROOT}/dp_20pct_report.json" \
+    "${FORMAL_ROOT}/datajuicer_candidates_latest.json"
+  cp -p "${RUN_ROOT}/dp_20pct_report.md" \
+    "${FORMAL_ROOT}/datajuicer_candidates_latest.md"
+fi
 echo "[$(date -Is)] Candidate run complete: ${RUN_ROOT}"

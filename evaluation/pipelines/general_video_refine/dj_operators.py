@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import pathlib
 from typing import Any, Dict, Mapping
@@ -80,6 +81,12 @@ def _operator_class(name: str):
         )
 
         return VideoFramesTextSimilarityFilter
+    if name == "video_duration_filter":
+        from data_juicer.ops.filter.video_duration_filter import (
+            VideoDurationFilter,
+        )
+
+        return VideoDurationFilter
     if name == "video_motion_score_filter":
         from data_juicer.ops.filter.video_motion_score_filter import (
             VideoMotionScoreFilter,
@@ -125,10 +132,16 @@ class DataJuicerVideoFilter:
         sample.setdefault(FIELDS_CONTEXT, {})
         operator = self._get_operator()
         use_cuda = getattr(operator, "use_cuda", lambda: False)
+        compute_stats = operator.compute_stats_single
+        parameters = inspect.signature(compute_stats).parameters
+        kwargs = {"context": False}
+        if "rank" in parameters or any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        ):
+            kwargs["rank"] = 0
         if not use_cuda():
-            computed = operator.compute_stats_single(
-                sample, rank=0, context=False
-            )
+            computed = compute_stats(sample, **kwargs)
             return bool(operator.process_single(computed))
 
         # Data-Juicer normally invokes accelerator operators from an outer
@@ -140,9 +153,7 @@ class DataJuicerVideoFilter:
         import torch
 
         with torch.inference_mode():
-            computed = operator.compute_stats_single(
-                sample, rank=0, context=False
-            )
+            computed = compute_stats(sample, **kwargs)
             return bool(operator.process_single(computed))
 
     def __getstate__(self):
@@ -224,6 +235,68 @@ def video_watermark_filter() -> DataJuicerVideoFilter:
     )
 
 
+def sandbox_video_nsfw_filter() -> DataJuicerVideoFilter:
+    return DataJuicerVideoFilter(
+        "video_nsfw_filter",
+        hf_nsfw_model="Falconsai/nsfw_image_detection",
+        max_score=0.000195383,
+        frame_sampling_method="uniform",
+        frame_num=3,
+        reduce_mode="avg",
+        any_or_all="any",
+    )
+
+
+def sandbox_video_text_similarity_filter() -> DataJuicerVideoFilter:
+    return DataJuicerVideoFilter(
+        "video_frames_text_similarity_filter",
+        hf_clip="openai/clip-vit-base-patch32",
+        min_score=0.306337,
+        max_score=1.0,
+        frame_sampling_method="uniform",
+        frame_num=3,
+        horizontal_flip=False,
+        vertical_flip=False,
+        reduce_mode="avg",
+        any_or_all="any",
+    )
+
+
+def sandbox_video_motion_filter() -> DataJuicerVideoFilter:
+    return DataJuicerVideoFilter(
+        "video_motion_score_filter",
+        min_score=3.0,
+        max_score=20.0,
+        sampling_fps=2,
+        any_or_all="any",
+    )
+
+
+def sandbox_video_aesthetics_filter() -> DataJuicerVideoFilter:
+    return DataJuicerVideoFilter(
+        "video_aesthetics_filter",
+        hf_scorer_model=(
+            "shunk031/"
+            "aesthetics-predictor-v2-sac-logos-ava1-l14-linearMSE"
+        ),
+        min_score=0.418164,
+        max_score=1.0,
+        frame_sampling_method="uniform",
+        frame_num=3,
+        reduce_mode="avg",
+        any_or_all="any",
+    )
+
+
+def sandbox_video_duration_filter() -> DataJuicerVideoFilter:
+    return DataJuicerVideoFilter(
+        "video_duration_filter",
+        min_duration=2.0,
+        max_duration=100000.0,
+        any_or_all="any",
+    )
+
+
 __all__ = [
     "DataJuicerVideoFilter",
     "LanguageIDScoreFilter",
@@ -231,6 +304,11 @@ __all__ = [
     "SetVideoRootMapper",
     "parse_json_line",
     "project_output",
+    "sandbox_video_aesthetics_filter",
+    "sandbox_video_duration_filter",
+    "sandbox_video_motion_filter",
+    "sandbox_video_nsfw_filter",
+    "sandbox_video_text_similarity_filter",
     "video_aesthetics_filter",
     "video_motion_filter",
     "video_nsfw_filter",

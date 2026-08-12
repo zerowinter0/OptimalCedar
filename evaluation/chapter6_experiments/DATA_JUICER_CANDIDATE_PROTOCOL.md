@@ -11,7 +11,7 @@ collected. It is intended to prevent result-driven workload selection.
 - Migration audit: `DATA_JUICER_RECIPE_AUDIT.md`
 - Resource protocol: the Chapter 6 W=8 protocol (`CPU_BUDGET=64`, one
   Ray actor or SMP process per profiled stage, ten seconds per profile stage,
-  one shared profile for all optimizers, and a five-minute plan timeout).
+  one shared profile for all optimizers, and a 60-minute plan timeout).
 - Optimizer set: original Cedar, Data-Juicer, DP-Cedar, DP, and Pecan.
   DP-two-stage is outside the requested comparison scope and is ignored in
   both the best-competitor calculation and all subsequent candidate runs.
@@ -99,7 +99,7 @@ neither input data nor any measured optimizer setting and avoids using an
 unmeasured single-process utility as a proxy for the parallel system result.
 
 The extension batch uses exactly the same W=8, CPU-budget-64, shared-profile,
-three-repeat round-robin, 300-second plan timeout, and 3,600-second execution
+three-repeat round-robin, 3,600-second plan timeout, and 3,600-second execution
 timeout protocol as the first batch. Registering this complete batch before
 measurement prevents selecting only workloads whose observed optimizer result
 is favorable to DP.
@@ -167,7 +167,9 @@ individual outcomes.
 ### Formal timeout and censored-runtime rule
 
 This reporting clarification was recorded before any candidate execution
-completed. A plan optimization exceeding 300 seconds is reported as
+completed and originally used a 300-second plan threshold. The current public
+protocol supersedes that threshold with 3,600 seconds: a plan optimization
+exceeding 3,600 seconds is reported as
 unavailable and provides no execution-time evidence. An execution exceeding
 3,600 seconds is right-censored at 3,600 seconds.
 
