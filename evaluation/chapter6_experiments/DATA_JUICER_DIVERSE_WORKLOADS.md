@@ -129,6 +129,27 @@ profile observes approximately 0.996 cumulative retention, so this target
 covers about 87% of the source while retaining a margin against source
 exhaustion; its projected execution remains well below 3,600 seconds.
 
+## Formal data-scale evidence
+
+The following values are derived from the frozen local files. For text, the
+byte figure is the target output count multiplied by the source's mean record
+size. It is therefore a lower bound on bytes parsed before filtering: producing
+the requested retained outputs can only require scanning the same amount or
+more. For video, the first 5,000 source records deliberately reference 5,000
+different files.
+
+| Workload | Frozen source | Formal target | Minimum input represented by target |
+|---|---:|---:|---:|
+| `redpajama_code` | 50,000 records / 391,228,525 B | 20,000 outputs | 156,491,410 B (40.0% of records) |
+| `redpajama_arxiv` | 52,552 records / 3,221,193,432 B | 2,500 outputs | 153,238,384 B |
+| `alpaca_cot` | 74,771 records / 33,895,084 B | 65,000 outputs | 29,465,708 B (86.9% of records) |
+| `video_self_evolution` | 200,000 captions / 10,000 videos | 5,000 outputs | 5,000 distinct files / 1,093,920,286 B |
+
+Thus the smaller record count for long-document and video workloads does not
+turn them into fixture-scale tests. Sample targets vary because the unit cost
+and record payload differ by orders of magnitude, while every successful run
+must still finish within the same 3,600-second limit.
+
 The final set and aggregate win fraction will be recorded after the queued
 screening runs finish. In addition, original Cedar and DP two-stage plans
 behind reused Pile results are being re-audited with the current 3,600-second
