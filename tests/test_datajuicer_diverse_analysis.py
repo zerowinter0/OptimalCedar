@@ -4,6 +4,7 @@ import pytest
 
 from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
     _diversity_summary,
+    _general_video_summary,
     _pile_summaries,
     _relativize_paths,
     _selection,
@@ -149,6 +150,66 @@ def test_summarize_matrix_uses_old_overlimit_runs_as_timeout_evidence(
     assert len(
         summary["runs"]["optimizer"]["threshold_exceeding_sources"]
     ) == 3
+
+
+def test_general_video_formal_summary_ignores_historical_cross_run_values(
+    tmp_path,
+):
+    formal = (
+        tmp_path
+        / "root/general_video_refine_formal_7500/general_video_refine/results"
+    )
+    historical_competitors = (
+        tmp_path
+        / "repo/outputs/chapter6_experiments/general_video_refine_formal"
+        / "matrix/general_video_refine/results"
+    )
+    historical_dp = (
+        tmp_path
+        / "repo/outputs/chapter6_experiments"
+        / "general_video_refine_cost_model_fix_formal"
+        / "general_video_refine/results"
+    )
+    optimizers = (
+        "optimizer",
+        "dj_optimizer",
+        "dp_cedar_optimizer",
+        "dp_optimizer",
+        "dp_two_stage_optimizer",
+        "pecan_optimizer",
+    )
+    for round_number in (1, 2, 3):
+        for optimizer in optimizers:
+            _write_result(
+                formal,
+                round_number,
+                optimizer,
+                10.0 if optimizer == "dp_optimizer" else 15.0,
+                7500,
+            )
+        _write_result(
+            historical_competitors,
+            round_number,
+            "dj_optimizer",
+            1.0,
+            10000,
+        )
+        _write_result(
+            historical_dp,
+            round_number,
+            "dp_optimizer",
+            100.0,
+            10000,
+        )
+
+    summary = _general_video_summary(tmp_path / "root", tmp_path / "repo")
+
+    assert summary["valid"] is True
+    assert summary["dp_speedup_over_best_other"] == pytest.approx(1.5)
+    assert summary["dp_at_least_20pct_faster"] is True
+    assert summary["historical_cross_run_screening"][
+        "used_as_formal_speedup_evidence"
+    ] is False
 
 
 def test_pile_summary_requires_and_exposes_current_six_optimizer_evidence(

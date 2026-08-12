@@ -198,6 +198,26 @@ def _screening_summary(
         for name, value in times.items()
         if name != "dp_optimizer" and value <= EXECUTION_LIMIT_SEC
     }
+
+
+def _general_video_summary(root: Path, repo: Path) -> dict[str, Any]:
+    """Use only the fresh round-robin matrix as formal video evidence."""
+    video_old = repo / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/results"
+    video_dp = repo / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine/results"
+    video_fallback = root / "general_video_refine_formal_7500/general_video_refine/results"
+    summary = _summarize_matrix(
+        "general_video_refine",
+        7500,
+        {name: [video_fallback] for name in OPTIMIZERS},
+        str(video_fallback.parent),
+    )
+    summary["historical_cross_run_screening"] = {
+        "competitors": str(video_old),
+        "corrected_dp": str(video_dp),
+        "requested_outputs": 10000,
+        "used_as_formal_speedup_evidence": False,
+    }
+    return summary
     best = min(competitors, key=competitors.get) if dp and competitors else None
     speedup = competitors[best] / dp if best else None
     return {
@@ -528,20 +548,7 @@ def main() -> None:
         },
         str(standard / "llava_pretrain"),
     )
-    video_old = repo / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/results"
-    video_dp = repo / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine/results"
-    video_fallback = root / "general_video_refine_formal_7500/general_video_refine/results"
-    ledger["general_video_refine"] = _summarize_matrix(
-        "general_video_refine", 7500,
-        {name: [video_fallback] for name in OPTIMIZERS},
-        str(video_fallback.parent),
-    )
-    ledger["general_video_refine"]["historical_cross_run_screening"] = {
-        "competitors": str(video_old),
-        "corrected_dp": str(video_dp),
-        "requested_outputs": 10000,
-        "used_as_formal_speedup_evidence": False,
-    }
+    ledger["general_video_refine"] = _general_video_summary(root, repo)
     video_self_results = root / "video_self_evolution_formal/video_self_evolution/results"
     ledger["video_self_evolution"] = _summarize_matrix(
         "video_self_evolution", 5000,
