@@ -39,12 +39,35 @@ def _formal_report():
         "pecan_optimizer",
     )
     workloads = [f"workload_{index}" for index in range(6)]
-    run = {
-        "valid": True,
-        "within_execution_limit": True,
-        "formally_unavailable": False,
-        "execution_times_sec": [10.0, 11.0, 9.0],
-    }
+    def run(values):
+        return {
+            "valid": True,
+            "within_execution_limit": True,
+            "formally_unavailable": False,
+            "execution_times_sec": values,
+            "mean_execution_time_sec": sum(values) / len(values),
+        }
+
+    def workload_item(index):
+        is_win = index < 4
+        dp_values = [7.5, 8.0, 8.5] if is_win else [9.5, 10.0, 10.5]
+        other_values = [9.5, 10.0, 10.5]
+        runs = {
+            optimizer: run(
+                dp_values if optimizer == "dp_optimizer" else other_values
+            )
+            for optimizer in optimizers
+        }
+        speedup = 10.0 / (8.0 if is_win else 10.0)
+        return {
+            "valid": True,
+            "dp_at_least_20pct_faster": is_win,
+            "best_other_optimizer": "optimizer",
+            "best_other_execution_time_sec": 10.0,
+            "dp_execution_time_sec": 8.0 if is_win else 10.0,
+            "dp_speedup_over_best_other": speedup,
+            "runs": runs,
+        }
     return {
         "protocol": {
             "local_workers": 8,
@@ -57,11 +80,7 @@ def _formal_report():
         },
         "selected_workloads": workloads,
         "ledger": {
-            workload: {
-                "valid": True,
-                "dp_at_least_20pct_faster": index < 4,
-                "runs": {optimizer: dict(run) for optimizer in optimizers},
-            }
+            workload: workload_item(index)
             for index, workload in enumerate(workloads)
         },
         "summary": {
@@ -87,7 +106,16 @@ def test_archive_report_validation_enforces_formal_gates():
 
 def test_archive_report_validation_rejects_more_than_forty_percent_nonwins():
     report = _formal_report()
+    report["ledger"]["workload_3"]["runs"]["dp_optimizer"] = {
+        "valid": True,
+        "within_execution_limit": True,
+        "formally_unavailable": False,
+        "execution_times_sec": [9.5, 10.0, 10.5],
+        "mean_execution_time_sec": 10.0,
+    }
     report["ledger"]["workload_3"]["dp_at_least_20pct_faster"] = False
+    report["ledger"]["workload_3"]["dp_execution_time_sec"] = 10.0
+    report["ledger"]["workload_3"]["dp_speedup_over_best_other"] = 1.0
     report["summary"].update(wins=3, non_wins=3, failure_fraction=0.5)
     import pytest
 
@@ -113,4 +141,20 @@ def test_archive_report_validation_requires_successful_dp_and_comparator():
                 execution_times_sec=[],
             )
     with pytest.raises(RuntimeError, match="successful comparator"):
+        _validate_report(report)
+
+
+def test_archive_report_validation_recomputes_means_and_speedups():
+    import pytest
+
+    report = _formal_report()
+    report["ledger"]["workload_0"]["dp_speedup_over_best_other"] = 99.0
+    with pytest.raises(RuntimeError, match="inconsistent derived result"):
+        _validate_report(report)
+
+    report = _formal_report()
+    report["ledger"]["workload_0"]["runs"]["dp_optimizer"][
+        "mean_execution_time_sec"
+    ] = 99.0
+    with pytest.raises(RuntimeError, match="inconsistent execution mean"):
         _validate_report(report)

@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
+import statistics
 import tempfile
 from pathlib import Path
 
@@ -137,6 +139,7 @@ def _validate_report(report: dict) -> None:
                 f"selected workload lacks exact six-optimizer evidence: {workload}"
             )
         successful_optimizers = set()
+        successful_means = {}
         for optimizer, run in runs.items():
             valid = (
                 run.get("valid") is True
@@ -154,6 +157,15 @@ def _validate_report(report: dict) -> None:
                 )
             if valid:
                 successful_optimizers.add(optimizer)
+                measured_mean = statistics.mean(run["execution_times_sec"])
+                reported_mean = run.get("mean_execution_time_sec")
+                if reported_mean is None or not math.isclose(
+                    float(reported_mean), measured_mean, rel_tol=1e-12
+                ):
+                    raise RuntimeError(
+                        f"inconsistent execution mean: {workload}/{optimizer}"
+                    )
+                successful_means[optimizer] = measured_mean
         if "dp_optimizer" not in successful_optimizers:
             raise RuntimeError(
                 f"selected workload lacks three successful DP runs: {workload}"
@@ -162,7 +174,35 @@ def _validate_report(report: dict) -> None:
             raise RuntimeError(
                 f"selected workload lacks a successful comparator: {workload}"
             )
-        wins += item.get("dp_at_least_20pct_faster") is True
+        competitor_means = {
+            optimizer: mean
+            for optimizer, mean in successful_means.items()
+            if optimizer != "dp_optimizer"
+        }
+        best_optimizer = min(competitor_means, key=competitor_means.get)
+        best_time = competitor_means[best_optimizer]
+        dp_time = successful_means["dp_optimizer"]
+        speedup = best_time / dp_time
+        reported_values = {
+            "best_other_optimizer": best_optimizer,
+            "best_other_execution_time_sec": best_time,
+            "dp_execution_time_sec": dp_time,
+            "dp_speedup_over_best_other": speedup,
+            "dp_at_least_20pct_faster": speedup >= 1.20,
+        }
+        for key, expected in reported_values.items():
+            observed = item.get(key)
+            if isinstance(expected, float):
+                matches = observed is not None and math.isclose(
+                    float(observed), expected, rel_tol=1e-12
+                )
+            else:
+                matches = observed == expected
+            if not matches:
+                raise RuntimeError(
+                    f"inconsistent derived result for {workload}: {key}"
+                )
+        wins += speedup >= 1.20
     non_wins = len(selected) - wins
     failure_fraction = non_wins / len(selected)
     if failure_fraction > 0.40:
