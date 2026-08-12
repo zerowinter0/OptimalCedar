@@ -179,7 +179,7 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
         readme = [
             "# Formal Data-Juicer diverse-workload artifacts",
             "",
-            "This directory is generated only after every selected workload passes the W=8/CPU-64, three-repeat, 3,600-second execution audit and the reused Pile workloads pass the current 3,600-second original-Cedar plan audit.",
+            "This directory is generated only after every selected workload has complete W=8/CPU-64, three-repeat, 3,600-second evidence for all six optimizers and the reused Pile workloads pass the current 3,600-second original-Cedar and DP two-stage plan audit.",
             "",
             "Selected workloads: " + ", ".join(f"`{name}`" for name in selected) + ".",
             "",

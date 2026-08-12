@@ -236,6 +236,23 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
             )
         item = payload["candidates"][workload]
         runs = item["runs"]
+        for optimizer in (
+            "dj_optimizer",
+            "dp_cedar_optimizer",
+            "dp_optimizer",
+            "pecan_optimizer",
+        ):
+            run = runs[optimizer]
+            successful = (
+                run.get("valid") is True
+                and run.get("mean_execution_time_sec") is not None
+                and run["mean_execution_time_sec"] <= EXECUTION_LIMIT_SEC
+            )
+            unavailable = run.get("formally_unavailable") is True
+            if not (successful or unavailable):
+                raise RuntimeError(
+                    f"incomplete frozen evidence for {workload}/{optimizer}"
+                )
         competitors = {
             name: run["mean_execution_time_sec"]
             for name, run in runs.items()
@@ -262,6 +279,21 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
             competitors["dp_two_stage_optimizer"] = two_stage_audit[
                 "mean_execution_time_sec"
             ]
+        if not (
+            audit["valid"] and audit["within_execution_limit"]
+            or audit["formally_unavailable"]
+        ):
+            raise RuntimeError(
+                f"incomplete current original-Cedar evidence for {workload}"
+            )
+        if not (
+            two_stage_audit["valid"]
+            and two_stage_audit["within_execution_limit"]
+            or two_stage_audit["formally_unavailable"]
+        ):
+            raise RuntimeError(
+                f"incomplete current DP two-stage evidence for {workload}"
+            )
         dp_time = runs["dp_optimizer"]["mean_execution_time_sec"]
         best = min(competitors, key=competitors.get)
         speedup = competitors[best] / dp_time
@@ -272,6 +304,11 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
             "cedar_60m_audit_complete": True,
             "cedar_60m_audit": audit,
             "dp_two_stage_60m_audit": two_stage_audit,
+            "runs": {
+                **runs,
+                "optimizer": audit,
+                "dp_two_stage_optimizer": two_stage_audit,
+            },
             "valid": True,
             "best_other_optimizer": best,
             "best_other_execution_time_sec": competitors[best],

@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
+    _pile_summaries,
     _selection,
     _summarize_matrix,
 )
@@ -102,6 +105,97 @@ def test_summarize_matrix_rejects_missing_optimizer_evidence(tmp_path):
     )
 
     assert summary["valid"] is False
+
+
+def test_pile_summary_requires_and_exposes_current_six_optimizer_evidence(
+    tmp_path,
+):
+    workloads = {
+        "pile_europarl": ("europarl_2500", 2500),
+        "pile_hackernews": ("heldout_20000", 20000),
+        "pile_pubmed_abstracts": ("heldout_20000", 20000),
+        "pile_uspto_backgrounds": ("heldout_20000", 20000),
+    }
+    canonical_payload = {"candidates": {}}
+    for workload, (run_id, samples) in workloads.items():
+        canonical_payload["candidates"][workload] = {
+            "runs": {
+                "optimizer": {
+                    "valid": False,
+                    "formally_unavailable": True,
+                    "mean_execution_time_sec": None,
+                },
+                "dj_optimizer": {
+                    "valid": True,
+                    "formally_unavailable": False,
+                    "mean_execution_time_sec": 15.0,
+                },
+                "dp_cedar_optimizer": {
+                    "valid": True,
+                    "formally_unavailable": False,
+                    "mean_execution_time_sec": 20.0,
+                },
+                "dp_optimizer": {
+                    "valid": True,
+                    "formally_unavailable": False,
+                    "mean_execution_time_sec": 10.0,
+                },
+                "pecan_optimizer": {
+                    "valid": True,
+                    "formally_unavailable": False,
+                    "mean_execution_time_sec": 18.0,
+                },
+            }
+        }
+        run_root = (
+            tmp_path
+            / "audit"
+            / "datajuicer_candidate_runs"
+            / run_id
+        )
+        results = run_root / workload / "results"
+        for round_number in (1, 2, 3):
+            _write_result(
+                results, round_number, "optimizer", 16.0, samples
+            )
+            _write_result(
+                results,
+                round_number,
+                "dp_two_stage_optimizer",
+                12.0,
+                samples,
+            )
+        (run_root / workload / "metadata.txt").write_text(
+            "optimizer_timeout_sec=3600\n"
+            "optimizers=optimizer dp_two_stage_optimizer\n",
+            encoding="utf-8",
+        )
+        (run_root / "candidate_matrix.log").write_text(
+            f"Candidate run complete: {run_root}\n",
+            encoding="utf-8",
+        )
+    canonical = tmp_path / "canonical.json"
+    canonical.write_text(
+        json.dumps(canonical_payload), encoding="utf-8"
+    )
+
+    summaries = _pile_summaries(canonical, tmp_path / "audit")
+
+    assert set(summaries["pile_europarl"]["runs"]) == {
+        "optimizer",
+        "dj_optimizer",
+        "dp_cedar_optimizer",
+        "dp_optimizer",
+        "dp_two_stage_optimizer",
+        "pecan_optimizer",
+    }
+    assert (
+        summaries["pile_europarl"]["best_other_optimizer"]
+        == "dp_two_stage_optimizer"
+    )
+    assert summaries["pile_europarl"][
+        "dp_speedup_over_best_other"
+    ] == pytest.approx(1.2)
 
 
 def test_selection_fallback_has_six_workloads_and_one_third_nonwins():
