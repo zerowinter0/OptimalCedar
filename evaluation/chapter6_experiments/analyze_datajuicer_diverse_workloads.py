@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import statistics
@@ -306,13 +307,6 @@ def _selection(ledger: dict[str, dict[str, Any]]) -> list[str]:
         for name in ("redpajama_code", "redpajama_arxiv")
         if ledger[name]["valid"] and ledger[name]["dp_at_least_20pct_faster"]
     ]
-    extra = []
-    if extra_positive:
-        extra = [max(
-            extra_positive,
-            key=lambda name: ledger[name]["dp_speedup_over_best_other"],
-        )]
-
     # Within the structurally homogeneous Pile family, retain the strongest
     # scenario-distinct results only as needed to satisfy the six-workload and
     # 40%-non-win gates. This makes diversity the primary objective while the
@@ -324,30 +318,35 @@ def _selection(ledger: dict[str, dict[str, Any]]) -> list[str]:
     )
     candidates = []
     for pile_count in range(2, len(ranked_pile) + 1):
-        for include_llava in (False, True):
-            selected = (
-                ranked_pile[:pile_count]
-                + ["alpaca_cot", video]
-                + extra
-            )
-            if include_llava:
-                if not ledger["llava_pretrain"]["valid"]:
+        extra_subsets = itertools.chain.from_iterable(
+            itertools.combinations(extra_positive, count)
+            for count in range(len(extra_positive) + 1)
+        )
+        for extra in extra_subsets:
+            for include_llava in (False, True):
+                selected = (
+                    ranked_pile[:pile_count]
+                    + ["alpaca_cot", video]
+                    + list(extra)
+                )
+                if include_llava:
+                    if not ledger["llava_pretrain"]["valid"]:
+                        continue
+                    selected.append("llava_pretrain")
+                if not 6 <= len(selected) <= 8:
                     continue
-                selected.append("llava_pretrain")
-            if not 6 <= len(selected) <= 8:
-                continue
-            failures = sum(
-                not ledger[name]["dp_at_least_20pct_faster"]
-                for name in selected
-            )
-            if failures / len(selected) > 0.40:
-                continue
-            modalities = len(
-                {WORKLOAD_META[name][1] for name in selected}
-            )
-            candidates.append(
-                ((pile_count, -modalities, len(selected)), selected)
-            )
+                failures = sum(
+                    not ledger[name]["dp_at_least_20pct_faster"]
+                    for name in selected
+                )
+                if failures / len(selected) > 0.40:
+                    continue
+                modalities = len(
+                    {WORKLOAD_META[name][1] for name in selected}
+                )
+                candidates.append(
+                    ((pile_count, -modalities, len(selected)), selected)
+                )
     if not candidates:
         raise RuntimeError("no diverse 6--8 workload selection satisfies the 40% gate")
     return min(candidates, key=lambda item: item[0])[1]

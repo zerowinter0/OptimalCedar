@@ -116,7 +116,7 @@ def test_selection_fallback_has_six_workloads_and_one_third_nonwins():
     ) == 2
 
 
-def test_selection_uses_strong_extra_positive_to_admit_image_text():
+def test_selection_uses_both_positive_new_scenarios_to_reduce_pile_count():
     ledger = _base_ledger()
     ledger["redpajama_code"] = _item(valid=True, win=True, speedup=1.3)
     ledger["redpajama_arxiv"] = _item(valid=True, win=True, speedup=1.25)
@@ -125,8 +125,9 @@ def test_selection_uses_strong_extra_positive_to_admit_image_text():
 
     assert len(selected) == 6
     assert "redpajama_code" in selected
-    assert "redpajama_arxiv" not in selected
+    assert "redpajama_arxiv" in selected
     assert "llava_pretrain" not in selected
+    assert sum(name.startswith("pile_") for name in selected) == 2
     nonwins = sum(
         not ledger[name]["dp_at_least_20pct_faster"] for name in selected
     )
