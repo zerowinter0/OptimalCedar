@@ -14,6 +14,14 @@ from pathlib import Path
 
 ALLOWED_SUFFIXES = {".json", ".yaml", ".yml", ".txt", ".md", ".tsv"}
 EXCLUDED_PARTS = {"logs", "cache", "diagnostics", "__pycache__"}
+EXPECTED_OPTIMIZERS = {
+    "optimizer",
+    "dj_optimizer",
+    "dp_cedar_optimizer",
+    "dp_optimizer",
+    "dp_two_stage_optimizer",
+    "pecan_optimizer",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -97,12 +105,77 @@ def _verify_existing(archive: Path, final_selection: Path) -> None:
         raise RuntimeError("archive final_selection differs from current final report")
 
 
+def _validate_report(report: dict) -> None:
+    protocol = report.get("protocol", {})
+    expected_protocol = {
+        "local_workers": 8,
+        "cpu_budget": 64,
+        "repetitions": 3,
+        "optimizer_plan_limit_sec": 3600,
+        "execution_limit_sec": 3600,
+        "speedup_threshold": 1.20,
+        "maximum_non_win_fraction": 0.40,
+    }
+    for key, expected in expected_protocol.items():
+        if protocol.get(key) != expected:
+            raise RuntimeError(
+                f"unexpected formal protocol {key}: "
+                f"{protocol.get(key)!r} != {expected!r}"
+            )
+    selected = report.get("selected_workloads", [])
+    if len(selected) != len(set(selected)) or not 6 <= len(selected) <= 8:
+        raise RuntimeError("final selection must contain six to eight unique workloads")
+    ledger = report.get("ledger", {})
+    wins = 0
+    for workload in selected:
+        item = ledger.get(workload, {})
+        if item.get("valid") is not True:
+            raise RuntimeError(f"selected workload is invalid: {workload}")
+        runs = item.get("runs", {})
+        if set(runs) != EXPECTED_OPTIMIZERS:
+            raise RuntimeError(
+                f"selected workload lacks exact six-optimizer evidence: {workload}"
+            )
+        for optimizer, run in runs.items():
+            valid = (
+                run.get("valid") is True
+                and run.get("within_execution_limit", True) is True
+                and len(run.get("execution_times_sec", [])) == 3
+                and all(
+                    0 < float(value) <= 3600
+                    for value in run.get("execution_times_sec", [])
+                )
+            )
+            unavailable = run.get("formally_unavailable") is True
+            if not (valid or unavailable):
+                raise RuntimeError(
+                    f"incomplete formal run: {workload}/{optimizer}"
+                )
+        wins += item.get("dp_at_least_20pct_faster") is True
+    non_wins = len(selected) - wins
+    failure_fraction = non_wins / len(selected)
+    if failure_fraction > 0.40:
+        raise RuntimeError("selected workload non-win fraction exceeds 40%")
+    summary = report.get("summary", {})
+    expected_summary = {
+        "selected_count": len(selected),
+        "wins": wins,
+        "non_wins": non_wins,
+        "failure_fraction": failure_fraction,
+    }
+    for key, expected in expected_summary.items():
+        if summary.get(key) != expected:
+            raise RuntimeError(f"inconsistent final summary field: {key}")
+    scenarios = summary.get("diversity", {}).get("scenarios", [])
+    if len(set(scenarios)) < 6:
+        raise RuntimeError("final selection covers fewer than six scenarios")
+
+
 def create_archive(root: Path, archive: Path, repo: Path) -> None:
     final_selection = root / "final_selection.json"
     report = json.loads(final_selection.read_text(encoding="utf-8"))
+    _validate_report(report)
     selected = report["selected_workloads"]
-    if not 6 <= len(selected) <= 8:
-        raise RuntimeError("final selection does not contain six to eight workloads")
     if archive.exists():
         _verify_existing(archive, final_selection)
         print(f"verified existing archive: {archive}")
