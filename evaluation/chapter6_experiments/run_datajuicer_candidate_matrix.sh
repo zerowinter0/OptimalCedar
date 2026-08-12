@@ -21,7 +21,7 @@ PROFILE_TIMEOUT_SEC="${DJ_PROFILE_TIMEOUT_SEC:-3600}"
 RESUME_RUN="${DJ_CANDIDATE_RESUME:-0}"
 REUSE_PROFILE_RUN_ID="${DJ_REUSE_PROFILE_RUN_ID:-}"
 REUSE_EXISTING_PROFILES="${DJ_REUSE_EXISTING_PROFILES:-0}"
-OPTIMIZERS_CSV="${DJ_CANDIDATE_OPTIMIZERS:-optimizer,dj_optimizer,dp_cedar_optimizer,dp_optimizer,pecan_optimizer}"
+OPTIMIZERS_CSV="${DJ_CANDIDATE_OPTIMIZERS:-optimizer,dj_optimizer,dp_cedar_optimizer,dp_optimizer,dp_two_stage_optimizer,pecan_optimizer}"
 IFS=',' read -r -a OPTIMIZERS <<< "${OPTIMIZERS_CSV}"
 WORKLOADS_CSV="${DJ_CANDIDATE_WORKLOADS:-pile_europarl,redpajama_code}"
 IFS=',' read -r -a WORKLOADS <<< "${WORKLOADS_CSV}"
@@ -48,7 +48,7 @@ fi
 DP_SELECTED=0
 for optimizer in "${OPTIMIZERS[@]}"; do
   case "${optimizer}" in
-    optimizer|dj_optimizer|dp_cedar_optimizer|dp_optimizer|pecan_optimizer) ;;
+    optimizer|dj_optimizer|dp_cedar_optimizer|dp_optimizer|dp_two_stage_optimizer|pecan_optimizer) ;;
     *) echo "Unknown optimizer in DJ_CANDIDATE_OPTIMIZERS: ${optimizer}" >&2; exit 2 ;;
   esac
   [[ "${optimizer}" == "dp_optimizer" ]] && DP_SELECTED=1

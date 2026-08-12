@@ -16,6 +16,7 @@ OPTIMIZERS = (
     "dj_optimizer",
     "dp_cedar_optimizer",
     "dp_optimizer",
+    "dp_two_stage_optimizer",
     "pecan_optimizer",
 )
 THRESHOLD = 1.20
@@ -53,6 +54,7 @@ def _optimizer_measurement(
 ) -> dict[str, Any]:
     values: dict[int, float] = {}
     sources = []
+    unavailable_sources = []
     for root in result_roots:
         for path in sorted(root.glob(f"round*__{optimizer}.json")):
             prefix = path.stem.split("__", 1)[0]
@@ -69,6 +71,35 @@ def _optimizer_measurement(
                 )
             values[round_number] = value
             sources.append(str(path))
+        workload_root = root.parent
+        evidence_paths = [
+            workload_root / "plans" / f"{optimizer}.unavailable.json",
+            *root.glob(f"round*__{optimizer}.timeout.json"),
+            *(workload_root / "status").glob(f"plan__{optimizer}.json"),
+            *(workload_root / "status").glob(f"round*__{optimizer}.json"),
+        ]
+        for evidence_path in evidence_paths:
+            if not evidence_path.is_file():
+                continue
+            try:
+                evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            status = evidence.get("status")
+            reason = evidence.get("reason")
+            is_timeout = status in {
+                "optimizer_timeout",
+                "infeasible_timeout",
+                "timeout",
+            } or (
+                status == "unavailable"
+                and reason in {
+                    "plan_generation_timeout",
+                    "optimizer_timeout",
+                }
+            )
+            if is_timeout:
+                unavailable_sources.append(str(evidence_path))
     ordered = [values[key] for key in sorted(values)]
     valid = sorted(values) == [1, 2, 3]
     return {
@@ -81,7 +112,9 @@ def _optimizer_measurement(
         "within_execution_limit": valid and all(
             value <= EXECUTION_LIMIT_SEC for value in ordered
         ),
+        "formally_unavailable": not valid and bool(unavailable_sources),
         "sources": sources,
+        "unavailable_sources": unavailable_sources,
     }
 
 
@@ -105,7 +138,17 @@ def _summarize_matrix(
         and run["valid"]
         and run["within_execution_limit"]
     }
-    valid = dp["valid"] and dp["within_execution_limit"] and bool(competitors)
+    complete_optimizer_evidence = all(
+        run["valid"] and run["within_execution_limit"]
+        or run["formally_unavailable"]
+        for run in runs.values()
+    )
+    valid = (
+        dp["valid"]
+        and dp["within_execution_limit"]
+        and bool(competitors)
+        and complete_optimizer_evidence
+    )
     best = min(competitors, key=competitors.get) if valid else None
     best_time = competitors.get(best) if best else None
     speedup = best_time / dp["mean_execution_time_sec"] if valid else None
@@ -183,6 +226,8 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
             and "optimizer_timeout_sec=3600" in audit_metadata.read_text(
                 encoding="utf-8", errors="replace"
             )
+            and "optimizers=optimizer dp_two_stage_optimizer"
+            in audit_metadata.read_text(encoding="utf-8", errors="replace")
         )
         if not audit_complete:
             raise RuntimeError(
@@ -205,6 +250,17 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
         )
         if audit["valid"] and audit["within_execution_limit"]:
             competitors["optimizer"] = audit["mean_execution_time_sec"]
+        two_stage_audit = _optimizer_measurement(
+            [audit_results],
+            "dp_two_stage_optimizer",
+            2500 if workload == "pile_europarl" else 20000,
+        )
+        if two_stage_audit["valid"] and two_stage_audit[
+            "within_execution_limit"
+        ]:
+            competitors["dp_two_stage_optimizer"] = two_stage_audit[
+                "mean_execution_time_sec"
+            ]
         dp_time = runs["dp_optimizer"]["mean_execution_time_sec"]
         best = min(competitors, key=competitors.get)
         speedup = competitors[best] / dp_time
@@ -214,6 +270,7 @@ def _pile_summaries(canonical: Path, audit_root: Path) -> dict[str, Any]:
             "evidence": str(canonical),
             "cedar_60m_audit_complete": True,
             "cedar_60m_audit": audit,
+            "dp_two_stage_60m_audit": two_stage_audit,
             "valid": True,
             "best_other_optimizer": best,
             "best_other_execution_time_sec": competitors[best],
@@ -355,6 +412,7 @@ def main() -> None:
     root = args.root.resolve()
     ledger = _pile_summaries(args.canonical.resolve(), root / "cedar_60m_audit")
     standard = repo / "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads"
+    modal_two_stage = root / "two_stage_modal_audit"
     ledger["alpaca_cot"] = _summarize_matrix(
         "alpaca_cot", 20000,
         {name: [root / "alpaca_formal/alpaca_cot/results"] for name in OPTIMIZERS},
@@ -365,14 +423,28 @@ def main() -> None:
     )
     ledger["llava_pretrain"] = _summarize_matrix(
         "llava_pretrain", 5000,
-        {name: [standard / "llava_pretrain/results"] for name in OPTIMIZERS},
+        {
+            name: [
+                modal_two_stage / "llava_pretrain/results"
+                if name in {"optimizer", "dp_two_stage_optimizer"}
+                else standard / "llava_pretrain/results"
+            ]
+            for name in OPTIMIZERS
+        },
         str(standard / "llava_pretrain"),
     )
     video_old = repo / "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/results"
     video_dp = repo / "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine/results"
     ledger["general_video_refine"] = _summarize_matrix(
         "general_video_refine", 10000,
-        {name: [video_dp if name == "dp_optimizer" else video_old] for name in OPTIMIZERS},
+        {
+            name: [
+                video_dp
+                if name == "dp_optimizer"
+                else video_old
+            ]
+            for name in OPTIMIZERS
+        },
         f"competitors={video_old}; corrected_DP={video_dp}",
     )
     video_self_results = root / "video_self_evolution_formal/video_self_evolution/results"

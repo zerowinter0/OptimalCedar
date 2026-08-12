@@ -194,7 +194,9 @@ The workload remains in the registered denominator and is reported as a
 failure; missing competitor cells are never imputed. The rule therefore
 cannot create a DP win. It only avoids spending additional hours on a
 candidate whose required DP mean can no longer be formed. All workloads for
-which DP remains potentially valid still execute the complete five-optimizer,
+which DP remains potentially valid still execute the complete six-optimizer
+(`optimizer`, `dj_optimizer`, `dp_cedar_optimizer`, `dp_optimizer`,
+`dp_two_stage_optimizer`, and `pecan_optimizer`),
 three-repeat round-robin matrix.
 
 ### EuroParl post-timeout resource allocation

@@ -39,8 +39,11 @@ video_self_evolution.
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
 dp_optimizer. OPTIMIZER_SET=paper runs the five optimizers in the current
 paper figure. OPTIMIZER_SET=complete runs their union with dp_two_stage_optimizer.
-The default "all" preserves the project-standard five-optimizer matrix.
+The default "all" is the project-standard six-optimizer matrix.
 OPTIMIZER_SET=dp_only regenerates only dp_optimizer.
+OPTIMIZER_SET=dp_two_stage_only runs only dp_two_stage_optimizer.
+OPTIMIZER_SET=legacy_and_two_stage runs original Cedar and the DP two-stage
+ablation for supplementing older formal matrices.
 EOF
 }
 
@@ -79,6 +82,7 @@ case "${OPTIMIZER_SET}" in
       dp_cedar_optimizer
       dp_optimizer
       dp_two_stage_optimizer
+      pecan_optimizer
     )
     ;;
   required)
@@ -106,8 +110,14 @@ case "${OPTIMIZER_SET}" in
   dp_only)
     OPTIMIZERS=(dp_optimizer)
     ;;
+  dp_two_stage_only)
+    OPTIMIZERS=(dp_two_stage_optimizer)
+    ;;
+  legacy_and_two_stage)
+    OPTIMIZERS=(optimizer dp_two_stage_optimizer)
+    ;;
   *)
-    echo "OPTIMIZER_SET must be all, required, paper, complete, or dp_only." >&2
+    echo "OPTIMIZER_SET must be all, required, paper, complete, dp_only, dp_two_stage_only, or legacy_and_two_stage." >&2
     exit 2
     ;;
 esac

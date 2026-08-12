@@ -16,8 +16,31 @@ ALPACA_ROOT="${BASE_ROOT}/alpaca_formal"
 cd "${REPO_ROOT}"
 source env/bin/activate
 
+complete_candidate_report() {
+  local report="$1" repeats="$2"
+  [[ -f "${report}" ]] || return 1
+  python - "${report}" "${repeats}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+expected = {
+    "optimizer",
+    "dj_optimizer",
+    "dp_cedar_optimizer",
+    "dp_optimizer",
+    "dp_two_stage_optimizer",
+    "pecan_optimizer",
+}
+protocol = report.get("protocol", {})
+assert set(protocol.get("candidate_optimizer_set", [])) == expected
+assert protocol.get("candidate_repeats") == int(sys.argv[2])
+PY
+}
+
 mkdir -p "${CODE_ROOT}"
-if [[ -f "${CODE_RUN_ROOT}/dp_20pct_report.json" ]]; then
+if complete_candidate_report "${CODE_RUN_ROOT}/dp_20pct_report.json" 1; then
   echo "[$(date -Is)] REUSE completed RP-Code screening"
 elif [[ -e "${CODE_RUN_ROOT}" ]]; then
   echo "[$(date -Is)] RESUME incomplete RP-Code screening"
@@ -62,7 +85,8 @@ raise SystemExit(
 )
 PY
 then
-  if [[ -f "${CODE_FORMAL_RUN_ROOT}/dp_20pct_report.json" ]]; then
+  if complete_candidate_report \
+       "${CODE_FORMAL_RUN_ROOT}/dp_20pct_report.json" 3; then
     echo "[$(date -Is)] REUSE completed RP-Code formal matrix"
   elif [[ -e "${CODE_FORMAL_RUN_ROOT}" ]]; then
     echo "[$(date -Is)] RESUME incomplete RP-Code formal matrix"
@@ -109,7 +133,7 @@ elif [[ -e "${ARXIV_ROOT}" ]]; then
   MATRIX_OUTPUT_ROOT="${ARXIV_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
   REPEATS=1 \
-  OPTIMIZER_SET=paper \
+  OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
   REDPAJAMA_ARXIV_SAMPLES=2500 \
@@ -120,7 +144,7 @@ else
   MATRIX_OUTPUT_ROOT="${ARXIV_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
   REPEATS=1 \
-  OPTIMIZER_SET=paper \
+  OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
   REDPAJAMA_ARXIV_SAMPLES=2500 \
@@ -159,7 +183,7 @@ then
     MATRIX_OUTPUT_ROOT="${ARXIV_FORMAL_ROOT}" \
     PROFILE_DIR="${BASE_ROOT}/profiles" \
     REPEATS=3 \
-    OPTIMIZER_SET=paper \
+    OPTIMIZER_SET=complete \
     OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
     EXECUTION_TIMEOUT_SEC=3600 \
     REDPAJAMA_ARXIV_SAMPLES=2500 \
@@ -170,7 +194,7 @@ then
     MATRIX_OUTPUT_ROOT="${ARXIV_FORMAL_ROOT}" \
     PROFILE_DIR="${BASE_ROOT}/profiles" \
     REPEATS=3 \
-    OPTIMIZER_SET=paper \
+    OPTIMIZER_SET=complete \
     OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
     EXECUTION_TIMEOUT_SEC=3600 \
     REDPAJAMA_ARXIV_SAMPLES=2500 \
@@ -193,7 +217,7 @@ elif [[ -e "${ALPACA_ROOT}" ]]; then
   MATRIX_OUTPUT_ROOT="${ALPACA_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
   REPEATS=3 \
-  OPTIMIZER_SET=paper \
+  OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
   ALPACA_COT_SAMPLES=20000 \
@@ -204,7 +228,7 @@ else
   MATRIX_OUTPUT_ROOT="${ALPACA_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
   REPEATS=3 \
-  OPTIMIZER_SET=paper \
+  OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
   ALPACA_COT_SAMPLES=20000 \

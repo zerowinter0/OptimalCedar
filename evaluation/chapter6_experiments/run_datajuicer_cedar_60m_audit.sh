@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-audit original Cedar plans under the current 60-minute plan threshold.
+# Re-audit original Cedar and DP two-stage plans under the current threshold.
 
 set -euo pipefail
 
@@ -21,26 +21,31 @@ run_audit_batch() {
     return
   fi
   if [[ -e "${run_root}" ]]; then
-    echo "Incomplete Cedar audit already exists: ${run_root}" >&2
-    exit 2
+    resume=1
+    echo "[$(date -Is)] RESUME incomplete optimizer audit ${run_id}"
+  else
+    resume=0
   fi
   DJ_CANDIDATE_OUTPUT_ROOT="${AUDIT_ROOT}" \
   DJ_CANDIDATE_PROFILE_DIR="${PROFILE_DIR}" \
   DJ_CANDIDATE_RUN_ID="${run_id}" \
   DJ_CANDIDATE_WORKLOADS="${workloads}" \
-  DJ_CANDIDATE_OPTIMIZERS=optimizer \
+  DJ_CANDIDATE_OPTIMIZERS=optimizer,dp_two_stage_optimizer \
   DJ_CANDIDATE_REPEATS=3 \
   DJ_CANDIDATE_OUTPUTS="${outputs}" \
   DJ_OPTIMIZER_TIMEOUT_SEC=3600 \
   DJ_EXECUTION_TIMEOUT_SEC=3600 \
   DJ_PROFILE_TIMEOUT_SEC=3600 \
   DJ_REUSE_EXISTING_PROFILES=1 \
+  DJ_CANDIDATE_RESUME="${resume}" \
   bash evaluation/chapter6_experiments/run_datajuicer_candidate_matrix.sh
 }
 
 run_audit_batch europarl_2500 pile_europarl 2500
 run_audit_batch heldout_20000 \
   pile_hackernews,pile_pubmed_abstracts,pile_uspto_backgrounds 20000
+
+bash evaluation/chapter6_experiments/run_datajuicer_two_stage_modal_audit.sh
 
 python evaluation/chapter6_experiments/analyze_datajuicer_diverse_workloads.py \
   --root "${BASE_ROOT}" \

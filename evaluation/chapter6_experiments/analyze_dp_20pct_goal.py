@@ -24,6 +24,7 @@ OPTIMIZERS = (
     "dj_optimizer",
     "dp_cedar_optimizer",
     "dp_optimizer",
+    "dp_two_stage_optimizer",
     "pecan_optimizer",
 )
 DP = "dp_optimizer"
@@ -31,6 +32,7 @@ EXISTING_COMPETITOR_ENTITIES = (
     "cedar_optimizer",
     "cedar_dj_optimizer",
     "cedar_dp_cedar_optimizer",
+    "cedar_dp_two_stage_optimizer",
     "cedar_pecan_optimizer",
 )
 THRESHOLD = 1.20
@@ -39,6 +41,7 @@ FORMAL_UNAVAILABLE_STATUSES = {
     "optimizer_timeout",
     "infeasible_timeout",
     "skipped",
+    "skipped_after_timeout",
 }
 
 

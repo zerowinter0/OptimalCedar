@@ -171,6 +171,10 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
         _copy_evidence_tree(
             root / "cedar_60m_audit", staging / "cedar_60m_audit"
         )
+        _copy_evidence_tree(
+            root / "two_stage_modal_audit",
+            staging / "two_stage_modal_audit",
+        )
 
         readme = [
             "# Formal Data-Juicer diverse-workload artifacts",

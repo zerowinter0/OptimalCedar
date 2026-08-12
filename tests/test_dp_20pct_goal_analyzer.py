@@ -255,6 +255,38 @@ def test_one_execution_timeout_is_not_complete_evidence(
     assert not result["dp_at_least_20pct_faster"]
 
 
+def test_first_timeout_and_skipped_repeats_are_unavailable_without_bound(
+    tmp_path,
+):
+    _write_json(
+        tmp_path
+        / "candidate"
+        / "status"
+        / "round1__optimizer.json",
+        {
+            "status": "infeasible_timeout",
+            "reason": "execution exceeded 3600s",
+        },
+    )
+    for round_number in (2, 3):
+        _write_json(
+            tmp_path
+            / "candidate"
+            / "status"
+            / f"round{round_number}__optimizer.json",
+            {
+                "status": "skipped_after_timeout",
+                "reason": "earlier repeat exceeded 3600s",
+            },
+        )
+
+    result = analyzer._read_candidate(tmp_path, "candidate", "optimizer")
+
+    assert result["outcome"] == "unavailable"
+    assert result["formally_unavailable"] is True
+    assert result["execution_time_lower_bound_sec"] is None
+
+
 def test_three_consistent_short_epochs_are_source_infeasible(tmp_path):
     _write_source_exhausted(tmp_path, "candidate", "dp_optimizer")
 
@@ -305,7 +337,7 @@ def test_workload_source_marker_is_a_denominator_failure(
     assert not result["dp_at_least_20pct_faster"]
 
 
-def test_existing_report_ignores_two_stage_optimizer(tmp_path):
+def test_existing_report_includes_two_stage_but_ignores_no_optimizer(tmp_path):
     report_path = tmp_path / "cross_system.json"
     _write_json(
         report_path,
@@ -337,9 +369,9 @@ def test_existing_report_ignores_two_stage_optimizer(tmp_path):
 
     result = analyzer._existing_summaries(report_path)["workload"]
 
-    assert result["best_other_optimizer"] == "cedar_optimizer"
-    assert result["best_other_execution_time_sec"] == 12.0
-    assert result["dp_speedup_over_best_other"] == 1.5
+    assert result["best_other_optimizer"] == "cedar_dp_two_stage_optimizer"
+    assert result["best_other_execution_time_sec"] == 10.0
+    assert result["dp_speedup_over_best_other"] == 1.25
     assert result["dp_at_least_20pct_faster"]
 
 

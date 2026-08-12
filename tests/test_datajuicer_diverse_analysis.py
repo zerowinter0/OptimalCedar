@@ -55,25 +55,25 @@ def test_summarize_matrix_uses_three_round_means_and_fastest_competitor(
     tmp_path,
 ):
     results = tmp_path / "results"
+    competitor_times = {
+        "optimizer": 20.0,
+        "dj_optimizer": 15.0,
+        "dp_cedar_optimizer": 18.0,
+        "dp_two_stage_optimizer": 17.0,
+        "pecan_optimizer": 16.0,
+    }
     for round_number, dp_seconds in enumerate((10.0, 11.0, 9.0), start=1):
         _write_result(
             results, round_number, "dp_optimizer", dp_seconds
         )
-        _write_result(
-            results, round_number, "dj_optimizer", 15.0
-        )
-        _write_result(
-            results, round_number, "optimizer", 20.0
-        )
+        for optimizer, seconds in competitor_times.items():
+            _write_result(results, round_number, optimizer, seconds)
 
     summary = _summarize_matrix(
         "example",
         100,
-        {
-            "optimizer": [results],
-            "dj_optimizer": [results],
-            "dp_optimizer": [results],
-        },
+        {optimizer: [results] for optimizer in competitor_times}
+        | {"dp_optimizer": [results]},
         "test evidence",
     )
 
@@ -83,6 +83,25 @@ def test_summarize_matrix_uses_three_round_means_and_fastest_competitor(
     assert summary["best_other_execution_time_sec"] == pytest.approx(15.0)
     assert summary["dp_speedup_over_best_other"] == pytest.approx(1.5)
     assert summary["dp_at_least_20pct_faster"] is True
+
+
+def test_summarize_matrix_rejects_missing_optimizer_evidence(tmp_path):
+    results = tmp_path / "results"
+    for round_number in (1, 2, 3):
+        _write_result(results, round_number, "dp_optimizer", 10.0)
+        _write_result(results, round_number, "dj_optimizer", 15.0)
+
+    summary = _summarize_matrix(
+        "example",
+        100,
+        {
+            "dp_optimizer": [results],
+            "dj_optimizer": [results],
+        },
+        "incomplete evidence",
+    )
+
+    assert summary["valid"] is False
 
 
 def test_selection_fallback_has_six_workloads_and_one_third_nonwins():

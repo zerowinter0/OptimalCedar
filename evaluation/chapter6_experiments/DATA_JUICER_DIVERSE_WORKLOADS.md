@@ -65,7 +65,9 @@ successful repetitions.
    absent from the existing formal candidate batch.
 3. Use one full-data execution per optimizer for screening. The input prefix,
    profile, W=8 resource signature, cache setting, and optimizer flags are
-   identical. Screening reduces only repetitions, not semantics or resources.
+   identical. The comparison includes original Cedar, Data-Juicer-style,
+   DP-Cedar, joint DP, two-stage DP, and Pecan. Screening reduces only
+   repetitions, not semantics or resources.
 4. Select six to eight workloads that maximize family coverage. At most 40%
    of the final set may fail to make DP at least 20% faster than the fastest
    non-DP optimizer. All screened outcomes remain in this ledger.
