@@ -3,6 +3,7 @@ import json
 import pytest
 
 from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
+    _diversity_summary,
     _pile_summaries,
     _selection,
     _summarize_matrix,
@@ -248,3 +249,21 @@ def test_selection_rejects_more_than_forty_percent_nonwins():
 
     with pytest.raises(RuntimeError, match="40% gate"):
         _selection(ledger)
+
+
+def test_diversity_summary_records_scenario_modality_and_operator_span():
+    summary = _diversity_summary(
+        [
+            "pile_hackernews",
+            "alpaca_cot",
+            "redpajama_code",
+            "video_self_evolution",
+            "llava_pretrain",
+            "pile_pubmed_abstracts",
+        ]
+    )
+
+    assert len(summary["scenarios"]) == 6
+    assert summary["modalities"] == ["code", "image-text", "text", "video-text"]
+    assert summary["hub_operator_count_range"] == [5, 17]
+    assert summary["cedar_operator_count_range"] == [8, 19]

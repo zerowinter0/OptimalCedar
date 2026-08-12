@@ -389,6 +389,18 @@ def _selection(ledger: dict[str, dict[str, Any]]) -> list[str]:
     return min(candidates, key=lambda item: item[0])[1]
 
 
+def _diversity_summary(selected: list[str]) -> dict[str, Any]:
+    metadata = [WORKLOAD_META[name] for name in selected]
+    hub_counts = [item[2] for item in metadata]
+    cedar_counts = [item[3] for item in metadata]
+    return {
+        "scenarios": sorted({item[0] for item in metadata}),
+        "modalities": sorted({item[1] for item in metadata}),
+        "hub_operator_count_range": [min(hub_counts), max(hub_counts)],
+        "cedar_operator_count_range": [min(cedar_counts), max(cedar_counts)],
+    }
+
+
 def _render(report: dict[str, Any]) -> str:
     lines = [
         "# Data-Juicer diverse-workload result",
@@ -413,12 +425,19 @@ def _render(report: dict[str, Any]) -> str:
             else f"| `{name}` | {scenario} | {modality} | {hub_ops} | {cedar_ops} | N/A | N/A | N/A | N/A | no (formal result incomplete) |"
         )
     summary = report["summary"]
+    diversity = summary["diversity"]
     lines.extend(
         [
             "",
             f"Selected: {summary['selected_count']} workloads; DP ≥1.20x wins: "
             f"{summary['wins']}; non-wins: {summary['non_wins']} "
             f"({summary['failure_fraction'] * 100:.1f}%).",
+            f"Coverage: {len(diversity['scenarios'])} scenarios, "
+            f"{len(diversity['modalities'])} modalities, Hub operator counts "
+            f"{diversity['hub_operator_count_range'][0]}--"
+            f"{diversity['hub_operator_count_range'][1]}, and Cedar operator "
+            f"counts {diversity['cedar_operator_count_range'][0]}--"
+            f"{diversity['cedar_operator_count_range'][1]}.",
             "",
             "Every non-selected screened outcome remains in the JSON ledger; selection does not erase negative evidence.",
             "",
@@ -446,6 +465,13 @@ def main() -> None:
     args = parser.parse_args()
 
     root = args.root.resolve()
+    classification = json.loads(
+        (root / "recipe_classification.json").read_text(encoding="utf-8")
+    )
+    if classification.get("recipe_count") != len(
+        classification.get("recipes", [])
+    ):
+        raise RuntimeError("recipe classification count is inconsistent")
     ledger = _pile_summaries(args.canonical.resolve(), root / "cedar_60m_audit")
     standard = repo / "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads"
     modal_two_stage = root / "two_stage_modal_audit"
@@ -532,6 +558,8 @@ def main() -> None:
             "execution_limit_sec": 3600,
             "speedup_threshold": THRESHOLD,
             "maximum_non_win_fraction": 0.40,
+            "data_juicer_hub_commit": classification["hub_commit"],
+            "classified_recipe_count": classification["recipe_count"],
         },
         "selected_workloads": selected,
         "ledger": ledger,
@@ -540,6 +568,7 @@ def main() -> None:
             "wins": wins,
             "non_wins": len(selected) - wins,
             "failure_fraction": (len(selected) - wins) / len(selected),
+            "diversity": _diversity_summary(selected),
         },
     }
     args.json_output.parent.mkdir(parents=True, exist_ok=True)
