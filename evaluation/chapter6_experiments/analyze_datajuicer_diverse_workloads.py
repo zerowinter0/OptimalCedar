@@ -55,6 +55,7 @@ def _optimizer_measurement(
 ) -> dict[str, Any]:
     values: dict[int, float] = {}
     sources = []
+    threshold_exceeding_sources = []
     unavailable_sources = []
     for root in result_roots:
         for path in sorted(root.glob(f"round*__{optimizer}.json")):
@@ -72,6 +73,8 @@ def _optimizer_measurement(
                 )
             values[round_number] = value
             sources.append(str(path))
+            if value > EXECUTION_LIMIT_SEC:
+                threshold_exceeding_sources.append(str(path))
         workload_root = root.parent
         evidence_paths = [
             workload_root / "plans" / f"{optimizer}.unavailable.json",
@@ -103,6 +106,14 @@ def _optimizer_measurement(
                 unavailable_sources.append(str(evidence_path))
     ordered = [values[key] for key in sorted(values)]
     valid = sorted(values) == [1, 2, 3]
+    within_execution_limit = valid and all(
+        value <= EXECUTION_LIMIT_SEC for value in ordered
+    )
+    # Results produced under an older, looser timeout remain direct evidence
+    # that the plan is unavailable under the current 60-minute protocol.  Do
+    # not silently discard those measurements or misclassify the optimizer as
+    # having incomplete evidence.
+    execution_limit_exceeded = valid and not within_execution_limit
     return {
         "valid": valid,
         "execution_times_sec": ordered,
@@ -110,11 +121,12 @@ def _optimizer_measurement(
         "stddev_execution_time_sec": (
             statistics.stdev(ordered) if valid else None
         ),
-        "within_execution_limit": valid and all(
-            value <= EXECUTION_LIMIT_SEC for value in ordered
-        ),
-        "formally_unavailable": not valid and bool(unavailable_sources),
+        "within_execution_limit": within_execution_limit,
+        "execution_limit_exceeded": execution_limit_exceeded,
+        "formally_unavailable": execution_limit_exceeded
+        or (not valid and bool(unavailable_sources)),
         "sources": sources,
+        "threshold_exceeding_sources": threshold_exceeding_sources,
         "unavailable_sources": unavailable_sources,
     }
 

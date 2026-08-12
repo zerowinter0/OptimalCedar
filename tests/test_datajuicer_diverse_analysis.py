@@ -109,6 +109,48 @@ def test_summarize_matrix_rejects_missing_optimizer_evidence(tmp_path):
     assert summary["valid"] is False
 
 
+def test_summarize_matrix_uses_old_overlimit_runs_as_timeout_evidence(
+    tmp_path,
+):
+    results = tmp_path / "results"
+    for round_number in (1, 2, 3):
+        _write_result(results, round_number, "dp_optimizer", 10.0)
+        _write_result(results, round_number, "dj_optimizer", 15.0)
+        for optimizer in (
+            "optimizer",
+            "dp_cedar_optimizer",
+            "dp_two_stage_optimizer",
+            "pecan_optimizer",
+        ):
+            _write_result(results, round_number, optimizer, 3700.0)
+
+    summary = _summarize_matrix(
+        "example",
+        100,
+        {
+            optimizer: [results]
+            for optimizer in (
+                "optimizer",
+                "dj_optimizer",
+                "dp_cedar_optimizer",
+                "dp_optimizer",
+                "dp_two_stage_optimizer",
+                "pecan_optimizer",
+            )
+        },
+        "older loose-timeout evidence",
+    )
+
+    assert summary["valid"] is True
+    assert summary["best_other_optimizer"] == "dj_optimizer"
+    assert summary["runs"]["optimizer"]["within_execution_limit"] is False
+    assert summary["runs"]["optimizer"]["execution_limit_exceeded"] is True
+    assert summary["runs"]["optimizer"]["formally_unavailable"] is True
+    assert len(
+        summary["runs"]["optimizer"]["threshold_exceeding_sources"]
+    ) == 3
+
+
 def test_pile_summary_requires_and_exposes_current_six_optimizer_evidence(
     tmp_path,
 ):
