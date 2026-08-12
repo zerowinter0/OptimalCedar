@@ -407,6 +407,8 @@ def _render(report: dict[str, Any]) -> str:
         "",
         "All selected results use W=8, CPU budget 64, cache disabled, one shared profile per workload, and three measured repetitions. A win means DP is at least 1.20x faster than the fastest available non-DP optimizer.",
         "",
+        "Hub operator counts include every entry in the official recipe, including global deduplicators. Cedar operator counts exclude the source and omitted cross-record deduplicators, but include fixed parse, path-resolution, synchronization, and projection adapters actually executed by Cedar.",
+        "",
         "| workload | scenario | modality | Hub ops | Cedar ops | samples | DP (s) | best other (s) | speedup | selected |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|:---:|",
     ]
@@ -560,6 +562,10 @@ def main() -> None:
             "maximum_non_win_fraction": 0.40,
             "data_juicer_hub_commit": classification["hub_commit"],
             "classified_recipe_count": classification["recipe_count"],
+            "operator_count_convention": {
+                "hub": "all official recipe process entries, including global deduplicators",
+                "cedar": "logical executed pipes excluding source and omitted cross-record deduplicators, including fixed adapters",
+            },
         },
         "selected_workloads": selected,
         "ledger": ledger,

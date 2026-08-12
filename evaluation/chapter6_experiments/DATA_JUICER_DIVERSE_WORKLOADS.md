@@ -20,8 +20,11 @@ per-record reorder/fusion search and are excluded consistently with
 
 ## Recipe classification
 
-Operator counts refer to entries in each recipe's `process` list and include
-cross-record deduplication when present.
+Hub operator counts refer to entries in each recipe's `process` list and
+include cross-record deduplication when present. Cedar operator counts exclude
+the source and omitted cross-record deduplicators, but include fixed parse,
+path-resolution, synchronization, and projection adapters that Cedar actually
+executes.
 
 | Family | Hub recipes | Operator-count range | Distinguishing work |
 |---|---:|---:|---|
