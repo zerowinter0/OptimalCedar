@@ -28,10 +28,10 @@ WORKLOAD_META = {
     "pile_hackernews": ("online discussion", "text", 16, 18),
     "pile_pubmed_abstracts": ("biomedical abstracts", "text", 17, 19),
     "pile_uspto_backgrounds": ("patent background", "text", 17, 19),
-    "redpajama_code": ("source-code refinement", "code", 15, 18),
+    "redpajama_code": ("source-code refinement", "code", 15, 17),
     "redpajama_arxiv": ("scientific long documents", "text", 16, 18),
     "alpaca_cot": ("instruction/reasoning tuning", "text", 7, 8),
-    "llava_pretrain": ("image-caption refinement", "image-text", 13, 18),
+    "llava_pretrain": ("image-caption refinement", "image-text", 13, 16),
     "general_video_refine": ("video-text quality refinement", "video-text", 7, 10),
     "video_self_evolution": ("video self-evolution filtering", "video-text", 5, 8),
 }

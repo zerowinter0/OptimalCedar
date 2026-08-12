@@ -48,12 +48,12 @@ successful repetitions.
 |---|---|---:|---|
 | `alpaca_cot` | instruction/post-tuning | 8 | implemented; fresh screening |
 | `redpajama_arxiv` | scientific documents | 18 | implemented; fresh screening |
-| `redpajama_code` | source code | 18 | implemented; formal result available |
+| `redpajama_code` | source code | 17 | implemented; formal result available |
 | `pile_europarl` | parliamentary text | 19 | implemented; formal result available |
 | `pile_hackernews` | social/news discussion | 18 | implemented; formal result available |
 | `pile_pubmed_abstracts` | biomedical abstracts | 19 | implemented; formal result available |
 | `pile_uspto_backgrounds` | patent/legal-technical text | 19 | implemented; formal result available |
-| `llava_pretrain` | image-text refinement | 18 | implemented; formal result available |
+| `llava_pretrain` | image-text refinement | 16 | implemented; formal result available |
 | `general_video_refine` | video-text filtering | 10 | implemented; corrected DP result available |
 | `video_self_evolution` | video self-evolution filtering | 8 | implemented as a same-family replacement candidate; queued screening |
 | `bloom_oscar` | multilingual web text | 17 | implemented, but the official OSCAR source is unavailable locally; fallback only |

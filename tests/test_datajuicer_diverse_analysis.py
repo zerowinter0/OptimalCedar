@@ -267,3 +267,12 @@ def test_diversity_summary_records_scenario_modality_and_operator_span():
     assert summary["modalities"] == ["code", "image-text", "text", "video-text"]
     assert summary["hub_operator_count_range"] == [5, 17]
     assert summary["cedar_operator_count_range"] == [8, 19]
+
+
+def test_reported_cedar_counts_match_current_logical_features():
+    from evaluation.chapter6_experiments.analyze_datajuicer_diverse_workloads import (
+        WORKLOAD_META,
+    )
+
+    assert WORKLOAD_META["redpajama_code"][3] == 17
+    assert WORKLOAD_META["llava_pretrain"][3] == 16
