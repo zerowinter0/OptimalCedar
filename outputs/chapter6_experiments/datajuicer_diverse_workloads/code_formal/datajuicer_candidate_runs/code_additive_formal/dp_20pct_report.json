@@ -1,0 +1,191 @@
+{
+  "protocol": {
+    "threshold": 1.2,
+    "candidate_repeats": 3,
+    "candidate_outputs": 20000,
+    "execution_timeout_sec": 3600.0,
+    "local_workers": 8,
+    "cpu_budget": 64,
+    "candidate_optimizer_set": [
+      "optimizer",
+      "dj_optimizer",
+      "dp_cedar_optimizer",
+      "dp_optimizer",
+      "dp_two_stage_optimizer",
+      "pecan_optimizer"
+    ],
+    "candidate_roots": [
+      "/workspace/OptimalCedar/outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal"
+    ]
+  },
+  "candidates": {
+    "redpajama_code": {
+      "runs": {
+        "optimizer": {
+          "execution_times_sec": [
+            551.2903825188987,
+            553.6300779189914,
+            551.9200019859709
+          ],
+          "mean_execution_time_sec": 552.280154141287,
+          "stddev_execution_time_sec": 1.2107129397747145,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 19.10802986798808,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            459.51111965300515,
+            459.7354892399162,
+            461.4991243928671
+          ],
+          "mean_execution_time_sec": 460.2485777619295,
+          "stddev_execution_time_sec": 1.0888000665846356,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.1066768490709364,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            553.0631074928679,
+            554.9795785460155,
+            551.7606235640123
+          ],
+          "mean_execution_time_sec": 553.267769867632,
+          "stddev_execution_time_sec": 1.619207463475218,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.742001465987414,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            273.916092566913,
+            275.4553051190451,
+            274.7260244509671
+          ],
+          "mean_execution_time_sec": 274.6991407123084,
+          "stddev_execution_time_sec": 0.7699583571294253,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 4.6998398990835994,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_two_stage_optimizer": {
+          "execution_times_sec": [
+            623.4407055908814,
+            624.2709084460512,
+            620.614890292054
+          ],
+          "mean_execution_time_sec": 622.7755014429955,
+          "stddev_execution_time_sec": 1.9166349689918993,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.7736912651453167,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            467.19851311598904,
+            465.924857562175,
+            467.46988814510405
+          ],
+          "mean_execution_time_sec": 466.864419607756,
+          "stddev_execution_time_sec": 0.8249204384236596,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.0890602990984917,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        }
+      },
+      "workload_outcome": "success",
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 460.2485777619295,
+      "best_other_is_lower_bound": false,
+      "dp_speedup_over_best_other": 1.6754642062894054,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true
+    }
+  },
+  "combined": {
+    "redpajama_code": {
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 460.2485777619295,
+      "best_other_is_lower_bound": false,
+      "dp_execution_time_sec": 274.6991407123084,
+      "dp_speedup_over_best_other": 1.6754642062894054,
+      "dp_speedup_is_lower_bound": false,
+      "dp_at_least_20pct_faster": true,
+      "source": "/workspace/OptimalCedar/outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal",
+      "workload_outcome": "success"
+    }
+  },
+  "summary": {
+    "total_workloads": 1,
+    "valid_workloads": 1,
+    "dp_20pct_wins": 1,
+    "fraction": 1.0,
+    "target_fraction": 0.3,
+    "minimum_wins_required": 1,
+    "additional_wins_needed": 0,
+    "target_met": true
+  }
+}

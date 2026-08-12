@@ -1,0 +1,14 @@
+{
+  "workload": "redpajama_code",
+  "optimizer": "pecan_optimizer",
+  "round": 3,
+  "formal_result_used": false,
+  "reason": "Four recipe-equivalence validators overlapped this execution and could have contended for CPU resources.",
+  "overlap_start_utc": "2026-08-12T21:59:00Z",
+  "overlap_end_utc": "2026-08-12T21:59:14Z",
+  "execution_start_utc": "2026-08-12T21:54:30Z",
+  "execution_end_utc": "2026-08-12T22:03:02Z",
+  "measured_execution_time_sec": 465.2838739550207,
+  "processed_samples": 20000,
+  "remediation": "Quarantined the result and log, then reran only round 3 of pecan_optimizer after the other RP-Code executions had completed."
+}
