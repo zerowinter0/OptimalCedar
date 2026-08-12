@@ -56,7 +56,7 @@ successful repetitions.
 |---|---|---:|---|
 | `alpaca_cot` | instruction/post-tuning | 8 | implemented; fresh screening |
 | `redpajama_arxiv` | scientific documents | 18 | implemented; fresh screening |
-| `redpajama_code` | source code | 17 | implemented; formal result available |
+| `redpajama_code` | source code | 17 | implemented; fresh formal result complete |
 | `pile_europarl` | parliamentary text | 19 | implemented; formal result available |
 | `pile_hackernews` | social/news discussion | 18 | implemented; formal result available |
 | `pile_pubmed_abstracts` | biomedical abstracts | 19 | implemented; formal result available |
@@ -98,7 +98,7 @@ Speedup is fastest non-DP execution time divided by DP execution time.
 | `pile_hackernews` | 2.762x | yes |
 | `pile_pubmed_abstracts` | 1.507x | yes |
 | `pile_uspto_backgrounds` | 2.450x | yes |
-| `redpajama_code` | 1.675x | yes; fresh six-optimizer screen, formal matrix running |
+| `redpajama_code` | 1.675x | yes; fresh six-optimizer formal matrix complete |
 | `llava_pretrain` | 0.883x | no |
 | `general_video_refine` | 0.980x | no; corrected DP is within 2.1% of Data-Juicer |
 
@@ -120,7 +120,7 @@ and ten seconds per measured stage.
 |---|---:|---|---|---|
 | `alpaca_cot` | 20,000 | complete | DP 29.074 s; fastest competitor 28.573 s (0.983x) | below 1.20x; retain as a negative screening result |
 | `redpajama_arxiv` | 20,000 | complete | DJ timed out after 3,600 s at 3,367 outputs | scale infeasible; no optimizer-speedup claim |
-| `redpajama_code` | 20,000 | reused validated formal profile | DP 274.821 s; fastest competitor DJ 460.193 s (1.675x); all six optimizers complete | passes 1.20x; three-repeat formal matrix running |
+| `redpajama_code` | 20,000 | reused validated formal profile | DP 274.821 s; fastest competitor DJ 460.193 s (1.675x); all six optimizers complete | passes 1.20x; three-repeat formal matrix complete |
 | `redpajama_arxiv` | 2,500 | reused fresh profile | queued after Code | pending |
 
 The 20,000-output ArXiv attempt was stopped after the completed Data-Juicer
@@ -131,6 +131,13 @@ source prefix and recipe, changes only the requested retained-output count,
 and covers roughly 140 MiB of long scientific text at the source file's mean
 record size. This is large enough to be a substantive execution while leaving
 headroom under the threshold according to the completed rate measurement.
+
+The RP-Code formal matrix contains three round-robin repetitions of all six
+optimizers at 20,000 outputs. Joint DP averages 274.699 s; the fastest
+non-DP optimizer is the Data-Juicer-style optimizer at 460.249 s, giving a
+1.675x speedup. A Pecan third repetition that overlapped a short recipe
+validation command was quarantined and replaced by a clean 467.470 s run;
+the quarantined measurement is not used in the reported mean.
 
 The Alpaca-CoT screen uses 20,000 outputs for candidate triage. Its formal
 matrix uses 65,000 outputs from the immutable 74,771-record source. The fresh
