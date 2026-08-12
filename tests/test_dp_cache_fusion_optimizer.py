@@ -5,11 +5,20 @@ import pytest
 
 from cedar.compose import Feature
 from cedar.compose import constants
-from cedar.compose.dp_optimizer import BlockCandidate, DpOptimizer
+from cedar.compose.dp_optimizer import (
+    BlockCandidate,
+    BlockCandidateProvider,
+    DpOptimizer,
+)
 from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 from cedar.compose.my_optimizer import MyOptimizer
 from cedar.compose.optimizer import Optimizer, OptimizerOptions, PipeDesc
-from cedar.pipes import MapperPipe, Pipe, PipeVariantType
+from cedar.pipes import (
+    MapperPipe,
+    Pipe,
+    PipeExecutionResource,
+    PipeVariantType,
+)
 from cedar.sources import IterSource
 
 
@@ -165,6 +174,42 @@ def test_dp_final_ray_stages_use_cedar_batch_tuning(optimizer_cls):
         expected_inflight = ctx.submit_batch_size * ctx.n_actors * 3
         assert ctx.max_inflight == expected_inflight
         assert ctx.max_prefetch == expected_inflight
+
+
+def test_cuda_operator_is_not_an_smp_candidate():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    cuda_pipe = next(
+        pipe
+        for pipe in feature.logical_pipes.values()
+        if isinstance(pipe, MapperPipe)
+    )
+    cuda_pipe.set_execution_resource(PipeExecutionResource.CUDA)
+
+    profile = _ray_profile_for(feature)
+    profile["offloads"]["SMP"] = {
+        p_id: dict(stats, throughput=1000.0)
+        for p_id, stats in profile["offloads"]["RAY"].items()
+    }
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = profile
+    optimizer.options = OptimizerOptions(enable_offload=True)
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    provider = BlockCandidateProvider(optimizer, inner_ops)
+    provider.prepare()
+    cuda_idx = inner_ops.index(cuda_pipe.id)
+    variants = {
+        candidate.variant
+        for candidate in provider.candidates_for(1 << cuda_idx)
+    }
+
+    assert PipeVariantType.RAY in variants
+    assert PipeVariantType.SMP not in variants
 
 
 def test_single_smp_stage_pays_placement_dependent_boundary_cost():

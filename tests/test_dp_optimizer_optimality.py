@@ -21,7 +21,7 @@ from cedar.compose.dp_optimizer import (
 from cedar.compose import constants
 from cedar.compose.my_optimizer import MyOptimizer
 from cedar.compose.optimizer import OptimizerOptions, PipeDesc
-from cedar.pipes import PipeVariantType
+from cedar.pipes import PipeComputeScaling, PipeVariantType
 from cedar.sources import IterSource
 
 
@@ -105,6 +105,46 @@ def test_old_profile_keeps_exact_size_only_work_product():
     assert [
         optimizer._dp_work_prod(mask) for mask in range(4)
     ] == optimizer._dp_r_prod
+
+
+def test_per_record_compute_keeps_boundaries_byte_scaled():
+    optimizer = DpOptimizer()
+    optimizer._dp_compute_scaling = PipeComputeScaling.PER_RECORD
+    optimizer._dp_r_prod = [1.0, 4.0]
+    optimizer._dp_volume_prod = [1.0, 2.0]
+    optimizer._dp_cardinality_prod = [1.0, 0.5]
+
+    assert optimizer._dp_compute_work_prod(1) == 0.5
+    assert optimizer._dp_work_prod(1) == 2.0
+
+
+def test_per_record_cost_is_anchored_at_its_profiled_position():
+    optimizer = DpOptimizer()
+    optimizer._dp_pred_indices = [[], []]
+    optimizer._dp_compute_scalings = [
+        PipeComputeScaling.PER_BYTE,
+        PipeComputeScaling.PER_RECORD,
+    ]
+    optimizer._dp_r_prod = [1.0, 4.0, 1.0, 4.0]
+    optimizer._dp_volume_prod = [1.0, 2.0, 1.0, 2.0]
+    optimizer._dp_cardinality_prod = [1.0, 0.5, 1.0, 0.5]
+    optimizer.profiled_stats = {
+        "baseline": {
+            "input_sizes": {0: 100.0, 1: 400.0},
+            "output_sizes": {99: 100.0},
+        }
+    }
+    optimizer._get_source_p_id = lambda: 99
+
+    index = _BlockCostIndex(
+        optimizer,
+        inner_ops=[0, 1],
+        costs=[0.1, 10.0],
+    )
+    cost, order = index.get(0b11)
+
+    assert order == (0, 1)
+    assert math.isclose(cost, 10.1)
 
 
 def test_search_drops_resource_coordinate_without_strict_limit():

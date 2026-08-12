@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Optional, Dict, List
 import logging
 import time
@@ -10,6 +11,20 @@ from .context import PipeVariantType
 
 
 logger = logging.getLogger(__name__)
+
+
+class PipeComputeScaling(str, Enum):
+    """Quantity that determines how an operator's compute cost scales."""
+
+    PER_BYTE = "per_byte"
+    PER_RECORD = "per_record"
+
+
+class PipeExecutionResource(str, Enum):
+    """Exclusive execution resource required by an operator."""
+
+    CPU = "cpu"
+    CUDA = "cuda"
 
 
 class Partition:

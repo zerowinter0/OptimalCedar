@@ -11,7 +11,13 @@ from typing import List
 from cedar.client import DataSet
 from cedar.compose import Feature, OptimizerOptions
 from cedar.config import CedarContext
-from cedar.pipes import FilterPipe, MapperPipe, Pipe
+from cedar.pipes import (
+    FilterPipe,
+    MapperPipe,
+    Pipe,
+    PipeComputeScaling,
+    PipeExecutionResource,
+)
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
@@ -38,41 +44,54 @@ class GeneralVideoRefineFeature(Feature):
         super().__init__()
         self.video_root = Path(video_root)
 
+    @staticmethod
+    def _per_record(
+        pipe: Pipe, *, cuda: bool = False
+    ) -> Pipe:
+        pipe.set_compute_scaling(PipeComputeScaling.PER_RECORD)
+        if cuda:
+            pipe.set_execution_resource(PipeExecutionResource.CUDA)
+        return pipe
+
     def _compose(self, source_pipes: List[Pipe]):
-        fp = MapperPipe(
+        fp = self._per_record(MapperPipe(
             source_pipes[0], ops.parse_json_line, tag="parse"
-        ).fix()
-        fp = MapperPipe(
+        )).fix()
+        fp = self._per_record(MapperPipe(
             fp,
             ops.SetVideoRootMapper(self.video_root),
             tag="video_root",
-        ).fix()
-        fp = FilterPipe(
+        )).fix()
+        fp = self._per_record(FilterPipe(
             fp,
             ops.LanguageIDScoreFilter(lang="en", min_score=0.26311219),
             tag="language_id",
-        )
-        fp = FilterPipe(
+        ))
+        fp = self._per_record(FilterPipe(
             fp,
             ops.PerplexityFilter(lang="en", max_ppl=7376.81378),
             tag="perplexity",
-        )
-        fp = FilterPipe(
+        ))
+        fp = self._per_record(FilterPipe(
             fp, ops.video_aesthetics_filter(), tag="video_aesthetics"
-        )
-        fp = FilterPipe(
+        ), cuda=True)
+        fp = self._per_record(FilterPipe(
             fp,
             ops.video_text_similarity_filter(),
             tag="video_text_similarity",
-        )
-        fp = FilterPipe(
+        ), cuda=True)
+        fp = self._per_record(FilterPipe(
             fp, ops.video_motion_filter(), tag="video_motion"
-        )
-        fp = FilterPipe(fp, ops.video_nsfw_filter(), tag="video_nsfw")
-        fp = FilterPipe(
+        ))
+        fp = self._per_record(FilterPipe(
+            fp, ops.video_nsfw_filter(), tag="video_nsfw"
+        ), cuda=True)
+        fp = self._per_record(FilterPipe(
             fp, ops.video_watermark_filter(), tag="video_watermark"
-        )
-        return MapperPipe(fp, ops.project_output, tag="project_output").fix()
+        ), cuda=True)
+        return self._per_record(
+            MapperPipe(fp, ops.project_output, tag="project_output")
+        ).fix()
 
     def release_profile_resources(self) -> None:
         """Clear Data-Juicer's process-global accelerator model cache."""

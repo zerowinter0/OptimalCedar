@@ -18,7 +18,12 @@ from .utils import (
     get_fixed_pipes,
     flip_adj_list,
 )
-from cedar.pipes import Pipe, PipeVariantContextFactory
+from cedar.pipes import (
+    Pipe,
+    PipeComputeScaling,
+    PipeExecutionResource,
+    PipeVariantContextFactory,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +51,8 @@ class MyOptimizer(Optimizer):
         self._dp_selectivities: List[float] = []
         self._dp_cardinality_prod: List[float] = []
         self._dp_volume_prod: List[float] = []
+        self._dp_compute_scalings: List[PipeComputeScaling] = []
+        self._dp_compute_scaling = PipeComputeScaling.PER_BYTE
         self._pending_fusion_blocks: List[List[int]] = []
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
         self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
@@ -477,6 +484,67 @@ class MyOptimizer(Optimizer):
             return volume_prod[mask]
         return self._dp_r_prod[mask]
 
+    def _dp_compute_scaling_for_idx(
+        self, operator_idx: Optional[int]
+    ) -> PipeComputeScaling:
+        if (
+            operator_idx is not None
+            and operator_idx < len(self._dp_compute_scalings)
+        ):
+            return self._dp_compute_scalings[operator_idx]
+        return self._dp_compute_scaling
+
+    def _dp_compute_work_prod(
+        self, mask: int, operator_idx: Optional[int] = None
+    ) -> float:
+        """Return the multiplier appropriate for operator compute work.
+
+        Cedar historically scales compute by serialized byte volume.  An
+        operator annotated as per-record instead scales only by the number of
+        surviving records. Stage boundaries and cache I/O continue to use
+        :meth:`_dp_work_prod` and therefore remain byte based.
+        """
+        if (
+            self._dp_compute_scaling_for_idx(operator_idx)
+            == PipeComputeScaling.PER_RECORD
+        ):
+            return self._dp_cardinality_prod[mask]
+        return self._dp_work_prod(mask)
+
+    def _dp_compute_cost_denominator(
+        self,
+        operator_idx: int,
+        baseline_input_size: float,
+        source_size: float,
+    ) -> float:
+        """Normalize a profiled cost without changing its baseline value.
+
+        ``_BlockCostIndex`` stores costs per source byte and multiplies the
+        final sum by ``source_size``. For per-record work, divide by the
+        cardinality at the operator's original position as well as the source
+        size. This makes the estimated cost at that original position exactly
+        equal to its profiled cost while removing unrelated item-size growth.
+        """
+        if (
+            self._dp_compute_scaling_for_idx(operator_idx)
+            == PipeComputeScaling.PER_RECORD
+        ):
+            original_prefix = (1 << operator_idx) - 1
+            return (
+                source_size * self._dp_cardinality_prod[original_prefix]
+            )
+        return baseline_input_size
+
+    def _dp_smp_supported_for_pipe(self, p_id: int) -> bool:
+        """Whether SMP can safely execute this operator's resource class."""
+        if self.logical_pipes is None:
+            return False
+        pipe = self.logical_pipes.get(p_id)
+        return bool(
+            pipe is not None
+            and pipe.execution_resource != PipeExecutionResource.CUDA
+        )
+
     def _allowed_fusion(self, p_id: int):
         # Tensor conversion changes representation and has backend-specific
         # storage semantics; keep it as an explicit stage. Match both Cedar's
@@ -756,6 +824,10 @@ class MyOptimizer(Optimizer):
                 )
             selectivities.append(value)
         self._dp_selectivities = selectivities
+
+        self._dp_compute_scalings = [
+            self.logical_pipes[p_id].compute_scaling for p_id in inner_ops
+        ]
 
         cardinality_prod = [1.0] * full_mask
         volume_prod = [1.0] * full_mask

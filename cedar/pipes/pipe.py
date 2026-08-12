@@ -23,6 +23,8 @@ from .context import (
 from .common import (
     MutationError,
     CedarPipeSpec,
+    PipeComputeScaling,
+    PipeExecutionResource,
 )
 from .variant import (
     PipeVariant,
@@ -80,6 +82,11 @@ class Pipe(abc.ABC):
         self.id = None  # for use by feature
         self.pipe_spec: Optional[CedarPipeSpec] = None
         self.tag = tag
+        # Optimizer-facing cost semantics.  Defaults deliberately preserve
+        # Cedar's historical byte-volume model; workloads must opt in when an
+        # operator has a fixed per-record cost or requires an accelerator.
+        self.compute_scaling = PipeComputeScaling.PER_BYTE
+        self.execution_resource = PipeExecutionResource.CPU
 
         self.ok_to_mutate = threading.Event()
         self.ok_to_mutate.set()
@@ -113,6 +120,18 @@ class Pipe(abc.ABC):
                 self._input_tf_spec = input_tf_spec
 
         self._pipes_to_fuse = None
+
+    def set_compute_scaling(
+        self, scaling: PipeComputeScaling
+    ) -> "Pipe":
+        self.compute_scaling = PipeComputeScaling(scaling)
+        return self
+
+    def set_execution_resource(
+        self, resource: PipeExecutionResource
+    ) -> "Pipe":
+        self.execution_resource = PipeExecutionResource(resource)
+        return self
 
     def __getstate__(self):
         state = self.__dict__.copy()

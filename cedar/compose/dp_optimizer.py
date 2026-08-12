@@ -14,7 +14,19 @@ from .optimizer import OptimizerOptions, PhysicalPlan, PipeDesc, PipeVariantType
 logger = logging.getLogger(__name__)
 
 
-def _work_prod(optimizer: "DpOptimizer", mask: int) -> float:
+def _work_prod(
+    optimizer: "DpOptimizer", mask: int, operator_idx: int
+) -> float:
+    method = getattr(optimizer, "_dp_compute_work_prod", None)
+    if method is not None:
+        return method(mask, operator_idx)
+    method = getattr(optimizer, "_dp_work_prod", None)
+    if method is not None:
+        return method(mask)
+    return optimizer._dp_r_prod[mask]
+
+
+def _volume_prod(optimizer: "DpOptimizer", mask: int) -> float:
     method = getattr(optimizer, "_dp_work_prod", None)
     if method is not None:
         return method(mask)
@@ -80,7 +92,11 @@ class _BlockCostIndex:
                 "input_sizes"
             ][p_id]
             if baseline_input > 0 and costs[i] != float("inf"):
-                self.per_byte[i] = costs[i] / baseline_input
+                denominator = optimizer._dp_compute_cost_denominator(
+                    i, baseline_input, self.source_size
+                )
+                if denominator > 0:
+                    self.per_byte[i] = costs[i] / denominator
         self._costs: Dict[int, float] = {0: 0.0}
         self._orders: Dict[int, Tuple[int, ...]] = {0: tuple()}
 
@@ -116,7 +132,7 @@ class _BlockCostIndex:
                 continue
             candidate = (
                 prev_cost
-                + _work_prod(self.optimizer, prev) * self.per_byte[i]
+                + _work_prod(self.optimizer, prev, i) * self.per_byte[i]
             )
             if candidate < best:
                 best = candidate
@@ -194,6 +210,14 @@ class BlockCandidateProvider:
                 pipe: Optional[Pipe] = opt.logical_pipes.get(p_id)
                 if pipe is None or not pipe.can_mutate_to(vt):
                     continue
+                # SMP has no accelerator resource scheduling.  Treat it as an
+                # infeasible placement for CUDA operators rather than hiding
+                # shared-GPU contention behind an arbitrary cost multiplier.
+                if (
+                    vt == PipeVariantType.SMP
+                    and not opt._dp_smp_supported_for_pipe(p_id)
+                ):
+                    continue
                 if p_id not in backend_stats:
                     continue
 
@@ -245,6 +269,19 @@ class BlockCandidateProvider:
                 if mask & (1 << i)
             )
         ):
+            self._candidates_by_mask[mask] = []
+            return []
+        if is_multi and len(
+            {
+                opt._dp_compute_scaling_for_idx(i)
+                for i in range(self.n)
+                if mask & (1 << i)
+            }
+        ) != 1:
+            # Moving a fused block scales all of its internal costs by one
+            # outer work multiplier. Mixed byte/record semantics therefore
+            # remain separate stages until the candidate representation can
+            # retain both cost components.
             self._candidates_by_mask[mask] = []
             return []
 
@@ -321,6 +358,15 @@ class BlockCandidateProvider:
                 for idx in ordered
             ):
                 raise ValueError("The materialized fusion cannot use this variant.")
+            if len(
+                {
+                    self.optimizer._dp_compute_scaling_for_idx(idx)
+                    for idx in ordered
+                }
+            ) != 1:
+                raise ValueError(
+                    "A fused block cannot mix byte- and record-scaled costs."
+                )
 
         index = self._variant_indexes[variant]
         if is_multi and variant in self._fused_variant_indexes:
@@ -346,7 +392,10 @@ class BlockCandidateProvider:
                 ]
                 if missing_internal:
                     raise ValueError("The fused block order violates dependencies.")
-            normalized_cost += _work_prod(self.optimizer, local_mask) * index.per_byte[idx]
+            normalized_cost += (
+                _work_prod(self.optimizer, local_mask, idx)
+                * index.per_byte[idx]
+            )
             local_mask |= 1 << idx
 
         return BlockCandidate(
@@ -443,7 +492,7 @@ class CacheTransitionPolicy:
         # never present in the DP state.
         cache_cost = (
             self.cache_cost_per_source_sample
-            * _work_prod(self.optimizer, next_mask)
+            * _volume_prod(self.optimizer, next_mask)
         )
         yield TransitionChoice(
             state=DpStateSummary(
@@ -715,7 +764,7 @@ class DpOptimizer(MyOptimizer):
     ) -> float:
         """Return the one authoritative non-cache DP transition cost."""
         return (
-            _work_prod(self, prev_mask) * block.cost
+            _work_prod(self, prev_mask, block.order[0]) * block.cost
             + self._dp_stage_boundary_cost(prev_mask, block)
         )
 
