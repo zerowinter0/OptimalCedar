@@ -344,6 +344,13 @@ generate_plan() {
     --results_path "${result}"
   )
 
+  if [[ "${RESUME_RUN}" == "1" &&
+        -f "${workload_root}/plans/${optimizer}.yaml" ]] &&
+     validate_plan "${workload_root}/plans/${optimizer}.yaml"; then
+    echo "[$(date -Is)] REUSE PLAN ${workload}/${optimizer}"
+    return 0
+  fi
+
   echo "[$(date -Is)] PLAN ${workload}/${optimizer}"
   printf 'command:' > "${log}"
   printf ' %q' "${args[@]}" >> "${log}"
@@ -386,6 +393,33 @@ execute_plan() {
   kwargs="dataset_path=$(dataset_path "${workload}")"
   log="${workload_root}/logs/${tag}.log"
   result="${workload_root}/results/${tag}.json"
+
+  if [[ "${RESUME_RUN}" == "1" && -f "${result}" ]] &&
+     python - "${result}" "${OUTPUTS}" <<'PY'
+import json
+import math
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    payload = json.load(stream)
+times = payload.get("epoch_run_times")
+samples = payload.get("epoch_num_samples")
+required = int(sys.argv[2])
+valid = (
+    isinstance(times, list)
+    and len(times) == 1
+    and math.isfinite(float(times[0]))
+    and float(times[0]) > 0
+    and isinstance(samples, list)
+    and len(samples) == 1
+    and int(samples[0]) >= required
+)
+raise SystemExit(0 if valid else 1)
+PY
+  then
+    echo "[$(date -Is)] REUSE DONE ${workload}/${tag}"
+    return 0
+  fi
   local -a args=(
     python evaluation/eval_cedar.py
     --dataset_file "${dataset}"

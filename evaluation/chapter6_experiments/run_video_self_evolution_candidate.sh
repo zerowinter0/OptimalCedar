@@ -60,8 +60,26 @@ if [[ -f "${SCREEN_ROOT}/video_self_evolution/nohup.log" ]] &&
      "${SCREEN_ROOT}/video_self_evolution/nohup.log"; then
   echo "[$(date -Is)] REUSE video-self-evolution screen"
 elif [[ -e "${SCREEN_ROOT}" ]]; then
-  echo "Incomplete video-self-evolution screen exists: ${SCREEN_ROOT}" >&2
-  exit 2
+  echo "[$(date -Is)] RESUME incomplete video-self-evolution screen"
+  set +e
+  MATRIX_OUTPUT_ROOT="${SCREEN_ROOT}" \
+  PROFILE_DIR="${BASE_ROOT}/profiles" \
+  REPEATS=1 \
+  OPTIMIZER_SET=paper \
+  OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
+  EXECUTION_TIMEOUT_SEC=3600 \
+  VIDEO_SELF_EVOLUTION_SAMPLES=2000 \
+  RESUME_EXISTING=1 \
+  bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
+    --workloads video_self_evolution
+  screen_status=$?
+  set -e
+  if [[ "${screen_status}" -ne 0 ]]; then
+    printf '{\n  "status": "screening_infeasible_or_failed",\n  "requested_outputs": 2000,\n  "selected": false\n}\n' \
+      > "${STATUS_ROOT}/decision.json"
+    echo "[$(date -Is)] video-self-evolution resumed screen infeasible; retain evidence and continue"
+    exit 0
+  fi
 else
   set +e
   MATRIX_OUTPUT_ROOT="${SCREEN_ROOT}" \
@@ -107,8 +125,17 @@ then
        "${FORMAL_ROOT}/video_self_evolution/nohup.log"; then
     echo "[$(date -Is)] REUSE video-self-evolution formal matrix"
   elif [[ -e "${FORMAL_ROOT}" ]]; then
-    echo "Incomplete video-self-evolution formal matrix exists: ${FORMAL_ROOT}" >&2
-    exit 2
+    echo "[$(date -Is)] RESUME incomplete video-self-evolution formal matrix"
+    MATRIX_OUTPUT_ROOT="${FORMAL_ROOT}" \
+    PROFILE_DIR="${BASE_ROOT}/profiles" \
+    REPEATS=3 \
+    OPTIMIZER_SET=paper \
+    OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
+    EXECUTION_TIMEOUT_SEC=3600 \
+    VIDEO_SELF_EVOLUTION_SAMPLES=5000 \
+    RESUME_EXISTING=1 \
+    bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
+      --workloads video_self_evolution
   else
     MATRIX_OUTPUT_ROOT="${FORMAL_ROOT}" \
     PROFILE_DIR="${BASE_ROOT}/profiles" \

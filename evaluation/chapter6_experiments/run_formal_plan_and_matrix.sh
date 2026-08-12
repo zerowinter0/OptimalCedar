@@ -321,6 +321,7 @@ generate_plan() {
     # that optimizer as unavailable and continue the matrix.
     if [[ -s "${result}" ]] && python - "${result}" <<'PY'
 import json
+import math
 import sys
 
 with open(sys.argv[1]) as handle:
@@ -426,6 +427,14 @@ if epoch_samples != [expected]:
         f"sample count mismatch in {path}: expected [{expected}], "
         f"found {epoch_samples}"
     )
+epoch_times = result.get("epoch_run_times")
+if (
+    not isinstance(epoch_times, list)
+    or len(epoch_times) != 1
+    or not math.isfinite(float(epoch_times[0]))
+    or float(epoch_times[0]) <= 0
+):
+    raise SystemExit(f"invalid epoch_run_times in {path}: {epoch_times}")
 PY
 }
 
@@ -546,7 +555,9 @@ run_workload() {
         continue
       fi
       if [[ "${RESUME_EXISTING}" == "1" && \
-            -f "${root}/results/round1__${optimizer}.json" ]]; then
+            -f "${root}/results/round1__${optimizer}.json" ]] &&
+         validate_result \
+           "${root}/results/round1__${optimizer}.json" "${samples}"; then
         echo "[$(date -Is)] REUSE ${workload}/${optimizer} cache warmup" \
           | tee -a "${root}/nohup.log"
         continue
@@ -585,7 +596,8 @@ run_workload() {
         continue
       fi
       if [[ "${RESUME_EXISTING}" == "1" && \
-            -f "${root}/results/${tag}.json" ]]; then
+            -f "${root}/results/${tag}.json" ]] &&
+         validate_result "${root}/results/${tag}.json" "${samples}"; then
         echo "[$(date -Is)] REUSE ${workload}/${tag} result" \
           | tee -a "${root}/nohup.log"
         continue

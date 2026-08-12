@@ -20,8 +20,19 @@ mkdir -p "${CODE_ROOT}"
 if [[ -f "${CODE_RUN_ROOT}/dp_20pct_report.json" ]]; then
   echo "[$(date -Is)] REUSE completed RP-Code screening"
 elif [[ -e "${CODE_RUN_ROOT}" ]]; then
-  echo "Incomplete RP-Code screening already exists: ${CODE_RUN_ROOT}" >&2
-  exit 2
+  echo "[$(date -Is)] RESUME incomplete RP-Code screening"
+  DJ_CANDIDATE_OUTPUT_ROOT="${CODE_ROOT}" \
+  DJ_CANDIDATE_PROFILE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/profiles" \
+  DJ_CANDIDATE_RUN_ID=code_additive_screen \
+  DJ_CANDIDATE_WORKLOADS=redpajama_code \
+  DJ_CANDIDATE_REPEATS=1 \
+  DJ_CANDIDATE_OUTPUTS=20000 \
+  DJ_OPTIMIZER_TIMEOUT_SEC=3600 \
+  DJ_EXECUTION_TIMEOUT_SEC=3600 \
+  DJ_PROFILE_TIMEOUT_SEC=3600 \
+  DJ_REUSE_EXISTING_PROFILES=1 \
+  DJ_CANDIDATE_RESUME=1 \
+  bash evaluation/chapter6_experiments/run_datajuicer_candidate_matrix.sh
 else
   DJ_CANDIDATE_OUTPUT_ROOT="${CODE_ROOT}" \
   DJ_CANDIDATE_PROFILE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/profiles" \
@@ -54,8 +65,19 @@ then
   if [[ -f "${CODE_FORMAL_RUN_ROOT}/dp_20pct_report.json" ]]; then
     echo "[$(date -Is)] REUSE completed RP-Code formal matrix"
   elif [[ -e "${CODE_FORMAL_RUN_ROOT}" ]]; then
-    echo "Incomplete RP-Code formal matrix exists: ${CODE_FORMAL_RUN_ROOT}" >&2
-    exit 2
+    echo "[$(date -Is)] RESUME incomplete RP-Code formal matrix"
+    DJ_CANDIDATE_OUTPUT_ROOT="${CODE_FORMAL_ROOT}" \
+    DJ_CANDIDATE_PROFILE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/profiles" \
+    DJ_CANDIDATE_RUN_ID=code_additive_formal \
+    DJ_CANDIDATE_WORKLOADS=redpajama_code \
+    DJ_CANDIDATE_REPEATS=3 \
+    DJ_CANDIDATE_OUTPUTS=20000 \
+    DJ_OPTIMIZER_TIMEOUT_SEC=3600 \
+    DJ_EXECUTION_TIMEOUT_SEC=3600 \
+    DJ_PROFILE_TIMEOUT_SEC=3600 \
+    DJ_REUSE_EXISTING_PROFILES=1 \
+    DJ_CANDIDATE_RESUME=1 \
+    bash evaluation/chapter6_experiments/run_datajuicer_candidate_matrix.sh
   else
     DJ_CANDIDATE_OUTPUT_ROOT="${CODE_FORMAL_ROOT}" \
     DJ_CANDIDATE_PROFILE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/profiles" \
@@ -83,8 +105,17 @@ if [[ -f "${ARXIV_ROOT}/redpajama_arxiv/results/round1__dp_optimizer.json" &&
      "${ARXIV_ROOT}/redpajama_arxiv/nohup.log"; then
   echo "[$(date -Is)] REUSE completed scaled RP-ArXiv screening"
 elif [[ -e "${ARXIV_ROOT}" ]]; then
-  echo "Incomplete scaled RP-ArXiv screening already exists: ${ARXIV_ROOT}" >&2
-  exit 2
+  echo "[$(date -Is)] RESUME incomplete scaled RP-ArXiv screening"
+  MATRIX_OUTPUT_ROOT="${ARXIV_ROOT}" \
+  PROFILE_DIR="${BASE_ROOT}/profiles" \
+  REPEATS=1 \
+  OPTIMIZER_SET=paper \
+  OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
+  EXECUTION_TIMEOUT_SEC=3600 \
+  REDPAJAMA_ARXIV_SAMPLES=2500 \
+  RESUME_EXISTING=1 \
+  bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
+    --workloads redpajama_arxiv
 else
   MATRIX_OUTPUT_ROOT="${ARXIV_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
@@ -124,8 +155,17 @@ then
        "${ARXIV_FORMAL_ROOT}/redpajama_arxiv/nohup.log"; then
     echo "[$(date -Is)] REUSE completed RP-ArXiv formal matrix"
   elif [[ -e "${ARXIV_FORMAL_ROOT}" ]]; then
-    echo "Incomplete RP-ArXiv formal matrix exists: ${ARXIV_FORMAL_ROOT}" >&2
-    exit 2
+    echo "[$(date -Is)] RESUME incomplete RP-ArXiv formal matrix"
+    MATRIX_OUTPUT_ROOT="${ARXIV_FORMAL_ROOT}" \
+    PROFILE_DIR="${BASE_ROOT}/profiles" \
+    REPEATS=3 \
+    OPTIMIZER_SET=paper \
+    OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
+    EXECUTION_TIMEOUT_SEC=3600 \
+    REDPAJAMA_ARXIV_SAMPLES=2500 \
+    RESUME_EXISTING=1 \
+    bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
+      --workloads redpajama_arxiv
   else
     MATRIX_OUTPUT_ROOT="${ARXIV_FORMAL_ROOT}" \
     PROFILE_DIR="${BASE_ROOT}/profiles" \
@@ -149,8 +189,17 @@ if [[ -f "${ALPACA_ROOT}/alpaca_cot/results/round3__dp_optimizer.json" &&
    grep -Fq "COMPLETE alpaca_cot" "${ALPACA_ROOT}/alpaca_cot/nohup.log"; then
   echo "[$(date -Is)] REUSE completed Alpaca-CoT formal matrix"
 elif [[ -e "${ALPACA_ROOT}" ]]; then
-  echo "Incomplete Alpaca-CoT formal matrix already exists: ${ALPACA_ROOT}" >&2
-  exit 2
+  echo "[$(date -Is)] RESUME incomplete Alpaca-CoT formal matrix"
+  MATRIX_OUTPUT_ROOT="${ALPACA_ROOT}" \
+  PROFILE_DIR="${BASE_ROOT}/profiles" \
+  REPEATS=3 \
+  OPTIMIZER_SET=paper \
+  OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
+  EXECUTION_TIMEOUT_SEC=3600 \
+  ALPACA_COT_SAMPLES=20000 \
+  RESUME_EXISTING=1 \
+  bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
+    --workloads alpaca_cot
 else
   MATRIX_OUTPUT_ROOT="${ALPACA_ROOT}" \
   PROFILE_DIR="${BASE_ROOT}/profiles" \
