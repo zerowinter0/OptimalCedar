@@ -107,6 +107,19 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             staging / "evidence/pile/data_pipeline_matrix.json",
         )
 
+        source_metadata = {
+            "redpajama_code.json": repo
+            / "datasets/redpajama_code/redpajama-github-raw-50000.metadata.json",
+            "redpajama_arxiv.json": repo
+            / "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.metadata.json",
+            "alpaca_cot.json": repo
+            / "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
+            "video_self_evolution.json": repo
+            / "datasets/general_video_refine/dataset_metadata.json",
+        }
+        for name, source in source_metadata.items():
+            _copy_file(source, staging / "source_metadata" / name)
+
         canonical_profiles = (
             repo
             / "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/profiles"
@@ -183,7 +196,7 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             "",
             "Selected workloads: " + ", ".join(f"`{name}`" for name in selected) + ".",
             "",
-            "`final_selection.json` is authoritative. `screening/` retains non-selected outcomes; `profiles/` and `evidence/` contain the exact inputs to the aggregate; `MANIFEST.tsv` provides size and SHA-256 for every archived file.",
+            "`final_selection.json` is authoritative. `screening/` retains non-selected outcomes; `profiles/` and `evidence/` contain the exact inputs to the aggregate; `source_metadata/` records frozen dataset provenance, size, and content hashes; `MANIFEST.tsv` provides size and SHA-256 for every archived file.",
             "",
         ]
         (staging / "README.md").write_text("\n".join(readme), encoding="utf-8")
