@@ -378,6 +378,36 @@ generate_plan() {
   cp -p "${tmp_plan}" "${workload_root}/plans/${optimizer}.yaml"
 }
 
+run_guarded_result() {
+  local timeout_sec="$1" result="$2" log="$3"
+  shift 3
+  local pid status=0 start_time="${SECONDS}"
+
+  rm -f "${result}"
+  setsid "$@" >> "${log}" 2>&1 &
+  pid=$!
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [[ -s "${result}" ]]; then
+      sleep 10
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 0
+    fi
+    if ((SECONDS - start_time >= timeout_sec)); then
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+      sleep 2
+      kill -KILL -- "-${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      return 124
+    fi
+    sleep 5
+  done
+  wait "${pid}" || status=$?
+  [[ "${status}" -eq 0 && -s "${result}" ]]
+}
+
 execute_plan() {
   local workload="$1" optimizer="$2" round="$3"
   local workload_root="${RUN_ROOT}/${workload}"
@@ -436,8 +466,8 @@ PY
   printf 'command:' > "${log}"
   printf ' %q' "${args[@]}" >> "${log}"
   printf '\n' >> "${log}"
-  timeout --signal=TERM --kill-after=30s "${EXECUTION_TIMEOUT_SEC}" \
-    "${args[@]}" >> "${log}" 2>&1
+  run_guarded_result "${EXECUTION_TIMEOUT_SEC}" "${result}" "${log}" \
+    "${args[@]}"
   local status=$?
   if [[ "${status}" -eq 124 || "${status}" -eq 137 ]]; then
     write_status "${workload}" "${tag}" "infeasible_timeout" \
