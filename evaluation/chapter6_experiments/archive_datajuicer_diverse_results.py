@@ -136,6 +136,7 @@ def _validate_report(report: dict) -> None:
             raise RuntimeError(
                 f"selected workload lacks exact six-optimizer evidence: {workload}"
             )
+        successful_optimizers = set()
         for optimizer, run in runs.items():
             valid = (
                 run.get("valid") is True
@@ -151,6 +152,16 @@ def _validate_report(report: dict) -> None:
                 raise RuntimeError(
                     f"incomplete formal run: {workload}/{optimizer}"
                 )
+            if valid:
+                successful_optimizers.add(optimizer)
+        if "dp_optimizer" not in successful_optimizers:
+            raise RuntimeError(
+                f"selected workload lacks three successful DP runs: {workload}"
+            )
+        if successful_optimizers == {"dp_optimizer"}:
+            raise RuntimeError(
+                f"selected workload lacks a successful comparator: {workload}"
+            )
         wins += item.get("dp_at_least_20pct_faster") is True
     non_wins = len(selected) - wins
     failure_fraction = non_wins / len(selected)

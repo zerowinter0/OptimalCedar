@@ -93,3 +93,24 @@ def test_archive_report_validation_rejects_more_than_forty_percent_nonwins():
 
     with pytest.raises(RuntimeError, match="exceeds 40%"):
         _validate_report(report)
+
+
+def test_archive_report_validation_requires_successful_dp_and_comparator():
+    import pytest
+
+    report = _formal_report()
+    dp = report["ledger"]["workload_0"]["runs"]["dp_optimizer"]
+    dp.update(valid=False, formally_unavailable=True, execution_times_sec=[])
+    with pytest.raises(RuntimeError, match="successful DP"):
+        _validate_report(report)
+
+    report = _formal_report()
+    for optimizer, run in report["ledger"]["workload_0"]["runs"].items():
+        if optimizer != "dp_optimizer":
+            run.update(
+                valid=False,
+                formally_unavailable=True,
+                execution_times_sec=[],
+            )
+    with pytest.raises(RuntimeError, match="successful comparator"):
+        _validate_report(report)
