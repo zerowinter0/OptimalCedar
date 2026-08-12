@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -14,24 +15,28 @@ CANDIDATES = {
         "source": "datasets/redpajama_code/redpajama-github-raw-50000.jsonl",
         "metadata": "datasets/redpajama_code/redpajama-github-raw-50000.metadata.json",
         "metadata_bytes_key": "bytes",
+        "metadata_sha256_key": "sha256",
         "target_outputs": 20_000,
     },
     "redpajama_arxiv": {
         "source": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl",
         "metadata": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.metadata.json",
         "metadata_bytes_key": "bytes",
+        "metadata_sha256_key": "sha256",
         "target_outputs": 2_500,
     },
     "alpaca_cot": {
         "source": "datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl",
         "metadata": "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
         "metadata_bytes_key": "jsonl_bytes",
+        "metadata_sha256_key": "jsonl_sha256",
         "target_outputs": 65_000,
     },
     "video_self_evolution": {
         "source": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
         "metadata": "datasets/general_video_refine/dataset_metadata.json",
         "metadata_bytes_key": "output_bytes",
+        "metadata_sha256_key": "output_sha256",
         "metadata_records_key": "video_caption_pair_count",
         "target_outputs": 5_000,
         "video_root": "datasets/general_video_refine/videos",
@@ -58,6 +63,14 @@ def _prefix_stats(path: Path, count: int) -> tuple[int, int]:
 def _source_record_count(path: Path) -> int:
     with path.open("rb") as stream:
         return sum(1 for _ in stream)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _video_prefix_files(
@@ -93,14 +106,21 @@ def audit(repo: Path) -> dict[str, Any]:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         source_bytes = source.stat().st_size
         source_records = _source_record_count(source)
+        source_sha256 = _sha256(source)
         metadata_bytes = int(metadata[str(spec["metadata_bytes_key"])])
+        metadata_sha256 = str(metadata[str(spec["metadata_sha256_key"])])
         records_key = str(spec.get("metadata_records_key", "records"))
         metadata_records = int(metadata[records_key])
-        if source_bytes != metadata_bytes or source_records != metadata_records:
+        if (
+            source_bytes != metadata_bytes
+            or source_records != metadata_records
+            or source_sha256 != metadata_sha256
+        ):
             raise RuntimeError(
                 f"source metadata mismatch for {workload}: "
                 f"bytes={source_bytes}/{metadata_bytes}, "
-                f"records={source_records}/{metadata_records}"
+                f"records={source_records}/{metadata_records}, "
+                f"sha256={source_sha256}/{metadata_sha256}"
             )
         target = int(spec["target_outputs"])
         _, prefix_bytes = _prefix_stats(source, target)
@@ -109,6 +129,7 @@ def audit(repo: Path) -> dict[str, Any]:
             "metadata": str(spec["metadata"]),
             "source_records": source_records,
             "source_bytes": source_bytes,
+            "source_sha256": source_sha256,
             "formal_output_target": target,
             "minimum_prefix_jsonl_bytes": prefix_bytes,
             "target_to_source_record_fraction": target / source_records,

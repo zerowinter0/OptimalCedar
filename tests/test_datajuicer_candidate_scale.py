@@ -4,6 +4,7 @@ import pytest
 
 from evaluation.chapter6_experiments.audit_datajuicer_candidate_scale import (
     _prefix_stats,
+    _sha256,
     _video_prefix_files,
 )
 
@@ -15,6 +16,15 @@ def test_prefix_stats_uses_exact_source_order_bytes(tmp_path):
     assert _prefix_stats(source, 2) == (2, 23)
     with pytest.raises(RuntimeError, match="source exhausted"):
         _prefix_stats(source, 4)
+
+
+def test_sha256_hashes_file_contents(tmp_path):
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"frozen data\n")
+
+    assert _sha256(source) == (
+        "786ddc5f99bc2fad9220258132d7d4a163cc09e349b70c96b0bceba5e419aab1"
+    )
 
 
 def test_video_prefix_requires_distinct_existing_files(tmp_path):

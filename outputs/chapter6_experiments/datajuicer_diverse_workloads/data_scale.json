@@ -6,6 +6,7 @@
       "metadata": "datasets/redpajama_code/redpajama-github-raw-50000.metadata.json",
       "source_records": 50000,
       "source_bytes": 391228525,
+      "source_sha256": "06cec94e35208b0b699986736712dda550aa8af10db4fcf2d6648a9664d63476",
       "formal_output_target": 20000,
       "minimum_prefix_jsonl_bytes": 155929345,
       "target_to_source_record_fraction": 0.4
@@ -15,6 +16,7 @@
       "metadata": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.metadata.json",
       "source_records": 52552,
       "source_bytes": 3221193432,
+      "source_sha256": "6a1d683cf107e1e83069bb3f79db70269fe36d2dac0f173cf8aeaa878c7f0d40",
       "formal_output_target": 2500,
       "minimum_prefix_jsonl_bytes": 157411194,
       "target_to_source_record_fraction": 0.0475719287562795
@@ -24,6 +26,7 @@
       "metadata": "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
       "source_records": 74771,
       "source_bytes": 33895084,
+      "source_sha256": "a23ddec651d20b07ebe468e3673443d0e5b7e876b97e74aa7b7d321390daf0a6",
       "formal_output_target": 65000,
       "minimum_prefix_jsonl_bytes": 28571798,
       "target_to_source_record_fraction": 0.869320993433283
@@ -33,6 +36,7 @@
       "metadata": "datasets/general_video_refine/dataset_metadata.json",
       "source_records": 200000,
       "source_bytes": 31419873,
+      "source_sha256": "ba823255476796a444de400abf923f8442e162d1bbacfb8c382c8861c866c3c6",
       "formal_output_target": 5000,
       "minimum_prefix_jsonl_bytes": 787306,
       "target_to_source_record_fraction": 0.025,
