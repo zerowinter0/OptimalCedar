@@ -120,6 +120,12 @@ and covers roughly 140 MiB of long scientific text at the source file's mean
 record size. This is large enough to be a substantive execution while leaving
 headroom under the threshold according to the completed rate measurement.
 
+The Alpaca-CoT screen uses 20,000 outputs for candidate triage. Its formal
+matrix uses 65,000 outputs from the immutable 74,771-record source. The fresh
+profile observes approximately 0.996 cumulative retention, so this target
+covers about 87% of the source while retaining a margin against source
+exhaustion; its projected execution remains well below 3,600 seconds.
+
 The final set and aggregate win fraction will be recorded after the queued
 screening runs finish. In addition, original Cedar and DP two-stage plans
 behind reused Pile results are being re-audited with the current 3,600-second

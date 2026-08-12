@@ -450,7 +450,7 @@ def main() -> None:
     standard = repo / "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads"
     modal_two_stage = root / "two_stage_modal_audit"
     ledger["alpaca_cot"] = _summarize_matrix(
-        "alpaca_cot", 20000,
+        "alpaca_cot", 65000,
         {name: [root / "alpaca_formal/alpaca_cot/results"] for name in OPTIMIZERS},
         str(root / "alpaca_formal/alpaca_cot"),
     )

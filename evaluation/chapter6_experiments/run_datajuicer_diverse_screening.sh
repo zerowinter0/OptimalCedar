@@ -220,7 +220,7 @@ elif [[ -e "${ALPACA_ROOT}" ]]; then
   OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
-  ALPACA_COT_SAMPLES=20000 \
+  ALPACA_COT_SAMPLES=65000 \
   RESUME_EXISTING=1 \
   bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
     --workloads alpaca_cot
@@ -231,7 +231,7 @@ else
   OPTIMIZER_SET=complete \
   OPTIMIZER_PLAN_TIMEOUT_SEC=3600 \
   EXECUTION_TIMEOUT_SEC=3600 \
-  ALPACA_COT_SAMPLES=20000 \
+  ALPACA_COT_SAMPLES=65000 \
   bash evaluation/chapter6_experiments/run_formal_plan_and_matrix.sh \
     --workloads alpaca_cot
 fi
