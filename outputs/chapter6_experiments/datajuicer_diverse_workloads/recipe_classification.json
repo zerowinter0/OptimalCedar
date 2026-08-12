@@ -640,7 +640,7 @@
       "operator_count": 5,
       "reorderable_per_record_count": 5,
       "global_deduplicator_count": 0,
-      "model_operator_count": 5,
+      "model_operator_count": 3,
       "operators": [
         "video_nsfw_filter",
         "video_frames_text_similarity_filter",
@@ -655,7 +655,7 @@
       "operator_count": 7,
       "reorderable_per_record_count": 7,
       "global_deduplicator_count": 0,
-      "model_operator_count": 7,
+      "model_operator_count": 6,
       "operators": [
         "language_id_score_filter",
         "perplexity_filter",
