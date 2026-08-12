@@ -53,6 +53,9 @@ python evaluation/chapter6_experiments/analyze_datajuicer_diverse_workloads.py \
   --root "${BASE_ROOT}" \
   --json-output "${BASE_ROOT}/final_selection.json" \
   --markdown-output "${BASE_ROOT}/final_selection.md"
+python evaluation/chapter6_experiments/plot_datajuicer_diverse_workloads.py \
+  --report "${BASE_ROOT}/final_selection.json" \
+  --output-dir "${BASE_ROOT}/figures"
 python evaluation/chapter6_experiments/archive_datajuicer_diverse_results.py \
   --root "${BASE_ROOT}"
 

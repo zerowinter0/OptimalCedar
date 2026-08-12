@@ -149,6 +149,13 @@ def create_archive(root: Path, archive: Path, repo: Path) -> None:
             _copy_json_without_repo_absolute_paths(
                 source, staging / "source_metadata" / name, repo
             )
+        for name in (
+            "datajuicer_diverse_runtime.pdf",
+            "datajuicer_diverse_runtime.png",
+            "datajuicer_diverse_runtime.svg",
+            "datajuicer_diverse_runtime.tsv",
+        ):
+            _copy_file(root / "figures" / name, staging / "figures" / name)
 
         canonical_profiles = (
             repo
