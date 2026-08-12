@@ -108,7 +108,7 @@ and ten seconds per measured stage.
 |---|---:|---|---|---|
 | `alpaca_cot` | 20,000 | complete | DP 29.074 s; fastest competitor 28.573 s (0.983x) | below 1.20x; retain as a negative screening result |
 | `redpajama_arxiv` | 20,000 | complete | DJ timed out after 3,600 s at 3,367 outputs | scale infeasible; no optimizer-speedup claim |
-| `redpajama_code` | 20,000 | reused validated formal profile | fresh additive-objective screening running | pending |
+| `redpajama_code` | 20,000 | reused validated formal profile | DP 274.821 s; fastest competitor DJ 460.193 s (1.675x); all six optimizers complete | passes 1.20x; three-repeat formal matrix running |
 | `redpajama_arxiv` | 2,500 | reused fresh profile | queued after Code | pending |
 
 The 20,000-output ArXiv attempt was stopped after the completed Data-Juicer
