@@ -1,5 +1,10 @@
 # Data-Juicer diverse-workload study
 
+This file is the authoritative protocol for the current six-optimizer diverse
+workload study. `DATA_JUICER_CANDIDATE_PROTOCOL.md` remains the historical
+pre-registration record for the earlier text-only candidate batches; where
+their comparison sets differ, this document governs the current study.
+
 This document records the workload search used to broaden the Chapter 6
 evaluation beyond structurally similar 15--18-operator text-refinement
 pipelines. It is a screening ledger, not a rule for silently discarding

@@ -15,6 +15,7 @@ ALPACA_ROOT="${BASE_ROOT}/alpaca_formal"
 
 cd "${REPO_ROOT}"
 source env/bin/activate
+export DJ_CANDIDATE_DIVERSE_PROTOCOL="evaluation/chapter6_experiments/DATA_JUICER_DIVERSE_WORKLOADS.md"
 
 complete_candidate_report() {
   local report="$1" repeats="$2"

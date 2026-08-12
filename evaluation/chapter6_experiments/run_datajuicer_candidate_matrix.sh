@@ -516,6 +516,9 @@ write_metadata() {
   {
     printf 'protocol=datajuicer_predeclared_candidate_w8\n'
     printf 'candidate_protocol=evaluation/chapter6_experiments/DATA_JUICER_CANDIDATE_PROTOCOL.md\n'
+    if [[ -n "${DJ_CANDIDATE_DIVERSE_PROTOCOL:-}" ]]; then
+      printf 'diverse_protocol=%s\n' "${DJ_CANDIDATE_DIVERSE_PROTOCOL}"
+    fi
     printf 'workload=%s\n' "${workload}"
     printf 'dataset=%s\n' "${local_data}"
     printf 'dataset_sha256=%s\n' "$(sha256sum "${local_data}" | awk '{print $1}')"

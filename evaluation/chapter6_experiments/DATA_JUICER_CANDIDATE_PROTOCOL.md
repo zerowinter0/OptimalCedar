@@ -12,9 +12,11 @@ collected. It is intended to prevent result-driven workload selection.
 - Resource protocol: the Chapter 6 W=8 protocol (`CPU_BUDGET=64`, one
   Ray actor or SMP process per profiled stage, ten seconds per profile stage,
   one shared profile for all optimizers, and a 60-minute plan timeout).
-- Optimizer set: original Cedar, Data-Juicer, DP-Cedar, DP, and Pecan.
-  DP-two-stage is outside the requested comparison scope and is ignored in
-  both the best-competitor calculation and all subsequent candidate runs.
+- Historical optimizer set for the batches pre-registered in this file:
+  original Cedar, Data-Juicer, DP-Cedar, DP, and Pecan. The later diverse
+  workload study in `DATA_JUICER_DIVERSE_WORKLOADS.md` supersedes this
+  comparison set for current public claims and requires all six optimizers,
+  including DP-two-stage.
 
 Global deduplicators are excluded because Cedar's optimizer operates on
 per-sample pipelines. This is the same documented boundary used by the
