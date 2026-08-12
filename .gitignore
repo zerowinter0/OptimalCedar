@@ -169,6 +169,10 @@ cython_debug/
 # pinned in evaluation/baselines/versions.lock.json.
 /data-juicer/
 
+# Upstream recipe catalog used for workload discovery. The exact observed
+# revision and derived inventory are tracked in the Chapter 6 artifacts.
+/data-juicer-hub/
+
 # Verified source archives used to build the legacy Plumber/FastFlow images.
 # The reproducible download script and checksums are tracked; archives are not.
 /docker/baselines/sources/
