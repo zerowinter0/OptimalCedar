@@ -423,6 +423,7 @@ validate_result() {
   local result="$1" expected_samples="$2"
   python - "${result}" "${expected_samples}" <<'PY'
 import json
+import math
 import sys
 
 path = sys.argv[1]
