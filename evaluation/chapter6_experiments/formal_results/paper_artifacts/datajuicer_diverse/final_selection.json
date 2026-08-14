@@ -1,0 +1,1496 @@
+{
+  "protocol": {
+    "local_workers": 8,
+    "cpu_budget": 64,
+    "repetitions": 3,
+    "optimizer_plan_limit_sec": 3600,
+    "execution_limit_sec": 3600,
+    "speedup_threshold": 1.2,
+    "maximum_non_win_fraction": 0.4,
+    "data_juicer_hub_commit": "47fc34588b5d4258c13747cea37c2b63cf4e11b0",
+    "classified_recipe_count": 33,
+    "operator_count_convention": {
+      "hub": "all official recipe process entries, including global deduplicators",
+      "cedar": "logical executed pipes excluding source and omitted cross-record deduplicators, including fixed adapters"
+    }
+  },
+  "selected_workloads": [
+    "pile_hackernews",
+    "pile_uspto_backgrounds",
+    "pile_europarl",
+    "alpaca_cot",
+    "general_video_refine",
+    "redpajama_code"
+  ],
+  "data_scale": {
+    "definition": "Exact first-N source-order input prefix for N formal retained outputs; because no pipeline expands records, actual scanning is at least this large.",
+    "workloads": {
+      "redpajama_code": {
+        "source": "datasets/redpajama_code/redpajama-github-raw-50000.jsonl",
+        "metadata": "datasets/redpajama_code/redpajama-github-raw-50000.metadata.json",
+        "source_records": 50000,
+        "source_bytes": 391228525,
+        "source_sha256": "06cec94e35208b0b699986736712dda550aa8af10db4fcf2d6648a9664d63476",
+        "formal_output_target": 20000,
+        "minimum_prefix_jsonl_bytes": 155929345,
+        "target_to_source_record_fraction": 0.4
+      },
+      "redpajama_arxiv": {
+        "source": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.jsonl",
+        "metadata": "datasets/redpajama_arxiv/redpajama-arxiv-raw-3gib.metadata.json",
+        "source_records": 52552,
+        "source_bytes": 3221193432,
+        "source_sha256": "6a1d683cf107e1e83069bb3f79db70269fe36d2dac0f173cf8aeaa878c7f0d40",
+        "formal_output_target": 2500,
+        "minimum_prefix_jsonl_bytes": 157411194,
+        "target_to_source_record_fraction": 0.0475719287562795
+      },
+      "alpaca_cot": {
+        "source": "datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl",
+        "metadata": "datasets/alpaca_cot/alpaca-cot-en-cot-data.metadata.json",
+        "source_records": 74771,
+        "source_bytes": 33895084,
+        "source_sha256": "a23ddec651d20b07ebe468e3673443d0e5b7e876b97e74aa7b7d321390daf0a6",
+        "formal_output_target": 65000,
+        "minimum_prefix_jsonl_bytes": 28571798,
+        "target_to_source_record_fraction": 0.869320993433283
+      },
+      "video_self_evolution": {
+        "source": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
+        "metadata": "datasets/general_video_refine/dataset_metadata.json",
+        "source_records": 200000,
+        "source_bytes": 31419873,
+        "source_sha256": "ba823255476796a444de400abf923f8442e162d1bbacfb8c382c8861c866c3c6",
+        "formal_output_target": 5000,
+        "minimum_prefix_jsonl_bytes": 787306,
+        "target_to_source_record_fraction": 0.025,
+        "minimum_distinct_video_files": 5000,
+        "minimum_distinct_video_bytes": 1093920286
+      },
+      "general_video_refine": {
+        "source": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
+        "metadata": "datasets/general_video_refine/dataset_metadata.json",
+        "source_records": 200000,
+        "source_bytes": 31419873,
+        "source_sha256": "ba823255476796a444de400abf923f8442e162d1bbacfb8c382c8861c866c3c6",
+        "formal_output_target": 7500,
+        "minimum_prefix_jsonl_bytes": 1181369,
+        "target_to_source_record_fraction": 0.0375,
+        "minimum_distinct_video_files": 7500,
+        "minimum_distinct_video_bytes": 1643624063
+      }
+    }
+  },
+  "ledger": {
+    "pile_europarl": {
+      "workload": "pile_europarl",
+      "expected_samples": 2500,
+      "evidence": "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json",
+      "cedar_60m_audit_complete": true,
+      "cedar_60m_audit": {
+        "valid": false,
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "stddev_execution_time_sec": null,
+        "within_execution_limit": false,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": true,
+        "sources": [],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/status/plan__optimizer.json"
+        ]
+      },
+      "dp_two_stage_60m_audit": {
+        "valid": true,
+        "execution_times_sec": [
+          2417.9839885949623,
+          2419.739834696986,
+          2421.989218840841
+        ],
+        "mean_execution_time_sec": 2419.9043473775964,
+        "stddev_execution_time_sec": 2.0076766789468623,
+        "within_execution_limit": true,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": false,
+        "sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round1__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round2__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round3__dp_two_stage_optimizer.json"
+        ],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": []
+      },
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/status/plan__optimizer.json"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            1837.251230443013,
+            1833.2974714100128,
+            1838.9901792230085
+          ],
+          "mean_execution_time_sec": 1836.5129603586781,
+          "stddev_execution_time_sec": 2.917278286194731,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 2.959886953001842,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            3078.538772828062,
+            3086.0975484279916,
+            3072.0562356789596
+          ],
+          "mean_execution_time_sec": 3078.8975189783378,
+          "stddev_execution_time_sec": 7.027527305481273,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 6.112496682908386,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            1226.0652575659333,
+            1230.451086494024,
+            1226.939293660922
+          ],
+          "mean_execution_time_sec": 1227.8185459069598,
+          "stddev_execution_time_sec": 2.321354611157238,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 29.052542070974596,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            2406.7465558859985,
+            2408.1998040518956,
+            2399.6687910049222
+          ],
+          "mean_execution_time_sec": 2404.871716980939,
+          "stddev_execution_time_sec": 4.564078394577783,
+          "processed_samples": [
+            2500,
+            2500,
+            2500
+          ],
+          "optimization_time_sec": 2.9625831389566883,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            2417.9839885949623,
+            2419.739834696986,
+            2421.989218840841
+          ],
+          "mean_execution_time_sec": 2419.9043473775964,
+          "stddev_execution_time_sec": 2.0076766789468623,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/europarl_2500/pile_europarl/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 1836.5129603586781,
+      "dp_execution_time_sec": 1227.8185459069598,
+      "dp_speedup_over_best_other": 1.495752744964518,
+      "dp_at_least_20pct_faster": true
+    },
+    "pile_hackernews": {
+      "workload": "pile_hackernews",
+      "expected_samples": 20000,
+      "evidence": "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json",
+      "cedar_60m_audit_complete": true,
+      "cedar_60m_audit": {
+        "valid": false,
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "stddev_execution_time_sec": null,
+        "within_execution_limit": false,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": true,
+        "sources": [],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/status/plan__optimizer.json"
+        ]
+      },
+      "dp_two_stage_60m_audit": {
+        "valid": true,
+        "execution_times_sec": [
+          1324.0246576359496,
+          1333.003620039206,
+          1325.9583856458776
+        ],
+        "mean_execution_time_sec": 1327.662221107011,
+        "stddev_execution_time_sec": 4.725752100854966,
+        "within_execution_limit": true,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": false,
+        "sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round1__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round2__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round3__dp_two_stage_optimizer.json"
+        ],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": []
+      },
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/status/plan__optimizer.json"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            1315.4494340829842,
+            1305.146516259003,
+            1304.2736336139787
+          ],
+          "mean_execution_time_sec": 1308.2898613186553,
+          "stddev_execution_time_sec": 6.215713366443661,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.117243034997955,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            1291.512828549021,
+            1290.287694292987,
+            1294.4586684420065
+          ],
+          "mean_execution_time_sec": 1292.0863970946714,
+          "stddev_execution_time_sec": 2.143826484435459,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 4.574041888990905,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            469.264087899006,
+            466.41400672099553,
+            467.51746113802074
+          ],
+          "mean_execution_time_sec": 467.7318519193407,
+          "stddev_execution_time_sec": 1.4370849785759365,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.26414730399847,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            1305.2177642440074,
+            1308.6781982959947,
+            1296.9020211840107
+          ],
+          "mean_execution_time_sec": 1303.5993279080042,
+          "stddev_execution_time_sec": 6.052610095940053,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.087750020000385,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            1324.0246576359496,
+            1333.003620039206,
+            1325.9583856458776
+          ],
+          "mean_execution_time_sec": 1327.662221107011,
+          "stddev_execution_time_sec": 4.725752100854966,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_hackernews/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dp_cedar_optimizer",
+      "best_other_execution_time_sec": 1292.0863970946714,
+      "dp_execution_time_sec": 467.7318519193407,
+      "dp_speedup_over_best_other": 2.762451160408654,
+      "dp_at_least_20pct_faster": true
+    },
+    "pile_pubmed_abstracts": {
+      "workload": "pile_pubmed_abstracts",
+      "expected_samples": 20000,
+      "evidence": "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json",
+      "cedar_60m_audit_complete": true,
+      "cedar_60m_audit": {
+        "valid": false,
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "stddev_execution_time_sec": null,
+        "within_execution_limit": false,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": true,
+        "sources": [],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/status/plan__optimizer.json"
+        ]
+      },
+      "dp_two_stage_60m_audit": {
+        "valid": true,
+        "execution_times_sec": [
+          298.116531542968,
+          298.31444159708917,
+          300.5091889188625
+        ],
+        "mean_execution_time_sec": 298.9800540196399,
+        "stddev_execution_time_sec": 1.3279616908615812,
+        "within_execution_limit": true,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": false,
+        "sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round1__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round2__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round3__dp_two_stage_optimizer.json"
+        ],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": []
+      },
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/status/plan__optimizer.json"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            305.83838323000236,
+            303.9855951879872,
+            303.6709987029899
+          ],
+          "mean_execution_time_sec": 304.49832570699317,
+          "stddev_execution_time_sec": 1.171135500624652,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.065467336011352,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            303.1906455139979,
+            304.1237445699808,
+            303.72639395599253
+          ],
+          "mean_execution_time_sec": 303.68026134665706,
+          "stddev_execution_time_sec": 0.46825700774480267,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 6.226066965988139,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            201.5935449259996,
+            201.8546220920107,
+            201.10418509098236
+          ],
+          "mean_execution_time_sec": 201.51745070299754,
+          "stddev_execution_time_sec": 0.3809615088284026,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.0693060499907,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            305.3939857140067,
+            303.42291102500167,
+            304.56781787998625
+          ],
+          "mean_execution_time_sec": 304.4615715396649,
+          "stddev_execution_time_sec": 0.989823252420774,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.072050252027111,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            298.116531542968,
+            298.31444159708917,
+            300.5091889188625
+          ],
+          "mean_execution_time_sec": 298.9800540196399,
+          "stddev_execution_time_sec": 1.3279616908615812,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_pubmed_abstracts/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dp_two_stage_optimizer",
+      "best_other_execution_time_sec": 298.9800540196399,
+      "dp_execution_time_sec": 201.51745070299754,
+      "dp_speedup_over_best_other": 1.483643490807581,
+      "dp_at_least_20pct_faster": true
+    },
+    "pile_uspto_backgrounds": {
+      "workload": "pile_uspto_backgrounds",
+      "expected_samples": 20000,
+      "evidence": "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json",
+      "cedar_60m_audit_complete": true,
+      "cedar_60m_audit": {
+        "valid": false,
+        "execution_times_sec": [],
+        "mean_execution_time_sec": null,
+        "stddev_execution_time_sec": null,
+        "within_execution_limit": false,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": true,
+        "sources": [],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/status/plan__optimizer.json"
+        ]
+      },
+      "dp_two_stage_60m_audit": {
+        "valid": true,
+        "execution_times_sec": [
+          909.2376525481232,
+          915.7239259530324,
+          907.8356930380687
+        ],
+        "mean_execution_time_sec": 910.9324238464081,
+        "stddev_execution_time_sec": 4.208353828434245,
+        "within_execution_limit": true,
+        "execution_limit_exceeded": false,
+        "formally_unavailable": false,
+        "sources": [
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round1__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round2__dp_two_stage_optimizer.json",
+          "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round3__dp_two_stage_optimizer.json"
+        ],
+        "threshold_exceeding_sources": [],
+        "unavailable_sources": []
+      },
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/status/plan__optimizer.json"
+          ]
+        },
+        "dj_optimizer": {
+          "execution_times_sec": [
+            834.0327363230172,
+            826.5372228329943,
+            827.18477360002
+          ],
+          "mean_execution_time_sec": 829.2515775853439,
+          "stddev_execution_time_sec": 4.153244473311381,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.077500475978013,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_cedar_optimizer": {
+          "execution_times_sec": [
+            911.2637160080194,
+            925.1277441180137,
+            913.6302563250065
+          ],
+          "mean_execution_time_sec": 916.6739054836798,
+          "stddev_execution_time_sec": 7.416243591569622,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 6.227119668998057,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_optimizer": {
+          "execution_times_sec": [
+            338.9133554250002,
+            337.8037552909809,
+            338.53428324099514
+          ],
+          "mean_execution_time_sec": 338.41713131899206,
+          "stddev_execution_time_sec": 0.5640004822477153,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 26.26395659899572,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "pecan_optimizer": {
+          "execution_times_sec": [
+            892.5374439029838,
+            891.6191243459762,
+            886.4970170689921
+          ],
+          "mean_execution_time_sec": 890.2178617726507,
+          "stddev_execution_time_sec": 3.254895034214414,
+          "processed_samples": [
+            20000,
+            20000,
+            20000
+          ],
+          "optimization_time_sec": 3.0795747869997285,
+          "execution_time_lower_bound_sec": null,
+          "outcome": "success",
+          "valid": true,
+          "formally_unavailable": false,
+          "source_infeasible": false,
+          "statuses": [],
+          "errors": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            909.2376525481232,
+            915.7239259530324,
+            907.8356930380687
+          ],
+          "mean_execution_time_sec": 910.9324238464081,
+          "stddev_execution_time_sec": 4.208353828434245,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/cedar_60m_audit/datajuicer_candidate_runs/heldout_20000/pile_uspto_backgrounds/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 829.2515775853439,
+      "dp_execution_time_sec": 338.41713131899206,
+      "dp_speedup_over_best_other": 2.45038297663392,
+      "dp_at_least_20pct_faster": true
+    },
+    "alpaca_cot": {
+      "workload": "alpaca_cot",
+      "expected_samples": 65000,
+      "evidence": "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot",
+      "runs": {
+        "optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            120.37349193100818,
+            120.65194429899566,
+            121.04477089690045
+          ],
+          "mean_execution_time_sec": 120.69006904230143,
+          "stddev_execution_time_sec": 0.33725952106863777,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dj_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            120.66698163701221,
+            120.57149637793191,
+            120.38771680695936
+          ],
+          "mean_execution_time_sec": 120.54206494063449,
+          "stddev_execution_time_sec": 0.14193966483036327,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__dj_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            120.46441119187512,
+            120.7003122670576,
+            120.45761915296316
+          ],
+          "mean_execution_time_sec": 120.54078087063196,
+          "stddev_execution_time_sec": 0.1381999738866882,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__dp_cedar_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__dp_cedar_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__dp_cedar_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            124.9200872250367,
+            124.85917164199054,
+            124.76769751100801
+          ],
+          "mean_execution_time_sec": 124.84898545934509,
+          "stddev_execution_time_sec": 0.07670381328917877,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__dp_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            120.64688417199068,
+            120.15615479205735,
+            120.31292747380212
+          ],
+          "mean_execution_time_sec": 120.37198881261672,
+          "stddev_execution_time_sec": 0.25063920760600567,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            120.58240200579166,
+            120.62959522102028,
+            121.24873518687673
+          ],
+          "mean_execution_time_sec": 120.82024413789622,
+          "stddev_execution_time_sec": 0.3718336108842413,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round1__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round2__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/alpaca_formal/alpaca_cot/results/round3__pecan_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dp_two_stage_optimizer",
+      "best_other_execution_time_sec": 120.37198881261672,
+      "dp_execution_time_sec": 124.84898545934509,
+      "dp_speedup_over_best_other": 0.9641407046260202,
+      "dp_at_least_20pct_faster": false,
+      "screening": null
+    },
+    "llava_pretrain": {
+      "workload": "llava_pretrain",
+      "expected_samples": 5000,
+      "evidence": "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain",
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/two_stage_modal_audit/llava_pretrain/plans/optimizer.unavailable.json"
+          ]
+        },
+        "dj_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            80.85007347801002,
+            80.64526463701623,
+            79.19627922098152
+          ],
+          "mean_execution_time_sec": 80.23053911200259,
+          "stddev_execution_time_sec": 0.90153025848747,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round1__dj_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round2__dj_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round3__dj_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            84.1994340949459,
+            84.84215627098456,
+            84.01059533999069
+          ],
+          "mean_execution_time_sec": 84.35072856864038,
+          "stddev_execution_time_sec": 0.4359368174594998,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round1__dp_cedar_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round2__dp_cedar_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round3__dp_cedar_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            85.42825586895924,
+            84.79817251599161,
+            84.40661571698729
+          ],
+          "mean_execution_time_sec": 84.87768136731272,
+          "stddev_execution_time_sec": 0.5154399995238232,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round1__dp_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round2__dp_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round3__dp_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            81.81658740597777,
+            84.50963450595737,
+            85.12730170111172
+          ],
+          "mean_execution_time_sec": 83.81784120434895,
+          "stddev_execution_time_sec": 1.760437662944579,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/two_stage_modal_audit/llava_pretrain/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/two_stage_modal_audit/llava_pretrain/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/two_stage_modal_audit/llava_pretrain/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            80.09061742102494,
+            80.251146463037,
+            80.00159441801952
+          ],
+          "mean_execution_time_sec": 80.11445276736049,
+          "stddev_execution_time_sec": 0.12647192808802765,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round1__pecan_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round2__pecan_optimizer.json",
+            "evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core/workloads/llava_pretrain/results/round3__pecan_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "pecan_optimizer",
+      "best_other_execution_time_sec": 80.11445276736049,
+      "dp_execution_time_sec": 84.87768136731272,
+      "dp_speedup_over_best_other": 0.9438812592047714,
+      "dp_at_least_20pct_faster": false
+    },
+    "general_video_refine": {
+      "workload": "general_video_refine",
+      "expected_samples": 7500,
+      "evidence": "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine",
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__optimizer.timeout.json"
+          ]
+        },
+        "dj_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            1936.0160022461787,
+            1979.601103164954,
+            2021.707630333025
+          ],
+          "mean_execution_time_sec": 1979.1082452480525,
+          "stddev_execution_time_sec": 42.847940005772585,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round2__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round3__dj_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": true,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__dp_cedar_optimizer.timeout.json"
+          ]
+        },
+        "dp_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            2135.535166717833,
+            2170.7766294789035,
+            2152.7873010290787
+          ],
+          "mean_execution_time_sec": 2153.033032408605,
+          "stddev_execution_time_sec": 17.622016408973863,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round2__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round3__dp_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            3124.209534841124,
+            3149.073351382045,
+            3177.444411006989
+          ],
+          "mean_execution_time_sec": 3150.2424324100525,
+          "stddev_execution_time_sec": 26.636686598304237,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            2089.734284543898,
+            2098.9969886268955,
+            2053.2509516819846
+          ],
+          "mean_execution_time_sec": 2080.6607416175925,
+          "stddev_execution_time_sec": 24.185157844593785,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round1__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round2__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/general_video_refine_formal_7500/general_video_refine/results/round3__pecan_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 1979.1082452480525,
+      "dp_execution_time_sec": 2153.033032408605,
+      "dp_speedup_over_best_other": 0.9192187093544115,
+      "dp_at_least_20pct_faster": false,
+      "historical_cross_run_screening": {
+        "competitors": "outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/results",
+        "corrected_dp": "outputs/chapter6_experiments/general_video_refine_cost_model_fix_formal/general_video_refine/results",
+        "requested_outputs": 10000,
+        "used_as_formal_speedup_evidence": false
+      }
+    },
+    "video_self_evolution": {
+      "workload": "video_self_evolution",
+      "expected_samples": 5000,
+      "evidence": "outputs/chapter6_experiments/datajuicer_diverse_workloads/video_self_evolution_formal/video_self_evolution",
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dj_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "dp_execution_time_sec": null,
+      "dp_speedup_over_best_other": null,
+      "dp_at_least_20pct_faster": false,
+      "screening": null
+    },
+    "redpajama_code": {
+      "workload": "redpajama_code",
+      "expected_samples": 20000,
+      "evidence": "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code",
+      "runs": {
+        "optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            551.2903825188987,
+            553.6300779189914,
+            551.9200019859709
+          ],
+          "mean_execution_time_sec": 552.280154141287,
+          "stddev_execution_time_sec": 1.2107129397747145,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dj_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            459.51111965300515,
+            459.7354892399162,
+            461.4991243928671
+          ],
+          "mean_execution_time_sec": 460.2485777619295,
+          "stddev_execution_time_sec": 1.0888000665846356,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__dj_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__dj_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            553.0631074928679,
+            554.9795785460155,
+            551.7606235640123
+          ],
+          "mean_execution_time_sec": 553.267769867632,
+          "stddev_execution_time_sec": 1.619207463475218,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__dp_cedar_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__dp_cedar_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__dp_cedar_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            273.916092566913,
+            275.4553051190451,
+            274.7260244509671
+          ],
+          "mean_execution_time_sec": 274.6991407123084,
+          "stddev_execution_time_sec": 0.7699583571294253,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__dp_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__dp_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            623.4407055908814,
+            624.2709084460512,
+            620.614890292054
+          ],
+          "mean_execution_time_sec": 622.7755014429955,
+          "stddev_execution_time_sec": 1.9166349689918993,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__dp_two_stage_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__dp_two_stage_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": true,
+          "execution_times_sec": [
+            467.19851311598904,
+            465.924857562175,
+            467.46988814510405
+          ],
+          "mean_execution_time_sec": 466.864419607756,
+          "stddev_execution_time_sec": 0.8249204384236596,
+          "within_execution_limit": true,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round1__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round2__pecan_optimizer.json",
+            "outputs/chapter6_experiments/datajuicer_diverse_workloads/code_formal/datajuicer_candidate_runs/code_additive_formal/redpajama_code/results/round3__pecan_optimizer.json"
+          ],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": true,
+      "best_other_optimizer": "dj_optimizer",
+      "best_other_execution_time_sec": 460.2485777619295,
+      "dp_execution_time_sec": 274.6991407123084,
+      "dp_speedup_over_best_other": 1.6754642062894054,
+      "dp_at_least_20pct_faster": true,
+      "screening": null
+    },
+    "redpajama_arxiv": {
+      "workload": "redpajama_arxiv",
+      "expected_samples": 2500,
+      "evidence": "outputs/chapter6_experiments/datajuicer_diverse_workloads/arxiv_formal/redpajama_arxiv",
+      "runs": {
+        "optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dj_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_cedar_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "dp_two_stage_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        },
+        "pecan_optimizer": {
+          "valid": false,
+          "execution_times_sec": [],
+          "mean_execution_time_sec": null,
+          "stddev_execution_time_sec": null,
+          "within_execution_limit": false,
+          "execution_limit_exceeded": false,
+          "formally_unavailable": false,
+          "sources": [],
+          "threshold_exceeding_sources": [],
+          "unavailable_sources": []
+        }
+      },
+      "valid": false,
+      "best_other_optimizer": null,
+      "best_other_execution_time_sec": null,
+      "dp_execution_time_sec": null,
+      "dp_speedup_over_best_other": null,
+      "dp_at_least_20pct_faster": false,
+      "screening": null,
+      "infeasible_20000_output_attempt": {
+        "requested_outputs": 20000,
+        "dj_optimizer_timeout_sec": 3600,
+        "dj_optimizer_observed_outputs": 3367,
+        "source": "outputs/chapter6_experiments/datajuicer_diverse_workloads/screening_matrix/redpajama_arxiv/results/round1__dj_optimizer.timeout.json",
+        "used_as_speedup_evidence": false
+      }
+    }
+  },
+  "summary": {
+    "selected_count": 6,
+    "wins": 4,
+    "non_wins": 2,
+    "failure_fraction": 0.3333333333333333,
+    "diversity": {
+      "scenarios": [
+        "instruction/reasoning tuning",
+        "online discussion",
+        "parliamentary proceedings",
+        "patent background",
+        "source-code refinement",
+        "video-text quality refinement"
+      ],
+      "modalities": [
+        "code",
+        "text",
+        "video-text"
+      ],
+      "hub_operator_count_range": [
+        7,
+        17
+      ],
+      "cedar_operator_count_range": [
+        8,
+        19
+      ]
+    }
+  }
+}

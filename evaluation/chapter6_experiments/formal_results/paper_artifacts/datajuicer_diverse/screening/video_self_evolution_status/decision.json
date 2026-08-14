@@ -1,0 +1,5 @@
+{
+  "status": "screening_below_1.20x",
+  "screening_threshold": 1.2,
+  "selected": false
+}

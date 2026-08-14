@@ -1,0 +1,9 @@
+{
+  "dataset_id": "QingyiSi/Alpaca-CoT",
+  "revision": "18add89e3b884703ec869a5c6e2bcf1412ee7edc",
+  "source_file": "Chain-of-Thought/CoT_data.json",
+  "source_url": "https://huggingface.co/datasets/QingyiSi/Alpaca-CoT/resolve/18add89e3b884703ec869a5c6e2bcf1412ee7edc/Chain-of-Thought/CoT_data.json",
+  "records": 74771,
+  "jsonl_bytes": 33895084,
+  "jsonl_sha256": "a23ddec651d20b07ebe468e3673443d0e5b7e876b97e74aa7b7d321390daf0a6"
+}

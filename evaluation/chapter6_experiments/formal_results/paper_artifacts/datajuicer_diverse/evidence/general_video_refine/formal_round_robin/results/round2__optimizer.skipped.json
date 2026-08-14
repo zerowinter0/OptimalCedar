@@ -1,0 +1,7 @@
+{
+  "optimizer": "optimizer",
+  "repeat": 2,
+  "status": "skipped_after_timeout",
+  "skip_reason": "earlier_repeat_execution_timeout",
+  "execution_timeout_sec": 3600
+}

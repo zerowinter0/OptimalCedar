@@ -1,0 +1,10 @@
+{
+  "bytes": 391228525,
+  "config": "github",
+  "dataset_id": "togethercomputer/RedPajama-Data-1T",
+  "records": 50000,
+  "revision": "398f92572e94f4793e41c22ab7ea2a788d9e7de4",
+  "selection": "first 50000 valid records in streaming order",
+  "sha256": "06cec94e35208b0b699986736712dda550aa8af10db4fcf2d6648a9664d63476",
+  "split": "train"
+}

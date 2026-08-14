@@ -1,0 +1,12 @@
+{
+  "bytes": 432463766,
+  "data_juicer_hub_revision": "47fc345",
+  "dataset_id": "timaeus/pile-uspto_backgrounds",
+  "official_recipe": "refined_recipes/pretrain/pile-uspto-refine.yaml",
+  "records": 100000,
+  "revision": "cb4f574c22debca066312ddccd0d048cbd7e148b",
+  "selection": "complete frozen 100000-row train split",
+  "sha256": "9bc6300b6d5c3ad04a1bc7e5995bca00186e007a84eff54b5524775c606987c6",
+  "split": "train",
+  "workload": "pile_uspto_backgrounds"
+}

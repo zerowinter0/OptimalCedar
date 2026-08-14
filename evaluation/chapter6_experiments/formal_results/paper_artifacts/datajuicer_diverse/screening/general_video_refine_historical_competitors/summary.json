@@ -1,0 +1,92 @@
+{
+  "optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 3724.563827168662,
+    "sample_stdev_seconds": 5.644654222066911,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  },
+  "dj_optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 2866.7147688819873,
+    "sample_stdev_seconds": 28.986584854354273,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/dj_optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  },
+  "dp_cedar_optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 3731.416623058729,
+    "sample_stdev_seconds": 10.171064151047933,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/dp_cedar_optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  },
+  "dp_optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 3971.7491053994745,
+    "sample_stdev_seconds": 45.71871869420456,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/dp_optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  },
+  "dp_two_stage_optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 4166.556938175035,
+    "sample_stdev_seconds": 57.354291477656886,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/dp_two_stage_optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  },
+  "pecan_optimizer": {
+    "completed_repeats": 3,
+    "mean_seconds": 3081.6410342050563,
+    "sample_stdev_seconds": 20.35298046871073,
+    "samples": [
+      10000,
+      10000,
+      10000
+    ],
+    "timeout_files": [],
+    "skipped_files": [],
+    "plan": "/workspace/OptimalCedar/outputs/chapter6_experiments/general_video_refine_formal/matrix/general_video_refine/plans/pecan_optimizer.yaml",
+    "plan_exists": true,
+    "runtime_failures": {}
+  }
+}

@@ -1,0 +1,37 @@
+workload	scenario	modality	hub_operators	cedar_operators	samples	optimizer	outcome	mean_seconds	stddev_seconds	repetitions
+pile_hackernews	online discussion	text	16	18	20000	optimizer	unavailable			0
+pile_hackernews	online discussion	text	16	18	20000	dj_optimizer	success	1308.2898613186553	6.215713366443661	3
+pile_hackernews	online discussion	text	16	18	20000	dp_cedar_optimizer	success	1292.0863970946714	2.143826484435459	3
+pile_hackernews	online discussion	text	16	18	20000	dp_optimizer	success	467.7318519193407	1.4370849785759365	3
+pile_hackernews	online discussion	text	16	18	20000	dp_two_stage_optimizer	success	1327.662221107011	4.725752100854966	3
+pile_hackernews	online discussion	text	16	18	20000	pecan_optimizer	success	1303.5993279080042	6.052610095940053	3
+pile_uspto_backgrounds	patent background	text	17	19	20000	optimizer	unavailable			0
+pile_uspto_backgrounds	patent background	text	17	19	20000	dj_optimizer	success	829.2515775853439	4.153244473311381	3
+pile_uspto_backgrounds	patent background	text	17	19	20000	dp_cedar_optimizer	success	916.6739054836798	7.416243591569622	3
+pile_uspto_backgrounds	patent background	text	17	19	20000	dp_optimizer	success	338.41713131899206	0.5640004822477153	3
+pile_uspto_backgrounds	patent background	text	17	19	20000	dp_two_stage_optimizer	success	910.9324238464081	4.208353828434245	3
+pile_uspto_backgrounds	patent background	text	17	19	20000	pecan_optimizer	success	890.2178617726507	3.254895034214414	3
+pile_europarl	parliamentary proceedings	text	17	19	2500	optimizer	unavailable			0
+pile_europarl	parliamentary proceedings	text	17	19	2500	dj_optimizer	success	1836.5129603586781	2.917278286194731	3
+pile_europarl	parliamentary proceedings	text	17	19	2500	dp_cedar_optimizer	success	3078.8975189783378	7.027527305481273	3
+pile_europarl	parliamentary proceedings	text	17	19	2500	dp_optimizer	success	1227.8185459069598	2.321354611157238	3
+pile_europarl	parliamentary proceedings	text	17	19	2500	dp_two_stage_optimizer	success	2419.9043473775964	2.0076766789468623	3
+pile_europarl	parliamentary proceedings	text	17	19	2500	pecan_optimizer	success	2404.871716980939	4.564078394577783	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	optimizer	success	120.69006904230143	0.33725952106863777	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	dj_optimizer	success	120.54206494063449	0.14193966483036327	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	dp_cedar_optimizer	success	120.54078087063196	0.1381999738866882	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	dp_optimizer	success	124.84898545934509	0.07670381328917877	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	dp_two_stage_optimizer	success	120.37198881261672	0.25063920760600567	3
+alpaca_cot	instruction/reasoning tuning	text	7	8	65000	pecan_optimizer	success	120.82024413789622	0.3718336108842413	3
+general_video_refine	video-text quality refinement	video-text	7	10	7500	optimizer	unavailable			0
+general_video_refine	video-text quality refinement	video-text	7	10	7500	dj_optimizer	success	1979.1082452480525	42.847940005772585	3
+general_video_refine	video-text quality refinement	video-text	7	10	7500	dp_cedar_optimizer	unavailable			0
+general_video_refine	video-text quality refinement	video-text	7	10	7500	dp_optimizer	success	2153.033032408605	17.622016408973863	3
+general_video_refine	video-text quality refinement	video-text	7	10	7500	dp_two_stage_optimizer	success	3150.2424324100525	26.636686598304237	3
+general_video_refine	video-text quality refinement	video-text	7	10	7500	pecan_optimizer	success	2080.6607416175925	24.185157844593785	3
+redpajama_code	source-code refinement	code	15	17	20000	optimizer	success	552.280154141287	1.2107129397747145	3
+redpajama_code	source-code refinement	code	15	17	20000	dj_optimizer	success	460.2485777619295	1.0888000665846356	3
+redpajama_code	source-code refinement	code	15	17	20000	dp_cedar_optimizer	success	553.267769867632	1.619207463475218	3
+redpajama_code	source-code refinement	code	15	17	20000	dp_optimizer	success	274.6991407123084	0.7699583571294253	3
+redpajama_code	source-code refinement	code	15	17	20000	dp_two_stage_optimizer	success	622.7755014429955	1.9166349689918993	3
+redpajama_code	source-code refinement	code	15	17	20000	pecan_optimizer	success	466.864419607756	0.8249204384236596	3

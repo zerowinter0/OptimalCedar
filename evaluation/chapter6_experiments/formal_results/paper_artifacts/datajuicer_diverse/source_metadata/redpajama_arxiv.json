@@ -1,0 +1,38 @@
+{
+  "bytes": 3221193432,
+  "dataset_id": "togethercomputer/RedPajama-Data-1T",
+  "max_bytes": 3221225472,
+  "records": 52552,
+  "revision": "398f92572e94f4793e41c22ab7ea2a788d9e7de4",
+  "selection": "largest source-order prefix at most 3 GiB",
+  "sha256": "6a1d683cf107e1e83069bb3f79db70269fe36d2dac0f173cf8aeaa878c7f0d40",
+  "source_list": "urls/arxiv.txt",
+  "source_list_sha256": "f6eaf3bce82f31a620a5679d6ed34552b3f5b0d2f12b1c4beeb21c767639b30d",
+  "source_list_url": "https://huggingface.co/datasets/togethercomputer/RedPajama-Data-1T/resolve/398f92572e94f4793e41c22ab7ea2a788d9e7de4/urls/arxiv.txt",
+  "sources": [
+    {
+      "complete": true,
+      "declared_bytes": 810555210,
+      "records_consumed": 13198,
+      "url": "https://data.together.xyz/redpajama-data-1T/v1.0.0/arxiv/arxiv_023827cd-7ee8-42e6-aa7b-661731f4c70f.jsonl"
+    },
+    {
+      "complete": true,
+      "declared_bytes": 829033523,
+      "records_consumed": 13953,
+      "url": "https://data.together.xyz/redpajama-data-1T/v1.0.0/arxiv/arxiv_024de5df-1b7f-447c-8c3a-51407d8d6732.jsonl"
+    },
+    {
+      "complete": true,
+      "declared_bytes": 988545121,
+      "records_consumed": 16262,
+      "url": "https://data.together.xyz/redpajama-data-1T/v1.0.0/arxiv/arxiv_03232e26-be3f-4a28-a5d2-ee1d8c0e9831.jsonl"
+    },
+    {
+      "complete": false,
+      "declared_bytes": 912709988,
+      "records_consumed": 9139,
+      "url": "https://data.together.xyz/redpajama-data-1T/v1.0.0/arxiv/arxiv_034e819a-cfcb-43c6-ad25-0232ad48823c.jsonl"
+    }
+  ]
+}

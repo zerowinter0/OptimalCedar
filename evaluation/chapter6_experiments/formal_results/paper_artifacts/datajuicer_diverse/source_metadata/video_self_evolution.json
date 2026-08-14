@@ -1,0 +1,17 @@
+{
+  "dataset": "MSR-VTT",
+  "source_repository": "nisav/MSR-VTT",
+  "source_revision": "a9c822473969ee469e224da2187fda193c62e960",
+  "archive": "datasets/general_video_refine/source/MSRVTT_Videos.zip",
+  "archive_bytes": 2188992999,
+  "archive_sha256": "be4935000f7f9470ff9852d833b2ec808fcfaeb5beb3b2c08d25894b59352196",
+  "annotation": "datasets/general_video_refine/source/raw_data/MSRVTT_data.json",
+  "annotation_sha256": "3540d91f9fd5f9a56d75b00c6576f30814fd19395d027791a6d438e9dc297014",
+  "video_count": 10000,
+  "video_caption_pair_count": 200000,
+  "captions_per_video": 20,
+  "ordering": "caption_round_then_numeric_video_id",
+  "output": "datasets/general_video_refine/msrvtt-video-text-200000.jsonl",
+  "output_bytes": 31419873,
+  "output_sha256": "ba823255476796a444de400abf923f8442e162d1bbacfb8c382c8861c866c3c6"
+}

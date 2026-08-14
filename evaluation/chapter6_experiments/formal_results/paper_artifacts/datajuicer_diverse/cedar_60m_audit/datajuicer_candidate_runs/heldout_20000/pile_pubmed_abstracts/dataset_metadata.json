@@ -1,0 +1,12 @@
+{
+  "bytes": 139202876,
+  "data_juicer_hub_revision": "47fc345",
+  "dataset_id": "timaeus/pile-pubmed_abstracts",
+  "official_recipe": "refined_recipes/pretrain/pile-pubmed-abstract-refine.yaml",
+  "records": 100000,
+  "revision": "2d733e1624c384e4a97acfd4b93c8e739420b32e",
+  "selection": "complete frozen 100000-row train split",
+  "sha256": "6e0e791caec0510aabccc6bb4bc6d260842e180d26f24a592284be6f44f7ab94",
+  "split": "train",
+  "workload": "pile_pubmed_abstracts"
+}

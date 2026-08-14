@@ -1,0 +1,4 @@
+{
+  "status": "skipped",
+  "reason": "optimizer did not produce a valid plan"
+}

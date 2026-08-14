@@ -1,0 +1,60 @@
+physical_plan:
+  graph:
+    8: '10'
+    9: ''
+    10: '9'
+  n_local_workers: 8
+  pipes:
+    0:
+      name: MapperPipe_project_output
+      variant: INPROCESS
+    1:
+      name: FilterPipe_DataJuicerVideoFilter
+      variant: INPROCESS
+    2:
+      name: FilterPipe_DataJuicerVideoFilter
+      variant: INPROCESS
+    3:
+      name: FilterPipe_DataJuicerVideoFilter
+      variant: INPROCESS
+    4:
+      name: FilterPipe_DataJuicerVideoFilter
+      variant: INPROCESS
+    5:
+      name: FilterPipe_DataJuicerVideoFilter
+      variant: INPROCESS
+    6:
+      name: MapperPipe_SetVideoRootMapper
+      variant: INPROCESS
+    7:
+      name: MapperPipe_parse_json_line
+      variant: INPROCESS
+    8:
+      name: LocalLinePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    10:
+      fused_pipes:
+      - 7
+      - 6
+      - 1
+      - 5
+      - 4
+      - 2
+      - 3
+      - 0
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 1500
+        max_prefetch: 1500
+        n_actors: 1
+        submit_batch_size: 500
+        use_threads: true
+        variant_type: RAY

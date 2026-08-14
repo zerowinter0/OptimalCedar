@@ -1,0 +1,12 @@
+{
+  "bytes": 517630489,
+  "data_juicer_hub_revision": "47fc345",
+  "dataset_id": "timaeus/pile-hackernews",
+  "official_recipe": "refined_recipes/pretrain/pile-hackernews-refine.yaml",
+  "records": 100000,
+  "revision": "a5d6a32ee1039015b8037da6aa776af4cfb89df1",
+  "selection": "complete frozen 100000-row train split",
+  "sha256": "8a073fee80c24dc1174d532ee5467edd19675cf96fee5e74eba16e22b5cfe80e",
+  "split": "train",
+  "workload": "pile_hackernews"
+}

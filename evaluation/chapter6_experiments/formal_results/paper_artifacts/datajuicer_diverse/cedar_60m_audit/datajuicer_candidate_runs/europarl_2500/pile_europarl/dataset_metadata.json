@@ -1,0 +1,9 @@
+{
+  "bytes": 2147391191,
+  "dataset_id": "timaeus/pile-europarl",
+  "records": 31005,
+  "revision": "87959efff46f065483970da055c29a32f36a6c5e",
+  "selection": "largest source-order prefix not exceeding 2147483648 bytes",
+  "sha256": "355a615f30a945417657a27a96c4abceb73f9802717764e8478bcdac2e8fc70b",
+  "split": "train"
+}
