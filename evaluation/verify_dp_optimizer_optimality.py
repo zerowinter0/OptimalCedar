@@ -163,11 +163,15 @@ def _plan_cost(
     blocks: Sequence[Sequence[int]],
     block_backends: Sequence[str],
 ) -> float:
-    """Independent separable compute plus stage-boundary cost model."""
+    """Independent steady-state throughput-bottleneck objective."""
     item_size = 1.0
     cardinality = 1.0
     volume = 1.0
-    cost = 0.0
+    local_serial = 0.0
+    parallel_bottleneck = 0.0
+    baseline_scale = sum(
+        operator.costs["INPROCESS"] for operator in case.operators
+    )
     for block, backend in zip(blocks, block_backends):
         block_input = volume
         block_compute = 0.0
@@ -190,15 +194,22 @@ def _plan_cost(
             item_size *= operator.size_ratio
             cardinality *= operator.selectivity
             volume = item_size * cardinality
-        stage_work = block_compute
+        boundary_work = 0.0
         if boundary_throughput is not None:
-            stage_work += (
+            boundary_work = (
                 (block_input + volume)
                 / boundary_throughput
                 * 1000.0
             )
-        cost += stage_work
-    return cost
+        if backend == "INPROCESS":
+            local_serial += block_compute
+        else:
+            local_serial += boundary_work
+            local_serial += 1e-3 * block_compute * block_compute / baseline_scale
+            parallel_bottleneck = max(
+                parallel_bottleneck, block_compute
+            )
+    return max(local_serial, parallel_bottleneck)
 
 
 def exhaustive_oracle(
@@ -350,6 +361,7 @@ def run_dp_optimizer(
         "CEDAR_MATCH_PROFILE_RESOURCES",
         "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS",
         "CEDAR_PROFILE_MATCH_CPU_BUDGET",
+        "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER",
     )
     old_resource_env = {
         name: os.environ.get(name) for name in resource_env_names
@@ -366,6 +378,7 @@ def run_dp_optimizer(
             os.environ["CEDAR_PROFILE_MATCH_CPU_BUDGET"] = str(
                 parallel_stage_limit + 1
             )
+            os.environ["CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER"] = "0"
         plan = optimizer.run(
             profile,
             OptimizerOptions(

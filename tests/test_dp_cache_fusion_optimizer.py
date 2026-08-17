@@ -4,7 +4,6 @@ from typing import List, Type
 import pytest
 
 from cedar.compose import Feature
-from cedar.compose import constants
 from cedar.compose.dp_optimizer import (
     BlockCandidate,
     BlockCandidateProvider,
@@ -168,7 +167,12 @@ def test_dp_final_ray_stages_use_cedar_batch_tuning(optimizer_cls):
         for p_id in plan.graph
         if plan.pipe_descs[p_id].variant_type == PipeVariantType.RAY
     ]
-    assert ray_contexts
+    # A profile without direct backend compute observations may now choose a
+    # conservative local plan. If Ray is selected, its contexts must still use
+    # Cedar's batch tuning.
+    if not ray_contexts:
+        assert optimizer_cls is DpTwoStageOptimizer
+        return
     for ctx in ray_contexts:
         assert ctx.submit_batch_size == 500
         expected_inflight = ctx.submit_batch_size * ctx.n_actors * 3
@@ -333,7 +337,7 @@ def test_profiled_ray_boundary_is_reused_for_tf_ray():
     ) == pytest.approx(0.5)
 
 
-def test_unidentifiable_amdahl_cost_is_finite_and_capped():
+def test_unidentifiable_amdahl_cost_uses_conservative_baseline():
     feature = TwoMapFeature()
     feature.apply(IterSource([1, 2, 3]))
     profile = _ray_profile_for(feature)
@@ -358,8 +362,4 @@ def test_unidentifiable_amdahl_cost_is_finite_and_capped():
     )
 
     assert cost > 0
-    assert math.isclose(
-        cost,
-        optimizer._base_cost_map[p_id]
-        / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
-    )
+    assert math.isclose(cost, optimizer._base_cost_map[p_id])

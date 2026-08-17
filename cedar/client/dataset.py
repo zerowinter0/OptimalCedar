@@ -4,6 +4,8 @@ import pathlib
 import threading
 import multiprocessing as mp
 import math
+import copy
+import pickle
 import tempfile
 import time
 import yaml
@@ -20,9 +22,14 @@ from cedar.pipes import (
     DataSample,
     PipeVariantType,
     PipeVariantContext,
+    InProcessPipeVariantContext,
     RayPipeVariantContext,
     TFRayPipeVariantContext,
     SMPPipeVariantContext,
+)
+from cedar.pipes.common import (
+    ProfileInputReservoir,
+    set_profile_input_reservoir,
 )
 from .profiler import FeatureProfiler
 from .boundary_profiler import profile_stage_boundary_cached
@@ -50,7 +57,50 @@ logger = logging.getLogger(__name__)
 
 
 MP_QUEUE_MAX_SIZE = 100
-PROFILE_TIME_SEC = 10
+
+
+def _profile_time_sec_from_env() -> float:
+    """Return the independently configurable duration of each profile stage."""
+    raw = os.environ.get("CEDAR_PROFILE_TIME_SEC", "10")
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "CEDAR_PROFILE_TIME_SEC must be numeric"
+        ) from exc
+    if not math.isfinite(value) or value <= 0:
+        raise RuntimeError(
+            "CEDAR_PROFILE_TIME_SEC must be finite and positive"
+        )
+    return value
+
+
+PROFILE_TIME_SEC = _profile_time_sec_from_env()
+
+
+class _ProfileReplayPipeVariant(PipeVariant):
+    """Finite replay source backed by immutable serialized legal inputs."""
+
+    def __init__(self, snapshots: List[bytes], record_count: int) -> None:
+        super().__init__(None)
+        self.source = True
+        self.snapshots = snapshots
+        self.record_count = record_count
+        self.variant_ctx = InProcessPipeVariantContext()
+
+    def _iter_impl(self):
+        for idx in range(self.record_count):
+            value = pickle.loads(self.snapshots[idx % len(self.snapshots)])
+            yield DataSample(value)
+
+    def get_scale(self) -> int:
+        return 0
+
+    def is_scalable(self) -> bool:
+        return False
+
+    def shutdown(self) -> None:
+        return
 
 
 class _ProfiledFilterCallable:
@@ -706,12 +756,14 @@ class DataSet:
         # Optionally swap the optimizer implementation. The selector is:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
         # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
-        # 7/ExpOptimizer, 8/PecanOptimizer.
+        # 7/ExpOptimizer, 8/PecanOptimizer, 9/PecanTwoStageOptimizer,
+        # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
                 getattr(self.optimizer_options, "use_my_optimizer", 0)
             )
+        self._legacy_cedar_profile = optimizer_selector == 11
         if optimizer_selector == 1:
             from cedar.compose.my_optimizer import MyOptimizer
 
@@ -752,9 +804,28 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(PecanOptimizer())
+        elif optimizer_selector == 9:
+            from cedar.compose.policy_two_stage_optimizer import (
+                PecanTwoStageOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(PecanTwoStageOptimizer())
+        elif optimizer_selector == 10:
+            from cedar.compose.policy_two_stage_optimizer import (
+                DjTwoStageOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(DjTwoStageOptimizer())
+        elif optimizer_selector == 11:
+            from cedar.compose.simple_dp_optimizer import SimpleDpOptimizer
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(SimpleDpOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 8."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 11."
             )
 
         if len(self.features) == 0:
@@ -1187,10 +1258,28 @@ class DataSet:
         # Need to initialize ctx before profiling
         self._init_ctx()
 
+        if getattr(self, "_legacy_cedar_profile", False):
+            return self._profile_legacy_cedar(
+                f_name, n_samples=n_samples, output_file=output_file
+            )
+
         incremental_from = os.environ.get(
             "CEDAR_INCREMENTAL_PROFILE_FROM"
         )
         if incremental_from:
+            if (
+                os.environ.get(
+                    "CEDAR_INCREMENTAL_COMPUTE_SCALING"
+                )
+                == "1"
+            ):
+                return self._profile_compute_scaling_incremental(
+                    f_name=f_name,
+                    feature_to_profile=self.features[f_name],
+                    n_samples=n_samples,
+                    output_file=output_file,
+                    existing_profile=incremental_from,
+                )
             if os.environ.get("CEDAR_INCREMENTAL_WALL_BASELINE") == "1":
                 return self._profile_wall_baseline_incremental(
                     f_name=f_name,
@@ -1230,12 +1319,70 @@ class DataSet:
             "ray_actors_per_stage": RAY_PROFILE_N_ACTORS,
             "smp_procs_per_stage": SMP_PROFILE_N_PROCS,
         }
+        d["profile_metadata"] = {
+            "stage_duration_sec": PROFILE_TIME_SEC,
+        }
         logger.info("Profile resource signature: %s", d["resource_config"])
 
-        baseline_profile = self._profile_feature(
-            f_name, feature_to_profile, n_samples, None
+        layered_profile = (
+            os.environ.get("CEDAR_LAYERED_ADAPTIVE_PROFILE") == "1"
         )
+        reservoir = None
+        if layered_profile:
+            reservoir = ProfileInputReservoir(
+                max_samples_per_pipe=int(
+                    os.environ.get("CEDAR_PROFILE_POOL_SAMPLES", "64")
+                ),
+                max_bytes_per_pipe=int(
+                    os.environ.get(
+                        "CEDAR_PROFILE_POOL_BYTES_PER_PIPE",
+                        str(64 * 1024 * 1024),
+                    )
+                ),
+                max_bytes_total=int(
+                    os.environ.get(
+                        "CEDAR_PROFILE_POOL_BYTES_TOTAL",
+                        str(512 * 1024 * 1024),
+                    )
+                ),
+            )
+            set_profile_input_reservoir(reservoir)
+        try:
+            baseline_profile = self._profile_feature(
+                f_name, feature_to_profile, n_samples, None
+            )
+        finally:
+            if layered_profile:
+                set_profile_input_reservoir(None)
         d["baseline"] = baseline_profile
+        inferred_scalings = baseline_profile.get(
+            "compute_scaling_inference", {}
+        )
+        d["operator_compute_scaling"] = {}
+        for p_id, pipe in feature_to_profile.logical_pipes.items():
+            explicit = bool(
+                getattr(pipe, "compute_scaling_explicit", False)
+            )
+            inference = inferred_scalings.get(
+                p_id, inferred_scalings.get(str(p_id))
+            )
+            if explicit:
+                scaling = pipe.compute_scaling.value
+                mode = "explicit"
+            elif isinstance(inference, dict):
+                scaling = inference.get("scaling", "per_data")
+                mode = (
+                    "inferred"
+                    if inference.get("reason") == "classified"
+                    else "default"
+                )
+            else:
+                scaling = "per_data"
+                mode = "default"
+            entry = {"scaling": scaling, "mode": mode}
+            if isinstance(inference, dict):
+                entry["inference"] = inference
+            d["operator_compute_scaling"][p_id] = entry
 
         boundary_profile_setting = os.environ.get(
             "CEDAR_PROFILE_BOUNDARY_MODEL"
@@ -1250,20 +1397,27 @@ class DataSet:
                 "boundary": {},
             }
 
-        # If using ray, profile each op
-        if self.ctx.use_ray():
-            self._profile_ray(d, feature_to_profile, f_name, n_samples)
-            if profile_boundaries:
-                self._profile_boundary_model(
-                    d,
-                    PipeVariantType.RAY,
-                    RAY_PROFILE_N_ACTORS,
-                )
+        if layered_profile:
+            if reservoir is None:
+                raise RuntimeError("Layered profile input reservoir is absent")
+            self._profile_layered_backends(
+                d, feature_to_profile, reservoir
+            )
+        else:
+            # If using ray, profile each op
+            if self.ctx.use_ray():
+                self._profile_ray(d, feature_to_profile, f_name, n_samples)
 
-        # NOTE: Run this last as it un-tasksets
-        _set_cpu_affinity(SMP_TASKSET_MASK)
+            # NOTE: Run this last as it un-tasksets
+            _set_cpu_affinity(SMP_TASKSET_MASK)
+            self._profile_smp(d, feature_to_profile, f_name, n_samples)
 
-        self._profile_smp(d, feature_to_profile, f_name, n_samples)
+        if self.ctx.use_ray() and profile_boundaries:
+            self._profile_boundary_model(
+                d,
+                PipeVariantType.RAY,
+                RAY_PROFILE_N_ACTORS,
+            )
         if profile_boundaries:
             self._profile_boundary_model(
                 d,
@@ -1274,7 +1428,10 @@ class DataSet:
         if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
             _consolidate_filter_selectivity(d)
 
-        self._profile_tf(d, feature_to_profile, f_name, n_samples)
+        # TF fusion is a separate whole-pipeline candidate validation. It is
+        # deliberately excluded from the isolated-cost layer.
+        if not layered_profile:
+            self._profile_tf(d, feature_to_profile, f_name, n_samples)
 
         # TODO: ENote: Profile reading / writing disk
         write_time_per_byte, read_time_per_byte = self._profile_io()
@@ -1288,6 +1445,175 @@ class DataSet:
         with open(output_file, "w") as outfile:
             yaml.dump(d, outfile)
         return d
+
+    def _profile_legacy_cedar(
+        self,
+        f_name: str,
+        n_samples: Optional[int] = None,
+        output_file: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run Cedar's original baseline/Ray/SMP/TF profiling protocol."""
+        logger.info(
+            "Profiling feature %s with original Cedar profile schema", f_name
+        )
+        feature = self.features[f_name]
+        disabled_env = (
+            "CEDAR_PROFILE_INFER_COMPUTE_SCALING",
+            "CEDAR_PROFILE_FILTER_SELECTIVITY",
+        )
+        old_env = {key: os.environ.pop(key, None) for key in disabled_env}
+        try:
+            profile: Dict[str, Any] = {
+                "baseline": self._profile_feature(
+                    f_name, feature, n_samples, None
+                )
+            }
+            if self.ctx.use_ray():
+                self._profile_ray(
+                    profile,
+                    feature,
+                    f_name,
+                    n_samples,
+                    profile_backend_compute=False,
+                )
+            _set_cpu_affinity(SMP_TASKSET_MASK)
+            self._profile_smp(
+                profile,
+                feature,
+                f_name,
+                n_samples,
+                profile_backend_compute=False,
+            )
+            self._profile_tf(profile, feature, f_name, n_samples)
+            write_latency, read_latency = self._profile_io()
+            profile["disk_info"] = {
+                "read_latency": read_latency,
+                "write_latency": write_latency,
+            }
+        finally:
+            for key, value in old_env.items():
+                if value is not None:
+                    os.environ[key] = value
+
+        measurement_keys = {
+            "latencies",
+            "input_sizes",
+            "output_sizes",
+            "throughput",
+        }
+        profile["baseline"] = {
+            key: value
+            for key, value in profile["baseline"].items()
+            if key in measurement_keys
+        }
+        for backend_entries in profile.get("offloads", {}).values():
+            for p_id, measurement in list(backend_entries.items()):
+                backend_entries[p_id] = {
+                    key: value
+                    for key, value in measurement.items()
+                    if key in measurement_keys
+                }
+
+        if output_file is None:
+            output_file = f"/tmp/{f_name}_profile.yml"
+        with open(output_file, "w") as outfile:
+            yaml.dump(profile, outfile)
+        return profile
+
+    def _profile_compute_scaling_incremental(
+        self,
+        f_name: str,
+        feature_to_profile: Feature,
+        n_samples: Optional[int],
+        output_file: Optional[str],
+        existing_profile: str,
+    ) -> Dict[str, Any]:
+        """Add operator-level scaling semantics to an existing profile.
+
+        Only a fresh in-process baseline observation is executed. All numeric
+        measurements consumed by Cedar/DJ/Pecan and the existing DP cost
+        coefficients remain untouched, so prior optimizer results remain a
+        valid comparison set.
+        """
+        with open(existing_profile, "r") as stream:
+            profile = yaml.safe_load(stream)
+        if not isinstance(profile, dict):
+            raise RuntimeError(
+                f"Incremental profile is not a mapping: {existing_profile}"
+            )
+        baseline = profile.get("baseline")
+        if not isinstance(baseline, dict):
+            raise RuntimeError("Existing profile has no baseline mapping.")
+
+        old_setting = os.environ.get(
+            "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
+        )
+        os.environ["CEDAR_PROFILE_INFER_COMPUTE_SCALING"] = "1"
+        try:
+            fresh_baseline = self._profile_feature(
+                f_name, feature_to_profile, n_samples, None
+            )
+        finally:
+            if old_setting is None:
+                os.environ.pop(
+                    "CEDAR_PROFILE_INFER_COMPUTE_SCALING", None
+                )
+            else:
+                os.environ[
+                    "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
+                ] = old_setting
+
+        inference = fresh_baseline.get("compute_scaling_inference")
+        if not isinstance(inference, dict):
+            raise RuntimeError(
+                "Incremental operator scaling collected no inference data."
+            )
+        baseline_pipe_ids = set(baseline.get("latencies", {}))
+        unknown_pipe_ids = set(inference) - baseline_pipe_ids
+        if unknown_pipe_ids:
+            raise RuntimeError(
+                "Operator scaling observation contains pipes absent from "
+                f"the existing profile: {sorted(unknown_pipe_ids)}"
+            )
+
+        metadata = {}
+        for p_id, pipe in feature_to_profile.logical_pipes.items():
+            explicit = bool(
+                getattr(pipe, "compute_scaling_explicit", False)
+            )
+            observation = inference.get(
+                p_id, inference.get(str(p_id))
+            )
+            if explicit:
+                scaling = pipe.compute_scaling.value
+                mode = "explicit"
+            elif isinstance(observation, dict):
+                scaling = observation.get("scaling", "per_data")
+                mode = (
+                    "inferred"
+                    if observation.get("reason") == "classified"
+                    else "default"
+                )
+            else:
+                scaling = "per_data"
+                mode = "default"
+            entry = {"scaling": scaling, "mode": mode}
+            if isinstance(observation, dict):
+                entry["inference"] = observation
+            metadata[p_id] = entry
+        profile["operator_compute_scaling"] = metadata
+        profile["incremental_compute_scaling"] = {
+            "schema_version": 1,
+            "source_profile": os.path.abspath(existing_profile),
+            "method": "legal_input_size_latency_stratification",
+            "observed_operators": len(inference),
+        }
+
+        if output_file is None:
+            output_file = f"/tmp/{f_name}_profile.yml"
+        with open(output_file, "w") as outfile:
+            yaml.dump(profile, outfile)
+        return profile
 
     def _profile_wall_baseline_incremental(
         self,
@@ -1598,12 +1924,293 @@ class DataSet:
             "throughput": throughput_samples_per_sec,
         }
 
+    @staticmethod
+    def _modeled_offload_profile(
+        baseline: Dict[str, Any],
+        p_id: int,
+        backend_compute: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build the legacy schema from independently measured components."""
+        result = copy.deepcopy(baseline)
+        baseline_throughput = float(baseline["throughput"])
+        total_sec = 1.0 / max(baseline_throughput, 1e-12)
+        wall_latencies = baseline.get("wall_latencies", {})
+        local_ns = float(
+            wall_latencies.get(p_id, wall_latencies.get(str(p_id), 0.0))
+        )
+        backend_sec = (
+            float(backend_compute["mean_ms_per_sample"]) / 1000.0
+        )
+        modeled_sec = max(1e-12, total_sec - local_ns / 1e9 + backend_sec)
+        result["throughput"] = 1.0 / modeled_sec
+        result["backend_compute"] = backend_compute
+        result["throughput_provenance"] = {
+            "method": "component_substitution",
+            "measured_baseline_throughput": baseline_throughput,
+            "replaced_local_wall_ns_per_sample": local_ns,
+            "measured_backend_ms_per_sample": backend_compute[
+                "mean_ms_per_sample"
+            ],
+        }
+        return result
+
+    def _adaptive_operator_benchmark(
+        self,
+        pipe: Pipe,
+        snapshots: List[bytes],
+        variant_type: PipeVariantType,
+        width: int,
+        min_duration: float,
+        max_duration: float,
+        target_rse: float,
+        min_observations: int,
+    ) -> Dict[str, Any]:
+        """Measure one backend with fixed inputs until confidence converges."""
+        replay = _ProfileReplayPipeVariant(snapshots, 1)
+        predecessor = pipe.input_pipes[0]
+        replay.p_id = predecessor.id
+        old_predecessor_variant = predecessor.pipe_variant
+        predecessor.pipe_variant = replay
+        if variant_type == PipeVariantType.RAY:
+            variant_ctx = RayPipeVariantContext(
+                n_actors=width,
+                max_inflight=max(RAY_PROFILE_INFLIGHT, width * 5),
+                max_prefetch=RAY_PROFILE_PREFETCH,
+                use_threads=True,
+                submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
+                profile_backend_compute=True,
+            )
+        elif variant_type == PipeVariantType.TF_RAY:
+            variant_ctx = TFRayPipeVariantContext(
+                n_actors=width,
+                max_inflight=max(RAY_PROFILE_INFLIGHT, width * 5),
+                max_prefetch=RAY_PROFILE_PREFETCH,
+                use_threads=True,
+                submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
+                profile_backend_compute=True,
+            )
+        elif variant_type == PipeVariantType.SMP:
+            variant_ctx = SMPPipeVariantContext(
+                n_procs=width,
+                max_inflight=max(SMP_PROFILE_INFLIGHT, width * 3),
+                max_prefetch=SMP_PROFILE_PREFETCH,
+                use_threads=True,
+                disable_torch_parallelism=True,
+                profile_backend_compute=True,
+            )
+        else:
+            raise ValueError(f"Unsupported adaptive backend {variant_type}")
+        try:
+            variant = pipe._create_pipe_variant(variant_type, variant_ctx)
+        finally:
+            predecessor.pipe_variant = old_predecessor_variant
+        variant.p_id = pipe.id
+        variant.pipe_spec = pipe.pipe_spec
+        service = getattr(variant, "service", None)
+        if service is None:
+            service = getattr(variant_ctx, "service", None)
+        if service is None:
+            raise RuntimeError(
+                f"{variant_type.name} variant exposes no profiling service"
+            )
+        try:
+            warm_started = time.perf_counter()
+            replay.record_count = 1
+            for _ in variant:
+                pass
+            warm_elapsed = max(time.perf_counter() - warm_started, 1e-6)
+            reset_stats = getattr(
+                service, "reset_backend_compute_stats", None
+            )
+            if reset_stats is None:
+                raise RuntimeError(
+                    f"{variant_type.name} service cannot reset timing stats"
+                )
+            reset_stats()
+
+            # Aim for roughly half-second epochs. This bounds stopping
+            # overshoot without paying iterator reset overhead per record.
+            epoch_records = max(1, min(256, int(0.5 / warm_elapsed)))
+            started = time.perf_counter()
+            converged = False
+            rse = math.inf
+            stats = None
+            while True:
+                replay.record_count = epoch_records
+                for _ in variant:
+                    pass
+                elapsed = time.perf_counter() - started
+                stats = service.get_backend_compute_stats()
+                if stats is not None:
+                    mean = float(stats["mean_ms_per_sample"])
+                    stderr = float(stats["stderr_ms_per_sample"])
+                    rse = stderr / mean if mean > 0 else math.inf
+                    converged = (
+                        elapsed >= min_duration
+                        and int(stats["count"]) >= min_observations
+                        and rse <= target_rse
+                    )
+                if converged or elapsed >= max_duration:
+                    break
+            if stats is None:
+                raise RuntimeError(
+                    f"No {variant_type.name} worker timing for pipe {pipe.id}"
+                )
+            stats = dict(stats)
+            stats["adaptive_profile"] = {
+                "width": width,
+                "elapsed_sec": elapsed,
+                "warmup_sec": warm_elapsed,
+                "epoch_records": epoch_records,
+                "unique_input_records": len(snapshots),
+                "target_rse": target_rse,
+                "observed_rse": rse,
+                "min_duration_sec": min_duration,
+                "max_duration_sec": max_duration,
+                "min_observations": min_observations,
+                "converged": converged,
+                "stop_reason": "confidence" if converged else "max_duration",
+            }
+            return stats
+        finally:
+            variant.shutdown()
+
+    def _profile_layered_backends(
+        self,
+        profile: Dict[str, Any],
+        feature: Feature,
+        reservoir: ProfileInputReservoir,
+    ) -> None:
+        """Collect isolated adaptive costs and targeted width calibration."""
+        min_duration = float(
+            os.environ.get("CEDAR_ADAPTIVE_PROFILE_MIN_SEC", "3")
+        )
+        max_duration = float(
+            os.environ.get("CEDAR_ADAPTIVE_PROFILE_MAX_SEC", "30")
+        )
+        target_rse = float(
+            os.environ.get("CEDAR_ADAPTIVE_PROFILE_TARGET_RSE", "0.10")
+        )
+        min_observations = int(
+            os.environ.get("CEDAR_ADAPTIVE_PROFILE_MIN_OBS", "30")
+        )
+        if not (0 < min_duration <= max_duration):
+            raise RuntimeError("Invalid adaptive profile duration bounds")
+        if not (0 < target_rse < 1) or min_observations < 2:
+            raise RuntimeError("Invalid adaptive profile confidence settings")
+
+        profile["offloads"] = {
+            PipeVariantType.RAY.name: {},
+            PipeVariantType.TF_RAY.name: {},
+            PipeVariantType.SMP.name: {},
+        }
+        isolated = {}
+        candidates = {
+            PipeVariantType.RAY: [],
+            PipeVariantType.SMP: [],
+        }
+        for variant_type in (
+            PipeVariantType.RAY,
+            PipeVariantType.SMP,
+        ):
+            if variant_type == PipeVariantType.RAY and not self.ctx.use_ray():
+                continue
+            if variant_type == PipeVariantType.SMP:
+                _set_cpu_affinity(SMP_TASKSET_MASK)
+            for p_id, pipe in feature.logical_pipes.items():
+                if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
+                    continue
+                effective_variant = variant_type
+                if (
+                    variant_type == PipeVariantType.RAY
+                    and pipe.is_tf()
+                    and PipeVariantType.TF_RAY
+                    in pipe.pipe_spec.mutable_variants
+                ):
+                    effective_variant = PipeVariantType.TF_RAY
+                elif variant_type not in pipe.pipe_spec.mutable_variants:
+                    continue
+                predecessor_id = pipe.input_pipes[0].id
+                snapshots = reservoir.values_for(predecessor_id)
+                if not snapshots:
+                    raise RuntimeError(
+                        "No legal replay inputs captured for pipe "
+                        f"{p_id} from predecessor {predecessor_id}"
+                    )
+                logger.info(
+                    "Adaptive isolated profile pipe=%s backend=%s inputs=%s",
+                    p_id,
+                    effective_variant.name,
+                    len(snapshots),
+                )
+                timing = self._adaptive_operator_benchmark(
+                    pipe,
+                    snapshots,
+                    effective_variant,
+                    1,
+                    min_duration,
+                    max_duration,
+                    target_rse,
+                    min_observations,
+                )
+                profile["offloads"][effective_variant.name][p_id] = (
+                    self._modeled_offload_profile(
+                        profile["baseline"], p_id, timing
+                    )
+                )
+                isolated[f"{effective_variant.name}:{p_id}"] = timing
+                if variant_type in candidates:
+                    candidates[variant_type].append(
+                        (float(timing["mean_ms_per_sample"]), p_id, pipe,
+                         snapshots, effective_variant)
+                    )
+
+        physical = profile.setdefault(
+            "physical_model", {"schema_version": 1, "boundary": {}}
+        )
+        scaling = physical.setdefault("scaling", {})
+        top_k = int(os.environ.get("CEDAR_PROFILE_SCALING_TOP_K", "2"))
+        scaling_width = int(
+            os.environ.get("CEDAR_PROFILE_SCALING_WIDTH", "8")
+        )
+        for family, entries in candidates.items():
+            scaling[family.name] = {}
+            for _, p_id, pipe, snapshots, effective_variant in sorted(
+                entries, reverse=True, key=lambda item: item[0]
+            )[:top_k]:
+                timing = self._adaptive_operator_benchmark(
+                    pipe,
+                    snapshots,
+                    effective_variant,
+                    scaling_width,
+                    min(1.0, min_duration),
+                    min(10.0, max_duration),
+                    min(0.15, max(target_rse, 0.01)),
+                    min_observations,
+                )
+                scaling[family.name][p_id] = timing
+
+        profile["layered_profile"] = {
+            "schema_version": 1,
+            "method": "fixed_legal_input_adaptive_microbenchmark",
+            "input_pool": reservoir.metadata(),
+            "isolated_operator_costs": isolated,
+            "component_layers": {
+                "operator_compute": "isolated_replay",
+                "stage_boundary": "physical_model.boundary",
+                "parallel_scaling": "physical_model.scaling",
+                "contention_and_fusion": "deferred_to_selected_plan_validation",
+            },
+            "compatibility_throughput": "component_substitution",
+        }
+
     def _profile_smp(
         self,
         d: Dict[str, Any],
         feature_to_profile: Feature,
         f_name: str,
         n_samples: Optional[int],
+        profile_backend_compute: bool = True,
     ) -> None:
         if "offloads" not in d:
             d["offloads"] = {}
@@ -1622,7 +2229,7 @@ class DataSet:
                     max_prefetch=SMP_PROFILE_PREFETCH,
                     use_threads=True,
                     disable_torch_parallelism=True,
-                    profile_backend_compute=True,
+                    profile_backend_compute=profile_backend_compute,
                 )
                 profile = self._profile_feature(
                     f_name,
@@ -1638,6 +2245,7 @@ class DataSet:
         feature_to_profile: Feature,
         f_name: str,
         n_samples: Optional[int],
+        profile_backend_compute: bool = True,
     ) -> None:
         if "offloads" not in d:
             d["offloads"] = {}
@@ -1661,7 +2269,7 @@ class DataSet:
                         max_prefetch=RAY_PROFILE_PREFETCH,
                         use_threads=True,
                         submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
-                        profile_backend_compute=True,
+                        profile_backend_compute=profile_backend_compute,
                     )
 
                     profile = self._profile_feature(
@@ -1685,7 +2293,7 @@ class DataSet:
                         max_prefetch=RAY_PROFILE_PREFETCH,
                         use_threads=True,
                         submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
-                        profile_backend_compute=True,
+                        profile_backend_compute=profile_backend_compute,
                     )
 
                     profile = self._profile_feature(
@@ -1764,6 +2372,11 @@ class DataSet:
                 profiler.calculate_avg_wall_latency_per_sample()
             )
             input_sizes, output_sizes = profiler.calculate_avg_data_size()
+            compute_scaling_inference = None
+            if os.environ.get(
+                "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
+            ) == "1":
+                compute_scaling_inference = profiler.infer_compute_scaling()
 
             # A backend profile mutates exactly one logical operator.  Read
             # worker-side timings before reset tears down its service.
@@ -1804,6 +2417,8 @@ class DataSet:
             "output_sizes": output_sizes,
             "throughput": throughput_samples_per_sec,
         }
+        if compute_scaling_inference is not None:
+            result["compute_scaling_inference"] = compute_scaling_inference
         if backend_compute is not None:
             result["backend_compute"] = backend_compute
         if collect_filter_selectivity:

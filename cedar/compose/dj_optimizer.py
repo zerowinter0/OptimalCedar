@@ -1,11 +1,12 @@
 import copy
+import heapq
 import logging
 from typing import Dict, List, Optional, Set
 
 from cedar.pipes import FilterPipe
 
 from .optimizer import Optimizer
-from .utils import find_all_paths
+from .utils import derive_constraint_graph, find_all_paths
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,10 @@ class DjOptimizer(Optimizer):
             return graph
 
         reordered_order = self._reorder_consecutive_filters(linear_order)
+        constraint_graph = derive_constraint_graph(self.logical_pipes)
+        reordered_order = self._respect_filter_dependencies(
+            reordered_order, linear_order, constraint_graph
+        )
         if reordered_order == linear_order:
             logger.info("[DJ Reordering] No consecutive FilterPipe group reordered.")
             return graph
@@ -80,6 +85,82 @@ class DjOptimizer(Optimizer):
             reordered.extend(group)
 
         return reordered
+
+    def _respect_filter_dependencies(
+        self,
+        preferred_order: List[int],
+        original_order: List[int],
+        constraint_graph: Dict[int, Set[int]],
+    ) -> List[int]:
+        """Repair each filter group to respect explicit Cedar dependencies.
+
+        Data-Juicer's speed ordering is retained as the priority among ready
+        operators.  A dependency edge always wins over that preference, so a
+        two-stage DJ plan cannot enter a physical search with an invalid
+        logical order.
+        """
+        original_rank = {p_id: idx for idx, p_id in enumerate(original_order)}
+        result: List[int] = []
+        idx = 0
+        while idx < len(preferred_order):
+            if not self._is_filter_pipe(preferred_order[idx]):
+                result.append(preferred_order[idx])
+                idx += 1
+                continue
+
+            group: List[int] = []
+            while idx < len(preferred_order) and self._is_filter_pipe(
+                preferred_order[idx]
+            ):
+                group.append(preferred_order[idx])
+                idx += 1
+            result.extend(
+                self._stable_topological_filter_order(
+                    group, constraint_graph, original_rank
+                )
+            )
+        return result
+
+    @staticmethod
+    def _stable_topological_filter_order(
+        preferred: List[int],
+        constraint_graph: Dict[int, Set[int]],
+        original_rank: Dict[int, int],
+    ) -> List[int]:
+        group = set(preferred)
+        preferred_rank = {p_id: idx for idx, p_id in enumerate(preferred)}
+        indegree = {p_id: 0 for p_id in preferred}
+        successors = {p_id: set() for p_id in preferred}
+        for p_id in preferred:
+            for successor in constraint_graph[p_id]:
+                if successor in group:
+                    successors[p_id].add(successor)
+                    indegree[successor] += 1
+
+        ready = [
+            (preferred_rank[p_id], original_rank[p_id], p_id)
+            for p_id, degree in indegree.items()
+            if degree == 0
+        ]
+        heapq.heapify(ready)
+        ordered: List[int] = []
+        while ready:
+            _, _, p_id = heapq.heappop(ready)
+            ordered.append(p_id)
+            for successor in successors[p_id]:
+                indegree[successor] -= 1
+                if indegree[successor] == 0:
+                    heapq.heappush(
+                        ready,
+                        (
+                            preferred_rank[successor],
+                            original_rank[successor],
+                            successor,
+                        ),
+                    )
+        if len(ordered) != len(preferred):
+            raise ValueError("Detected cycle in DJ filter dependencies.")
+        return ordered
 
     def _is_filter_pipe(self, p_id: int) -> bool:
         pipe = self.logical_pipes.get(p_id)

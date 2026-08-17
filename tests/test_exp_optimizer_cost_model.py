@@ -15,7 +15,8 @@ from evaluation.pipelines.coco.cedar_dataset import COCOFeature
 
 COCO_PROFILE = (
     Path(__file__).resolve().parents[1]
-    / "evaluation/chapter6_experiments/formal_results/profiles/coco.yaml"
+    / "evaluation/chapter6_experiments/formal_results/"
+    "paper_artifacts/optimizer/profiles/coco.yaml"
 )
 
 

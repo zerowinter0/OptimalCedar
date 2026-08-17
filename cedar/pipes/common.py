@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Any, Optional, Dict, List
 import logging
+import pickle
+import threading
 import time
 import torch
 import tensorflow as tf
@@ -13,9 +15,98 @@ from .context import PipeVariantType
 logger = logging.getLogger(__name__)
 
 
+class ProfileInputReservoir:
+    """Bounded immutable snapshots of real intermediate pipe outputs."""
+
+    def __init__(
+        self,
+        max_samples_per_pipe: int = 64,
+        max_bytes_per_pipe: int = 64 * 1024 * 1024,
+        max_bytes_total: int = 512 * 1024 * 1024,
+    ) -> None:
+        self.max_samples_per_pipe = max_samples_per_pipe
+        self.max_bytes_per_pipe = max_bytes_per_pipe
+        self.max_bytes_total = max_bytes_total
+        self.samples: Dict[int, List[bytes]] = {}
+        self.bytes_per_pipe: Dict[int, int] = {}
+        self.total_bytes = 0
+        self.serialization_errors: Dict[int, int] = {}
+        self._lock = threading.Lock()
+
+    def capture(self, p_id: Optional[int], value: Any) -> None:
+        if p_id is None:
+            return
+        with self._lock:
+            if len(self.samples.get(p_id, [])) >= self.max_samples_per_pipe:
+                return
+        try:
+            snapshot = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception:
+            with self._lock:
+                self.serialization_errors[p_id] = (
+                    self.serialization_errors.get(p_id, 0) + 1
+                )
+            return
+        size = len(snapshot)
+        with self._lock:
+            values = self.samples.get(p_id, [])
+            pipe_bytes = self.bytes_per_pipe.get(p_id, 0)
+            # Keep one legal value even if one multimedia record exceeds the
+            # nominal cap; subsequent values must respect both memory limits.
+            if values and (
+                pipe_bytes + size > self.max_bytes_per_pipe
+                or self.total_bytes + size > self.max_bytes_total
+            ):
+                return
+            self.samples.setdefault(p_id, []).append(snapshot)
+            self.bytes_per_pipe[p_id] = pipe_bytes + size
+            self.total_bytes += size
+
+    def values_for(self, p_id: int) -> List[bytes]:
+        with self._lock:
+            return list(self.samples.get(p_id, []))
+
+    def metadata(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "snapshot_format": "pickle",
+                "max_samples_per_pipe": self.max_samples_per_pipe,
+                "max_bytes_per_pipe": self.max_bytes_per_pipe,
+                "max_bytes_total": self.max_bytes_total,
+                "total_bytes": self.total_bytes,
+                "samples_per_pipe": {
+                    p_id: len(values) for p_id, values in self.samples.items()
+                },
+                "bytes_per_pipe": dict(self.bytes_per_pipe),
+                "serialization_errors": dict(self.serialization_errors),
+            }
+
+
+_PROFILE_INPUT_RESERVOIR: Optional[ProfileInputReservoir] = None
+_PROFILE_INPUT_RESERVOIR_LOCK = threading.Lock()
+
+
+def set_profile_input_reservoir(
+    reservoir: Optional[ProfileInputReservoir],
+) -> None:
+    global _PROFILE_INPUT_RESERVOIR
+    with _PROFILE_INPUT_RESERVOIR_LOCK:
+        _PROFILE_INPUT_RESERVOIR = reservoir
+
+
+def capture_profile_input(p_id: Optional[int], value: Any) -> None:
+    reservoir = _PROFILE_INPUT_RESERVOIR
+    if reservoir is not None:
+        reservoir.capture(p_id, value)
+
+
 class PipeComputeScaling(str, Enum):
     """Quantity that determines how an operator's compute cost scales."""
 
+    PER_DATA = "per_data"
+    # Backwards-compatible spelling used by profiles and workloads created
+    # before operator-level scaling was introduced.  Both data-scaled values
+    # have identical optimizer semantics.
     PER_BYTE = "per_byte"
     PER_RECORD = "per_record"
 

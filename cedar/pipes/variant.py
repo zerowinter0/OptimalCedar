@@ -24,6 +24,7 @@ from .common import (
     DataSample,
     MutationError,
     CedarPipeSpec,
+    capture_profile_input,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,8 @@ class PipeVariant(abc.ABC):
 
                 # Get the buffer size if available
                 try:
+                    if isinstance(x, DataSample) and not x.dummy:
+                        capture_profile_input(self.p_id, x.data)
                     buf_size = self.get_buffer_size() if x.do_trace else None
                     x.trace(self.p_id, buf_size)
                     yield x

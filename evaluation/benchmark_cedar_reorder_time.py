@@ -31,6 +31,7 @@ OPTIMIZER_SELECTORS: Dict[str, int] = {
     "dp_optimizer": 2,
     "dp_two_stage_optimizer": 4,
     "dp_cedar_optimizer": 5,
+    "simple_dp_optimizer": 11,
 }
 
 REORDER_PASS_RUNNERS: Dict[str, str] = {
@@ -39,6 +40,7 @@ REORDER_PASS_RUNNERS: Dict[str, str] = {
     "dp_optimizer": "physical_dp_pass",
     "dp_two_stage_optimizer": "physical_dp_pass",
     "dp_cedar_optimizer": "logical_reorder_pass",
+    "simple_dp_optimizer": "physical_dp_pass",
 }
 
 
@@ -49,6 +51,7 @@ def optimizer_label(optimizer_name: str) -> str:
         "dp_optimizer": "DP Optimizer",
         "dp_two_stage_optimizer": "DP Two-Stage Optimizer",
         "dp_cedar_optimizer": "DP Cedar Optimizer",
+        "simple_dp_optimizer": "Simple DP (Cedar Cost)",
     }
     return labels.get(optimizer_name, optimizer_name)
 
@@ -151,6 +154,10 @@ def get_optimizer_class(optimizer_name: str) -> Type[Optimizer]:
         from cedar.compose.dp_cedar_optimizer import DpCedarOptimizer
 
         return DpCedarOptimizer
+    if optimizer_name == "simple_dp_optimizer":
+        from cedar.compose.simple_dp_optimizer import SimpleDpOptimizer
+
+        return SimpleDpOptimizer
     raise ValueError(f"Unsupported optimizer: {optimizer_name}")
 
 

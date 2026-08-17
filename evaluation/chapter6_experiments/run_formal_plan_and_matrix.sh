@@ -15,8 +15,7 @@ RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
 CPU_BUDGET="${CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
 REPEATS="${REPEATS:-1}"
-OPTIMIZER_PLAN_TIMEOUT_SEC="${OPTIMIZER_PLAN_TIMEOUT_SEC:-3600}"
-EXECUTION_TIMEOUT_SEC="${EXECUTION_TIMEOUT_SEC:-3600}"
+TASK_TIMEOUT_SEC="${TASK_TIMEOUT_SEC:-3600}"
 RESUME_EXISTING="${RESUME_EXISTING:-0}"
 OPTIMIZER_SET="${OPTIMIZER_SET:-all}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
@@ -26,6 +25,11 @@ ALPACA_COT_SAMPLES="${ALPACA_COT_SAMPLES:-20000}"
 REDPAJAMA_ARXIV_SAMPLES="${REDPAJAMA_ARXIV_SAMPLES:-20000}"
 GENERAL_VIDEO_REFINE_SAMPLES="${GENERAL_VIDEO_REFINE_SAMPLES:-10000}"
 VIDEO_SELF_EVOLUTION_SAMPLES="${VIDEO_SELF_EVOLUTION_SAMPLES:-5000}"
+PILE_EUROPARL_SAMPLES="${PILE_EUROPARL_SAMPLES:-2500}"
+PILE_HACKERNEWS_SAMPLES="${PILE_HACKERNEWS_SAMPLES:-20000}"
+PILE_PUBMED_SAMPLES="${PILE_PUBMED_SAMPLES:-20000}"
+PILE_USPTO_SAMPLES="${PILE_USPTO_SAMPLES:-20000}"
+REDPAJAMA_CODE_SAMPLES="${REDPAJAMA_CODE_SAMPLES:-20000}"
 SELECTED_WORKLOADS="all"
 
 usage() {
@@ -35,7 +39,8 @@ Usage: run_w8_plan_and_matrix.sh [--workloads workload[,workload...]]
 Default: run all workloads. Selected names: alpaca_cot, redpajama_arxiv, coco, commonvoice,
 commonvoice_cache, llava_pretrain, redpajama_c4, simclrv2, simclrv2_cache,
 wikitext103, wikitext103_cache, stackexchange, general_video_refine,
-video_self_evolution.
+video_self_evolution, pile_europarl, pile_hackernews,
+pile_pubmed_abstracts, pile_uspto_backgrounds, redpajama_code.
 
 OPTIMIZER_SET=required runs only dj_optimizer, dp_cedar_optimizer, and
 dp_optimizer. OPTIMIZER_SET=paper runs the five optimizers in the current
@@ -43,8 +48,15 @@ paper figure. OPTIMIZER_SET=complete runs their union with dp_two_stage_optimize
 The default "all" is the project-standard six-optimizer matrix.
 OPTIMIZER_SET=dp_only regenerates only dp_optimizer.
 OPTIMIZER_SET=dp_two_stage_only runs only dp_two_stage_optimizer.
+OPTIMIZER_SET=dj_two_stage_only runs only dj_two_stage_optimizer.
+OPTIMIZER_SET=simple_dp_only runs the joint DP with Cedar's original profile
+and cost model.
 OPTIMIZER_SET=legacy_and_two_stage runs original Cedar and the DP two-stage
 ablation for supplementing older formal matrices.
+OPTIMIZER_SET=operator_scaling_study runs the revised DP optimizer plus
+pecan_two_stage_optimizer and dj_two_stage_optimizer.
+OPTIMIZER_SET=formal_seven runs Cedar, DJ, Pecan, both policy two-stage
+baselines, Simple DP, and the revised DP optimizer.
 EOF
 }
 
@@ -114,11 +126,34 @@ case "${OPTIMIZER_SET}" in
   dp_two_stage_only)
     OPTIMIZERS=(dp_two_stage_optimizer)
     ;;
+  dj_two_stage_only)
+    OPTIMIZERS=(dj_two_stage_optimizer)
+    ;;
+  simple_dp_only)
+    OPTIMIZERS=(simple_dp_optimizer)
+    ;;
   legacy_and_two_stage)
     OPTIMIZERS=(optimizer dp_two_stage_optimizer)
     ;;
+  new_two_stage_only)
+    OPTIMIZERS=(pecan_two_stage_optimizer dj_two_stage_optimizer)
+    ;;
+  operator_scaling_study)
+    OPTIMIZERS=(dp_optimizer pecan_two_stage_optimizer dj_two_stage_optimizer)
+    ;;
+  formal_seven)
+    OPTIMIZERS=(
+      optimizer
+      dj_optimizer
+      pecan_optimizer
+      dj_two_stage_optimizer
+      pecan_two_stage_optimizer
+      simple_dp_optimizer
+      dp_optimizer
+    )
+    ;;
   *)
-    echo "OPTIMIZER_SET must be all, required, paper, complete, dp_only, dp_two_stage_only, or legacy_and_two_stage." >&2
+    echo "Unsupported OPTIMIZER_SET=${OPTIMIZER_SET}." >&2
     exit 2
     ;;
 esac
@@ -146,7 +181,11 @@ if [[ "${PLAN_ONLY}" != "0" && "${PLAN_ONLY}" != "1" ]]; then
   echo "PLAN_ONLY must be 0 or 1." >&2
   exit 2
 fi
-for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES; do
+if [[ ! "${TASK_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "TASK_TIMEOUT_SEC must be a positive integer: ${TASK_TIMEOUT_SEC}" >&2
+  exit 2
+fi
+for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES; do
   sample_value="${!sample_setting}"
   if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
     echo "${sample_setting} must be a positive integer: ${sample_value}" >&2
@@ -211,14 +250,20 @@ write_metadata() {
     printf 'measurement_protocol=fixed_w8_%s_round_robin_repeats\n' "${REPEATS}"
     printf 'profile_source=%s\n' "${profile#${REPO_ROOT}/}"
     printf 'cpu_budget=%s\n' "${CPU_BUDGET}"
+    printf 'dp_runtime_cpu_reserve_per_worker=%s\n' \
+      "${CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER:-1}"
     printf 'local_workers=%s\n' "${LOCAL_WORKERS}"
     printf 'repeats=%s\n' "${REPEATS}"
-    printf 'optimizer_plan_timeout_sec=%s\n' "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
-    printf 'execution_timeout_sec=%s\n' "${EXECUTION_TIMEOUT_SEC}"
-    printf 'execution_timeout_policy=skip_remaining_repeats_and_continue_matrix\n'
+    printf 'task_timeout_sec=%s\n' "${TASK_TIMEOUT_SEC}"
+    printf 'task_boundary=optimization_plus_first_execution\n'
+    printf 'timeout_policy=skip_remaining_repeats_and_continue_matrix\n'
     printf 'cache=%s\n' "${cache_mode}"
     printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
+    if [[ " ${OPTIMIZERS[*]} " == *" dp_optimizer "* || " ${OPTIMIZERS[*]} " == *" pecan_two_stage_optimizer "* || " ${OPTIMIZERS[*]} " == *" dj_two_stage_optimizer "* ]]; then
+      printf 'dp_objective=throughput_bottleneck_pareto\n'
+      printf 'dp_pareto_global_epsilon=%s\n' "${CEDAR_DP_PARETO_EPSILON:-0.10}"
+    fi
     printf 'dataset_kwargs=%s\n' "${kwargs}"
     if [[ "${workload}" == "alpaca_cot" || "${workload}" == "redpajama_arxiv" || "${workload}" == "video_self_evolution" || "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
       printf 'data_juicer_reference_commit=%s\n' \
@@ -272,7 +317,7 @@ write_metadata() {
 
 generate_plan() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
-  local cache_mode="$5" kwargs="$6" optimizer="$7"
+  local cache_mode="$5" kwargs="$6" optimizer="$7" timeout_sec="$8"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local log="${root}/logs/plan__${optimizer}.log"
   local result="${root}/warmup_results/plan_only__${optimizer}.json"
@@ -291,7 +336,7 @@ generate_plan() {
     --match_profile_resources
     --cpu_budget "${CPU_BUDGET}"
     --fixed_local_workers_ablation "${LOCAL_WORKERS}"
-    --optimizer_time_limit_sec "${OPTIMIZER_PLAN_TIMEOUT_SEC}"
+    --optimizer_time_limit_sec "${timeout_sec}"
     --disable_cedar_runtime_timeout
     --plan_only
     --optimizers "${optimizer}"
@@ -307,7 +352,7 @@ generate_plan() {
   # Do not copy a stale plan if a previous optimizer timed out.
   rm -f "${TMP_PLAN}"
   set +e
-  timeout --signal=TERM --kill-after=30s "${OPTIMIZER_PLAN_TIMEOUT_SEC}" \
+  timeout --signal=TERM --kill-after=30s "${timeout_sec}" \
     "${args[@]}" >> "${log}" 2>&1
   local status=$?
   set -e
@@ -316,9 +361,9 @@ generate_plan() {
     printf '{\n  "optimizer": "%s",\n  "status": "unavailable",\n' \
       "${optimizer}" > "${root}/plans/${optimizer}.unavailable.json"
     printf '  "reason": "plan_generation_timeout",\n  "timeout_sec": %s\n}\n' \
-      "${OPTIMIZER_PLAN_TIMEOUT_SEC}" \
+      "${timeout_sec}" \
       >> "${root}/plans/${optimizer}.unavailable.json"
-    echo "[$(date -Is)] UNAVAILABLE ${workload}/${optimizer}: plan generation exceeded ${OPTIMIZER_PLAN_TIMEOUT_SEC}s" \
+    echo "[$(date -Is)] UNAVAILABLE ${workload}/${optimizer}: plan generation exhausted ${timeout_sec}s task budget" \
       | tee -a "${root}/nohup.log"
     return 0
   fi
@@ -456,6 +501,7 @@ plan_has_cache() {
 
 warm_cache() {
   local workload="$1" dataset="$2" samples="$3" kwargs="$4" optimizer="$5"
+  local timeout_sec="$6"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
   local warmup_request=$((samples + 1))
   local -a args=(
@@ -477,10 +523,10 @@ warm_cache() {
   export CEDAR_CACHE_NAMESPACE="${workload}__${optimizer}"
   unset CEDAR_CACHE_SHARD
   echo "[$(date -Is)] WARMUP ${workload}/${optimizer}" | tee -a "${root}/nohup.log"
-  if ! run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
+  if ! run_guarded_result "${timeout_sec}" \
       "${root}/warmup_results/warmup__${optimizer}.json" \
       "${root}/logs/warmup__${optimizer}.log" "${args[@]}"; then
-    echo "Cache warmup failed or exceeded ${EXECUTION_TIMEOUT_SEC}s for ${workload}/${optimizer}" >&2
+    echo "Cache warmup failed or exhausted ${timeout_sec}s remaining task budget for ${workload}/${optimizer}" >&2
     return 1
   fi
   validate_result "${root}/warmup_results/warmup__${optimizer}.json" "${samples}"
@@ -515,6 +561,65 @@ if total_items != expected_items:
 PY
 }
 
+run_execution_round() {
+  local workload="$1" dataset="$2" samples="$3" cache_mode="$4"
+  local kwargs="$5" optimizer="$6" round="$7" timeout_sec="$8"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
+  local tag="round${round}__${optimizer}"
+  local -a args=(
+    python evaluation/eval_cedar.py
+    --dataset_file "${dataset}"
+    --master_feature_config "${root}/plans/${optimizer}.yaml"
+    --num_total_samples "${samples}"
+    --num_epochs 1
+    --use_ray
+    --ray_ip "${RAY_ADDRESS}"
+    --results_path "${root}/results/${tag}.json"
+  )
+  [[ -n "${kwargs}" ]] && args+=(--dataset_kwargs "${kwargs}")
+  if [[ "${cache_mode}" == "on" ]]; then
+    export CEDAR_CACHE_ROOT="${root}/cache"
+    export CEDAR_CACHE_NAMESPACE="${workload}__${optimizer}"
+    unset CEDAR_CACHE_SHARD
+  fi
+  echo "[$(date -Is)] RUN ${workload}/${tag} budget=${timeout_sec}s" \
+    | tee -a "${root}/nohup.log"
+  run_guarded_result "${timeout_sec}" \
+    "${root}/results/${tag}.json" \
+    "${root}/logs/${tag}.log" "${args[@]}"
+}
+
+record_task_timeout() {
+  local workload="$1" optimizer="$2" round="$3" reason="$4"
+  local root="${MATRIX_OUTPUT_ROOT}/${workload}"
+  local tag="round${round}__${optimizer}"
+  python - "${optimizer}" "${round}" "${reason}" "${TASK_TIMEOUT_SEC}" \
+    "${root}/results/${tag}.timeout.json" <<'PY'
+import json
+import sys
+
+optimizer, repeat, reason, timeout_sec, output = sys.argv[1:]
+with open(output, "w") as handle:
+    json.dump(
+        {
+            "optimizer": optimizer,
+            "repeat": int(repeat),
+            "status": "timeout",
+            "reason": reason,
+            "task_timeout_sec": int(timeout_sec),
+            "task_boundary": (
+                "optimization_plus_first_execution"
+                if int(repeat) == 1
+                else "execution"
+            ),
+        },
+        handle,
+        indent=2,
+    )
+    handle.write("\n")
+PY
+}
+
 run_workload() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
   local cache_mode="$5" kwargs="$6"
@@ -540,16 +645,87 @@ run_workload() {
   fi
   write_metadata "${workload}" "${profile}" "${samples}" "${cache_mode}" "${kwargs}"
 
+  # Round 1 is one unified task: optimize first, then execute with whatever
+  # remains of the same one-hour deadline. A timeout suppresses later rounds.
   for optimizer in "${OPTIMIZERS[@]}"; do
-    if [[ "${RESUME_EXISTING}" == "1" ]] && \
-       { [[ -f "${root}/plans/${optimizer}.yaml" ]] || \
-         [[ -f "${root}/plans/${optimizer}.unavailable.json" ]]; }; then
-      echo "[$(date -Is)] REUSE ${workload}/${optimizer} plan status" \
+    local task_start="${SECONDS}" remaining status
+    if [[ "${RESUME_EXISTING}" == "1" && \
+          -f "${root}/results/round1__${optimizer}.json" ]] &&
+       validate_result \
+         "${root}/results/round1__${optimizer}.json" "${samples}"; then
+      echo "[$(date -Is)] REUSE ${workload}/round1__${optimizer} result" \
         | tee -a "${root}/nohup.log"
       continue
     fi
-    generate_plan "${workload}" "${dataset}" "${profile}" "${samples}" \
-      "${cache_mode}" "${kwargs}" "${optimizer}"
+    if [[ "${RESUME_EXISTING}" != "1" || \
+          ! -f "${root}/plans/${optimizer}.yaml" ]]; then
+      generate_plan "${workload}" "${dataset}" "${profile}" "${samples}" \
+        "${cache_mode}" "${kwargs}" "${optimizer}" "${TASK_TIMEOUT_SEC}"
+    fi
+    if [[ ! -f "${root}/plans/${optimizer}.yaml" ]]; then
+      if [[ -f "${root}/plans/${optimizer}.unavailable.json" ]] && \
+         grep -q 'plan_generation_timeout' \
+           "${root}/plans/${optimizer}.unavailable.json"; then
+        execution_timed_out["${optimizer}"]=1
+        record_task_timeout \
+          "${workload}" "${optimizer}" 1 "unified_task_timeout_during_optimization"
+      fi
+      continue
+    fi
+    if [[ "${PLAN_ONLY}" == "1" ]]; then
+      continue
+    fi
+
+    remaining=$((TASK_TIMEOUT_SEC - (SECONDS - task_start)))
+    if ((remaining <= 0)); then
+      execution_timed_out["${optimizer}"]=1
+      record_task_timeout \
+        "${workload}" "${optimizer}" 1 "unified_task_timeout_after_optimization"
+      continue
+    fi
+    if [[ "${cache_mode}" == "on" ]] && \
+       plan_has_cache "${root}/plans/${optimizer}.yaml"; then
+      set +e
+      warm_cache "${workload}" "${dataset}" "${samples}" "${kwargs}" \
+        "${optimizer}" "${remaining}"
+      status=$?
+      set -e
+      if [[ "${status}" -ne 0 ]]; then
+        execution_timed_out["${optimizer}"]=1
+        record_task_timeout \
+          "${workload}" "${optimizer}" 1 "unified_task_timeout_during_cache_warmup"
+        continue
+      fi
+      remaining=$((TASK_TIMEOUT_SEC - (SECONDS - task_start)))
+    else
+      unset CEDAR_CACHE_ROOT CEDAR_CACHE_NAMESPACE CEDAR_CACHE_SHARD
+    fi
+    if ((remaining <= 0)); then
+      execution_timed_out["${optimizer}"]=1
+      record_task_timeout \
+        "${workload}" "${optimizer}" 1 "unified_task_timeout_before_execution"
+      continue
+    fi
+    set +e
+    run_execution_round "${workload}" "${dataset}" "${samples}" \
+      "${cache_mode}" "${kwargs}" "${optimizer}" 1 "${remaining}"
+    status=$?
+    set -e
+    if [[ "${status}" -eq 124 ]]; then
+      execution_timed_out["${optimizer}"]=1
+      record_task_timeout \
+        "${workload}" "${optimizer}" 1 "unified_task_timeout_during_execution"
+      echo "[$(date -Is)] TIMEOUT ${workload}/round1__${optimizer}: unified task exceeded ${TASK_TIMEOUT_SEC}s" \
+        | tee -a "${root}/nohup.log"
+      continue
+    elif [[ "${status}" -ne 0 ]]; then
+      echo "Execution failed for ${workload}/round1__${optimizer}" >&2
+      return "${status}"
+    fi
+    validate_result \
+      "${root}/results/round1__${optimizer}.json" "${samples}"
+    echo "[$(date -Is)] DONE ${workload}/round1__${optimizer}" \
+      | tee -a "${root}/nohup.log"
   done
 
   if [[ "${PLAN_ONLY}" == "1" ]]; then
@@ -558,29 +734,7 @@ run_workload() {
     return 0
   fi
 
-  if [[ "${cache_mode}" == "on" ]]; then
-    for optimizer in "${OPTIMIZERS[@]}"; do
-      [[ -f "${root}/plans/${optimizer}.yaml" ]] || continue
-      if ! plan_has_cache "${root}/plans/${optimizer}.yaml"; then
-        echo "[$(date -Is)] SKIP ${workload}/${optimizer} cache warmup: plan has no cache" \
-          | tee -a "${root}/nohup.log"
-        continue
-      fi
-      if [[ "${RESUME_EXISTING}" == "1" && \
-            -f "${root}/results/round1__${optimizer}.json" ]] &&
-         validate_result \
-           "${root}/results/round1__${optimizer}.json" "${samples}"; then
-        echo "[$(date -Is)] REUSE ${workload}/${optimizer} cache warmup" \
-          | tee -a "${root}/nohup.log"
-        continue
-      fi
-      warm_cache "${workload}" "${dataset}" "${samples}" "${kwargs}" "${optimizer}"
-    done
-  else
-    unset CEDAR_CACHE_ROOT CEDAR_CACHE_NAMESPACE CEDAR_CACHE_SHARD
-  fi
-
-  for ((round = 1; round <= REPEATS; round++)); do
+  for ((round = 2; round <= REPEATS; round++)); do
     offset=$(((round - 1) % ${#OPTIMIZERS[@]}))
     for ((i = 0; i < ${#OPTIMIZERS[@]}; i++)); do
       optimizer="${OPTIMIZERS[$(((offset + i) % ${#OPTIMIZERS[@]}))]}"
@@ -598,10 +752,10 @@ run_workload() {
           > "${root}/results/${tag}.skipped.json"
         printf '  "status": "skipped_after_timeout",\n' \
           >> "${root}/results/${tag}.skipped.json"
-        printf '  "skip_reason": "earlier_repeat_execution_timeout",\n' \
+        printf '  "skip_reason": "earlier_task_timeout",\n' \
           >> "${root}/results/${tag}.skipped.json"
-        printf '  "execution_timeout_sec": %s\n}\n' \
-          "${EXECUTION_TIMEOUT_SEC}" \
+        printf '  "task_timeout_sec": %s\n}\n' \
+          "${TASK_TIMEOUT_SEC}" \
           >> "${root}/results/${tag}.skipped.json"
         echo "[$(date -Is)] SKIP ${workload}/${tag}: earlier repeat timed out" \
           | tee -a "${root}/nohup.log"
@@ -614,40 +768,17 @@ run_workload() {
           | tee -a "${root}/nohup.log"
         continue
       fi
-      local -a args=(
-        python evaluation/eval_cedar.py
-        --dataset_file "${dataset}"
-        --master_feature_config "${root}/plans/${optimizer}.yaml"
-        --num_total_samples "${samples}"
-        --num_epochs 1
-        --use_ray
-        --ray_ip "${RAY_ADDRESS}"
-        --results_path "${root}/results/${tag}.json"
-      )
-      [[ -n "${kwargs}" ]] && args+=(--dataset_kwargs "${kwargs}")
-      if [[ "${cache_mode}" == "on" ]]; then
-        export CEDAR_CACHE_ROOT="${root}/cache"
-        export CEDAR_CACHE_NAMESPACE="${workload}__${optimizer}"
-        unset CEDAR_CACHE_SHARD
-      fi
-      echo "[$(date -Is)] RUN ${workload}/${tag}" | tee -a "${root}/nohup.log"
       set +e
-      run_guarded_result "${EXECUTION_TIMEOUT_SEC}" \
-        "${root}/results/${tag}.json" \
-        "${root}/logs/${tag}.log" "${args[@]}"
+      run_execution_round "${workload}" "${dataset}" "${samples}" \
+        "${cache_mode}" "${kwargs}" "${optimizer}" "${round}" \
+        "${TASK_TIMEOUT_SEC}"
       local execution_status=$?
       set -e
       if [[ "${execution_status}" -eq 124 ]]; then
-        printf '{\n  "optimizer": "%s",\n  "repeat": %s,\n' \
-          "${optimizer}" "${round}" \
-          > "${root}/results/${tag}.timeout.json"
-        printf '  "status": "timeout",\n  "reason": "execution_timeout",\n' \
-          >> "${root}/results/${tag}.timeout.json"
-        printf '  "execution_timeout_sec": %s\n}\n' \
-          "${EXECUTION_TIMEOUT_SEC}" \
-          >> "${root}/results/${tag}.timeout.json"
+        record_task_timeout \
+          "${workload}" "${optimizer}" "${round}" "execution_task_timeout"
         execution_timed_out["${optimizer}"]=1
-        echo "[$(date -Is)] TIMEOUT ${workload}/${tag}: exceeded ${EXECUTION_TIMEOUT_SEC}s" \
+        echo "[$(date -Is)] TIMEOUT ${workload}/${tag}: exceeded ${TASK_TIMEOUT_SEC}s" \
           | tee -a "${root}/nohup.log"
         continue
       elif [[ "${execution_status}" -ne 0 ]]; then
@@ -718,5 +849,25 @@ run_workload wikitext103 \
 run_workload wikitext103_cache \
   evaluation/pipelines/wikitext103/cedar_cache_dataset.py \
   "${PROFILE_DIR}/wikitext103_cache.yaml" 100000 on "max_samples=100000"
+run_workload pile_europarl \
+  evaluation/pipelines/pile_europarl/cedar_dataset.py \
+  "${PROFILE_DIR}/pile_europarl.yaml" "${PILE_EUROPARL_SAMPLES}" off \
+  "dataset_path=datasets/pile_europarl/pile-europarl-raw.jsonl"
+run_workload pile_hackernews \
+  evaluation/pipelines/pile_hackernews/cedar_dataset.py \
+  "${PROFILE_DIR}/pile_hackernews.yaml" "${PILE_HACKERNEWS_SAMPLES}" off \
+  "dataset_path=datasets/pile_hackernews/pile-hackernews-raw-100000.jsonl"
+run_workload pile_pubmed_abstracts \
+  evaluation/pipelines/pile_pubmed_abstracts/cedar_dataset.py \
+  "${PROFILE_DIR}/pile_pubmed_abstracts.yaml" "${PILE_PUBMED_SAMPLES}" off \
+  "dataset_path=datasets/pile_pubmed_abstracts/pile-pubmed-abstracts-raw-100000.jsonl"
+run_workload pile_uspto_backgrounds \
+  evaluation/pipelines/pile_uspto_backgrounds/cedar_dataset.py \
+  "${PROFILE_DIR}/pile_uspto_backgrounds.yaml" "${PILE_USPTO_SAMPLES}" off \
+  "dataset_path=datasets/pile_uspto_backgrounds/pile-uspto-backgrounds-raw-100000.jsonl"
+run_workload redpajama_code \
+  evaluation/pipelines/redpajama_code/cedar_dataset.py \
+  "${PROFILE_DIR}/redpajama_code.yaml" "${REDPAJAMA_CODE_SAMPLES}" off \
+  "dataset_path=datasets/redpajama_code/redpajama-github-raw-50000.jsonl"
 
 echo "[$(date -Is)] W=8 matrix complete"

@@ -33,6 +33,15 @@ class SplitFiltersFeature(Feature):
         return ft
 
 
+class DependentFiltersFeature(Feature):
+    def _compose(self, source_pipes: List[Pipe]):
+        ft = source_pipes[0]
+        ft = FilterPipe(ft, _true_filter, tag="must_run_first")
+        ft = FilterPipe(ft, _other_true_filter).depends_on(["must_run_first"])
+        ft = NoopPipe(ft)
+        return ft
+
+
 def _profile_for(feature: Feature, fast_filter_name: str):
     latencies = {}
     input_sizes = {}
@@ -113,5 +122,15 @@ def test_dj_optimizer_does_not_reorder_filters_across_non_filter_pipe():
     original_order = _linear_order(feature.logical_adj_list)
 
     order, _, _ = _run_dj_reorder(SplitFiltersFeature())
+
+    assert order == original_order
+
+
+def test_dj_optimizer_respects_explicit_filter_dependencies():
+    feature = DependentFiltersFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    original_order = _linear_order(feature.logical_adj_list)
+
+    order, _, _ = _run_dj_reorder(DependentFiltersFeature())
 
     assert order == original_order

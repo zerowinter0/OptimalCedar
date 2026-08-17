@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 from .dp_optimizer import (
     BlockCandidate,
     CacheTransitionPolicy,
+    DpObjectiveCost,
     DpOptimizer,
     ExtensibleDpSearch,
 )
@@ -189,6 +190,21 @@ class ExpOptimizer(DpOptimizer):
     def __init__(self) -> None:
         super().__init__()
         self._fallback_warnings: Set[Tuple[int, PipeVariantType]] = set()
+
+    def _dp_initial_objective_cost(self) -> DpObjectiveCost:
+        # ExpOptimizer is the legacy additive-model ablation. Keep its search
+        # semantics isolated from DpOptimizer's throughput objective.
+        return DpObjectiveCost()
+
+    def _dp_accumulate_objective_cost(
+        self,
+        previous: DpObjectiveCost,
+        extra_cost: float,
+        block: BlockCandidate,
+    ) -> DpObjectiveCost:
+        return DpObjectiveCost(
+            local_serial=previous.local_serial + extra_cost
+        )
 
     def _profile_entry(self, mapping: Dict, p_id: int):
         return mapping.get(p_id, mapping.get(str(p_id)))

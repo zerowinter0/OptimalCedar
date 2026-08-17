@@ -47,6 +47,9 @@ OPTIMIZERS = {
     "dp_cedar_optimizer": 5,
     "exp_optimizer": 7,
     "pecan_optimizer": 8,
+    "pecan_two_stage_optimizer": 9,
+    "dj_two_stage_optimizer": 10,
+    "simple_dp_optimizer": 11,
 }
 
 DEFAULT_OPTIMIZER_ORDER = [

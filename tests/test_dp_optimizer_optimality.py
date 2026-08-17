@@ -12,6 +12,7 @@ from evaluation.verify_dp_optimizer_optimality import (
 )
 from cedar.compose.dp_optimizer import (
     BlockCandidate,
+    DpObjectiveCost,
     DpOptimizer,
     DpStateSummary,
     ExtensibleDpSearch,
@@ -147,6 +148,26 @@ def test_per_record_cost_is_anchored_at_its_profiled_position():
     assert math.isclose(cost, 10.1)
 
 
+def test_per_record_normalization_survives_two_stage_reorder():
+    optimizer = DpOptimizer()
+    optimizer._dp_inner_ops = [20, 10]
+    optimizer._dp_compute_scalings = [
+        PipeComputeScaling.PER_RECORD,
+        PipeComputeScaling.PER_RECORD,
+    ]
+    optimizer._dp_profiled_input_cardinality = {10: 1.0, 20: 0.25}
+    optimizer._dp_cardinality_prod = [1.0, 1.0, 0.25, 0.25]
+
+    assert math.isclose(
+        optimizer._dp_compute_cost_denominator(0, 999.0, 100.0),
+        25.0,
+    )
+    assert math.isclose(
+        optimizer._dp_compute_cost_denominator(1, 999.0, 100.0),
+        100.0,
+    )
+
+
 def test_search_drops_resource_coordinate_without_strict_limit():
     """Resource counts must not split states when they cannot affect plans."""
 
@@ -214,6 +235,140 @@ def test_search_drops_resource_coordinate_without_strict_limit():
     assert result.cost == 1.0
     assert observed_parallel_cpus == [0]
     assert optimizer._dp_last_search_stats["retained_states"] == 2
+
+
+def test_pareto_frontier_keeps_initially_slower_parallel_choice():
+    """A scalar partial score would discard the globally faster pipeline."""
+
+    class OptimizerStub:
+        _dp_pred_indices = [[], [0]]
+
+        def _dp_parallel_stage_cpu_limit(self):
+            return None
+
+        def _dp_valid_single_last(self, prev_mask, idx):
+            return idx == 0 or bool(prev_mask & 1)
+
+        def _dp_regular_transition_cost(self, prev_mask, block):
+            return block.cost
+
+        def _dp_parallel_stage_cpu_cost(self, variant):
+            return 1
+
+        def _dp_accumulate_objective_cost(self, previous, extra, block):
+            if block.variant == PipeVariantType.RAY:
+                return DpObjectiveCost(
+                    previous.local_serial,
+                    max(previous.parallel_bottleneck, extra),
+                )
+            return DpObjectiveCost(
+                previous.local_serial + extra,
+                previous.parallel_bottleneck,
+            )
+
+    class ProviderStub:
+        def candidates_for(self, mask):
+            if mask == 1:
+                return [
+                    BlockCandidate(
+                        1, (0,), PipeVariantType.INPROCESS, 10.0, False
+                    ),
+                    BlockCandidate(1, (0,), PipeVariantType.RAY, 11.0, False),
+                ]
+            if mask == 2:
+                return [
+                    BlockCandidate(
+                        2, (1,), PipeVariantType.INPROCESS, 100.0, False
+                    )
+                ]
+            return []
+
+    class PolicyStub:
+        def initial_state(self):
+            return DpStateSummary()
+
+        def transitions(
+            self, prev_mask, next_mask, prev_state, regular_cost, block,
+            next_parallel_stage_cpus=None,
+        ):
+            yield TransitionChoice(prev_state, regular_cost)
+
+    result = ExtensibleDpSearch(
+        OptimizerStub(), [0, 1], ProviderStub(), PolicyStub()
+    ).run()
+
+    assert result.variants_by_idx[0] == PipeVariantType.RAY
+    assert result.objective == DpObjectiveCost(100.0, 11.0)
+    assert result.cost == 100.0
+
+
+def test_bottleneck_objective_balances_two_parallel_stages():
+    class OptimizerStub:
+        _dp_pred_indices = [[], [0], [1], [2]]
+
+        def _dp_parallel_stage_cpu_limit(self):
+            return 2
+
+        def _dp_valid_single_last(self, prev_mask, idx):
+            return idx == 0 or bool(prev_mask & (1 << (idx - 1)))
+
+        def _dp_fusion_block_valid(self, prev_mask, block_mask):
+            indices = [i for i in range(4) if block_mask & (1 << i)]
+            return indices == list(range(indices[0], indices[-1] + 1)) and (
+                indices[0] == 0 or bool(prev_mask & (1 << (indices[0] - 1)))
+            )
+
+        def _dp_fusion_transport_feasible(self, prev_mask, block):
+            return True
+
+        def _dp_regular_transition_cost(self, prev_mask, block):
+            return block.cost
+
+        def _dp_parallel_stage_cpu_cost(self, variant):
+            return 1
+
+        def _dp_accumulate_objective_cost(self, previous, extra, block):
+            return DpObjectiveCost(
+                previous.local_serial,
+                max(previous.parallel_bottleneck, extra),
+            )
+
+    class ProviderStub:
+        def candidates_for(self, mask):
+            indices = [i for i in range(4) if mask & (1 << i)]
+            if not indices:
+                return []
+            return [
+                BlockCandidate(
+                    mask,
+                    tuple(indices),
+                    PipeVariantType.RAY,
+                    float(len(indices)),
+                    len(indices) > 1,
+                )
+            ]
+
+    class PolicyStub:
+        def initial_state(self):
+            return DpStateSummary()
+
+        def transitions(
+            self, prev_mask, next_mask, prev_state, regular_cost, block,
+            next_parallel_stage_cpus=None,
+        ):
+            yield TransitionChoice(
+                DpStateSummary(
+                    parallel_stage_cpus=next_parallel_stage_cpus
+                ),
+                regular_cost,
+            )
+
+    result = ExtensibleDpSearch(
+        OptimizerStub(), list(range(4)), ProviderStub(), PolicyStub()
+    ).run()
+
+    assert result.blocks == [[0, 1], [2, 3]]
+    assert result.objective == DpObjectiveCost(0.0, 2.0)
 
 
 def _block_objective(order, ratios, costs, input_sizes):

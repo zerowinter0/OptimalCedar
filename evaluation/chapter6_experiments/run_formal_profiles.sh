@@ -268,7 +268,7 @@ echo "[$(date -Is)] Incremental backend compute: ${INCREMENTAL_BACKEND_COMPUTE}"
 echo "[$(date -Is)] Profile width: local_workers=1 ray_actors_per_stage=1 smp_procs_per_stage=1"
 
 echo "[$(date -Is)] Per-workload profile timeout: ${PROFILE_TIMEOUT_SEC}s"
-ray stop --force || true
+timeout 60s ray stop --force >/dev/null 2>&1 || true
 if ! ray start --head --node-ip-address=127.0.0.1 --port=6379 \
   --num-cpus="${CPU_BUDGET}" --disable-usage-stats; then
   echo "[$(date -Is)] FAILED to start Ray"
@@ -314,7 +314,7 @@ run_selected_profile simclrv2_cache evaluation/pipelines/simclrv2/cedar_cache_da
 run_selected_profile wikitext103 evaluation/pipelines/wikitext103/cedar_dataset.py || failures+=(wikitext103)
 run_selected_profile wikitext103_cache evaluation/pipelines/wikitext103/cedar_cache_dataset.py || failures+=(wikitext103_cache)
 
-ray stop --force || true
+timeout 60s ray stop --force >/dev/null 2>&1 || true
 if (( ${#failures[@]} )); then
   printf '[%s] Profile run completed with failures:' "$(date -Is)"
   printf ' %s' "${failures[@]}"

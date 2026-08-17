@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import statistics
 from collections import deque
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -52,7 +53,8 @@ class MyOptimizer(Optimizer):
         self._dp_cardinality_prod: List[float] = []
         self._dp_volume_prod: List[float] = []
         self._dp_compute_scalings: List[PipeComputeScaling] = []
-        self._dp_compute_scaling = PipeComputeScaling.PER_BYTE
+        self._dp_profiled_input_cardinality: Dict[int, float] = {}
+        self._dp_compute_scaling = PipeComputeScaling.PER_DATA
         self._pending_fusion_blocks: List[List[int]] = []
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
         self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
@@ -184,47 +186,157 @@ class MyOptimizer(Optimizer):
     def _calculate_pipe_cost(
         self, p_id: int, input_size: float, desc: Optional[PipeDesc]
     ) -> float:
-        """Use a conservative fallback for an unidentifiable Amdahl inverse.
+        """Conservatively combine worker and end-to-end backend measurements.
 
-        The shared Cedar estimator returns zero when an observed end-to-end
-        speedup exceeds the maximum attributable to one profiled operator.
-        Such a measurement lies at the singularity of the inverse; treating
-        it as a free operator makes the joint DP aggressively combine invalid
-        candidates, while falling all the way back to baseline reverses the
-        ranking against slower identifiable backends.  Use a finite speedup
-        cap so the strong measured signal survives without introducing zero
-        costs.
+        Direct worker timings isolate compute but omit IPC, queueing and
+        serialization.  A valid Amdahl inverse includes those runtime costs,
+        but can become unidentifiable near its singularity.  Use the larger
+        of the direct-compute sample mean and a valid end-to-end inverse;
+        if only one is valid, retain it.  When neither is identifiable, fall
+        back to the measured in-process cost rather than inventing speedup.
         """
-        cost = super()._calculate_pipe_cost(p_id, input_size, desc)
         if desc is None or desc.variant_type in (None, PipeVariantType.INPROCESS):
-            return cost
+            return super()._calculate_pipe_cost(p_id, input_size, desc)
         baseline_input = self.profiled_stats["baseline"]["input_sizes"][p_id]
         baseline_cost = (
             input_size / baseline_input * self._base_cost_map[p_id]
             if baseline_input > 0
             else self._base_cost_map[p_id]
         )
-        regularized_cost = max(
-            baseline_cost / constants.MAX_UNIDENTIFIABLE_OPERATOR_SPEEDUP,
-            1e-12,
+        backend_entry = self.profiled_stats.get("offloads", {}).get(
+            desc.variant_type.name, {}
+        ).get(p_id)
+        if backend_entry is None:
+            backend_entry = self.profiled_stats.get("offloads", {}).get(
+                desc.variant_type.name, {}
+            ).get(str(p_id))
+        direct = (
+            backend_entry.get("backend_compute")
+            if isinstance(backend_entry, dict)
+            else None
         )
-        if cost > 0 and math.isfinite(cost):
-            # Close to Amdahl's asymptote, even a technically identifiable
-            # inverse can imply an arbitrarily large and unstable operator
-            # speedup. Apply the same finite cap on both sides of the
-            # singularity so backend rankings do not flip discontinuously.
-            return max(cost, regularized_cost)
+        direct_cost: Optional[float] = None
+        if isinstance(direct, dict):
+            try:
+                mean = float(direct["mean_ms_per_sample"])
+                stderr = float(direct.get("stderr_ms_per_sample", 0.0))
+                count = int(direct.get("count", 0))
+            except (KeyError, TypeError, ValueError):
+                mean = float("nan")
+                stderr = float("nan")
+                count = 0
+            if (
+                count > 0
+                and math.isfinite(mean)
+                and mean >= 0.0
+                and math.isfinite(stderr)
+                and stderr >= 0.0
+            ):
+                # The objective estimates expected execution time, so use the
+                # unbiased sample mean. Profiled stderr remains available for
+                # accuracy/error-bar reporting; adding a per-operator 95% UCB
+                # here systematically rejects useful offloads when only a few
+                # actor batches were observed.
+                direct_cost = mean
+                scaling = self._dp_compute_scaling_for_pipe(p_id)
+                if scaling == PipeComputeScaling.PER_RECORD:
+                    # Worker timing is per processed record. Convert it to the
+                    # profiled per-source-record total expected by
+                    # _BlockCostIndex; the index then removes this original
+                    # cardinality before applying the reordered cardinality.
+                    direct_cost *= self._dp_profiled_input_cardinality.get(
+                        p_id, 1.0
+                    )
+                elif baseline_input > 0:
+                    direct_cost *= input_size / baseline_input
+                direct_cost = max(direct_cost, 1e-12)
+
+        inferred_cost = super()._calculate_pipe_cost(p_id, input_size, desc)
+        inferred_valid = inferred_cost > 0 and math.isfinite(inferred_cost)
+        if direct_cost is not None and inferred_valid:
+            return max(direct_cost, inferred_cost)
+        if direct_cost is not None:
+            return direct_cost
+        if inferred_valid:
+            return inferred_cost
         warning_key = (p_id, desc.variant_type)
         if warning_key not in self._invalid_cost_warnings:
             self._invalid_cost_warnings.add(warning_key)
             logger.warning(
                 "[MyOptimizer] Invalid inferred %s cost for pipe %s; "
-                "using finite capped-speedup cost (first value %s).",
+                "using conservative INPROCESS cost (first value %s).",
                 desc.variant_type.name,
                 p_id,
-                regularized_cost,
+                baseline_cost,
             )
-        return regularized_cost
+        return max(baseline_cost, 1e-12)
+
+    def _dp_compute_scaling_for_pipe(
+        self, p_id: int
+    ) -> PipeComputeScaling:
+        if self.logical_pipes is not None and p_id in self.logical_pipes:
+            pipe = self.logical_pipes[p_id]
+            if getattr(pipe, "compute_scaling_explicit", False):
+                return pipe.compute_scaling
+        entry = self.profiled_stats.get("operator_compute_scaling", {}).get(
+            p_id
+        )
+        if entry is None:
+            entry = self.profiled_stats.get(
+                "operator_compute_scaling", {}
+            ).get(str(p_id))
+        if isinstance(entry, dict):
+            entry = entry.get("scaling")
+        if entry is not None:
+            try:
+                return PipeComputeScaling(entry)
+            except ValueError:
+                pass
+        return PipeComputeScaling.PER_DATA
+
+    def _dp_observed_selectivities(self) -> Dict[int, float]:
+        """Return baseline selectivities with offload-count fallback.
+
+        Older frozen profiles did not persist baseline input/output counts, but
+        their isolated RAY/SMP observations did. Median aggregation reuses
+        those already-collected counts without changing or rerunning profile.
+        """
+        result: Dict[int, float] = {}
+        raw = self.profiled_stats.get("baseline", {}).get(
+            "selectivities", {}
+        )
+        for key, value in raw.items():
+            try:
+                p_id = int(key)
+                parsed = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(parsed) and 0.0 <= parsed <= 1.0:
+                result[p_id] = parsed
+
+        observations: Dict[int, List[float]] = {}
+        for variant_entries in self.profiled_stats.get(
+            "offloads", {}
+        ).values():
+            if not isinstance(variant_entries, dict):
+                continue
+            for pipe_profile in variant_entries.values():
+                if not isinstance(pipe_profile, dict):
+                    continue
+                for key, value in pipe_profile.get(
+                    "selectivities", {}
+                ).items():
+                    try:
+                        p_id = int(key)
+                        parsed = float(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if math.isfinite(parsed) and 0.0 <= parsed <= 1.0:
+                        observations.setdefault(p_id, []).append(parsed)
+        for p_id, values in observations.items():
+            if p_id not in result and values:
+                result[p_id] = statistics.median(values)
+        return result
 
     def _dp_has_supported_fusion_cost(
         self, variant_type: PipeVariantType
@@ -529,10 +641,17 @@ class MyOptimizer(Optimizer):
             self._dp_compute_scaling_for_idx(operator_idx)
             == PipeComputeScaling.PER_RECORD
         ):
+            if operator_idx < len(self._dp_inner_ops):
+                p_id = self._dp_inner_ops[operator_idx]
+                profiled_cardinality = (
+                    self._dp_profiled_input_cardinality.get(p_id)
+                )
+                if profiled_cardinality is not None:
+                    return source_size * profiled_cardinality
+            # Compatibility fallback for isolated unit-test stubs and old
+            # callers that do not prepare pipe-keyed baseline metadata.
             original_prefix = (1 << operator_idx) - 1
-            return (
-                source_size * self._dp_cardinality_prod[original_prefix]
-            )
+            return source_size * self._dp_cardinality_prod[original_prefix]
         return baseline_input_size
 
     def _dp_smp_supported_for_pipe(self, p_id: int) -> bool:
@@ -803,9 +922,43 @@ class MyOptimizer(Optimizer):
         # Cardinality is distinct from serialized size per surviving item.
         # Profiles predating schema v1 have no selection counts and therefore
         # preserve the original model exactly with selectivity 1.0.
-        raw_selectivities = self.profiled_stats["baseline"].get(
-            "selectivities", {}
+        raw_selectivities = self._dp_observed_selectivities()
+
+        # Anchor per-record costs at each pipe's position in the profiled
+        # logical pipeline. A two-stage optimizer may call this method after
+        # reordering ``inner_ops``; using that new index would silently change
+        # the baseline normalization and make costs incomparable across
+        # reorder policies.
+        output_p_id = self._get_output_p_id(self.logical_graph)
+        profiled_paths = find_all_paths(
+            self.logical_graph, source_p_id, output_p_id
         )
+        if len(profiled_paths) != 1:
+            raise RuntimeError(
+                "DP operator scaling requires one profiled logical path."
+            )
+        profiled_cardinality = 1.0
+        self._dp_profiled_input_cardinality = {}
+        for p_id in profiled_paths[0][1:]:
+            self._dp_profiled_input_cardinality[p_id] = (
+                profiled_cardinality
+            )
+            raw = raw_selectivities.get(
+                p_id, raw_selectivities.get(str(p_id), 1.0)
+            )
+            try:
+                value = float(raw)
+            except (TypeError, ValueError) as exc:
+                raise RuntimeError(
+                    f"Invalid filter selectivity for pipe {p_id}: {raw!r}"
+                ) from exc
+            if not math.isfinite(value) or value < 0.0 or value > 1.0:
+                raise RuntimeError(
+                    f"Filter selectivity for pipe {p_id} must be in [0, 1], "
+                    f"got {value!r}"
+                )
+            profiled_cardinality *= value
+
         selectivities: List[float] = []
         for p_id in inner_ops:
             raw = raw_selectivities.get(
@@ -825,9 +978,28 @@ class MyOptimizer(Optimizer):
             selectivities.append(value)
         self._dp_selectivities = selectivities
 
-        self._dp_compute_scalings = [
-            self.logical_pipes[p_id].compute_scaling for p_id in inner_ops
-        ]
+        profiled_scalings = self.profiled_stats.get(
+            "operator_compute_scaling", {}
+        )
+        self._dp_compute_scalings = []
+        for p_id in inner_ops:
+            pipe = self.logical_pipes[p_id]
+            scaling = pipe.compute_scaling
+            if not getattr(pipe, "compute_scaling_explicit", False):
+                entry = profiled_scalings.get(
+                    p_id, profiled_scalings.get(str(p_id))
+                )
+                if isinstance(entry, dict):
+                    entry = entry.get("scaling")
+                if entry is not None:
+                    try:
+                        scaling = PipeComputeScaling(entry)
+                    except ValueError as exc:
+                        raise RuntimeError(
+                            f"Invalid profiled compute scaling for pipe "
+                            f"{p_id}: {entry!r}"
+                        ) from exc
+            self._dp_compute_scalings.append(scaling)
 
         cardinality_prod = [1.0] * full_mask
         volume_prod = [1.0] * full_mask

@@ -15,7 +15,12 @@ from typing import List
 from cedar.client import DataSet
 from cedar.compose import Feature, OptimizerOptions
 from cedar.config import CedarContext
-from cedar.pipes import FilterPipe, MapperPipe, Pipe
+from cedar.pipes import (
+    FilterPipe,
+    MapperPipe,
+    Pipe,
+    PipeComputeScaling,
+)
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
@@ -33,32 +38,41 @@ class StackExchangeFeature(Feature):
     def _compose(self, source_pipes: List[Pipe]):
         fp = source_pipes[0]
         fp = MapperPipe(fp, dj_ops.parse_json_line, tag="parse").fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         fp = MapperPipe(fp, dj_ops.CleanEmailMapper(), tag="clean_email").fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, dj_ops.CleanLinksMapper(), tag="clean_links").fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, dj_ops.FixUnicodeMapper(), tag="fix_unicode").fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, dj_ops.PunctuationNormalizationMapper(), tag="normalize_punct"
         ).fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, dj_ops.WhitespaceNormalizationMapper(), tag="normalize_space"
         ).fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         fp = FilterPipe(
             fp,
             dj_ops.AlphanumericFilter(min_ratio=0.35, max_ratio=0.943),
             tag="alphanumeric",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.AverageLineLengthFilter(min_len=20, max_len=400),
             tag="avg_line_len",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.CharacterRepetitionFilter(rep_len=10, max_ratio=0.4),
             tag="char_repeat",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.FlaggedWordsFilter(
@@ -66,29 +80,35 @@ class StackExchangeFeature(Feature):
             ),
             tag="flagged_words",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.LanguageIDScoreFilter(min_score=0.1),
             tag="language_id",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.MaximumLineLengthFilter(min_len=80),
             tag="max_line_len",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.PerplexityFilter(lang="en", max_ppl=10_000),
             tag="perplexity",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.SpecialCharactersFilter(min_ratio=0.232, max_ratio=0.7),
             tag="special_chars",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp, dj_ops.TextLengthFilter(min_len=200), tag="text_length"
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         fp = FilterPipe(
             fp,
             dj_ops.WordsNumFilter(
@@ -99,6 +119,7 @@ class StackExchangeFeature(Feature):
             ),
             tag="words_num",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             dj_ops.WordRepetitionFilter(
@@ -109,11 +130,15 @@ class StackExchangeFeature(Feature):
             ),
             tag="word_repeat",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text").fix()
-        return MapperPipe(
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
+        fp = MapperPipe(
             fp, dj_ops.extract_output_text, tag="extract_text"
         ).fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
+        return fp
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:

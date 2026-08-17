@@ -106,6 +106,11 @@ class SMPService:
             "stderr_ms_per_sample": stddev / math.sqrt(count) / 1e6,
         }
 
+    def reset_backend_compute_stats(self) -> None:
+        self._backend_compute_count = 0
+        self._backend_compute_sum_ns = 0.0
+        self._backend_compute_sum_sq_ns = 0.0
+
     def can_submit(self):
         """
         Returns true if the service can take more tasks.

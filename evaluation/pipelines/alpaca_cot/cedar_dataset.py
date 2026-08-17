@@ -17,7 +17,12 @@ from typing import Any, Dict, List
 from cedar.client import DataSet
 from cedar.compose import Feature, OptimizerOptions
 from cedar.config import CedarContext
-from cedar.pipes import FilterPipe, MapperPipe, Pipe
+from cedar.pipes import (
+    FilterPipe,
+    MapperPipe,
+    Pipe,
+    PipeComputeScaling,
+)
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
@@ -62,6 +67,7 @@ class AlpacaCotFeature(Feature):
         fp = MapperPipe(
             source_pipes[0], parse_and_format, tag="parse_and_format"
         ).fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.AlphanumericFilter(
@@ -69,11 +75,13 @@ class AlpacaCotFeature(Feature):
             ),
             tag="alphanumeric",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.CharacterRepetitionFilter(rep_len=10, max_ratio=0.6),
             tag="char_repeat",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.FlaggedWordsFilter(
@@ -81,18 +89,24 @@ class AlpacaCotFeature(Feature):
             ),
             tag="flagged_words",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.MaximumLineLengthFilter(min_len=20),
             tag="max_line_len",
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp, ops.TextLengthFilter(min_len=30), tag="text_length"
         )
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         fp = MapperPipe(fp, ops.sync_text_key, tag="sync_text").fix()
-        return MapperPipe(
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
+        fp = MapperPipe(
             fp, ops.extract_output_text, tag="extract_text"
         ).fix()
+        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
+        return fp
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:

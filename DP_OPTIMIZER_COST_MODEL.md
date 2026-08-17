@@ -306,15 +306,28 @@ operator_cost = work_prod(S) * block.cost
 regular_cost = operator_cost + stage_boundary_cost
 ```
 
-默认使用 additive objective：
+`INPROCESS` block 与 source 共用 local worker 的串行执行通道，因此其
+`regular_cost` 累加到 `local_serial`。每一个 `RAY`、`TF_RAY` 或 `SMP`
+block 是独立的异步流水线 stage，因此更新 `parallel_bottleneck`：
 
 ```text
-new_cost = previous_cost + regular_cost
+INPROCESS:
+    local_serial' = local_serial + regular_cost
+
+RAY / TF_RAY / SMP:
+    parallel_bottleneck' = max(parallel_bottleneck, regular_cost)
 ```
 
-整条计划的 DP cost 就是所有 block 的 operator cost 与 boundary cost 之和。
+最终吞吐量目标为：
 
-DP 不含 source 算子的成本，因为 source 对所有候选计划相同，不影响排名。`inner_ops` 包含最终 output 算子，因此 output 参与 backend 和 fusion 选择，但依赖约束会保证其位置合法。
+```text
+plan_cost = max(local_serial, parallel_bottleneck)
+```
+
+source 成本会进入 `local_serial`。虽然它对 additive 排名是常数，但在
+`max(local_serial, parallel_bottleneck)` 中会影响 local/parallel 负载均衡，
+不能删除。`inner_ops` 包含最终 output 算子，因此 output 参与 backend 和
+fusion 选择，但依赖约束会保证其位置合法。
 
 ## 8. cache 成本
 
@@ -332,10 +345,12 @@ cache_read_cost =
     * work_prod(S)
 ```
 
-打开 cache 的转移会用 cache read cost 替换此前累计的 prefix cost：
+打开 cache 的转移会用 cache read cost 替换此前的两个 prefix 坐标；cache
+读取发生在 local lane：
 
 ```text
-new_cost = cache_read_cost
+local_serial = cache_read_cost
+parallel_bottleneck = 0
 ```
 
 cache 后面的随机或未缓存 suffix 再正常累加。
@@ -405,7 +420,27 @@ state =
     parallel_stage_cpus
 ```
 
-同一 mask、cache 状态和 CPU 占用只保留最低 additive cost。
+同一 mask、cache 状态和 CPU 占用维护精确的二维 Pareto 前沿：
+
+```text
+(local_serial, parallel_bottleneck)
+```
+
+只有当一个状态在两维上都不大于另一个状态时才会支配后者。不能只保留
+当前 `max(...)` 最小的状态：一个当前 local 较小、parallel 较大的状态，
+在后续继续追加 local operator 后可能成为全局最优。
+
+最多 8 个算子的 optimality 实验保留完整精确前沿。更大的正式负载默认
+使用 `CEDAR_DP_PARETO_EPSILON=0.10` 的乘法 trimming。每个 prefix 的误差
+设为：
+
+```text
+epsilon_step = (1 + epsilon_global)^(1 / n) - 1
+```
+
+因此经过最多 `n` 次转移后，两维服务需求的最坏乘法误差不超过 10%。设为
+`0` 可对任意算子数量恢复精确前沿，但复杂负载的计划生成时间和内存开销会
+明显上升。搜索日志同时记录 global/step epsilon、保留状态数和最大前沿。
 
 若两个候选 cost 在极小浮点容差内相同，代码倾向选择包含更多算子的 fusion block。
 
@@ -414,10 +449,15 @@ state =
 真正决定计划的是日志：
 
 ```text
-[DpOptimizer] DP state cost (inner ops only)
+[DpOptimizer] DP objective: throughput_bottleneck
 ```
 
-计划生成后打印的：
+其中同时报告 `local_serial` 与 `parallel_bottleneck`。计划物化后，
+`calculate_dp_objective_cost` 会严格重放同一组 block、backend、boundary 和
+cache 转移；重放值必须与搜索值一致，否则计划生成直接失败。
+
+继承的旧 Cedar `Optimizer.calculate_cost` 仍可能被其他 optimizer 用作报告
+指标。这套旧模型保留如下语义：
 
 ```text
 [DpOptimizer] Optimized plan cost = ...
@@ -447,9 +487,8 @@ reported_fused_cost =
     sum(operator_costs) * fused_IO / baseline_IO
 ```
 
-因此 `DP state cost` 和 `Optimized plan cost` 数值不同是正常的。但差异并不只是是否包含 source 这个常数项；在 fusion、filter 和 boundary 模型下，二者可能代表不同目标，甚至可能对两个计划给出不同排名。
-
-DP 搜索完成后，`calculate_cost` 通常不会重新改变重排、offload 和 fusion 结果。主要例外是 cache 插入时的二次收益校验。
+因此旧 Cedar cost 不能用于解释 DP 的计划排名；论文中的 DP 代价准确性实验
+应调用 `calculate_dp_objective_cost`。
 
 ## 12. 特殊控制流
 
@@ -468,7 +507,8 @@ local parallelism 在 DP 完成后由基类逻辑单独选择。除严格 profil
 - parallel stage transport 可由固定延迟加双向字节量除以带宽表示；
 - fixed latency 可以由 max inflight 完全摊薄；
 - fusion 只消除 stage boundary，不减少真实算子 compute；
-- additive 目标把所有 stage 工作相加；
+- distinct parallel stages 可在稳态流水线中并发，吞吐量由最慢 stage 与
+  local 串行通道二者中的较大值决定；
 - cache 模型面向 cache-hit epoch，不是冷启动加多 epoch 总成本；
 - local parallelism 的运行时收益没有直接进入 DP cost；
 - 联合 DP 只覆盖线性单路径流水线。
@@ -478,18 +518,17 @@ local parallelism 在 DP 完成后由基类逻辑单独选择。除严格 profil
 默认模式下，真正用于选择计划的目标可以概括为：
 
 ```text
-plan_cost =
-    sum(
-        按重排后字节量和记录数缩放的 operator compute cost
-    )
-    + sum(
-        每个 SMP/RAY/TF_RAY stage 的 boundary cost
-    )
+local_serial = source_cost + sum(INPROCESS block cost)
+
+parallel_bottleneck = max(
+    每个 SMP/RAY/TF_RAY block 的 compute + boundary cost
+)
+
+plan_cost = max(local_serial, parallel_bottleneck)
 ```
 
 cache 模式允许使用磁盘读取成本替换 deterministic prefix 的累计成本。
 
-当前实现最需要明确区分的是：DP 搜索使用“Amdahl offload cost 加显式
-boundary、fusion 不折扣 operator cost”的模型，而最终打印的
-`Optimized plan cost` 仍使用旧 `calculate_cost` 语义。两者目前不能视为
-同一个数值目标。
+搜索通过二维 Pareto 前沿保持该目标的精确最优子结构。六算子穷举验证会
+枚举所有合法重排、fusion 分区和 backend 分配，并检查 DP 与独立 oracle
+的全局最优值完全一致。
