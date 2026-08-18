@@ -320,43 +320,35 @@ def plot_results(rows: Sequence[Mapping[str, Any]], output_dir: pathlib.Path) ->
             "font.size": 8.5,
             "axes.labelsize": 9,
             "axes.titlesize": 10,
-            "legend.fontsize": 6.5,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
         }
     )
-    fig, axes = plt.subplots(1, 2, figsize=(12.2, 4.15), sharey=True)
-    panels = (("per_data", "Per-data operators"), ("per_record", "Per-record operators"))
-    for ax, (scaling, title) in zip(axes, panels):
-        panel_rows = [row for row in rows if row["scaling"] == scaling]
-        tags = sorted(
-            {str(row["tag"]) for row in panel_rows},
-            key=lambda tag: min(
-                int(row["position"]) for row in panel_rows if row["tag"] == tag
-            ),
+    fig, ax = plt.subplots(figsize=(7.6, 4.5))
+    tags = sorted(
+        {str(row["tag"]) for row in rows},
+        key=lambda tag: min(
+            int(row["position"]) for row in rows if row["tag"] == tag
+        ),
+    )
+    colors = plt.cm.tab20(np.linspace(0, 1, max(1, len(tags))))
+    for color, tag in zip(colors, tags):
+        values = sorted(
+            (row for row in rows if row["tag"] == tag),
+            key=lambda row: float(row["input_bytes"]),
         )
-        colors = plt.cm.tab20(np.linspace(0, 1, max(1, len(tags))))
-        for color, tag in zip(colors, tags):
-            values = sorted(
-                (row for row in panel_rows if row["tag"] == tag),
-                key=lambda row: float(row["input_bytes"]),
-            )
-            x = np.array([float(row["input_bytes"]) for row in values])
-            y = np.array([float(row["rate_records_per_sec"]) for row in values])
-            q1 = np.array([float(row["rate_q1_records_per_sec"]) for row in values])
-            q3 = np.array([float(row["rate_q3_records_per_sec"]) for row in values])
-            position = int(values[0]["position"])
-            label = f"{position:02d} {tag.replace('_', ' ')}"
-            ax.plot(x, y, marker="o", markersize=2.6, linewidth=1.05, color=color, label=label)
-            ax.fill_between(x, q1, q3, color=color, alpha=0.10, linewidth=0)
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log")
-        ax.set_title(title)
-        ax.set_xlabel("Input bytes per record")
-        ax.grid(True, which="both", alpha=0.22, linewidth=0.5)
-        ax.legend(loc="best", frameon=False, ncol=2 if scaling == "per_data" else 1)
-    axes[0].set_ylabel("Single-operator execution rate (records/s)")
-    fig.suptitle("StackExchange Data-Juicer pipeline: operator rate versus legal input size", y=1.015)
+        x = np.array([float(row["input_bytes"]) for row in values])
+        y = np.array([float(row["rate_records_per_sec"]) for row in values])
+        q1 = np.array([float(row["rate_q1_records_per_sec"]) for row in values])
+        q3 = np.array([float(row["rate_q3_records_per_sec"]) for row in values])
+        ax.plot(x, y, marker="o", markersize=2.6, linewidth=1.05, color=color)
+        ax.fill_between(x, q1, q3, color=color, alpha=0.10, linewidth=0)
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log", base=2)
+    ax.set_title("Operator execution rate versus legal input size")
+    ax.set_xlabel("Input bytes per record")
+    ax.set_ylabel("Single-operator execution rate (records/s)")
+    ax.grid(True, which="both", alpha=0.22, linewidth=0.5)
     fig.tight_layout()
     fig.savefig(output_dir / "operator_rate_vs_input_bytes.pdf", bbox_inches="tight")
     fig.savefig(output_dir / "operator_rate_vs_input_bytes.png", dpi=300, bbox_inches="tight")

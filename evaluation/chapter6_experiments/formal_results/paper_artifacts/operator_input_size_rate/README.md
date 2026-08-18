@@ -19,6 +19,11 @@ Each operator has twelve real legal-input points and every point is the median
 of seven single-CPU wall-clock repeats. See `PROTOCOL.md` and `metadata.json`
 for the exact method and provenance.
 
+The publication figure intentionally overlays all operators without class
+labels or a per-operator legend. Explicit labels remain in the metadata and
+this audit summary, but the figure first presents the empirical observation
+that the curves exhibit two different scaling behaviors.
+
 ## Files
 
 - `operator_rate_vs_input_bytes.pdf` and `.png`: publication figure.

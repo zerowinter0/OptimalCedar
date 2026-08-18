@@ -16,7 +16,9 @@ operator or order is redefined in the benchmark.
 5. The process is pinned to one CPU because one profiled Cedar Ray/SMP worker is
    allocated one CPU. Library thread counts are fixed to one.
 
-The y-axis is records per second, not bytes per second. Thus a per-data
-operator is expected to slow as record bytes increase, whereas a per-record
-operator should be comparatively size-insensitive. The figure separates the
-16 explicit per-data operators from the 3 explicit per-record operators.
+The x-axis is input bytes per record and the y-axis is records per second;
+both use base-2 logarithmic scales. All 19 operator curves are shown together
+without semantic class labels or a per-operator legend. The figure is intended
+to expose the empirical split--some rates decrease with input size while
+others remain approximately stable--before the two scaling classes are
+introduced in the paper text.
