@@ -650,6 +650,23 @@ run_workload() {
   for optimizer in "${OPTIMIZERS[@]}"; do
     local task_start="${SECONDS}" remaining status
     if [[ "${RESUME_EXISTING}" == "1" && \
+          -f "${root}/results/round1__${optimizer}.timeout.json" ]]; then
+      execution_timed_out["${optimizer}"]=1
+      echo "[$(date -Is)] REUSE ${workload}/round1__${optimizer} task timeout" \
+        | tee -a "${root}/nohup.log"
+      continue
+    fi
+    if [[ "${RESUME_EXISTING}" == "1" && \
+          -f "${root}/plans/${optimizer}.unavailable.json" ]]; then
+      if grep -q 'plan_generation_timeout' \
+          "${root}/plans/${optimizer}.unavailable.json"; then
+        execution_timed_out["${optimizer}"]=1
+      fi
+      echo "[$(date -Is)] REUSE ${workload}/${optimizer} unavailable plan" \
+        | tee -a "${root}/nohup.log"
+      continue
+    fi
+    if [[ "${RESUME_EXISTING}" == "1" && \
           -f "${root}/results/round1__${optimizer}.json" ]] &&
        validate_result \
          "${root}/results/round1__${optimizer}.json" "${samples}"; then
