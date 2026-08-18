@@ -22,3 +22,10 @@ without semantic class labels or a per-operator legend. The figure is intended
 to expose the empirical split--some rates decrease with input size while
 others remain approximately stable--before the two scaling classes are
 introduced in the paper text.
+
+The companion relative-rate figure divides every operator's rates and
+interquartile bounds by that operator's median rate at its smallest observed
+legal input. Consequently, each curve begins at 1 while later points may
+exceed 1. Its y-axis is also logarithmic with base 2, so the principal ticks
+are `1`, `2^-1`, `2^-2`, and so on; zero itself cannot appear on a logarithmic
+axis.

@@ -324,7 +324,6 @@ def plot_results(rows: Sequence[Mapping[str, Any]], output_dir: pathlib.Path) ->
             "ps.fonttype": 42,
         }
     )
-    fig, ax = plt.subplots(figsize=(7.6, 4.5))
     tags = sorted(
         {str(row["tag"]) for row in rows},
         key=lambda tag: min(
@@ -332,27 +331,59 @@ def plot_results(rows: Sequence[Mapping[str, Any]], output_dir: pathlib.Path) ->
         ),
     )
     colors = plt.cm.tab20(np.linspace(0, 1, max(1, len(tags))))
-    for color, tag in zip(colors, tags):
-        values = sorted(
-            (row for row in rows if row["tag"] == tag),
-            key=lambda row: float(row["input_bytes"]),
-        )
-        x = np.array([float(row["input_bytes"]) for row in values])
-        y = np.array([float(row["rate_records_per_sec"]) for row in values])
-        q1 = np.array([float(row["rate_q1_records_per_sec"]) for row in values])
-        q3 = np.array([float(row["rate_q3_records_per_sec"]) for row in values])
-        ax.plot(x, y, marker="o", markersize=2.6, linewidth=1.05, color=color)
-        ax.fill_between(x, q1, q3, color=color, alpha=0.10, linewidth=0)
-    ax.set_xscale("log", base=2)
-    ax.set_yscale("log", base=2)
-    ax.set_title("Operator execution rate versus legal input size")
-    ax.set_xlabel("Input bytes per record")
-    ax.set_ylabel("Single-operator execution rate (records/s)")
-    ax.grid(True, which="both", alpha=0.22, linewidth=0.5)
-    fig.tight_layout()
-    fig.savefig(output_dir / "operator_rate_vs_input_bytes.pdf", bbox_inches="tight")
-    fig.savefig(output_dir / "operator_rate_vs_input_bytes.png", dpi=300, bbox_inches="tight")
-    plt.close(fig)
+
+    def draw(*, relative: bool, filename: str) -> None:
+        fig, ax = plt.subplots(figsize=(7.6, 4.5))
+        relative_min = math.inf
+        relative_max = 0.0
+        for color, tag in zip(colors, tags):
+            values = sorted(
+                (row for row in rows if row["tag"] == tag),
+                key=lambda row: float(row["input_bytes"]),
+            )
+            x = np.array([float(row["input_bytes"]) for row in values])
+            y = np.array([float(row["rate_records_per_sec"]) for row in values])
+            q1 = np.array(
+                [float(row["rate_q1_records_per_sec"]) for row in values]
+            )
+            q3 = np.array(
+                [float(row["rate_q3_records_per_sec"]) for row in values]
+            )
+            if relative:
+                baseline_rate = y[0]
+                y = y / baseline_rate
+                q1 = q1 / baseline_rate
+                q3 = q3 / baseline_rate
+                relative_min = min(relative_min, float(np.min(q1)))
+                relative_max = max(relative_max, float(np.max(q3)))
+            ax.plot(x, y, marker="o", markersize=2.6, linewidth=1.05, color=color)
+            ax.fill_between(x, q1, q3, color=color, alpha=0.10, linewidth=0)
+        ax.set_xscale("log", base=2)
+        ax.set_yscale("log", base=2)
+        ax.set_xlabel("Input bytes per record")
+        if relative:
+            ax.axhline(1.0, color="black", linewidth=0.7, alpha=0.45)
+            lower_exponent = math.floor(math.log2(relative_min))
+            upper_exponent = math.ceil(math.log2(relative_max))
+            ax.set_yticks(
+                [
+                    2.0**exponent
+                    for exponent in range(lower_exponent, upper_exponent + 1)
+                ]
+            )
+            ax.set_title("Relative operator execution rate versus legal input size")
+            ax.set_ylabel("Relative execution rate (smallest input = 1)")
+        else:
+            ax.set_title("Operator execution rate versus legal input size")
+            ax.set_ylabel("Single-operator execution rate (records/s)")
+        ax.grid(True, which="both", alpha=0.22, linewidth=0.5)
+        fig.tight_layout()
+        fig.savefig(output_dir / f"{filename}.pdf", bbox_inches="tight")
+        fig.savefig(output_dir / f"{filename}.png", dpi=300, bbox_inches="tight")
+        plt.close(fig)
+
+    draw(relative=False, filename="operator_rate_vs_input_bytes")
+    draw(relative=True, filename="operator_relative_rate_vs_input_bytes")
 
 
 def parse_args() -> argparse.Namespace:

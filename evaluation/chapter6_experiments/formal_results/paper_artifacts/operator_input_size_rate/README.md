@@ -26,7 +26,10 @@ that the curves exhibit two different scaling behaviors.
 
 ## Files
 
-- `operator_rate_vs_input_bytes.pdf` and `.png`: publication figure.
+- `operator_rate_vs_input_bytes.pdf` and `.png`: absolute-rate publication
+  figure.
+- `operator_relative_rate_vs_input_bytes.pdf` and `.png`: relative-rate
+  publication figure; each operator's smallest-input rate is normalized to 1.
 - `raw_results.csv`: scalar table used for plotting.
 - `raw_results.json`: complete repeats and timing data.
 - `metadata.json`: dataset hash, operator order, input coverage, fitted
