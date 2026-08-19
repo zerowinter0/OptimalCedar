@@ -23,7 +23,7 @@ COCO_SAMPLES="${COCO_SAMPLES:-5000}"
 COCO_DATASET_KWARGS="${COCO_DATASET_KWARGS:-split=val2017}"
 ALPACA_COT_SAMPLES="${ALPACA_COT_SAMPLES:-20000}"
 REDPAJAMA_ARXIV_SAMPLES="${REDPAJAMA_ARXIV_SAMPLES:-20000}"
-GENERAL_VIDEO_REFINE_SAMPLES="${GENERAL_VIDEO_REFINE_SAMPLES:-10000}"
+GENERAL_VIDEO_REFINE_SAMPLES="${GENERAL_VIDEO_REFINE_SAMPLES:-5000}"
 VIDEO_SELF_EVOLUTION_SAMPLES="${VIDEO_SELF_EVOLUTION_SAMPLES:-5000}"
 PILE_EUROPARL_SAMPLES="${PILE_EUROPARL_SAMPLES:-2500}"
 PILE_HACKERNEWS_SAMPLES="${PILE_HACKERNEWS_SAMPLES:-20000}"
@@ -298,6 +298,7 @@ write_metadata() {
       printf 'scenario=general_video_text_quality_refinement\n'
       printf 'gpu=single_RTX_A6000_shared_by_all_optimizers\n'
       printf 'sample_construction=caption_round_then_numeric_video_id\n'
+      printf 'scale_note=reduced_protocol_5000_outputs_to_fit_unified_one_hour_budget\n'
     fi
     if [[ "${workload}" == "video_self_evolution" ]]; then
       printf 'data_source=nisav/MSR-VTT@a9c822473969ee469e224da2187fda193c62e960\n'

@@ -14,9 +14,9 @@ warmed independently, and warmup is excluded from reported execution time.
 
 | Paper figure | Canonical figure | Source data |
 |---|---|---|
-| Optimizer execution | `figures/optimizer_execution.pdf` | `optimizer/data/`, `optimizer/profiles/` |
+| Optimizer execution | `figures/optimizer_execution.pdf` | `optimizer/data/formal_seven/` |
 | Cross-system execution | `figures/cross_system_execution_time.pdf` | `cross_system/results/`, `cross_system/status/`, optimizer TSV |
-| Optimizer overhead | `figures/optimizer_overhead.pdf` | `optimizer/data/`, `optimizer/profiles/` |
+| Optimizer overhead | `figures/optimizer_overhead.pdf` | `optimizer/data/formal_seven/` |
 | DP scalability and exactness | `figures/dp_search_evaluation.pdf` | `search/data/` |
 | Cost-model accuracy | `figures/cost_model_accuracy.pdf` | `cost_model/analysis.json`, `optimizer/data/` |
 
@@ -29,12 +29,9 @@ directories retain their own source tables and editable figure formats.
 Run inside `optimalcedar-torch201-dev` after `source env/bin/activate`:
 
 ```bash
-# Optimizer execution and overhead
-python evaluation/chapter6_experiments/plot_latest_optimizer_dp_cedar_baseline.py \
-  --candidate-report evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/data_pipeline_matrix.json \
-  --scaled-run evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/enlarged_core \
-  --paper-matrix evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/standard_core \
-  --dp-replacement-matrix evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/dp_no_wall_clock \
+# Optimizer execution and overhead (seven optimizers, eight workloads)
+python evaluation/chapter6_experiments/plot_formal_seven_optimizer_matrix.py \
+  --matrix-root evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/data/formal_seven/matrix \
   --output-dir evaluation/chapter6_experiments/formal_results/paper_artifacts/optimizer/figures
 
 # Cross-system absolute execution time

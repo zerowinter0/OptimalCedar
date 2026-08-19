@@ -1,0 +1,8 @@
+{
+  "optimizer": "optimizer",
+  "repeat": 1,
+  "status": "timeout",
+  "reason": "unified_task_timeout_during_optimization",
+  "task_timeout_sec": 3600,
+  "task_boundary": "optimization_plus_first_execution"
+}

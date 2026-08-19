@@ -1,0 +1,122 @@
+physical_plan:
+  graph:
+    10: '21'
+    11: '10'
+    12: '11'
+    13: '12'
+    14: '13'
+    15: '14'
+    16: '15'
+    17: '16'
+    18: '17'
+    19: '18'
+    20: ''
+    21: '20'
+  n_local_workers: 8
+  pipes:
+    0:
+      name: MapperPipe_extract_output_text
+      variant: INPROCESS
+    1:
+      name: MapperPipe_sync_text_key
+      variant: INPROCESS
+    2:
+      name: FilterPipe_WordRepetitionFilter
+      variant: INPROCESS
+    3:
+      name: FilterPipe_WordsNumFilter
+      variant: INPROCESS
+    4:
+      name: FilterPipe_TextLengthFilter
+      variant: INPROCESS
+    5:
+      name: FilterPipe_SpecialCharactersFilter
+      variant: INPROCESS
+    6:
+      name: FilterPipe_PerplexityFilter
+      variant: INPROCESS
+    7:
+      name: FilterPipe_MaximumLineLengthFilter
+      variant: INPROCESS
+    8:
+      name: FilterPipe_LanguageIDScoreFilter
+      variant: INPROCESS
+    9:
+      name: FilterPipe_FlaggedWordsFilter
+      variant: INPROCESS
+    10:
+      name: FilterPipe_CharacterRepetitionFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    11:
+      name: FilterPipe_AverageLineLengthFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    12:
+      name: FilterPipe_AlphanumericFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    13:
+      name: MapperPipe_WhitespaceNormalizationMapper
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    14:
+      name: MapperPipe_PunctuationNormalizationMapper
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    15:
+      name: MapperPipe_FixUnicodeMapper
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    16:
+      name: MapperPipe_CleanLinksMapper
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    17:
+      name: MapperPipe_CleanEmailMapper
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    18:
+      name: MapperPipe_parse_json_line
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    19:
+      name: LocalLinePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    20:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    21:
+      fused_pipes:
+      - 9
+      - 8
+      - 7
+      - 6
+      - 5
+      - 4
+      - 3
+      - 2
+      - 1
+      - 0
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 4
+        use_threads: true
+        variant_type: RAY

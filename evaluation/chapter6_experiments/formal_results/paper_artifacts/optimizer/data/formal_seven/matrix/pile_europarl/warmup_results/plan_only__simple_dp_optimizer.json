@@ -1,0 +1,76 @@
+{
+  "dataset_file": "evaluation/pipelines/pile_europarl/cedar_dataset.py",
+  "dataset_func": "get_dataset",
+  "profiled_stats": "/workspace/OptimalCedar/outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_europarl.yaml",
+  "all_optimizer_passes_enabled": true,
+  "controller_enabled": false,
+  "local_parallelism_enabled": true,
+  "offload_enabled": true,
+  "ray_enabled": true,
+  "ray_ip": "127.0.0.1:6379",
+  "ray_cluster_resources": {
+    "node:172.23.166.103": 1.0,
+    "node:__internal_head__": 1.0,
+    "memory": 729947908300.0,
+    "CPU": 64.0,
+    "object_store_memory": 65280856883.0,
+    "GPU": 1.0,
+    "accelerator_type:RTX": 1.0
+  },
+  "caching_enabled": false,
+  "ray_available_parallelism": null,
+  "match_profile_resources": true,
+  "fixed_local_workers_ablation": 8,
+  "cpu_budget": 64,
+  "optimizer_time_limit_sec": 3600,
+  "optimizer_rss_limit_bytes": 405078136832,
+  "cedar_runs_last": false,
+  "execution_order_policy": "round_robin",
+  "execution_order_by_repeat": [
+    [
+      "simple_dp_optimizer"
+    ]
+  ],
+  "cedar_runtime_timeout_enabled": false,
+  "cedar_timeout_multiplier": 1.0,
+  "profile_complete": true,
+  "plan_only": true,
+  "calculate_plan_cost": false,
+  "workload_skipped": true,
+  "num_repeats": 1,
+  "requested_num_total_samples": 2500,
+  "data_num_total_samples": 2500,
+  "perf_excludes_setup_and_optimization": true,
+  "perf_excludes_cache_warmup": false,
+  "runs": [
+    {
+      "optimizer": "simple_dp_optimizer",
+      "setup_time_sec": 38.255760899046436,
+      "workload_wall_time_sec": 0.0,
+      "total_time_sec": 38.255760899046436,
+      "perf_time_sec": 0.0,
+      "num_samples": 0,
+      "throughput_samples_per_sec": 0.0,
+      "time_per_sample_us": 0.0,
+      "raw_workload_results": null,
+      "workload_skipped": true,
+      "skip_reason": "plan_only",
+      "num_repeats": 1,
+      "repeat_results": [
+        {
+          "optimizer": "simple_dp_optimizer",
+          "setup_time_sec": 38.255760899046436,
+          "workload_wall_time_sec": 0.0,
+          "total_time_sec": 38.255760899046436,
+          "perf_time_sec": 0.0,
+          "num_samples": 0,
+          "throughput_samples_per_sec": 0.0,
+          "time_per_sample_us": 0.0,
+          "raw_workload_results": null,
+          "workload_skipped": true,
+          "skip_reason": "plan_only"
+        }
+      ]
+    }
+  ]
+}

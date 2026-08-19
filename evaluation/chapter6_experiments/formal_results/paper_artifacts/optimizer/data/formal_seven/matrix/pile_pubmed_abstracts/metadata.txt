@@ -1,0 +1,16 @@
+ablation=fixed_local_workers_w8
+measurement_protocol=fixed_w8_3_round_robin_repeats
+profile_source=outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_pubmed_abstracts.yaml
+cpu_budget=64
+dp_runtime_cpu_reserve_per_worker=1
+local_workers=8
+repeats=3
+task_timeout_sec=3600
+task_boundary=optimization_plus_first_execution
+timeout_policy=skip_remaining_repeats_and_continue_matrix
+cache=off
+samples=20000
+optimizers=optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer
+dp_objective=throughput_bottleneck_pareto
+dp_pareto_global_epsilon=0.10
+dataset_kwargs=dataset_path=datasets/pile_pubmed_abstracts/pile-pubmed-abstracts-raw-100000.jsonl

@@ -1,0 +1,6 @@
+{
+  "optimizer": "pecan_two_stage_optimizer",
+  "status": "unavailable",
+  "reason": "plan_generation_timeout",
+  "timeout_sec": 3600
+}

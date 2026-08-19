@@ -1,0 +1,224 @@
+physical_plan:
+  graph:
+    2: '9'
+    3: '2'
+    5: '8'
+    6: '5'
+    7: '21'
+    8: '7'
+    9: '10'
+    10: '12'
+    12: '6'
+    19: '20'
+    20: '3'
+    21: '22'
+    22: ''
+  n_local_workers: 8
+  pipes:
+    0:
+      name: MapperPipe_extract_output_text
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    1:
+      name: MapperPipe_sync_text_key
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    2:
+      name: FilterPipe_WordRepetitionFilter
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    3:
+      name: FilterPipe_WordsNumFilter
+      variant: RAY
+      variant_ctx:
+        max_inflight: 597
+        max_prefetch: 597
+        n_actors: 1
+        submit_batch_size: 199
+        use_threads: true
+        variant_type: RAY
+    4:
+      name: FilterPipe_TextLengthFilter
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    5:
+      name: FilterPipe_SpecialCharactersFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    6:
+      name: FilterPipe_PerplexityFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    7:
+      name: FilterPipe_MaximumLineLengthFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    8:
+      name: FilterPipe_LanguageIDScoreFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      name: FilterPipe_FlaggedWordsFilter
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    10:
+      name: FilterPipe_CharacterRepetitionFilter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    11:
+      name: FilterPipe_AverageLineLengthFilter
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    12:
+      name: FilterPipe_AlphanumericFilter
+      variant: RAY
+      variant_ctx:
+        max_inflight: 507
+        max_prefetch: 507
+        n_actors: 1
+        submit_batch_size: 169
+        use_threads: true
+        variant_type: RAY
+    13:
+      name: MapperPipe_WhitespaceNormalizationMapper
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    14:
+      name: MapperPipe_PunctuationNormalizationMapper
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    15:
+      name: MapperPipe_FixUnicodeMapper
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    16:
+      name: MapperPipe_CleanLinksMapper
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    17:
+      name: MapperPipe_CleanEmailMapper
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    18:
+      name: MapperPipe_parse_json_line
+      variant: RAY
+      variant_ctx:
+        max_inflight: 100
+        max_prefetch: 100
+        n_actors: 1
+        submit_batch_size: 30
+        use_threads: true
+        variant_type: RAY
+    19:
+      name: LocalLinePipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    20:
+      fused_pipes:
+      - 18
+      - 17
+      - 16
+      - 15
+      - 14
+      - 13
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 408
+        max_prefetch: 408
+        n_actors: 1
+        submit_batch_size: 136
+        use_threads: true
+        variant_type: RAY
+    21:
+      fused_pipes:
+      - 11
+      - 4
+      - 1
+      - 0
+      name: FusedPipe
+      variant: RAY
+      variant_ctx:
+        max_inflight: 654
+        max_prefetch: 654
+        n_actors: 1
+        submit_batch_size: 218
+        use_threads: true
+        variant_type: RAY
+    22:
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS

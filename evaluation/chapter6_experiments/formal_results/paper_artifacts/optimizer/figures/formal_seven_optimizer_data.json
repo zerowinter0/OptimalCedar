@@ -1,0 +1,921 @@
+{
+  "alpaca_cot": {
+    "label": "Alpaca-CoT",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "data_juicer_reference_commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+      "data_source": "QingyiSi/Alpaca-CoT@18add89e3b884703ec869a5c6e2bcf1412ee7edc/Chain-of-Thought/CoT_data.json",
+      "dataset_kwargs": "dataset_path=datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "omitted_operators": "document_deduplicator,document_simhash_deduplicator",
+      "operator_count": "8",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/alpaca_cot.yaml",
+      "repeats": "3",
+      "samples": "20000",
+      "scenario": "instruction_reasoning",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 8,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          28.86085680499673,
+          28.859987949952483,
+          29.187767673982307
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 28.969537476310506,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.18899339435328666,
+        "setup_sec": 2.7622294740285724,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [
+          68.55271486798301,
+          67.10951679595746,
+          69.31384249194525
+        ],
+        "label": "DJ-TS",
+        "mean_execution_sec": 68.32535805196191,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 1.1196121135649861,
+        "setup_sec": 15.940968620823696,
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          69.19473747396842,
+          68.3623422391247,
+          70.28771218494512
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 69.28159729934607,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.9656194017394283,
+        "setup_sec": 3.4947647941298783,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [
+          28.666634110035375,
+          29.17603043001145,
+          28.73680133698508
+        ],
+        "label": "Cedar",
+        "mean_execution_sec": 28.859821959010635,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.27608279153898396,
+        "setup_sec": 2.7519510919228196,
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          28.961800331948325,
+          28.739258545916528,
+          29.17556436592713
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 28.95887441459733,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.2181676256643953,
+        "setup_sec": 2.945988604100421,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [
+          67.57969341799617,
+          68.78820766508579,
+          71.76583052403294
+        ],
+        "label": "Pecan-TS",
+        "mean_execution_sec": 69.37791053570497,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 2.1544716462155726,
+        "setup_sec": 15.832860432099551,
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          28.759409036953002,
+          29.060729371849447,
+          28.979420435149223
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 28.933186281317223,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.15588997334962618,
+        "setup_sec": 2.8132992000319064,
+        "status": "success"
+      }
+    }
+  },
+  "general_video_refine": {
+    "label": "GenerateVideo",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "data_juicer_recipe": "datajuicer/data-juicer-hub@47fc34588b5d4258c13747cea37c2b63cf4e11b0/refined_recipes/video/general-video-refine-example.yaml",
+      "data_source": "nisav/MSR-VTT@a9c822473969ee469e224da2187fda193c62e960",
+      "dataset_kwargs": "dataset_path=datasets/general_video_refine/msrvtt-video-text-200000.jsonl,video_root=datasets/general_video_refine/videos",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "gpu": "single_RTX_A6000_shared_by_all_optimizers",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "operator_count": "7",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/general_video_refine.yaml",
+      "repeats": "3",
+      "sample_construction": "caption_round_then_numeric_video_id",
+      "samples": "5000",
+      "scale_note": "reduced_protocol_5000_outputs_to_fit_unified_one_hour_budget",
+      "scenario": "general_video_text_quality_refinement",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 10,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          1012.4376478521153,
+          1033.0166386989877,
+          1082.372930760961
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 1042.6090724373546,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 35.94088253860487,
+        "setup_sec": 2.9347712569870055,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [
+          1730.4257808821276,
+          1783.121828192845,
+          1772.8017549770884
+        ],
+        "label": "DJ-TS",
+        "mean_execution_sec": 1762.1164546840203,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 27.92579600133401,
+        "setup_sec": 317.9987058872357,
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          1532.073786011897,
+          1535.6215691477992,
+          1547.6115055209957
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 1538.4356202268973,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 8.142133902895878,
+        "setup_sec": 3.6052385810762644,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [
+          1287.3718079277314,
+          1355.2758648321033,
+          1379.6959968870506
+        ],
+        "label": "Cedar",
+        "mean_execution_sec": 1340.7812232156284,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 47.83837312703631,
+        "setup_sec": 3.9531115000136197,
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          1068.4045741008595,
+          1145.208764769137,
+          1059.7297565629706
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 1091.1143651443224,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 47.04748843355798,
+        "setup_sec": 2.8614475377835333,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 5000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 316.64159104181454,
+        "status": "execution_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          2058.364505269099,
+          2052.6003528838046,
+          2135.6061469698325
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 2082.190335040912,
+        "repeats": 3,
+        "samples": 5000,
+        "sd_execution_sec": 46.34914331678175,
+        "setup_sec": 2.9744135569781065,
+        "status": "success"
+      }
+    }
+  },
+  "pile_europarl": {
+    "label": "EuroParl",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "dataset_kwargs": "dataset_path=datasets/pile_europarl/pile-europarl-raw.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_europarl.yaml",
+      "repeats": "3",
+      "samples": "2500",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          1835.468511643121,
+          1834.725991284009,
+          1834.5276528790127
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 1834.9073852687143,
+        "repeats": 3,
+        "samples": 2500,
+        "sd_execution_sec": 0.4959653584326842,
+        "setup_sec": 3.080059881089255,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 2500,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          652.8227207611781,
+          655.368159570964,
+          653.7860796370078
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 653.9923199897166,
+        "repeats": 3,
+        "samples": 2500,
+        "sd_execution_sec": 1.2851910347902695,
+        "setup_sec": 319.2432373079937,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [],
+        "label": "Cedar",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 2500,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          2402.5271991579793,
+          2411.9235105200205,
+          2410.12765422184
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 2408.192787966613,
+        "repeats": 3,
+        "samples": 2500,
+        "sd_execution_sec": 4.988030410123584,
+        "setup_sec": 3.1054994470905513,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 2500,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          1831.3050699471496,
+          1829.5641508880071,
+          1830.194964333903
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 1830.3547283896867,
+        "repeats": 3,
+        "samples": 2500,
+        "sd_execution_sec": 0.8813870930310264,
+        "setup_sec": 38.255760899046436,
+        "status": "success"
+      }
+    }
+  },
+  "pile_hackernews": {
+    "label": "HN",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "dataset_kwargs": "dataset_path=datasets/pile_hackernews/pile-hackernews-raw-100000.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_hackernews.yaml",
+      "repeats": "3",
+      "samples": "20000",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 18,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          1306.178437385941,
+          1304.9356663702056,
+          1301.8767168708146
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 1304.3302735423204,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 2.213837212761116,
+        "setup_sec": 3.1310257259756327,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          462.84122256888077,
+          463.5602124868892,
+          464.89945582393557
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 463.7669636265685,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 1.0445767364690777,
+        "setup_sec": 440.3778700311668,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [],
+        "label": "Cedar",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          1306.0491397820879,
+          1298.4064402077347,
+          1303.4107552981004
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 1302.622111762641,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 3.8819045796452785,
+        "setup_sec": 3.0868436070159078,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          475.2840895820409,
+          474.71310760313645,
+          473.97352118371055
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 474.65690612296265,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.6570892910829148,
+        "setup_sec": 35.67945054080337,
+        "status": "success"
+      }
+    }
+  },
+  "pile_pubmed_abstracts": {
+    "label": "PubMed",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "dataset_kwargs": "dataset_path=datasets/pile_pubmed_abstracts/pile-pubmed-abstracts-raw-100000.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_pubmed_abstracts.yaml",
+      "repeats": "3",
+      "samples": "20000",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          306.5180420349352,
+          303.9896914768033,
+          304.4878215957433
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 304.9985183691606,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 1.339308602221923,
+        "setup_sec": 3.0799869522452354,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          115.66978698596358,
+          115.61951805092394,
+          115.0756408739835
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 115.45498197029035,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.32947912220345865,
+        "setup_sec": 1436.0785239958204,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [],
+        "label": "Cedar",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          306.05331488279626,
+          305.1720841550268,
+          306.2258314099163
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 305.81707681591314,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.5652009708769778,
+        "setup_sec": 3.1495044552721083,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          208.3524462156929,
+          207.50825811224058,
+          207.75885440781713
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 207.8731862452502,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.4335518599783957,
+        "setup_sec": 38.26397709734738,
+        "status": "success"
+      }
+    }
+  },
+  "pile_uspto_backgrounds": {
+    "label": "USPTO",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "dataset_kwargs": "dataset_path=datasets/pile_uspto_backgrounds/pile-uspto-backgrounds-raw-100000.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/pile_uspto_backgrounds.yaml",
+      "repeats": "3",
+      "samples": "20000",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          825.0343332160264,
+          825.9824049929157,
+          830.1417251913808
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 827.052821133441,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 2.7167455222934356,
+        "setup_sec": 3.100368927232921,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          304.14306712476537,
+          303.56181185599416,
+          302.8788616149686
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 303.5279135319094,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.6327840982767546,
+        "setup_sec": 2008.0797957959585,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [],
+        "label": "Cedar",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          887.9666611310095,
+          887.2925465158187,
+          886.7883502012119
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 887.3491859493466,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.5911938606691494,
+        "setup_sec": 3.056043456774205,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          797.1681532319635,
+          799.3019186449237,
+          798.5952949319035
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 798.3551222695969,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 1.0869686702825783,
+        "setup_sec": 38.51264827186242,
+        "status": "success"
+      }
+    }
+  },
+  "redpajama_code": {
+    "label": "RP-Code",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "dataset_kwargs": "dataset_path=datasets/redpajama_code/redpajama-github-raw-50000.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/redpajama_code.yaml",
+      "repeats": "3",
+      "samples": "20000",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 17,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          463.73578014364466,
+          458.9333688542247,
+          461.7923971801065
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 461.4871820593253,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 2.415710195915941,
+        "setup_sec": 3.004531196318567,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          243.62899545999244,
+          245.03436809498817,
+          244.55999339185655
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 244.40778564894572,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.7149429757331818,
+        "setup_sec": 92.7326147519052,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [
+          555.885408454109,
+          557.4989220928401,
+          553.7538240011781
+        ],
+        "label": "Cedar",
+        "mean_execution_sec": 555.7127181827091,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 1.8785117450842808,
+        "setup_sec": 19.338124770205468,
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          465.70866230595857,
+          465.77081599086523,
+          466.8880045991391
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 466.1224942986543,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.6636793542427786,
+        "setup_sec": 3.0457842922769487,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 20000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          580.8441290347837,
+          580.698560367804,
+          579.7656085961498
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 580.4360993329125,
+        "repeats": 3,
+        "samples": 20000,
+        "sd_execution_sec": 0.5852058870730739,
+        "setup_sec": 4.769259937573224,
+        "status": "success"
+      }
+    }
+  },
+  "stackexchange": {
+    "label": "StackEx",
+    "metadata": {
+      "ablation": "fixed_local_workers_w8",
+      "cache": "off",
+      "cpu_budget": "64",
+      "data_juicer_reference_commit": "bb3d88aac183cc22b6f816262a812a9e5d5abb57",
+      "dataset_kwargs": "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl",
+      "dp_objective": "throughput_bottleneck_pareto",
+      "dp_pareto_global_epsilon": "0.10",
+      "dp_runtime_cpu_reserve_per_worker": "1",
+      "local_workers": "8",
+      "measurement_protocol": "fixed_w8_3_round_robin_repeats",
+      "omitted_operator": "document_simhash_deduplicator",
+      "optimizers": "optimizer dj_optimizer pecan_optimizer dj_two_stage_optimizer pecan_two_stage_optimizer simple_dp_optimizer dp_optimizer",
+      "profile_source": "outputs/chapter6_experiments/operator_scaling_two_stage_study/profiles/stackexchange.yaml",
+      "repeats": "3",
+      "samples": "10000",
+      "scale_note": "bounded_unique_redpajama_stackexchange_35000_source_for_10000_outputs",
+      "task_boundary": "optimization_plus_first_execution",
+      "task_timeout_sec": "3600",
+      "timeout_policy": "skip_remaining_repeats_and_continue_matrix"
+    },
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_times_sec": [
+          280.5406561109703,
+          279.9033984139096,
+          281.7704411421437
+        ],
+        "label": "DJ",
+        "mean_execution_sec": 280.7381652223412,
+        "repeats": 3,
+        "samples": 10000,
+        "sd_execution_sec": 0.949062444767904,
+        "setup_sec": 2.871055976022035,
+        "status": "success"
+      },
+      "dj_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "DJ-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 10000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "dp_optimizer": {
+        "execution_times_sec": [
+          190.36986732995138,
+          192.0637783491984,
+          190.6578777260147
+        ],
+        "label": "PICO",
+        "mean_execution_sec": 191.03050780172148,
+        "repeats": 3,
+        "samples": 10000,
+        "sd_execution_sec": 0.9063517613336226,
+        "setup_sec": 669.8924658210017,
+        "status": "success"
+      },
+      "optimizer": {
+        "execution_times_sec": [],
+        "label": "Cedar",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 10000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_times_sec": [
+          391.29586711805314,
+          392.5141503440682,
+          391.9306785929948
+        ],
+        "label": "Pecan",
+        "mean_execution_sec": 391.91356535170536,
+        "repeats": 3,
+        "samples": 10000,
+        "sd_execution_sec": 0.6093218787865571,
+        "setup_sec": 2.8522228049114347,
+        "status": "success"
+      },
+      "pecan_two_stage_optimizer": {
+        "execution_times_sec": [],
+        "label": "Pecan-TS",
+        "mean_execution_sec": null,
+        "repeats": 0,
+        "samples": 10000,
+        "sd_execution_sec": 0.0,
+        "setup_sec": 3600.0,
+        "status": "plan_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_times_sec": [
+          392.9797622929327,
+          394.896643636981,
+          391.8069514269009
+        ],
+        "label": "Simple-DP",
+        "mean_execution_sec": 393.2277857856049,
+        "repeats": 3,
+        "samples": 10000,
+        "sd_execution_sec": 1.5597070968439533,
+        "setup_sec": 37.70592607092112,
+        "status": "success"
+      }
+    }
+  }
+}
