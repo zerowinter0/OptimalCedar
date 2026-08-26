@@ -12,6 +12,7 @@ from typing import Tuple, Dict, Set, Optional, List, Any, Union
 from cedar.pipes import (
     CedarPipeSpec,
     Pipe,
+    PipeExecutionResource,
     PipeVariantType,
     PipeVariantContext,
     PipeVariantContextFactory,
@@ -105,11 +106,13 @@ class PipeDesc:
         variant_type: Optional[PipeVariantType] = None,
         variant_ctx: Optional[PipeVariantContext] = None,
         fused_pipes: Optional[List[int]] = None,
+        execution_resource: PipeExecutionResource = PipeExecutionResource.CPU,
     ) -> None:
         self.name = name
         self.variant_type = variant_type
         self.variant_ctx = variant_ctx
         self.fused_pipes = fused_pipes
+        self.execution_resource = PipeExecutionResource(execution_resource)
 
     def serialize(self) -> Dict[str, Any]:
         """
@@ -123,6 +126,7 @@ class PipeDesc:
             d["variant_ctx"] = self.variant_ctx.serialize()
         if self.fused_pipes is not None:
             d["fused_pipes"] = self.fused_pipes
+        d["execution_resource"] = self.execution_resource.value
 
         return d
 
@@ -192,11 +196,15 @@ class PhysicalPlan:
                 if "fused_pipes" not in pipe_dict:
                     raise ValueError(f"Fused pipes not supplied in dict {d}.")
             fused_pipes = pipe_dict.get("fused_pipes", None)
+            execution_resource = PipeExecutionResource(
+                pipe_dict.get("execution_resource", "cpu")
+            )
             desc = PipeDesc(
                 name=pipe_name,
                 variant_type=variant_type,
                 variant_ctx=variant_ctx,
                 fused_pipes=fused_pipes,
+                execution_resource=execution_resource,
             )
             pipe_descs[p_id] = desc
 
@@ -264,7 +272,10 @@ class Optimizer:
         # Create a pipedesc for each logical pipe
         pipe_descs = {}
         for p_id, pipe in logical_pipes.items():
-            desc = PipeDesc(name=pipe.get_logical_name())
+            desc = PipeDesc(
+                name=pipe.get_logical_name(),
+                execution_resource=pipe.execution_resource,
+            )
             pipe_descs[p_id] = desc
 
         graph = copy.deepcopy(logical_adj_list)  # deep copy the adj list
@@ -1986,6 +1997,15 @@ class Optimizer:
             variant_type=variant_type,
             variant_ctx=variant_ctx,
             fused_pipes=p_ids,
+            execution_resource=(
+                PipeExecutionResource.CUDA
+                if any(
+                    self.physical_plan.pipe_descs[p_id].execution_resource
+                    == PipeExecutionResource.CUDA
+                    for p_id in p_ids
+                )
+                else PipeExecutionResource.CPU
+            ),
         )
 
         new_p_id = self._get_new_p_id()

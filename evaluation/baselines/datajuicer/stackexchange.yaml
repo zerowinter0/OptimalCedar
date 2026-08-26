@@ -2,7 +2,7 @@
 # Source recipe: datajuicer/data-juicer-hub@47fc34588b5d4258c13747cea37c2b63cf4e11b0
 # refined_recipes/pretrain/redpajama-pile-stackexchange-refine.yaml
 project_name: optimalcedar-stackexchange
-dataset_path: /workspace/OptimalCedar/datasets/stackexchange/redpajama-stackexchange-35000.jsonl
+dataset_path: /workspace/OptimalCedar/datasets/stackexchange/redpajama-stackexchange-400000.jsonl
 export_path: /tmp/optimalcedar-datajuicer/stackexchange.jsonl
 np: 64
 text_keys: text

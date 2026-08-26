@@ -172,8 +172,20 @@ def legend_handles() -> list[Patch]:
     return handles
 
 
-def draw_execution(matrix: dict[str, Any], output_dir: Path) -> None:
-    fig, axes = plt.subplots(2, 4, figsize=(10.8, 5.25))
+def draw_execution(
+    matrix: dict[str, Any],
+    output_dir: Path,
+    *,
+    ncols: int = 4,
+    stem: str = "formal_seven_optimizer_execution",
+) -> None:
+    nrows = math.ceil(len(WORKLOADS) / ncols)
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(2.7 * ncols, 2.625 * nrows),
+        squeeze=False,
+    )
     for ax, (workload, label, operator_count) in zip(axes.flat, WORKLOADS):
         items = matrix[workload]["optimizers"]
         successes = [
@@ -226,13 +238,15 @@ def draw_execution(matrix: dict[str, Any], output_dir: Path) -> None:
         ax.set_xticks([])
         ax.set_title(f"{label} ({operator_count} ops)", loc="left", pad=2)
         style(ax)
+    for ax in axes.flat[len(WORKLOADS) :]:
+        ax.set_visible(False)
     for ax in axes[:, 0]:
         ax.set_ylabel("Execution time (s)")
     fig.legend(
         handles=legend_handles(),
         loc="upper center",
         bbox_to_anchor=(0.5, 1.015),
-        ncol=8,
+        ncol=min(len(legend_handles()), 9),
         frameon=False,
         columnspacing=0.9,
         handlelength=1.6,
@@ -243,11 +257,23 @@ def draw_execution(matrix: dict[str, Any], output_dir: Path) -> None:
         fontsize=9,
     )
     fig.subplots_adjust(top=0.86, bottom=0.07, left=0.065, right=0.995, hspace=0.34, wspace=0.28)
-    save(fig, output_dir, "formal_seven_optimizer_execution")
+    save(fig, output_dir, stem)
 
 
-def draw_overhead(matrix: dict[str, Any], output_dir: Path) -> None:
-    fig, axes = plt.subplots(2, 4, figsize=(10.8, 5.25))
+def draw_overhead(
+    matrix: dict[str, Any],
+    output_dir: Path,
+    *,
+    ncols: int = 4,
+    stem: str = "formal_seven_optimizer_overhead",
+) -> None:
+    nrows = math.ceil(len(WORKLOADS) / ncols)
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(2.7 * ncols, 2.625 * nrows),
+        squeeze=False,
+    )
     for ax, (workload, label, operator_count) in zip(axes.flat, WORKLOADS):
         items = matrix[workload]["optimizers"]
         for index, (optimizer, _optimizer_label, color, hatch) in enumerate(
@@ -285,13 +311,15 @@ def draw_overhead(matrix: dict[str, Any], output_dir: Path) -> None:
         ax.set_xticks([])
         ax.set_title(f"{label} ({operator_count} ops)", loc="left", pad=2)
         style(ax)
+    for ax in axes.flat[len(WORKLOADS) :]:
+        ax.set_visible(False)
     for ax in axes[:, 0]:
         ax.set_ylabel("Optimization time (s)")
     fig.legend(
         handles=legend_handles(),
         loc="upper center",
         bbox_to_anchor=(0.5, 1.015),
-        ncol=8,
+        ncol=min(len(legend_handles()), 9),
         frameon=False,
         columnspacing=0.9,
         handlelength=1.6,
@@ -302,7 +330,7 @@ def draw_overhead(matrix: dict[str, Any], output_dir: Path) -> None:
         fontsize=9,
     )
     fig.subplots_adjust(top=0.86, bottom=0.07, left=0.065, right=0.995, hspace=0.34, wspace=0.28)
-    save(fig, output_dir, "formal_seven_optimizer_overhead")
+    save(fig, output_dir, stem)
 
 
 def save(fig, output_dir: Path, stem: str) -> None:

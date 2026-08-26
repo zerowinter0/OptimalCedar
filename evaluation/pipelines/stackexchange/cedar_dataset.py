@@ -28,7 +28,7 @@ from evaluation.pipelines.stackexchange import dj_operators as dj_ops
 
 
 DEFAULT_DATASET_PATH = pathlib.Path(
-    "datasets/stackexchange/redpajama-stackexchange-35000.jsonl"
+    "datasets/stackexchange/redpajama-stackexchange-400000.jsonl"
 )
 
 

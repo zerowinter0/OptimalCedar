@@ -51,6 +51,10 @@ def test_mixed_plan_uses_final_active_stages_and_budget():
         "smp_procs_per_stage_per_worker": 1,
         "global_ray_actors": 21,
         "global_smp_procs": 21,
+        "gpu_ray_stages": 0,
+        "global_gpu_actors": 0,
+        "gpu_fraction_per_actor": 0.0,
+        "total_accounted_gpus": 0.0,
         "total_accounted_cpus": 63,
     }
 

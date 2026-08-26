@@ -30,6 +30,8 @@ PILE_HACKERNEWS_SAMPLES="${PILE_HACKERNEWS_SAMPLES:-20000}"
 PILE_PUBMED_SAMPLES="${PILE_PUBMED_SAMPLES:-20000}"
 PILE_USPTO_SAMPLES="${PILE_USPTO_SAMPLES:-20000}"
 REDPAJAMA_CODE_SAMPLES="${REDPAJAMA_CODE_SAMPLES:-20000}"
+STACKEXCHANGE_SAMPLES="${STACKEXCHANGE_SAMPLES:-160000}"
+STACKEXCHANGE_DATASET_PATH="${STACKEXCHANGE_DATASET_PATH:-datasets/stackexchange/redpajama-stackexchange-400000.jsonl}"
 SELECTED_WORKLOADS="all"
 
 usage() {
@@ -51,6 +53,7 @@ OPTIMIZER_SET=dp_two_stage_only runs only dp_two_stage_optimizer.
 OPTIMIZER_SET=dj_two_stage_only runs only dj_two_stage_optimizer.
 OPTIMIZER_SET=simple_dp_only runs the joint DP with Cedar's original profile
 and cost model.
+OPTIMIZER_SET=pico_simple_gate compares PICO and Simple-DP round-robin.
 OPTIMIZER_SET=legacy_and_two_stage runs original Cedar and the DP two-stage
 ablation for supplementing older formal matrices.
 OPTIMIZER_SET=operator_scaling_study runs the revised DP optimizer plus
@@ -132,6 +135,9 @@ case "${OPTIMIZER_SET}" in
   simple_dp_only)
     OPTIMIZERS=(simple_dp_optimizer)
     ;;
+  pico_simple_gate)
+    OPTIMIZERS=(simple_dp_optimizer dp_optimizer)
+    ;;
   legacy_and_two_stage)
     OPTIMIZERS=(optimizer dp_two_stage_optimizer)
     ;;
@@ -185,7 +191,7 @@ if [[ ! "${TASK_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
   echo "TASK_TIMEOUT_SEC must be a positive integer: ${TASK_TIMEOUT_SEC}" >&2
   exit 2
 fi
-for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES; do
+for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES STACKEXCHANGE_SAMPLES; do
   sample_value="${!sample_setting}"
   if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
     echo "${sample_setting} must be a positive integer: ${sample_value}" >&2
@@ -261,8 +267,10 @@ write_metadata() {
     printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     if [[ " ${OPTIMIZERS[*]} " == *" dp_optimizer "* || " ${OPTIMIZERS[*]} " == *" pecan_two_stage_optimizer "* || " ${OPTIMIZERS[*]} " == *" dj_two_stage_optimizer "* ]]; then
-      printf 'dp_objective=throughput_bottleneck_pareto\n'
+      printf 'dp_objective=multi_bottleneck\n'
       printf 'dp_pareto_global_epsilon=%s\n' "${CEDAR_DP_PARETO_EPSILON:-0.10}"
+      printf 'dp_gpu_objective=single_shared_gpu_serial_service_demand\n'
+      printf 'ray_gpu_accounting=fractional_sum_exactly_one_gpu\n'
     fi
     printf 'dataset_kwargs=%s\n' "${kwargs}"
     if [[ "${workload}" == "alpaca_cot" || "${workload}" == "redpajama_arxiv" || "${workload}" == "video_self_evolution" || "${workload}" == "llava_pretrain" || "${workload}" == "redpajama_c4" || "${workload}" == "stackexchange" ]]; then
@@ -276,7 +284,8 @@ write_metadata() {
       printf 'scale_note=bounded_raw_c4_1975058466B_829916_source_for_20000_outputs\n'
     fi
     if [[ "${workload}" == "stackexchange" ]]; then
-      printf 'scale_note=bounded_unique_redpajama_stackexchange_35000_source_for_10000_outputs\n'
+      printf 'scale_note=bounded_unique_redpajama_stackexchange_400000_source_for_%s_outputs\n' \
+        "${STACKEXCHANGE_SAMPLES}"
       printf 'omitted_operator=document_simhash_deduplicator\n'
     fi
     if [[ "${workload}" == "alpaca_cot" ]]; then
@@ -835,8 +844,8 @@ run_workload redpajama_c4 \
   "dataset_path=datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl"
 run_workload stackexchange \
   evaluation/pipelines/stackexchange/cedar_dataset.py \
-  "${PROFILE_DIR}/stackexchange.yaml" 10000 off \
-  "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl"
+  "${PROFILE_DIR}/stackexchange.yaml" "${STACKEXCHANGE_SAMPLES}" off \
+  "dataset_path=${STACKEXCHANGE_DATASET_PATH}"
 run_workload alpaca_cot \
   evaluation/pipelines/alpaca_cot/cedar_dataset.py \
   "${PROFILE_DIR}/alpaca_cot.yaml" "${ALPACA_COT_SAMPLES}" off \

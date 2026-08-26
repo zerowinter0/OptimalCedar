@@ -11,12 +11,19 @@ from cedar.compose.dp_optimizer import (
 )
 from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
 from cedar.compose.my_optimizer import MyOptimizer
-from cedar.compose.optimizer import Optimizer, OptimizerOptions, PipeDesc
+from cedar.compose.optimizer import (
+    Optimizer,
+    OptimizerOptions,
+    PhysicalPlan,
+    PipeDesc,
+)
 from cedar.pipes import (
+    InProcessPipeVariantContext,
     MapperPipe,
     Pipe,
     PipeExecutionResource,
     PipeVariantType,
+    RayPipeVariantContext,
 )
 from cedar.sources import IterSource
 
@@ -180,6 +187,46 @@ def test_dp_final_ray_stages_use_cedar_batch_tuning(optimizer_cls):
         assert ctx.max_prefetch == expected_inflight
 
 
+def test_final_ray_batch_tuning_propagates_across_fused_stages():
+    optimizer = MyOptimizer()
+    optimizer.profiled_stats = {
+        "baseline": {"output_sizes": {0: 100.0}}
+    }
+    optimizer._data_size_ratio_map = {
+        1: 2.0,
+        2: 3.0,
+        3: 5.0,
+        4: 7.0,
+    }
+    optimizer.physical_plan = PhysicalPlan(
+        graph={0: {10}, 10: {11}, 11: set()},
+        pipe_descs={
+            0: PipeDesc(
+                "source",
+                PipeVariantType.INPROCESS,
+                InProcessPipeVariantContext(),
+            ),
+            10: PipeDesc(
+                "first_fused",
+                PipeVariantType.RAY,
+                RayPipeVariantContext(),
+                fused_pipes=[1, 2],
+            ),
+            11: PipeDesc(
+                "second_fused",
+                PipeVariantType.RAY,
+                RayPipeVariantContext(),
+                fused_pipes=[3, 4],
+            ),
+        },
+    )
+
+    sizes = optimizer._dp_final_stage_item_size_map()
+
+    assert sizes[10] == pytest.approx((100.0, 600.0))
+    assert sizes[11] == pytest.approx((600.0, 21_000.0))
+
+
 def test_cuda_operator_is_not_an_smp_candidate():
     feature = TwoMapFeature()
     feature.apply(IterSource([1, 2, 3]))
@@ -214,6 +261,11 @@ def test_cuda_operator_is_not_an_smp_candidate():
 
     assert PipeVariantType.RAY in variants
     assert PipeVariantType.SMP not in variants
+    assert PipeVariantType.INPROCESS not in variants
+    assert all(
+        candidate.execution_resource == PipeExecutionResource.CUDA
+        for candidate in provider.candidates_for(1 << cuda_idx)
+    )
 
 
 def test_single_smp_stage_pays_placement_dependent_boundary_cost():
@@ -311,9 +363,9 @@ def test_profiled_boundary_model_overrides_compatibility_constant():
         materializes_fusion=False,
     )
 
-    # Cedar overlaps up to 100 requests: 3/100 ms fixed latency plus
-    # 2,000 bytes / 2 MB/s = 1.03 ms steady-state service time.
-    assert optimizer._dp_stage_boundary_cost(0, block) == pytest.approx(1.03)
+    # SMP submits one sample per request. Queue capacity does not amortize the
+    # 3 ms task-level latency; 2,000 bytes / 2 MB/s adds 1 ms.
+    assert optimizer._dp_stage_boundary_cost(0, block) == pytest.approx(4.0)
 
 
 def test_profiled_ray_boundary_is_reused_for_tf_ray():

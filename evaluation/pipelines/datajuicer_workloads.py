@@ -18,7 +18,7 @@ DEFAULT_PATHS = {
         "datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl"
     ),
     "stackexchange": Path(
-        "datasets/stackexchange/redpajama-stackexchange-35000.jsonl"
+        "datasets/stackexchange/redpajama-stackexchange-400000.jsonl"
     ),
     "pile_europarl": Path(
         "datasets/pile_europarl/pile-europarl-raw.jsonl"

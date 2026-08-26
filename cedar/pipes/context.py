@@ -159,12 +159,14 @@ class RayPipeVariantContext(PipeVariantContext):
         use_threads: bool = True,
         submit_batch_size: int = 1,
         profile_backend_compute: bool = False,
+        num_gpus: float = 0.0,
     ):
         self.max_inflight = max_inflight
         self.max_prefetch = max_prefetch
         self.use_threads = use_threads
         self.n_actors = n_actors
         self.profile_backend_compute = profile_backend_compute
+        self.num_gpus = float(num_gpus)
         self.service = RayService(
             submit_batch_size=submit_batch_size,
             profile_backend_compute=profile_backend_compute,
@@ -180,6 +182,7 @@ class RayPipeVariantContext(PipeVariantContext):
         d["max_prefetch"] = self.max_prefetch
         d["use_threads"] = self.use_threads
         d["submit_batch_size"] = self.submit_batch_size
+        d["num_gpus"] = self.num_gpus
         return d
 
     def shutdown(self) -> None:
@@ -195,6 +198,7 @@ class RayPipeVariantContext(PipeVariantContext):
         self.profile_backend_compute = getattr(
             self, "profile_backend_compute", False
         )
+        self.num_gpus = float(getattr(self, "num_gpus", 0.0))
         self.service = RayService(
             submit_batch_size=self.submit_batch_size,
             profile_backend_compute=self.profile_backend_compute,
@@ -249,12 +253,14 @@ class TFRayPipeVariantContext(PipeVariantContext):
         submit_batch_size: int = 1,
         num_parallel_calls: Optional[int] = None,
         profile_backend_compute: bool = False,
+        num_gpus: float = 0.0,
     ):
         self.max_inflight = max_inflight
         self.max_prefetch = max_prefetch
         self.use_threads = use_threads
         self.n_actors = n_actors
         self.profile_backend_compute = profile_backend_compute
+        self.num_gpus = float(num_gpus)
         self.service = RayService(
             submit_batch_size=submit_batch_size,
             profile_backend_compute=profile_backend_compute,
@@ -272,6 +278,7 @@ class TFRayPipeVariantContext(PipeVariantContext):
         d["use_threads"] = self.use_threads
         d["submit_batch_size"] = self.submit_batch_size
         d["num_parallel_calls"] = self.num_parallel_calls
+        d["num_gpus"] = self.num_gpus
         return d
 
     def shutdown(self) -> None:
@@ -287,6 +294,7 @@ class TFRayPipeVariantContext(PipeVariantContext):
         self.profile_backend_compute = getattr(
             self, "profile_backend_compute", False
         )
+        self.num_gpus = float(getattr(self, "num_gpus", 0.0))
         self.service = RayService(
             submit_batch_size=self.submit_batch_size,
             profile_backend_compute=self.profile_backend_compute,
@@ -361,12 +369,14 @@ class PipeVariantContextFactory:
                 max_prefetch = spec.get("max_prefetch", 20)
                 use_threads = spec.get("use_threads", True)
                 submit_batch_size = spec.get("submit_batch_size", 10)
+                num_gpus = spec.get("num_gpus", 0.0)
                 return RayPipeVariantContext(
                     n_actors=n_actors,
                     max_inflight=max_inflight,
                     max_prefetch=max_prefetch,
                     use_threads=use_threads,
                     submit_batch_size=submit_batch_size,
+                    num_gpus=num_gpus,
                 )
         elif variant_type == PipeVariantType.TF:
             if spec is None:
@@ -386,6 +396,7 @@ class PipeVariantContextFactory:
                 use_threads = spec.get("use_threads", True)
                 submit_batch_size = spec.get("submit_batch_size", 10)
                 num_parallel_calls = spec.get("num_parallel_calls", None)
+                num_gpus = spec.get("num_gpus", 0.0)
                 return TFRayPipeVariantContext(
                     n_actors=n_actors,
                     max_inflight=max_inflight,
@@ -393,6 +404,7 @@ class PipeVariantContextFactory:
                     use_threads=use_threads,
                     submit_batch_size=submit_batch_size,
                     num_parallel_calls=num_parallel_calls,
+                    num_gpus=num_gpus,
                 )
         elif variant_type == PipeVariantType.RAY_DS:
             return RayDSPipeVariantContext()

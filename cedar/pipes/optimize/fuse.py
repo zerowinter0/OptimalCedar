@@ -23,7 +23,12 @@ from ..context import (
     TFPipeVariantContext,
     TFRayPipeVariantContext,
 )
-from ..common import MutationError, CedarPipeSpec, cedar_pipe
+from ..common import (
+    MutationError,
+    CedarPipeSpec,
+    PipeExecutionResource,
+    cedar_pipe,
+)
 from ..filter import is_dropped_sample
 from cedar.service import SMPActor, RayActor
 
@@ -74,6 +79,12 @@ class FusedOptimizerPipe(Pipe):
         fused_name = "FusedOptimizerPipe(" + fused_name + ")"
         logger.info(f"Created fused pipe {fused_name}")
         super().__init__(fused_name, pipes[0].input_pipes, is_random=is_random)
+
+        if any(
+            pipe.execution_resource == PipeExecutionResource.CUDA
+            for pipe in pipes
+        ):
+            self.set_execution_resource(PipeExecutionResource.CUDA)
 
         self.pipes = pipes
 
@@ -287,7 +298,9 @@ class RayFusedOptimizerPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return RayActorFusedOptimizerPipeVariant.remote(self.name, self.fn)
+        return RayActorFusedOptimizerPipeVariant.options(
+            num_gpus=self.variant_ctx.num_gpus
+        ).remote(self.name, self.fn)
 
     def _get_next_result(self, timeout: float = 1.0):
         while True:
@@ -408,7 +421,9 @@ class TFRayFusedOptimizerPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return TFRayActorFusedOptimizerPipeVariant.remote(
+        return TFRayActorFusedOptimizerPipeVariant.options(
+            num_gpus=self.variant_ctx.num_gpus
+        ).remote(
             self.name,
             self.fns,
             self.tf_spec,

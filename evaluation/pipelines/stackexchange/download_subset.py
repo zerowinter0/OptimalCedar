@@ -11,13 +11,15 @@ from pathlib import Path
 from datasets import load_dataset
 
 
-DEFAULT_OUTPUT = Path("datasets/stackexchange/redpajama-stackexchange-35000.jsonl")
+DEFAULT_OUTPUT = Path(
+    "datasets/stackexchange/redpajama-stackexchange-400000.jsonl"
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--max-samples", type=int, default=35_000)
+    parser.add_argument("--max-samples", type=int, default=400_000)
     args = parser.parse_args()
     if args.max_samples <= 0:
         parser.error("--max-samples must be positive")

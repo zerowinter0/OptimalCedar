@@ -16,6 +16,7 @@ import math
 import multiprocessing as mp
 import os
 import pathlib
+import pickle
 import platform
 import statistics
 import tempfile
@@ -33,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_PAYLOAD_BYTES: Tuple[int, ...] = (
+    512,
+    4 * 1024,
     64 * 1024,
     1024 * 1024,
     4 * 1024 * 1024,
@@ -43,8 +46,63 @@ DEFAULT_TARGET_BYTES = 128 * 1024 * 1024
 MIN_MEASURED_SAMPLES = 32
 MAX_MEASURED_SAMPLES = 512
 MIN_ACCEPTED_R_SQUARED = 0.75
-CALIBRATION_SCHEMA_VERSION = 1
-DEFAULT_CACHE_PATH = "/tmp/cedar_boundary_profiles_v1.json"
+CALIBRATION_SCHEMA_VERSION = 2
+DEFAULT_CACHE_PATH = "/tmp/cedar_boundary_profiles_v2.json"
+
+
+def profile_object_marshalling(
+    snapshots: Sequence[bytes],
+    variant: PipeVariantType,
+    max_samples: int = 16,
+) -> Dict[str, Any]:
+    """Measure driver-side marshalling on real legal pipeline values.
+
+    ``snapshots`` are immutable pickle captures produced by the baseline
+    profile.  They are decoded before timing, so the reported input term is
+    the serialization Cedar performs when submitting a value and the output
+    term is the deserialization Cedar performs when receiving it.  This
+    complements the byte-only platform calibration with object-shape costs
+    (nested dictionaries, arrays, tensors, and similar values).
+    """
+    if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+        serializer = ray.cloudpickle
+    elif variant == PipeVariantType.SMP:
+        serializer = pickle
+    else:
+        raise ValueError(f"Unsupported marshalling variant: {variant}")
+    selected = list(snapshots[:max(1, max_samples)])
+    if not selected:
+        raise ValueError("Object marshalling needs at least one snapshot")
+    values = [pickle.loads(snapshot) for snapshot in selected]
+
+    # One untimed pass initializes type-specific reducers/imports.
+    for value in values[: min(2, len(values))]:
+        serializer.loads(
+            serializer.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        )
+
+    serialize_ms: List[float] = []
+    deserialize_ms: List[float] = []
+    serialized_bytes: List[int] = []
+    for value in values:
+        started = time.perf_counter()
+        payload = serializer.dumps(
+            value, protocol=pickle.HIGHEST_PROTOCOL
+        )
+        middle = time.perf_counter()
+        serializer.loads(payload)
+        finished = time.perf_counter()
+        serialize_ms.append((middle - started) * 1000.0)
+        deserialize_ms.append((finished - middle) * 1000.0)
+        serialized_bytes.append(len(payload))
+    return {
+        "method": "real_object_driver_marshalling",
+        "variant": variant.name,
+        "samples": len(values),
+        "serialize_ms_per_sample": statistics.median(serialize_ms),
+        "deserialize_ms_per_sample": statistics.median(deserialize_ms),
+        "serialized_bytes_per_sample": statistics.median(serialized_bytes),
+    }
 
 
 @ray.remote
@@ -370,13 +428,17 @@ def profile_stage_boundary_cached(
     lock_path = pathlib.Path(str(path) + ".lock")
     with lock_path.open("a+") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        cache: Dict[str, Any] = {"schema_version": 1, "entries": {}}
+        cache: Dict[str, Any] = {
+            "schema_version": CALIBRATION_SCHEMA_VERSION,
+            "entries": {},
+        }
         if path.exists():
             try:
                 loaded = json.loads(path.read_text())
                 if (
                     isinstance(loaded, dict)
-                    and loaded.get("schema_version") == 1
+                    and loaded.get("schema_version")
+                    == CALIBRATION_SCHEMA_VERSION
                     and isinstance(loaded.get("entries"), dict)
                 ):
                     cache = loaded

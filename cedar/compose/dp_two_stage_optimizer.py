@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from cedar.pipes import Pipe
 
 from .dp_optimizer import DpOptimizer
+from .my_optimizer import MyOptimizer
 from .optimizer import OptimizerOptions, PhysicalPlan, PipeDesc, PipeVariantType
 
 
@@ -35,6 +36,11 @@ class DpTwoStageOptimizer(DpOptimizer):
     and jointly optimizes contiguous fusion blocks, offload variants, and cache
     placement.
     """
+
+    joint_actor_allocation = False
+
+    def _allocate_final_remote_stage_resources(self) -> None:
+        MyOptimizer._allocate_final_remote_stage_resources(self)
 
     def run(
         self, profiled_data: Union[str, Dict[str, Any]], options: OptimizerOptions

@@ -82,7 +82,8 @@ work_prod(S) = size_prod(S) * cardinality_prod(S)
 work_prod = 0.2 * 0.5 = 0.1
 ```
 
-此后算子的计算量和 stage boundary 数据量都按原始输入的 10% 估算。
+此后 per-data 算子的计算量和 stage boundary 总字节量都按原始输入的 10%
+估算；boundary 的单项大小和记录数仍分别保留，不能提前合并成 volume。
 
 这套模型假设 size ratio 和 selectivity 都是与执行顺序无关的乘法系数。对于固定输出形状、内容相关压缩率或相关过滤器，这只是近似。
 
@@ -175,19 +176,43 @@ DP 直接使用上述 Amdahl 反推 cost。Profile 中可能存在的
 
 ## 5. stage boundary 成本
 
-对于 `SMP`、`RAY` 和 `TF_RAY`，每个物理 stage 单独支付一次输入和输出 boundary 成本：
+对于 `SMP`、`RAY` 和 `TF_RAY`，每个物理 stage 单独支付一次输入和输出
+boundary 成本。新 profile 的首选数据不是构造字节数组的线性拟合，而是从
+baseline profile 的 reservoir 中取出各逻辑边界的真实、合法对象，让 identity
+算子通过与正式计划相同的一 actor/process Ray/SMP variant。测量覆盖 driver
+队列、task 提交、序列化、传输和结果交付，并使用正式计划按对象大小确定的
+Ray submit batch。
+
+一次同类型 identity stage 同时包含该类型的输入、输出边界。对于输入类型为
+`A`、输出类型为 `B` 的融合 block，模型使用：
 
 ```text
-boundary_cost =
-    fixed_latency_ms / max_inflight
-    + (input_bytes + output_bytes)
+real_boundary_cost =
+    0.5 * identity_stage_ms(A) * input_record_ratio
+    + 0.5 * identity_stage_ms(B) * output_record_ratio
+```
+
+这样，融合仍只保留 block 的首、尾物理边界，内部逻辑边界不会被重复计费。
+该实测服务需求进入共享 local-runtime 坐标；算子本身的 backend compute 仍进入
+对应的并行 stage 坐标。
+
+若是旧 profile，没有 real-object identity-stage 数据，才回退到下面的构造载荷
+带宽/固定延迟模型：
+
+```text
+boundary_cost_per_source_record =
+    fixed_latency_ms * input_record_ratio / ray_submit_batch_size
+    + (input_item_bytes * input_record_ratio
+       + output_item_bytes * output_record_ratio)
       / boundary_throughput_bytes_per_sec
       * 1000
 ```
 
 其中：
 
-- fixed latency 除以 profile 时的并发请求数；
+- Ray fixed latency 是每次 actor task 的固定成本，只由同一次提交中的 batch
+  样本摊销；SMP 每次提交一条样本，因此该除数为 1；
+- max inflight 只是队列与背压上限，不代表并行执行能力，不参与固定成本摊销；
 - 带宽项不会除，因为它仍是每个样本实际消耗的传输服务时间；
 - `TF_RAY` 使用 `RAY` boundary 模型；
 - `INPROCESS` 的 boundary cost 为 0。
@@ -203,18 +228,26 @@ physical_model.boundary.<variant>.fixed_latency_ms
 
 - SMP throughput：100 MB/s；
 - RAY/TF_RAY throughput：10 GB/s；
-- fixed latency：0；
-- max inflight：100。
+- fixed latency：0。
 
 若 stage 放在已执行集合 `S` 后，并覆盖 block `B`：
 
 ```text
-boundary_input =
-    source_output_size * work_prod(S)
+input_item_bytes =
+    source_output_size * size_prod(S)
 
-boundary_output =
-    source_output_size * work_prod(S union B)
+output_item_bytes =
+    source_output_size * size_prod(S union B)
+
+input_record_ratio = cardinality_prod(S)
+
+output_record_ratio = cardinality_prod(S union B)
 ```
+
+Ray 的 `submit_batch_size` 严格使用 `input_item_bytes + output_item_bytes`
+计算，与最终物理计划的运行时规则相同；它不使用 `work_prod`。filter 降低的
+是期望任务数和总传输量，而不是一条存活记录的大小。把 volume 当作 item
+size 会在 filter 后虚构过大的 batch，并系统性低估 task latency。
 
 ## 6. fusion 成本
 
@@ -306,22 +339,39 @@ operator_cost = work_prod(S) * block.cost
 regular_cost = operator_cost + stage_boundary_cost
 ```
 
-`INPROCESS` block 与 source 共用 local worker 的串行执行通道，因此其
-`regular_cost` 累加到 `local_serial`。每一个 `RAY`、`TF_RAY` 或 `SMP`
-block 是独立的异步流水线 stage，因此更新 `parallel_bottleneck`：
+CPU `INPROCESS` block 与 source 共用 local worker 的串行执行通道，因此其
+`regular_cost` 累加到 `local_serial`。CPU `RAY`、`TF_RAY` 或 `SMP` block
+的 backend compute 更新 `parallel_bottleneck`；real-object identity profile
+测得的边界服务需求更新 `local_serial`。旧 profile 的合成带宽回退项仍与
+backend compute 一起进入 parallel stage，保持向后兼容。
+
+`PipeExecutionResource.CUDA` block 使用独立的 `gpu_serial` 坐标。正式实验
+只有一张 GPU，因此不同 GPU stage 不能被视为具有独立吞吐能力，其服务需求
+必须累加。CPU 坐标以单个 local worker 为尺度，而 GPU 是 W 个 worker 共享
+的全局资源，所以 GPU compute 还要乘固定 worker 数 W：
 
 ```text
 INPROCESS:
     local_serial' = local_serial + regular_cost
 
-RAY / TF_RAY / SMP:
-    parallel_bottleneck' = max(parallel_bottleneck, regular_cost)
+CPU RAY / TF_RAY / SMP:
+    local_serial' = local_serial + real_boundary_cost
+    parallel_bottleneck' = max(parallel_bottleneck, compute_cost)
+
+CUDA RAY / TF_RAY:
+    stage_cost = compute_cost + boundary_cost
+    gpu_serial' = gpu_serial + W * stage_cost
 ```
+
+CUDA block 不允许使用 `INPROCESS` 或 `SMP`，从而保证物理计划能够显式声明
+GPU 资源。物理计划按所有 GPU actor 的全局数量分配 fractional GPU；例如
+W=8 且只有一个单 actor GPU stage 时，每个 actor 声明 1/8 GPU，整份计划
+合计恰好一张 GPU。
 
 最终吞吐量目标为：
 
 ```text
-plan_cost = max(local_serial, parallel_bottleneck)
+plan_cost = max(local_serial, parallel_bottleneck, gpu_serial)
 ```
 
 source 成本会进入 `local_serial`。虽然它对 additive 排名是常数，但在
@@ -351,6 +401,7 @@ cache_read_cost =
 ```text
 local_serial = cache_read_cost
 parallel_bottleneck = 0
+gpu_serial = 0
 ```
 
 cache 后面的随机或未缓存 suffix 再正常累加。
@@ -420,13 +471,13 @@ state =
     parallel_stage_cpus
 ```
 
-同一 mask、cache 状态和 CPU 占用维护精确的二维 Pareto 前沿：
+同一 mask、cache 状态和 CPU 占用维护服务需求 Pareto 前沿：
 
 ```text
-(local_serial, parallel_bottleneck)
+(local_serial, parallel_bottleneck, parallel_total_work, gpu_serial)
 ```
 
-只有当一个状态在两维上都不大于另一个状态时才会支配后者。不能只保留
+只有当一个状态在所有维度上都不大于另一个状态时才会支配后者。不能只保留
 当前 `max(...)` 最小的状态：一个当前 local 较小、parallel 较大的状态，
 在后续继续追加 local operator 后可能成为全局最优。
 
@@ -438,7 +489,7 @@ state =
 epsilon_step = (1 + epsilon_global)^(1 / n) - 1
 ```
 
-因此经过最多 `n` 次转移后，两维服务需求的最坏乘法误差不超过 10%。设为
+因此经过最多 `n` 次转移后，各维服务需求的最坏乘法误差不超过 10%。设为
 `0` 可对任意算子数量恢复精确前沿，但复杂负载的计划生成时间和内存开销会
 明显上升。搜索日志同时记录 global/step epsilon、保留状态数和最大前沿。
 
@@ -505,10 +556,10 @@ local parallelism 在 DP 完成后由基类逻辑单独选择。除严格 profil
 - operator compute 与处理字节量线性相关；
 - size ratio 与 selectivity 可以相乘且不随重排顺序改变；
 - parallel stage transport 可由固定延迟加双向字节量除以带宽表示；
-- fixed latency 可以由 max inflight 完全摊薄；
+- Ray task-level fixed latency 可以由同一 task 的 submit batch 摊销；
 - fusion 只消除 stage boundary，不减少真实算子 compute；
-- distinct parallel stages 可在稳态流水线中并发，吞吐量由最慢 stage 与
-  local 串行通道二者中的较大值决定；
+- distinct CPU parallel stages 可在稳态流水线中并发；共享同一张卡的 GPU
+  stages 则共享一个串行服务容量，其需求累加；
 - cache 模型面向 cache-hit epoch，不是冷启动加多 epoch 总成本；
 - local parallelism 的运行时收益没有直接进入 DP cost；
 - 联合 DP 只覆盖线性单路径流水线。
@@ -521,14 +572,16 @@ local parallelism 在 DP 完成后由基类逻辑单独选择。除严格 profil
 local_serial = source_cost + sum(INPROCESS block cost)
 
 parallel_bottleneck = max(
-    每个 SMP/RAY/TF_RAY block 的 compute + boundary cost
+    每个 CPU SMP/RAY/TF_RAY block 的 compute + boundary cost
 )
 
-plan_cost = max(local_serial, parallel_bottleneck)
+gpu_serial = W * sum(每个 CUDA block 的 compute + boundary cost)
+
+plan_cost = max(local_serial, parallel_bottleneck, gpu_serial)
 ```
 
 cache 模式允许使用磁盘读取成本替换 deterministic prefix 的累计成本。
 
-搜索通过二维 Pareto 前沿保持该目标的精确最优子结构。六算子穷举验证会
+搜索通过多维 Pareto 前沿保持该目标的精确最优子结构。六算子穷举验证会
 枚举所有合法重排、fusion 分区和 backend 分配，并检查 DP 与独立 oracle
 的全局最优值完全一致。

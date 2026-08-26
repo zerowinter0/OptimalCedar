@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import yaml
 from scipy.stats import spearmanr
 
@@ -29,6 +28,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from cedar.compose.optimizer import PhysicalPlan
+from evaluation.chapter6_experiments.cost_model_accuracy_metrics import (
+    pairwise_qerrors,
+    qerror_summary,
+)
 from evaluation.cedar_utils import CedarEvalSpec
 from evaluation.eval_cedar import import_module_from_path
 
@@ -294,6 +297,7 @@ def model_metrics(candidates: list[dict[str, Any]], field: str) -> dict[str, Any
     rho = None
     if len(scored) >= 3 and len(set(costs)) > 1 and len(set(times)) > 1:
         rho = float(spearmanr(costs, times).statistic)
+    qerrors, ordered_correct, ordered_total = pairwise_qerrors(candidates, field)
     return {
         "coverage": len(scored) / len(candidates),
         "num_scored": len(scored),
@@ -302,6 +306,84 @@ def model_metrics(candidates: list[dict[str, Any]], field: str) -> dict[str, Any
         "fastest_candidate": fastest["candidate_id"],
         "top1_correct": selected["candidate_id"] == fastest["candidate_id"],
         "selection_regret": selected["mean_runtime_sec"] / fastest["mean_runtime_sec"] - 1.0,
+        "pairwise_qerror": qerror_summary(qerrors),
+        "pairwise_order_accuracy": (
+            ordered_correct / ordered_total if ordered_total else None
+        ),
+    }
+
+
+def aggregate_model_metrics(
+    workloads: dict[str, Any], field: str
+) -> dict[str, Any]:
+    all_qerrors: list[float] = []
+    correct = 0
+    total = 0
+    workload_metrics = []
+    for workload in workloads.values():
+        candidates = workload["candidates"]
+        values, workload_correct, workload_total = pairwise_qerrors(
+            candidates, field
+        )
+        all_qerrors.extend(values)
+        correct += workload_correct
+        total += workload_total
+        model_key = {
+            "cedar_cost": "cedar",
+            "dp_objective_cost": "dp",
+            "reference_dp_cost": "reference_dp",
+        }[field]
+        metrics = workload["models"].get(model_key)
+        if metrics and metrics.get("num_scored", 0) >= 2:
+            workload_metrics.append(metrics)
+    rhos = [
+        item["spearman_rho"]
+        for item in workload_metrics
+        if item.get("spearman_rho") is not None
+    ]
+    return {
+        "num_workloads": len(workload_metrics),
+        "pairwise_qerror": qerror_summary(all_qerrors),
+        "pairwise_order_accuracy": correct / total if total else None,
+        "macro_spearman_rho": statistics.mean(rhos) if rhos else None,
+        "top1_correct": sum(bool(item.get("top1_correct")) for item in workload_metrics),
+        "mean_selection_regret": statistics.mean(
+            item["selection_regret"] for item in workload_metrics
+        ) if workload_metrics else None,
+    }
+
+
+def shared_coverage_summary(
+    workloads: dict[str, Any], fields: tuple[str, ...]
+) -> dict[str, Any]:
+    """Evaluate every model on exactly the plans scorable by all models."""
+    model_keys = {
+        "cedar_cost": "cedar",
+        "dp_objective_cost": "dp",
+        "reference_dp_cost": "reference_dp",
+    }
+    shared: dict[str, Any] = {}
+    for name, workload in workloads.items():
+        candidates = [
+            candidate
+            for candidate in workload["candidates"]
+            if all(field in candidate for field in fields)
+        ]
+        if len(candidates) < 2:
+            continue
+        shared[name] = {
+            "candidates": candidates,
+            "models": {
+                model_keys[field]: model_metrics(candidates, field)
+                for field in fields
+            },
+        }
+    return {
+        "protocol": "same workload-plan pairs scorable by every listed model",
+        "models": {
+            model_keys[field]: aggregate_model_metrics(shared, field)
+            for field in fields
+        },
     }
 
 
@@ -313,7 +395,25 @@ def main() -> None:
         default=FORMAL_ROOT / "paper_artifacts" / "cost_model" / "analysis.json",
     )
     parser.add_argument("--workloads", nargs="+", choices=WORKLOADS, default=list(WORKLOADS))
+    parser.add_argument(
+        "--reference-analysis",
+        type=Path,
+        help=(
+            "Optional older analysis.json. Matching plan costs are imported "
+            "as a frozen reference model for an offline before/after comparison."
+        ),
+    )
     args = parser.parse_args()
+
+    reference_costs: dict[tuple[str, str], float] = {}
+    if args.reference_analysis is not None:
+        reference = json.loads(args.reference_analysis.read_text())
+        for workload_name, workload in reference.get("workloads", {}).items():
+            for candidate in workload.get("candidates", []):
+                if "sha256" in candidate and "dp_objective_cost" in candidate:
+                    reference_costs[(workload_name, candidate["sha256"])] = float(
+                        candidate["dp_objective_cost"]
+                    )
 
     result: dict[str, Any] = {
         "protocol": {
@@ -323,6 +423,13 @@ def main() -> None:
             "deduplication": "canonical physical-plan SHA-256 within workload",
             "runtime": "mean of all three-round records producing the canonical plan",
             "execution_rerun": False,
+            "accuracy_metric": (
+                "pairwise Q-error of predicted versus measured runtime ratios; "
+                "1.0 is exact and workload-wide scale cancels"
+            ),
+            "reference_analysis": (
+                str(args.reference_analysis) if args.reference_analysis else None
+            ),
         },
         "workloads": {},
     }
@@ -330,6 +437,12 @@ def main() -> None:
         print(f"Scoring {workload_name}...", flush=True)
         candidates = collect_candidates(workload_name)
         score_candidates(workload_name, candidates)
+        for candidate in candidates:
+            reference_cost = reference_costs.get(
+                (workload_name, candidate["sha256"])
+            )
+            if reference_cost is not None:
+                candidate["reference_dp_cost"] = reference_cost
         result["workloads"][workload_name] = {
             "label": WORKLOADS[workload_name].label,
             "cache": WORKLOADS[workload_name].cache,
@@ -340,11 +453,25 @@ def main() -> None:
             "models": {
                 "cedar": model_metrics(candidates, "cedar_cost"),
                 "dp": model_metrics(candidates, "dp_objective_cost"),
+                "reference_dp": model_metrics(candidates, "reference_dp_cost"),
             },
             "candidates": candidates,
         }
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+
+    result["summary"] = {
+        "cedar": aggregate_model_metrics(result["workloads"], "cedar_cost"),
+        "dp": aggregate_model_metrics(result["workloads"], "dp_objective_cost"),
+        "reference_dp": aggregate_model_metrics(
+            result["workloads"], "reference_dp_cost"
+        ),
+    }
+    result["shared_coverage_summary"] = shared_coverage_summary(
+        result["workloads"],
+        ("cedar_cost", "reference_dp_cost", "dp_objective_cost"),
+    )
+    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

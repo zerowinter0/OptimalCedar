@@ -10,6 +10,8 @@ import time
 from collections import deque
 from typing import Any, List
 
+from cedar.utils.threading import limit_native_threadpools
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +25,10 @@ class RayActor:
 
     def __init__(self, name: str):
         self.name = name
+        # Ray normally sets OMP_NUM_THREADS, but the actor can reuse a worker
+        # process whose native libraries are already loaded.  Enforce the
+        # same one-logical-CPU contract as local and SMP workers explicitly.
+        self._native_threadpool_limiter = limit_native_threadpools(1)
 
     @abc.abstractmethod
     def process(self, data: Any) -> Any:

@@ -303,7 +303,9 @@ class RayFilterPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return RayActorFilterPipeVariant.remote(self.name, self.fn)
+        return RayActorFilterPipeVariant.options(
+            num_gpus=self.variant_ctx.num_gpus
+        ).remote(self.name, self.fn)
 
     def _get_next_result(self, timeout: float = 1.0) -> DataSample:
         while True:

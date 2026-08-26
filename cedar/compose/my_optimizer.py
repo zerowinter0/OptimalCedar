@@ -195,8 +195,24 @@ class MyOptimizer(Optimizer):
         if only one is valid, retain it.  When neither is identifiable, fall
         back to the measured in-process cost rather than inventing speedup.
         """
-        if desc is None or desc.variant_type in (None, PipeVariantType.INPROCESS):
-            return super()._calculate_pipe_cost(p_id, input_size, desc)
+        if desc is None or desc.variant_type in (
+            None,
+            PipeVariantType.INPROCESS,
+        ):
+            baseline_cost = super()._calculate_pipe_cost(
+                p_id, input_size, desc
+            )
+            # Formal execution replicates every local INPROCESS operator in
+            # W worker processes. Worker-side SMP timing at width W executes
+            # the same Python callable in W independent processes and excludes
+            # IPC, making it a direct contention measurement for local
+            # compute. Use it conservatively when the adaptive run converged.
+            width_cost = self._dp_profiled_width_compute_cost(
+                p_id, PipeVariantType.SMP, input_size
+            )
+            if width_cost is not None:
+                return max(baseline_cost, width_cost)
+            return baseline_cost
         baseline_input = self.profiled_stats["baseline"]["input_sizes"][p_id]
         baseline_cost = (
             input_size / baseline_input * self._base_cost_map[p_id]
@@ -251,6 +267,16 @@ class MyOptimizer(Optimizer):
                     direct_cost *= input_size / baseline_input
                 direct_cost = max(direct_cost, 1e-12)
 
+        width_cost = self._dp_profiled_width_compute_cost(
+            p_id, desc.variant_type, input_size
+        )
+        if width_cost is not None:
+            direct_cost = (
+                width_cost
+                if direct_cost is None
+                else max(direct_cost, width_cost)
+            )
+
         inferred_cost = super()._calculate_pipe_cost(p_id, input_size, desc)
         inferred_valid = inferred_cost > 0 and math.isfinite(inferred_cost)
         if direct_cost is not None and inferred_valid:
@@ -270,6 +296,170 @@ class MyOptimizer(Optimizer):
                 baseline_cost,
             )
         return max(baseline_cost, 1e-12)
+
+    def _dp_profiled_width_compute_cost(
+        self,
+        p_id: int,
+        variant_type: PipeVariantType,
+        input_size: float,
+    ) -> Optional[float]:
+        """Return converged worker compute measured under W-way contention.
+
+        The isolated layer measures one worker accurately, while
+        ``physical_model.scaling`` repeats selected expensive operators at the
+        formal width. Only converged width>1 measurements are ranking data;
+        incomplete max-duration observations remain diagnostics.
+        """
+        key = (
+            PipeVariantType.RAY.name
+            if variant_type == PipeVariantType.TF_RAY
+            else variant_type.name
+        )
+        entries = (
+            self.profiled_stats.get("physical_model", {})
+            .get("scaling", {})
+            .get(key, {})
+        )
+        if not isinstance(entries, dict):
+            return None
+        entry = entries.get(p_id, entries.get(str(p_id)))
+        target_width = max(
+            2,
+            int(
+                os.environ.get(
+                    "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS", "8"
+                )
+            ),
+        )
+        mean = self._dp_scaling_mean(entry, target_width)
+        if mean is None:
+            return None
+
+        baseline_input = float(
+            self.profiled_stats["baseline"]["input_sizes"][p_id]
+        )
+        cost = mean
+        scaling = self._dp_compute_scaling_for_pipe(p_id)
+        if scaling == PipeComputeScaling.PER_RECORD:
+            cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
+        elif baseline_input > 0:
+            cost *= input_size / baseline_input
+        return max(cost, 1e-12)
+
+    @staticmethod
+    def _dp_scaling_mean(
+        entry: Any, target_width: int
+    ) -> Optional[float]:
+        """Return an interpolated converged per-actor latency at one width."""
+        if not isinstance(entry, dict) or target_width < 1:
+            return None
+        raw_widths = entry.get("widths")
+        timings = raw_widths if isinstance(raw_widths, dict) else None
+        if timings is None:
+            timings = {}
+            adaptive = entry.get("adaptive_profile", {})
+            if isinstance(adaptive, dict) and "width" in adaptive:
+                timings[adaptive["width"]] = entry
+        points = []
+        for raw_width, timing in timings.items():
+            if not isinstance(timing, dict):
+                continue
+            adaptive = timing.get("adaptive_profile", {})
+            if not isinstance(adaptive, dict) or adaptive.get("converged") is not True:
+                continue
+            try:
+                width = int(raw_width)
+                mean = float(timing["mean_ms_per_sample"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if width >= 1 and math.isfinite(mean) and mean >= 0.0:
+                points.append((width, mean))
+        if not points:
+            return None
+        points.sort()
+        for width, mean in points:
+            if width == target_width:
+                return mean
+        lower = [point for point in points if point[0] < target_width]
+        upper = [point for point in points if point[0] > target_width]
+        if lower and upper:
+            left_width, left_mean = lower[-1]
+            right_width, right_mean = upper[0]
+            fraction = (target_width - left_width) / (right_width - left_width)
+            return left_mean + fraction * (right_mean - left_mean)
+        # Extrapolation is deliberately conservative: use the nearest measured
+        # per-actor latency rather than assuming continued linear speedup.
+        return (lower[-1] if lower else upper[0])[1]
+
+    def _dp_pipe_cost_at_parallelism(
+        self,
+        p_id: int,
+        variant_type: PipeVariantType,
+        parallelism: int,
+        width_one_cost: float,
+    ) -> float:
+        """Return per-actor latency at the candidate's global concurrency.
+
+        A formal plan is copied into ``W`` local workers.  A stage configured
+        with ``a`` actors/processes per worker therefore runs ``W * a``
+        workers on the same machine, not ``a``.  Looking up the curve at only
+        ``a`` was systematically optimistic for multi-stage plans: every
+        stage appeared to have an isolated CPU pool even though Ray and SMP
+        share the same host cores, memory bandwidth, and storage path.
+        """
+        if parallelism < 1 or not math.isfinite(width_one_cost):
+            return width_one_cost
+        key = (
+            PipeVariantType.RAY.name
+            if variant_type == PipeVariantType.TF_RAY
+            else variant_type.name
+        )
+        entries = (
+            self.profiled_stats.get("physical_model", {})
+            .get("scaling", {})
+            .get(key, {})
+        )
+        if not isinstance(entries, dict):
+            return width_one_cost
+        entry = entries.get(p_id, entries.get(str(p_id)))
+        formal_workers = max(1, int(self.physical_plan.n_local_workers))
+        if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") == "1":
+            raw_workers = os.environ.get(
+                "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
+            )
+            if raw_workers is not None:
+                try:
+                    formal_workers = int(raw_workers)
+                except ValueError as exc:
+                    raise RuntimeError(
+                        "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be an integer"
+                    ) from exc
+                if formal_workers < 1:
+                    raise RuntimeError(
+                        "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be positive"
+                    )
+        # Price every remote block under the final plan's total concurrently
+        # active remote CPU slots, since all stages share the same host.
+        assumed_total = getattr(
+            self, "_dp_assumed_total_parallel_stage_cpus", None
+        )
+        contention_parallelism = parallelism
+        if assumed_total is not None:
+            contention_parallelism = max(parallelism, int(assumed_total))
+        global_concurrency = formal_workers * contention_parallelism
+        mean = self._dp_scaling_mean(entry, global_concurrency)
+        if mean is None:
+            return width_one_cost
+        baseline_input = float(
+            self.profiled_stats["baseline"]["input_sizes"][p_id]
+        )
+        cost = mean
+        scaling = self._dp_compute_scaling_for_pipe(p_id)
+        if scaling == PipeComputeScaling.PER_RECORD:
+            cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
+        elif baseline_input <= 0:
+            return width_one_cost
+        return max(cost, 1e-12)
 
     def _dp_compute_scaling_for_pipe(
         self, p_id: int
@@ -527,6 +717,28 @@ class MyOptimizer(Optimizer):
             return 0.0
         return latency if math.isfinite(latency) and latency >= 0 else 0.0
 
+    def _dp_object_boundary_operator(
+        self, variant: PipeVariantType, p_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Return real-object marshalling measurements for one operator."""
+        physical_model = self.profiled_stats.get("physical_model", {})
+        if not isinstance(physical_model, dict):
+            return None
+        object_boundaries = physical_model.get("object_boundary", {})
+        if not isinstance(object_boundaries, dict):
+            return None
+        key = (
+            PipeVariantType.RAY.name
+            if variant == PipeVariantType.TF_RAY
+            else variant.name
+        )
+        backend = object_boundaries.get(key)
+        operators = backend.get("operators", {}) if isinstance(backend, dict) else {}
+        if not isinstance(operators, dict):
+            return None
+        entry = operators.get(p_id, operators.get(str(p_id)))
+        return entry if isinstance(entry, dict) else None
+
     def _dp_boundary_cost_ms(
         self,
         variant: PipeVariantType,
@@ -535,31 +747,45 @@ class MyOptimizer(Optimizer):
     ) -> float:
         """Return steady-state boundary service time per sample.
 
-        Boundary calibration is deliberately synchronous, while Cedar keeps
-        many stage requests in flight.  Charging its fitted round-trip latency
-        once per sample makes latency the throughput bottleneck even though it
-        is overlapped in the actual pipeline.  Bandwidth remains a per-sample
-        service cost; amortize only the fixed latency by the profiled in-flight
-        width.
+        Boundary calibration is deliberately synchronous and therefore fits
+        one fixed cost per submitted task. Ray submits a batch in one actor
+        call, so only that task-level term is shared by the samples in the
+        batch. ``max_inflight`` is a queue/backpressure limit, not execution
+        parallelism, and must not be used to divide service demand. SMP
+        submits one sample per request and therefore receives no batching
+        discount. Bandwidth remains a per-sample service cost.
         """
         throughput = self._dp_boundary_throughput(variant)
         if throughput is None:
             return 0.0
-        config = self.profiled_stats.get("resource_config", {})
-        key = (
-            "ray_max_inflight"
-            if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
-            else "smp_max_inflight"
-        )
-        try:
-            max_inflight = int(
-                config.get(key, constants.PROFILE_STAGE_MAX_INFLIGHT)
+        fixed_cost_divisor = 1
+        if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            fixed_cost_divisor = self._dp_ray_submit_batch_size(
+                input_size, output_size
             )
-        except (TypeError, ValueError):
-            max_inflight = constants.PROFILE_STAGE_MAX_INFLIGHT
-        max_inflight = max(1, max_inflight)
-        return self._dp_boundary_fixed_latency_ms(variant) / max_inflight + (
+        return (
+            self._dp_boundary_fixed_latency_ms(variant) / fixed_cost_divisor
+        ) + (
             (input_size + output_size) / throughput * 1000.0
+        )
+
+    @staticmethod
+    def _dp_ray_submit_batch_size(
+        input_size: float, output_size: float
+    ) -> int:
+        """Return the exact submit-batch rule used by a final Ray stage."""
+        total_io_size = input_size + output_size
+        if not math.isfinite(total_io_size) or total_io_size <= 0:
+            return 1
+        return min(
+            max(
+                int(
+                    constants.RAY_SUBMIT_BATCH_SCALING_FACTOR
+                    // total_io_size
+                ),
+                1,
+            ),
+            500,
         )
 
     def _dp_stage_boundary_cost(self, prev_mask: int, block) -> float:
@@ -570,19 +796,145 @@ class MyOptimizer(Optimizer):
         pays one input and one output boundary, while every operator's compute
         cost remains undiscounted.
         """
+        local_cost, parallel_cost = self._dp_stage_boundary_components(
+            prev_mask, block
+        )
+        return local_cost + parallel_cost
+
+    def _dp_stage_boundary_components(
+        self, prev_mask: int, block
+    ) -> Tuple[float, float]:
+        """Return local byte service and remote task service per source row.
+
+        A Ray batch is selected from the size of one surviving item, whereas
+        transport work is proportional to the expected byte volume and task
+        count is proportional to the number of surviving input records.  The
+        old implementation used byte volume as an item size; after a filter it
+        therefore invented larger batches than the runtime could submit.
+
+        New layered profiles measure driver marshalling on the actual legal
+        objects seen by every operator.  For those profiles, submission and
+        driver serialization are charged to the shared local lane while byte
+        transport remains on the parallel stage.  Old profiles retain the
+        previous end-to-end parallel-only interpretation.
+        """
         throughput = self._dp_boundary_throughput(block.variant)
         if throughput is None:
-            return 0.0
+            return 0.0, 0.0
 
-        source_size = self.profiled_stats["baseline"]["output_sizes"][
-            self._get_source_p_id()
-        ]
-        next_mask = prev_mask | block.mask
-        input_size = source_size * self._dp_work_prod(prev_mask)
-        output_size = source_size * self._dp_work_prod(next_mask)
-        return self._dp_boundary_cost_ms(
-            block.variant, input_size, output_size
+        source_size = float(
+            self.profiled_stats["baseline"]["output_sizes"][
+                self._get_source_p_id()
+            ]
         )
+        next_mask = prev_mask | block.mask
+        input_item_size = source_size * self._dp_r_prod[prev_mask]
+        output_item_size = source_size * self._dp_r_prod[next_mask]
+
+        cardinality = getattr(self, "_dp_cardinality_prod", [])
+        if len(cardinality) == len(self._dp_r_prod):
+            input_records = cardinality[prev_mask]
+            output_records = cardinality[next_mask]
+        else:
+            input_records = 1.0
+            output_records = 1.0
+
+        submit_batch = 1
+        if block.variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            submit_batch = self._dp_ray_submit_batch_size(
+                input_item_size, output_item_size
+            )
+        transported_bytes_ms = (
+            input_item_size * input_records
+            + output_item_size * output_records
+        ) / throughput * 1000.0
+        fixed_ms = (
+            self._dp_boundary_fixed_latency_ms(block.variant)
+            * input_records
+            / submit_batch
+        )
+        block_order = getattr(block, "order", ())
+        inner_ops = getattr(self, "_dp_inner_ops", ())
+        if not block_order or not inner_ops:
+            return 0.0, transported_bytes_ms + fixed_ms
+        first_p_id = inner_ops[block_order[0]]
+        last_p_id = inner_ops[block_order[-1]]
+        input_entry = self._dp_object_boundary_operator(
+            block.variant, first_p_id
+        )
+        output_entry = self._dp_object_boundary_operator(
+            block.variant, last_p_id
+        )
+        if input_entry is not None and output_entry is not None:
+            try:
+                input_identity_ms = float(
+                    input_entry["input_identity_stage"][
+                        "mean_ms_per_sample"
+                    ]
+                )
+                output_identity_ms = float(
+                    output_entry["output_identity_stage"][
+                        "mean_ms_per_sample"
+                    ]
+                )
+            except (KeyError, TypeError, ValueError):
+                input_identity_ms = float("nan")
+                output_identity_ms = float("nan")
+            if (
+                math.isfinite(input_identity_ms)
+                and input_identity_ms >= 0.0
+                and math.isfinite(output_identity_ms)
+                and output_identity_ms >= 0.0
+            ):
+                # Each identity measurement is a complete same-object stage
+                # round trip. Half of the first boundary plus half of the last
+                # approximates submit(input_type) + receive(output_type), while
+                # preserving one measured task/queue fixed cost. This is
+                # charged to the shared local runtime lane; block compute stays
+                # on its Ray/SMP parallel-stage coordinate.
+                identity_boundary_ms = (
+                    0.5 * input_identity_ms * input_records
+                    + 0.5 * output_identity_ms * output_records
+                )
+                return identity_boundary_ms, 0.0
+            try:
+                input_marshal_ms = float(
+                    input_entry["input_serialize_ms_per_sample"]
+                )
+                output_marshal_ms = float(
+                    output_entry["output_deserialize_ms_per_sample"]
+                )
+            except (KeyError, TypeError, ValueError):
+                input_marshal_ms = float("nan")
+                output_marshal_ms = float("nan")
+            if (
+                math.isfinite(input_marshal_ms)
+                and input_marshal_ms >= 0.0
+                and math.isfinite(output_marshal_ms)
+                and output_marshal_ms >= 0.0
+            ):
+                local_stage_ms = (
+                    fixed_ms
+                    + input_marshal_ms * input_records
+                    + output_marshal_ms * output_records
+                )
+                if block.variant == PipeVariantType.SMP:
+                    residuals = []
+                    for entry in (input_entry, output_entry):
+                        try:
+                            residual = float(
+                                entry[
+                                    "shared_runtime_overhead_ms_per_sample"
+                                ]
+                            )
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        if math.isfinite(residual) and residual >= 0.0:
+                            residuals.append(residual)
+                    if residuals:
+                        local_stage_ms += max(residuals) * input_records
+                return local_stage_ms, transported_bytes_ms
+        return 0.0, transported_bytes_ms + fixed_ms
 
     def _dp_work_prod(self, mask: int) -> float:
         """Aggregate byte-volume multiplier for one source record.
@@ -1982,7 +2334,15 @@ class MyOptimizer(Optimizer):
                     spec=spec,
                 )
 
-        # Match Cedar's shared Ray actor budget across all offloaded stages.
+        self._allocate_final_remote_stage_resources()
+
+        # The DP path deliberately bypasses Optimizer._offload_and_fuse(),
+        # which normally tunes these queueing parameters after materializing a
+        # Ray stage. Keep the selected widths and tune queueing afterwards.
+        self._tune_final_ray_stage_contexts()
+
+    def _allocate_final_remote_stage_resources(self) -> None:
+        """Apply Cedar's native shared actor allocation before final policy."""
         ray_contexts = [
             self.physical_plan.pipe_descs[p_id].variant_ctx
             for p_id in self.physical_plan.graph
@@ -1997,20 +2357,20 @@ class MyOptimizer(Optimizer):
             for ctx in ray_contexts:
                 ctx.n_actors = n_actors
 
-        # The DP path deliberately bypasses Optimizer._offload_and_fuse(),
-        # which normally tunes these queueing parameters after materializing a
-        # Ray stage.  Keep the DP's plan choices unchanged, but apply the same
-        # execution-parameter rule to its final active Ray stages.
-        self._tune_final_ray_stage_contexts()
-
     def _tune_final_ray_stage_contexts(self) -> None:
         """Apply Cedar's Ray submit-batch rule to the final physical plan.
 
         This is intentionally a post-processing step: it neither changes the
         selected variants nor the reorder/fusion structure produced by DP.
         """
-        input_size_map, output_size_map = self._calculate_size_map(
-            self.physical_plan.graph
+        stage_sizes = self._dp_final_stage_item_size_map()
+        ray_stage_count = sum(
+            self.physical_plan.pipe_descs[p_id].variant_type
+            in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+            for p_id in self.physical_plan.graph
+        )
+        finite_workload_cap = self._dp_finite_workload_ray_batch_cap(
+            ray_stage_count
         )
 
         for p_id in self.physical_plan.graph:
@@ -2021,28 +2381,13 @@ class MyOptimizer(Optimizer):
             ):
                 continue
 
-            if desc.is_fused_pipe():
-                # The original member ids are no longer graph nodes after
-                # fusion, so calculate their final output from the fused
-                # stage's physical input size.
-                input_size = input_size_map[p_id]
-                output_size = input_size
-                for fused_p_id in desc.fused_pipes:
-                    output_size *= self._data_size_ratio_map[fused_p_id]
-            else:
-                input_size = input_size_map[p_id]
-                output_size = output_size_map[p_id]
+            input_size, output_size = stage_sizes[p_id]
 
-            total_io_size = input_size + output_size
+            submit_batch_size = self._dp_ray_submit_batch_size(
+                input_size, output_size
+            )
             submit_batch_size = min(
-                max(
-                    int(
-                        constants.RAY_SUBMIT_BATCH_SCALING_FACTOR
-                        // total_io_size
-                    ),
-                    1,
-                ),
-                500,
+                submit_batch_size, finite_workload_cap
             )
             desc.variant_ctx.set_submit_batch_size(submit_batch_size)
             logger.info(
@@ -2055,6 +2400,91 @@ class MyOptimizer(Optimizer):
                 desc.variant_ctx.max_inflight,
                 desc.variant_ctx.max_prefetch,
             )
+
+    def _dp_finite_workload_ray_batch_cap(
+        self, ray_stage_count: int
+    ) -> int:
+        """Bound Ray batch size so a finite pipeline can reach steady state.
+
+        The byte-size rule is sufficient for one Ray stage. With multiple
+        stages, however, a batch of 500 can leave only a handful of batches
+        per W=8 worker. The bottleneck objective assumes stage overlap, so
+        require enough batches that ideal fill/drain overhead is at most 10%:
+        ``n_batches >= (n_stages - 1) / 0.10``.
+        """
+        if ray_stage_count <= 1 or self.options is None:
+            return 500
+        num_samples = getattr(self.options, "num_samples", None)
+        if num_samples is None:
+            return 500
+        try:
+            num_samples = int(num_samples)
+        except (TypeError, ValueError):
+            return 500
+        if num_samples <= 0:
+            return 500
+        fixed_workers = os.environ.get(
+            "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
+        )
+        workers = (
+            max(1, int(fixed_workers))
+            if fixed_workers is not None
+            else max(1, int(self.physical_plan.n_local_workers))
+        )
+        samples_per_worker = math.ceil(num_samples / workers)
+        min_batches = max(1, math.ceil((ray_stage_count - 1) / 0.10))
+        return max(1, min(500, samples_per_worker // min_batches))
+
+    def _dp_final_stage_item_size_map(
+        self,
+    ) -> Dict[int, Tuple[float, float]]:
+        """Propagate per-item sizes through the materialized linear plan.
+
+        ``Optimizer._calculate_size_map`` sees a fused pipe only by its new
+        synthetic id and therefore cannot propagate the fused members' size
+        ratios into the next physical stage. Walk the final source-to-sink
+        chain explicitly and apply every logical member ratio exactly once.
+        Synthetic cache/prefetch nodes preserve the current item size.
+        """
+        graph = self.physical_plan.graph
+        downstream_ids = {
+            child for children in graph.values() for child in children
+        }
+        sources = [p_id for p_id in graph if p_id not in downstream_ids]
+        if len(sources) != 1:
+            raise RuntimeError(
+                "Ray batch tuning requires one linear physical-plan source."
+            )
+
+        source_p_id = sources[0]
+        current_size = float(
+            self.profiled_stats["baseline"]["output_sizes"][source_p_id]
+        )
+        sizes: Dict[int, Tuple[float, float]] = {}
+        current_p_id = source_p_id
+        while True:
+            children = graph[current_p_id]
+            if not children:
+                break
+            if len(children) != 1:
+                raise RuntimeError(
+                    "Ray batch tuning requires a linear physical plan."
+                )
+            next_p_id = next(iter(children))
+            desc = self.physical_plan.pipe_descs[next_p_id]
+            input_size = current_size
+            members = (
+                desc.fused_pipes
+                if desc.fused_pipes is not None
+                else [next_p_id]
+            )
+            for member_p_id in members:
+                ratio = self._data_size_ratio_map.get(member_p_id, 1.0)
+                if ratio is not None:
+                    current_size *= ratio
+            sizes[next_p_id] = (input_size, current_size)
+            current_p_id = next_p_id
+        return sizes
 
 
 __all__ = ["MyOptimizer"]

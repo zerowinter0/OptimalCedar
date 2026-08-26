@@ -141,8 +141,9 @@ class _PolicyTwoStageOptimizer(DpTwoStageOptimizer):
                     feasible_plans += 1
                     key = (
                         objective.score,
-                        objective.total_work,
                         objective.local_serial,
+                        objective.parallel_bottleneck,
+                        objective.gpu_serial,
                         len(blocks),
                         tuple(variant.value for variant in assignment),
                         fusion_mask,
@@ -194,6 +195,7 @@ class _PolicyTwoStageOptimizer(DpTwoStageOptimizer):
             order=list(range(n)),
             blocks=best_blocks,
             variants_by_idx=variants_by_idx,
+            parallelism_by_idx={idx: 1 for idx in range(n)},
             cache_after_idx=best_cache_after_idx,
             cost=best_objective.score,
             objective=best_objective,
@@ -280,7 +282,7 @@ class _PolicyTwoStageOptimizer(DpTwoStageOptimizer):
             next_mask = prefix_mask | candidate.mask
             next_cpus = (
                 state.parallel_stage_cpus
-                + self._dp_parallel_stage_cpu_cost(candidate.variant)
+                + self._dp_parallel_stage_cpu_cost(candidate)
             )
             if cpu_limit is not None and next_cpus > cpu_limit:
                 return None
@@ -321,7 +323,7 @@ class _PolicyTwoStageOptimizer(DpTwoStageOptimizer):
                 objective = DpObjectiveCost(local_serial=choice.extra_cost)
             else:
                 objective = self._dp_accumulate_objective_cost(
-                    objective, choice.extra_cost, candidate
+                    objective, choice.extra_cost, candidate, prefix_mask
                 )
             state = choice.state
             prefix_mask = next_mask

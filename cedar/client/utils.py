@@ -12,6 +12,7 @@ from cedar.pipes import PipeVariantType, DataSample
 from .profiler import FeatureProfiler
 from .controller import FeatureController
 from .logger import DataSetLogger
+from cedar.utils.threading import limit_native_threadpools
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,10 @@ def multiprocess_worker_loop(
     ray_init_lock=None,
 ):
     logger.info(f"Starting multiprocess worker {idx}...")
+    # Keep this controller alive for the entire worker.  In fork mode NumPy
+    # may already have initialized OpenBLAS, so environment variables alone
+    # are insufficient.
+    native_threadpool_limiter = limit_native_threadpools(1)  # noqa: F841
     torch.set_num_threads(1)
     # Give every local worker a stable cache shard inside the shared
     # workload/optimizer cache namespace. This is independent of the process

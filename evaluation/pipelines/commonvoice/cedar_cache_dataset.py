@@ -41,9 +41,24 @@ class CommonvoiceFeature(Feature):
         fp = MapperPipe(fp, _read, is_random=False).fix()
         fp = MapperPipe(fp, _resample, is_random=False).fix()
         fp = MapperPipe(fp, _spec, is_random=False).fix()
-        fp = MapperPipe(fp, _stretch, is_random=False)
-        fp = MapperPipe(fp, time_mask, is_random=False)
-        fp = MapperPipe(fp, frequency_mask, is_random=False)
+        fp = MapperPipe(
+            fp,
+            _stretch,
+            is_random=False,
+            tag="commonvoice_stretch",
+        )
+        fp = MapperPipe(
+            fp,
+            time_mask,
+            is_random=False,
+            tag="commonvoice_time_mask",
+        ).depends_on(["commonvoice_stretch"])
+        fp = MapperPipe(
+            fp,
+            frequency_mask,
+            is_random=False,
+            tag="commonvoice_frequency_mask",
+        ).depends_on(["commonvoice_time_mask"])
         fp = MapperPipe(fp, mel, is_random=False).fix()
         return fp
 

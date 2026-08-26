@@ -12,6 +12,7 @@ from typing import Any, Iterable, List, Dict, Tuple, Optional, Set, Union
 from cedar.config import CedarContext
 from cedar.pipes import (
     Pipe,
+    PipeExecutionResource,
     PipeVariantType,
     PipeVariantContext,
     PipeVariantContextFactory,
@@ -52,12 +53,15 @@ def apply_profile_matched_resources(
     profiled_stats: Dict[str, Any],
     cpu_budget: int,
     fixed_local_workers: Optional[int] = None,
+    preserve_optimizer_widths: bool = False,
 ) -> Dict[str, Any]:
-    """Bind a physical plan to the exact per-stage profile width.
+    """Apply one strict remote-worker budget without forcing width one.
 
-    Local workers replicate every active Ray/SMP stage. With one CPU for each
-    local worker process, the unified single-node budget is
-    W * (1 + K_ray * A_ray + K_smp * A_smp).
+    The profile width describes measurement, not the final plan width. With W
+    local workers and one runtime-reserve slot per worker, every optimizer gets
+    the same remote budget ``floor(CPU_BUDGET / W) - 2``. Baselines distribute
+    it Cedar-style over fixed stages; joint DP may preserve an optimized
+    allocation that fits the same budget.
     """
     if cpu_budget < 1:
         raise RuntimeError(
@@ -94,17 +98,6 @@ def apply_profile_matched_resources(
     smp_width = _positive_resource_int(
         config.get("smp_procs_per_stage"), "smp_procs_per_stage"
     )
-    if (
-        ray_width != 1
-        or smp_width != 1
-        or config.get("actors_per_stage") != 1
-    ):
-        raise RuntimeError(
-            "This experiment requires actors_per_stage=1 for both Ray and SMP; "
-            f"profile has ray={ray_width}, smp={smp_width}, "
-            f"actors_per_stage={config.get('actors_per_stage')!r}"
-        )
-
     active_descs = [plan.pipe_descs[p_id] for p_id in plan.graph]
     active_ray_ds = [
         p_id
@@ -114,8 +107,8 @@ def apply_profile_matched_resources(
     if active_ray_ds:
         raise RuntimeError(
             "Strict profile resource matching does not support active "
-            "RAY_DS stages because their Ray Data task width is not bound "
-            "by ray_actors_per_stage=1; active pipe IDs: "
+            "RAY_DS stages because their task width is not exposed through "
+            "a plan variant context; active pipe IDs: "
             f"{active_ray_ds}"
         )
     ray_descs = [
@@ -129,69 +122,122 @@ def apply_profile_matched_resources(
         for desc in active_descs
         if desc.variant_type == PipeVariantType.SMP
     ]
-    per_worker_cpus = (
-        1 + len(ray_descs) * ray_width + len(smp_descs) * smp_width
-    )
-    if per_worker_cpus > cpu_budget:
-        raise RuntimeError(
-            "Final plan cannot fit one local worker under the unified CPU "
-            f"budget: per_worker={per_worker_cpus}, budget={cpu_budget}"
-        )
-
-    max_local_workers = cpu_budget // per_worker_cpus
     if fixed_local_workers is None:
-        local_workers = max_local_workers
-        local_worker_policy = "max_under_cpu_budget"
+        local_workers = max(1, int(plan.n_local_workers))
+        local_worker_policy = "optimizer_selected"
     else:
         local_workers = _positive_resource_int(
             fixed_local_workers, "fixed_local_workers"
         )
-        if local_workers > max_local_workers:
-            raise RuntimeError(
-                "Fixed local-worker ablation exceeds the unified CPU budget: "
-                f"fixed={local_workers}, max={max_local_workers}"
-            )
         local_worker_policy = "fixed_ablation"
     plan.set_local_workers(local_workers)
-    for desc in ray_descs:
-        desc.variant_ctx.n_actors = ray_width
-    for desc in smp_descs:
-        desc.variant_ctx.n_procs = smp_width
 
+    runtime_reserve = int(
+        os.environ.get("CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1")
+    )
+    if runtime_reserve < 0:
+        raise RuntimeError("Runtime CPU reserve must be non-negative.")
+    remote_budget = cpu_budget // local_workers - 1 - runtime_reserve
+    # Preserve physical graph order so the deterministic remainder allocation
+    # does not systematically favour one backend when Ray and SMP coexist.
+    remote_descs = [
+        desc
+        for desc in active_descs
+        if desc.variant_type
+        in (PipeVariantType.RAY, PipeVariantType.TF_RAY, PipeVariantType.SMP)
+    ]
+    if remote_descs and remote_budget < len(remote_descs):
+        raise RuntimeError(
+            "Physical plan has more remote stages than the common actor "
+            f"budget: stages={len(remote_descs)}, budget={remote_budget}"
+        )
+    if preserve_optimizer_widths:
+        widths = [
+            _positive_resource_int(
+                (
+                    desc.variant_ctx.n_actors
+                    if desc.variant_type
+                    in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+                    else desc.variant_ctx.n_procs
+                ),
+                "optimized stage width",
+            )
+            for desc in remote_descs
+        ]
+        if sum(widths) > remote_budget:
+            raise RuntimeError(
+                "Optimizer-selected widths exceed the common remote budget: "
+                f"widths={widths}, budget={remote_budget}"
+            )
+        allocation_policy = "joint_dp"
+    elif remote_descs:
+        quotient, remainder = divmod(remote_budget, len(remote_descs))
+        widths = [
+            quotient + (1 if index < remainder else 0)
+            for index in range(len(remote_descs))
+        ]
+        allocation_policy = "cedar_equal_share_exact_budget"
+    else:
+        widths = []
+        allocation_policy = "no_remote_stages"
+    for desc, width in zip(remote_descs, widths):
+        if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            desc.variant_ctx.n_actors = width
+        else:
+            desc.variant_ctx.n_procs = width
+
+    gpu_ray_descs = [
+        desc
+        for desc in ray_descs
+        if desc.execution_resource == PipeExecutionResource.CUDA
+    ]
+    global_gpu_actors = local_workers * sum(
+        desc.variant_ctx.n_actors for desc in gpu_ray_descs
+    )
+    gpu_fraction_per_actor = (
+        1.0 / global_gpu_actors if global_gpu_actors else 0.0
+    )
+    for desc in ray_descs:
+        desc.variant_ctx.num_gpus = (
+            gpu_fraction_per_actor
+            if desc.execution_resource == PipeExecutionResource.CUDA
+            else 0.0
+        )
+
+    ray_widths = [desc.variant_ctx.n_actors for desc in ray_descs]
+    smp_widths = [desc.variant_ctx.n_procs for desc in smp_descs]
+    used_remote_width = sum(ray_widths) + sum(smp_widths)
     signature = {
         "cpu_budget": cpu_budget,
         "local_workers": local_workers,
         "local_worker_policy": local_worker_policy,
+        "runtime_reserve_per_worker": runtime_reserve,
+        "remote_budget_per_worker": remote_budget,
+        "remote_width_used_per_worker": used_remote_width,
+        "allocation_policy": allocation_policy,
+        "profile_ray_actors_per_stage": ray_width,
+        "profile_smp_procs_per_stage": smp_width,
         "ray_stages": len(ray_descs),
         "smp_stages": len(smp_descs),
-        "ray_actors_per_stage_per_worker": ray_width,
-        "smp_procs_per_stage_per_worker": smp_width,
-        "global_ray_actors": (
-            local_workers * len(ray_descs) * ray_width
+        "ray_actor_widths_per_stage_per_worker": ray_widths,
+        "smp_process_widths_per_stage_per_worker": smp_widths,
+        "global_ray_actors": local_workers * sum(ray_widths),
+        "global_smp_procs": local_workers * sum(smp_widths),
+        "gpu_ray_stages": len(gpu_ray_descs),
+        "global_gpu_actors": global_gpu_actors,
+        "gpu_fraction_per_actor": gpu_fraction_per_actor,
+        "total_accounted_gpus": (
+            global_gpu_actors * gpu_fraction_per_actor
         ),
-        "global_smp_procs": (
-            local_workers * len(smp_descs) * smp_width
-        ),
-        "total_accounted_cpus": local_workers * per_worker_cpus,
+        "total_accounted_cpus": local_workers * (1 + used_remote_width),
     }
 
     if signature["total_accounted_cpus"] > cpu_budget:
         raise RuntimeError(
             f"Resource policy exceeded CPU budget: {signature}"
         )
-    if any(
-        desc.variant_ctx.n_actors != ray_width for desc in ray_descs
-    ):
-        raise RuntimeError(
-            "Ray plan width does not match profile resource signature"
-        )
-    if any(desc.variant_ctx.n_procs != smp_width for desc in smp_descs):
-        raise RuntimeError(
-            "SMP plan width does not match profile resource signature"
-        )
-
     logger.warning(
-        "Applied and verified profile-matched resource signature: %s",
+        "Applied common remote-resource budget: %s",
         signature,
     )
     return signature
@@ -1283,7 +1329,17 @@ class Feature(abc.ABC):
             )
             self.profile_matched_resource_signature = (
                 apply_profile_matched_resources(
-                    plan, profile, int(cpu_budget_raw), fixed_local_workers
+                    plan,
+                    profile,
+                    int(cpu_budget_raw),
+                    fixed_local_workers,
+                    preserve_optimizer_widths=bool(
+                        getattr(
+                            self.optimizer,
+                            "joint_actor_allocation",
+                            False,
+                        )
+                    ),
                 )
             )
         return plan

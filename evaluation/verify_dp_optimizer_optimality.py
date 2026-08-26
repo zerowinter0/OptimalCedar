@@ -204,10 +204,9 @@ def _plan_cost(
         if backend == "INPROCESS":
             local_serial += block_compute
         else:
-            local_serial += boundary_work
-            local_serial += 1e-3 * block_compute * block_compute / baseline_scale
+            stage_cost = block_compute + boundary_work
             parallel_bottleneck = max(
-                parallel_bottleneck, block_compute
+                parallel_bottleneck, stage_cost
             )
     return max(local_serial, parallel_bottleneck)
 

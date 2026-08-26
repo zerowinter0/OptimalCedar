@@ -95,6 +95,46 @@ def test_simple_dp_pipe_cost_ignores_extended_profile_layers():
     assert optimizer._calculate_pipe_cost(p_id, input_size, desc) == cedar_cost
 
 
+def test_simple_dp_joint_search_ignores_multiwidth_scaling_curves():
+    baseline_optimizer, baseline_plan, _ = _run(
+        _ray_profile_for,
+        offload=True,
+        fusion=True,
+        caching=False,
+    )
+
+    def extended_profile(feature):
+        profile = copy.deepcopy(_ray_profile_for(feature))
+        ray_entries = profile["offloads"]["RAY"]
+        profile["physical_model"] = {
+            "scaling": {
+                "RAY": {
+                    p_id: {
+                        "widths": {
+                            1: {
+                                "mean_ms_per_sample": 1e9,
+                                "adaptive_profile": {"converged": True},
+                            }
+                        }
+                    }
+                    for p_id in ray_entries
+                }
+            }
+        }
+        return profile
+
+    optimizer, plan, _ = _run(
+        extended_profile,
+        offload=True,
+        fusion=True,
+        caching=False,
+    )
+    assert optimizer._last_dp_search_result == (
+        baseline_optimizer._last_dp_search_result
+    )
+    assert plan.to_dict() == baseline_plan.to_dict()
+
+
 def test_simple_dp_profiling_emits_original_cedar_schema(
     monkeypatch, tmp_path
 ):
@@ -132,9 +172,6 @@ def test_simple_dp_profiling_emits_original_cedar_schema(
 
     monkeypatch.setattr(dataset, "_profile_ray", profile_ray)
     monkeypatch.setattr(dataset, "_profile_smp", profile_smp)
-    monkeypatch.setattr(
-        "cedar.client.dataset._set_cpu_affinity", lambda mask: None
-    )
     monkeypatch.setattr(
         dataset,
         "_profile_tf",

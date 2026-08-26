@@ -343,7 +343,9 @@ class RayMapperPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return RayActorMapperPipeVariant.remote(self.name, self.fn)
+        return RayActorMapperPipeVariant.options(
+            num_gpus=self.variant_ctx.num_gpus
+        ).remote(self.name, self.fn)
 
 
 class TFMapperPipeVariant(TFPipeVariant):
@@ -467,7 +469,9 @@ class TFRayMapperPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return TFRayActorMapperPipeVariant.remote(
+        return TFRayActorMapperPipeVariant.options(
+            num_gpus=self.variant_ctx.num_gpus
+        ).remote(
             self.name,
             self.fn,
             self.tf_spec,

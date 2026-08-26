@@ -14,6 +14,7 @@ CPU_BUDGET=64
 PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-3600}"
 SELECTED_WORKLOADS="all"
 INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
+STACKEXCHANGE_DATASET_PATH="${STACKEXCHANGE_DATASET_PATH:-datasets/stackexchange/redpajama-stackexchange-400000.jsonl}"
 export INCREMENTAL_BACKEND_COMPUTE
 
 usage() {
@@ -202,7 +203,7 @@ run_profile() {
   local target_profile="${PROFILE_ROOT}/${name}.yaml"
   local log="${LOG_ROOT}/${name}.log"
   local -a args=(
-    taskset -c 0 python evaluation/eval_cedar.py
+    python evaluation/eval_cedar.py
     --dataset_file "${dataset}"
     --profiled_stats "${staged_profile}"
     --run_profiling
@@ -284,7 +285,7 @@ run_selected_profile llava_pretrain evaluation/pipelines/llava_pretrain/cedar_da
 run_selected_profile redpajama_c4 evaluation/pipelines/redpajama_c4/cedar_dataset.py \
   "dataset_path=datasets/redpajama_c4/redpajama-c4-raw-829916.jsonl" || failures+=(redpajama_c4)
 run_selected_profile stackexchange evaluation/pipelines/stackexchange/cedar_dataset.py \
-  "dataset_path=datasets/stackexchange/redpajama-stackexchange-35000.jsonl" || failures+=(stackexchange)
+  "dataset_path=${STACKEXCHANGE_DATASET_PATH}" || failures+=(stackexchange)
 run_selected_profile alpaca_cot evaluation/pipelines/alpaca_cot/cedar_dataset.py \
   "dataset_path=datasets/alpaca_cot/alpaca-cot-en-cot-data.jsonl" || failures+=(alpaca_cot)
 run_selected_profile redpajama_arxiv evaluation/pipelines/redpajama_arxiv/cedar_dataset.py \

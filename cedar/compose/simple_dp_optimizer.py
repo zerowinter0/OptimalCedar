@@ -26,6 +26,7 @@ from .dp_optimizer import (
     SearchResult,
     TransitionChoice,
 )
+from .my_optimizer import MyOptimizer
 from .optimizer import Optimizer, OptimizerOptions, PhysicalPlan, PipeDesc
 
 
@@ -64,6 +65,8 @@ class _CedarCostBlockCandidateProvider(BlockCandidateProvider):
                         variant=candidate.variant,
                         cost=candidate.cost * ratio,
                         materializes_fusion=True,
+                        execution_resource=candidate.execution_resource,
+                        parallelism=candidate.parallelism,
                     )
                 )
             candidates = adjusted
@@ -75,9 +78,13 @@ class _CedarCostBlockCandidateProvider(BlockCandidateProvider):
         order: Iterable[int],
         variant: PipeVariantType,
         prefix_mask: int = 0,
+        parallelism: int = 1,
     ) -> BlockCandidate:
         candidate = super().candidate_for_order(
-            order, variant, prefix_mask=prefix_mask
+            order,
+            variant,
+            prefix_mask=prefix_mask,
+            parallelism=parallelism,
         )
         if candidate.mask.bit_count() <= 1:
             return candidate
@@ -88,6 +95,8 @@ class _CedarCostBlockCandidateProvider(BlockCandidateProvider):
             variant=candidate.variant,
             cost=candidate.cost * ratio,
             materializes_fusion=True,
+            execution_resource=candidate.execution_resource,
+            parallelism=candidate.parallelism,
         )
 
 
@@ -133,6 +142,11 @@ class _CedarCacheTransitionPolicy(CacheTransitionPolicy):
 
 class SimpleDpOptimizer(DpOptimizer):
     """Joint DP whose objective is exactly Cedar's original scalar cost."""
+
+    joint_actor_allocation = False
+
+    def _allocate_final_remote_stage_resources(self) -> None:
+        MyOptimizer._allocate_final_remote_stage_resources(self)
 
     def run(
         self,
@@ -200,6 +214,24 @@ class SimpleDpOptimizer(DpOptimizer):
         # baseline-size scaling plus whole-pipeline Amdahl inversion.
         return Optimizer._calculate_pipe_cost(self, p_id, input_size, desc)
 
+    def _dp_pipe_cost_at_parallelism(
+        self,
+        p_id: int,
+        variant_type: PipeVariantType,
+        parallelism: int,
+        width_one_cost: float,
+    ) -> float:
+        """Keep this ablation independent of PICO's scaling curves.
+
+        Simple-DP is defined as the joint DP search evaluated strictly with
+        Cedar's original whole-pipeline offload cost.  The shared candidate
+        provider asks PICO optimizers for a width-specific worker cost; using
+        that hook here would silently replace Cedar's estimate with the new
+        layered profile and make the DP search disagree with Cedar's own
+        materialized ``calculate_cost``.
+        """
+        return width_one_cost
+
     def _dp_work_prod(self, mask: int) -> float:
         return self._dp_r_prod[mask]
 
@@ -249,6 +281,7 @@ class SimpleDpOptimizer(DpOptimizer):
         previous: DpObjectiveCost,
         extra_cost: float,
         block: BlockCandidate,
+        prev_mask: int,
     ) -> DpObjectiveCost:
         return DpObjectiveCost(
             local_serial=previous.local_serial + extra_cost
@@ -327,9 +360,12 @@ class SimpleDpOptimizer(DpOptimizer):
         state = cache_policy.initial_state()
         objective = self._dp_initial_objective_cost()
         prev_mask = 0
-        for order, variant, wants_cache in block_specs:
+        for order, variant, wants_cache, parallelism in block_specs:
             block = provider.candidate_for_order(
-                order, variant, prefix_mask=prev_mask
+                order,
+                variant,
+                prefix_mask=prev_mask,
+                parallelism=parallelism,
             )
             next_mask = prev_mask | block.mask
             regular_cost = self._dp_regular_transition_cost(
@@ -361,7 +397,7 @@ class SimpleDpOptimizer(DpOptimizer):
                 )
             else:
                 objective = self._dp_accumulate_objective_cost(
-                    objective, choice.extra_cost, block
+                    objective, choice.extra_cost, block, prev_mask
                 )
             state = choice.state
             prev_mask = next_mask

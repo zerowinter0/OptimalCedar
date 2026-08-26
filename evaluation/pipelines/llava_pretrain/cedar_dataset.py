@@ -20,7 +20,12 @@ from typing import List
 from cedar.client import DataSet
 from cedar.compose import Feature, OptimizerOptions
 from cedar.config import CedarContext
-from cedar.pipes import FilterPipe, MapperPipe, Pipe
+from cedar.pipes import (
+    FilterPipe,
+    MapperPipe,
+    Pipe,
+    PipeExecutionResource,
+)
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
@@ -129,6 +134,7 @@ class LlavaPretrainFeature(Feature):
             ),
             tag="image_text_similarity",
         )
+        fp.set_execution_resource(PipeExecutionResource.CUDA)
         fp = FilterPipe(
             fp,
             dj_ops.ImageTextMatchingFilter(
@@ -137,6 +143,7 @@ class LlavaPretrainFeature(Feature):
             ),
             tag="image_text_matching",
         )
+        fp.set_execution_resource(PipeExecutionResource.CUDA)
 
         fp = MapperPipe(fp, dj_ops.sync_text_key, tag="sync_text").fix()
         return fp

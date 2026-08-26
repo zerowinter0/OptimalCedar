@@ -1,6 +1,7 @@
 import logging
 import os
 import pathlib
+import statistics
 import threading
 import multiprocessing as mp
 import math
@@ -15,8 +16,10 @@ from queue import Queue, Empty
 
 from cedar.config import CedarContext
 from cedar.compose import Feature, OptimizerOptions, PhysicalPlan
+from cedar.compose import constants as compose_constants
 from cedar.pipes import (
     FilterPipe,
+    MapperPipe,
     Pipe,
     PipeVariant,
     DataSample,
@@ -32,7 +35,10 @@ from cedar.pipes.common import (
     set_profile_input_reservoir,
 )
 from .profiler import FeatureProfiler
-from .boundary_profiler import profile_stage_boundary_cached
+from .boundary_profiler import (
+    profile_object_marshalling,
+    profile_stage_boundary_cached,
+)
 from .controller import FeatureController
 from .logger import DataSetLogger
 from .utils import (
@@ -50,7 +56,6 @@ from .constants import (
     SMP_PROFILE_N_PROCS,
     SMP_PROFILE_INFLIGHT,
     SMP_PROFILE_PREFETCH,
-    SMP_TASKSET_MASK,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,6 +81,44 @@ def _profile_time_sec_from_env() -> float:
 
 
 PROFILE_TIME_SEC = _profile_time_sec_from_env()
+
+
+def _minimum_parallel_epoch_records(
+    variant_type: PipeVariantType,
+    width: int,
+    ray_batch_size: int,
+    minimum_records_per_worker: Optional[int] = None,
+) -> int:
+    """Return an epoch size that exercises every worker sufficiently.
+
+    A global observation count is misleading at high width: with 48 Ray
+    actors and batch size 10, the old rule supplied only two batches to each
+    actor.  Require a per-worker record floor and preserve complete Ray
+    batches so width curves represent sustained rather than startup behavior.
+    """
+    if width < 1 or ray_batch_size < 1:
+        raise ValueError("width and ray_batch_size must be positive")
+    if variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+        per_worker = ray_batch_size * 2
+        if minimum_records_per_worker is not None:
+            per_worker = max(per_worker, minimum_records_per_worker)
+        per_worker = (
+            (per_worker + ray_batch_size - 1) // ray_batch_size
+        ) * ray_batch_size
+    else:
+        per_worker = max(4, minimum_records_per_worker or 0)
+    return width * per_worker
+
+
+def _accept_profile_value(value: Any) -> bool:
+    """Pickle-safe pass-through predicate for boundary profiling.
+
+    A ``MapperPipe`` cannot be a backend-neutral identity for tuple values:
+    Cedar's SMP mapper expands tuple inputs as positional arguments, whereas
+    its Ray mapper passes the tuple as one value.  A filter actor evaluates
+    the predicate but returns the original object unchanged on both backends.
+    """
+    return True
 
 
 class _ProfileReplayPipeVariant(PipeVariant):
@@ -1397,6 +1440,15 @@ class DataSet:
                 "boundary": {},
             }
 
+        if layered_profile and profile_boundaries:
+            if self.ctx.use_ray():
+                self._profile_boundary_model(
+                    d, PipeVariantType.RAY, RAY_PROFILE_N_ACTORS
+                )
+            self._profile_boundary_model(
+                d, PipeVariantType.SMP, SMP_PROFILE_N_PROCS
+            )
+
         if layered_profile:
             if reservoir is None:
                 raise RuntimeError("Layered profile input reservoir is absent")
@@ -1408,17 +1460,19 @@ class DataSet:
             if self.ctx.use_ray():
                 self._profile_ray(d, feature_to_profile, f_name, n_samples)
 
-            # NOTE: Run this last as it un-tasksets
-            _set_cpu_affinity(SMP_TASKSET_MASK)
             self._profile_smp(d, feature_to_profile, f_name, n_samples)
 
-        if self.ctx.use_ray() and profile_boundaries:
+        if (
+            not layered_profile
+            and self.ctx.use_ray()
+            and profile_boundaries
+        ):
             self._profile_boundary_model(
                 d,
                 PipeVariantType.RAY,
                 RAY_PROFILE_N_ACTORS,
             )
-        if profile_boundaries:
+        if not layered_profile and profile_boundaries:
             self._profile_boundary_model(
                 d,
                 PipeVariantType.SMP,
@@ -1476,7 +1530,6 @@ class DataSet:
                     n_samples,
                     profile_backend_compute=False,
                 )
-            _set_cpu_affinity(SMP_TASKSET_MASK)
             self._profile_smp(
                 profile,
                 feature,
@@ -1729,7 +1782,6 @@ class DataSet:
             self._profile_ray(
                 fresh, feature_to_profile, f_name, n_samples
             )
-        _set_cpu_affinity(SMP_TASKSET_MASK)
         self._profile_smp(fresh, feature_to_profile, f_name, n_samples)
 
         existing_offloads = profile.get("offloads")
@@ -1964,6 +2016,8 @@ class DataSet:
         max_duration: float,
         target_rse: float,
         min_observations: int,
+        ray_submit_batch_size: Optional[int] = None,
+        minimum_records_per_worker: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Measure one backend with fixed inputs until confidence converges."""
         replay = _ProfileReplayPipeVariant(snapshots, 1)
@@ -1977,7 +2031,11 @@ class DataSet:
                 max_inflight=max(RAY_PROFILE_INFLIGHT, width * 5),
                 max_prefetch=RAY_PROFILE_PREFETCH,
                 use_threads=True,
-                submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
+                submit_batch_size=(
+                    ray_submit_batch_size
+                    if ray_submit_batch_size is not None
+                    else RAY_PROFILE_SUBMIT_BATCH_SIZE
+                ),
                 profile_backend_compute=True,
             )
         elif variant_type == PipeVariantType.TF_RAY:
@@ -2014,11 +2072,35 @@ class DataSet:
                 f"{variant_type.name} variant exposes no profiling service"
             )
         try:
+            if variant_type in (
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            ):
+                effective_batch = (
+                    ray_submit_batch_size
+                    if ray_submit_batch_size is not None
+                    else RAY_PROFILE_SUBMIT_BATCH_SIZE
+                )
+            else:
+                effective_batch = 1
+            minimum_parallel_epoch = _minimum_parallel_epoch_records(
+                variant_type,
+                width,
+                effective_batch,
+                minimum_records_per_worker,
+            )
+
+            # Warm the same per-worker work quantum used by measurement. Ray
+            # dispatches batches randomly, so the historical one-record warmup
+            # reached only one actor; at width 48, half of a two-batch/actor
+            # measurement could then be cold starts. A sustained warmup makes
+            # the confidence test operate on a stationary population.
             warm_started = time.perf_counter()
-            replay.record_count = 1
+            replay.record_count = minimum_parallel_epoch
             for _ in variant:
                 pass
             warm_elapsed = max(time.perf_counter() - warm_started, 1e-6)
+            warm_sec_per_record = warm_elapsed / minimum_parallel_epoch
             reset_stats = getattr(
                 service, "reset_backend_compute_stats", None
             )
@@ -2028,17 +2110,25 @@ class DataSet:
                 )
             reset_stats()
 
-            # Aim for roughly half-second epochs. This bounds stopping
-            # overshoot without paying iterator reset overhead per record.
-            epoch_records = max(1, min(256, int(0.5 / warm_elapsed)))
+            # Aim for roughly half-second epochs, but a parallel epoch must
+            # actually exercise every worker. The old upper bound of 256
+            # records could produce e.g. seven records for width=8 with a Ray
+            # submit batch of ten: one tail task ran on one actor and the
+            # resulting measurement was incorrectly labelled width=8.
+            epoch_records = max(
+                minimum_parallel_epoch,
+                min(4096, int(0.5 / warm_sec_per_record)),
+            )
             started = time.perf_counter()
             converged = False
             rse = math.inf
             stats = None
+            measured_input_records = 0
             while True:
                 replay.record_count = epoch_records
                 for _ in variant:
                     pass
+                measured_input_records += epoch_records
                 elapsed = time.perf_counter() - started
                 stats = service.get_backend_compute_stats()
                 if stats is not None:
@@ -2057,11 +2147,17 @@ class DataSet:
                     f"No {variant_type.name} worker timing for pipe {pipe.id}"
                 )
             stats = dict(stats)
+            stats["end_to_end_ms_per_input_sample"] = (
+                elapsed * 1000.0 / measured_input_records
+            )
+            stats["measured_input_records"] = measured_input_records
             stats["adaptive_profile"] = {
                 "width": width,
                 "elapsed_sec": elapsed,
                 "warmup_sec": warm_elapsed,
+                "warmup_records": minimum_parallel_epoch,
                 "epoch_records": epoch_records,
+                "minimum_parallel_epoch_records": minimum_parallel_epoch,
                 "unique_input_records": len(snapshots),
                 "target_rse": target_rse,
                 "observed_rse": rse,
@@ -2116,7 +2212,11 @@ class DataSet:
             if variant_type == PipeVariantType.RAY and not self.ctx.use_ray():
                 continue
             if variant_type == PipeVariantType.SMP:
-                _set_cpu_affinity(SMP_TASKSET_MASK)
+                # Do not inherit Cedar's historical eight-CPU profile mask.
+                # Formal W=8 execution uses the full container cpuset, and
+                # restricting a width-48 curve to CPUs 0-7 measures a wholly
+                # different resource configuration.
+                pass
             for p_id, pipe in feature.logical_pipes.items():
                 if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
                     continue
@@ -2168,27 +2268,197 @@ class DataSet:
         physical = profile.setdefault(
             "physical_model", {"schema_version": 1, "boundary": {}}
         )
+        object_boundaries = physical.setdefault("object_boundary", {})
+        identity_min_duration = float(
+            os.environ.get("CEDAR_IDENTITY_BOUNDARY_MIN_SEC", "0.5")
+        )
+        identity_max_duration = float(
+            os.environ.get("CEDAR_IDENTITY_BOUNDARY_MAX_SEC", "3")
+        )
+        if not (0 < identity_min_duration <= identity_max_duration):
+            raise RuntimeError("Invalid identity boundary profile duration")
+        for variant_type in (PipeVariantType.RAY, PipeVariantType.SMP):
+            if variant_type == PipeVariantType.RAY and not self.ctx.use_ray():
+                continue
+            values_by_pipe = {}
+            marshalling_cache = {}
+            identity_cache = {}
+
+            def identity_boundary_for(boundary_p_id: int) -> Dict[str, Any]:
+                cached = identity_cache.get(boundary_p_id)
+                if cached is not None:
+                    return cached
+                boundary_snapshots = reservoir.values_for(boundary_p_id)
+                if not boundary_snapshots:
+                    raise ValueError(
+                        f"No legal boundary inputs for pipe {boundary_p_id}"
+                    )
+                boundary_pipe = feature.logical_pipes[boundary_p_id]
+                identity_pipe = FilterPipe(
+                    boundary_pipe, _accept_profile_value
+                )
+                submit_batch_size = None
+                if variant_type == PipeVariantType.RAY:
+                    serialized_size = statistics.median(
+                        len(value) for value in boundary_snapshots
+                    )
+                    submit_batch_size = min(
+                        max(
+                            int(
+                                compose_constants.RAY_SUBMIT_BATCH_SCALING_FACTOR
+                                // max(2 * serialized_size, 1)
+                            ),
+                            1,
+                        ),
+                        500,
+                    )
+                timing = self._adaptive_operator_benchmark(
+                    identity_pipe,
+                    boundary_snapshots,
+                    variant_type,
+                    1,
+                    identity_min_duration,
+                    identity_max_duration,
+                    min(0.10, target_rse),
+                    min_observations,
+                    ray_submit_batch_size=submit_batch_size,
+                )
+                result = {
+                    "method": "cedar_identity_stage_real_objects",
+                    "mean_ms_per_sample": float(
+                        timing["end_to_end_ms_per_input_sample"]
+                    ),
+                    "backend_compute_ms_per_sample": float(
+                        timing["mean_ms_per_sample"]
+                    ),
+                    "input_records": int(timing["measured_input_records"]),
+                    "submit_batch_size": (
+                        submit_batch_size
+                        if submit_batch_size is not None
+                        else 1
+                    ),
+                    "adaptive_profile": timing["adaptive_profile"],
+                }
+                identity_cache[boundary_p_id] = result
+                return result
+
+            for p_id, pipe in feature.logical_pipes.items():
+                if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
+                    continue
+                predecessor_id = pipe.input_pipes[0].id
+                try:
+                    if predecessor_id not in marshalling_cache:
+                        marshalling_cache[predecessor_id] = (
+                            profile_object_marshalling(
+                                reservoir.values_for(predecessor_id),
+                                variant_type,
+                            )
+                        )
+                    if p_id not in marshalling_cache:
+                        marshalling_cache[p_id] = profile_object_marshalling(
+                            reservoir.values_for(p_id), variant_type
+                        )
+                    input_identity = identity_boundary_for(predecessor_id)
+                    output_identity = identity_boundary_for(p_id)
+                except (ValueError, TypeError, pickle.PickleError) as exc:
+                    logger.warning(
+                        "Skipping real-object %s boundary for pipe %s: %s",
+                        variant_type.name,
+                        p_id,
+                        exc,
+                    )
+                    continue
+                values_by_pipe[p_id] = {
+                    "input_pipe_id": predecessor_id,
+                    "input_serialize_ms_per_sample": marshalling_cache[
+                        predecessor_id
+                    ]["serialize_ms_per_sample"],
+                    "output_deserialize_ms_per_sample": marshalling_cache[
+                        p_id
+                    ]["deserialize_ms_per_sample"],
+                    "input_serialized_bytes_per_sample": marshalling_cache[
+                        predecessor_id
+                    ]["serialized_bytes_per_sample"],
+                    "output_serialized_bytes_per_sample": marshalling_cache[
+                        p_id
+                    ]["serialized_bytes_per_sample"],
+                    "input_identity_stage": input_identity,
+                    "output_identity_stage": output_identity,
+                }
+            object_boundaries[variant_type.name] = {
+                "schema_version": 2,
+                "method": "cedar_identity_stage_real_legal_objects",
+                "operators": values_by_pipe,
+            }
         scaling = physical.setdefault("scaling", {})
         top_k = int(os.environ.get("CEDAR_PROFILE_SCALING_TOP_K", "2"))
-        scaling_width = int(
-            os.environ.get("CEDAR_PROFILE_SCALING_WIDTH", "8")
+        raw_widths = os.environ.get("CEDAR_PROFILE_SCALING_WIDTHS")
+        if raw_widths is None:
+            raw_widths = os.environ.get("CEDAR_PROFILE_SCALING_WIDTH", "8")
+        try:
+            scaling_widths = sorted(
+                {int(value.strip()) for value in raw_widths.split(",")}
+            )
+        except ValueError as exc:
+            raise RuntimeError("Invalid scaling profile widths") from exc
+        if not scaling_widths or scaling_widths[0] < 1:
+            raise RuntimeError("Scaling profile widths must be positive")
+        scaling_max_duration = float(
+            os.environ.get("CEDAR_PROFILE_SCALING_MAX_SEC", "20")
         )
+        if scaling_max_duration <= 0:
+            raise RuntimeError("Invalid scaling profile max duration")
+        scaling_ray_batch_size = int(
+            os.environ.get("CEDAR_PROFILE_SCALING_RAY_BATCH_SIZE", "1")
+        )
+        scaling_min_records_per_worker = int(
+            os.environ.get(
+                "CEDAR_PROFILE_SCALING_MIN_RECORDS_PER_WORKER", "100"
+            )
+        )
+        if scaling_ray_batch_size < 1 or scaling_min_records_per_worker < 1:
+            raise RuntimeError("Invalid scaling profile work quantum")
         for family, entries in candidates.items():
             scaling[family.name] = {}
-            for _, p_id, pipe, snapshots, effective_variant in sorted(
+            ranked_entries = sorted(
                 entries, reverse=True, key=lambda item: item[0]
-            )[:top_k]:
-                timing = self._adaptive_operator_benchmark(
-                    pipe,
-                    snapshots,
-                    effective_variant,
-                    scaling_width,
-                    min(1.0, min_duration),
-                    min(10.0, max_duration),
-                    min(0.15, max(target_rse, 0.01)),
-                    min_observations,
-                )
-                scaling[family.name][p_id] = timing
+            )
+            if top_k > 0:
+                ranked_entries = ranked_entries[:top_k]
+            for _, p_id, pipe, snapshots, effective_variant in ranked_entries:
+                width_timings = {}
+                for scaling_width in scaling_widths:
+                    if scaling_width == 1:
+                        timing = isolated.get(
+                            f"{effective_variant.name}:{p_id}"
+                        )
+                    else:
+                        timing = self._adaptive_operator_benchmark(
+                            pipe,
+                            snapshots,
+                            effective_variant,
+                            scaling_width,
+                            min(1.0, min_duration),
+                            min(scaling_max_duration, max_duration),
+                            min(0.15, max(target_rse, 0.01)),
+                            min_observations,
+                            ray_submit_batch_size=(
+                                scaling_ray_batch_size
+                                if effective_variant
+                                in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+                                else None
+                            ),
+                            minimum_records_per_worker=(
+                                scaling_min_records_per_worker
+                            ),
+                        )
+                    if timing is not None:
+                        width_timings[scaling_width] = timing
+                scaling[family.name][p_id] = {
+                    "schema_version": 2,
+                    "method": "legal_input_multiwidth_actor_curve",
+                    "widths": width_timings,
+                }
 
         profile["layered_profile"] = {
             "schema_version": 1,
@@ -2198,6 +2468,7 @@ class DataSet:
             "component_layers": {
                 "operator_compute": "isolated_replay",
                 "stage_boundary": "physical_model.boundary",
+                "object_marshalling": "physical_model.object_boundary",
                 "parallel_scaling": "physical_model.scaling",
                 "contention_and_fusion": "deferred_to_selected_plan_validation",
             },
@@ -2460,9 +2731,3 @@ class DataSet:
     def _exit(self):
         # Backwards-compatible test helper.
         self.close()
-
-
-def _set_cpu_affinity(mask):
-    pid = os.getpid()  # Get current process ID
-    command = f"taskset -p {mask} {pid}"
-    os.system(command)  # Execute the taskset command

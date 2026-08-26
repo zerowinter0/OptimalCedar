@@ -201,6 +201,7 @@ class ExpOptimizer(DpOptimizer):
         previous: DpObjectiveCost,
         extra_cost: float,
         block: BlockCandidate,
+        prev_mask: int,
     ) -> DpObjectiveCost:
         return DpObjectiveCost(
             local_serial=previous.local_serial + extra_cost

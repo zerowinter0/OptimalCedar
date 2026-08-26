@@ -16,6 +16,7 @@ from pathlib import Path
 from evaluation.cedar_utils import CedarEvalSpec
 
 from evaluation.profiler import Profiler
+from cedar.utils.threading import limit_native_threadpools
 
 
 logger = logging.getLogger(__name__)
@@ -350,8 +351,10 @@ def main():
     spec = create_spec(args)
 
     # Set torch parallelism
+    native_threadpool_limiter = None
     if not args.allow_torch_parallelism:
         logger.warning("Setting torch threads to 1")
+        native_threadpool_limiter = limit_native_threadpools(1)
         torch.set_num_threads(1)
         # torch.set_num_interop_threads(1)
 

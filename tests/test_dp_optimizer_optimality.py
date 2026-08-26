@@ -255,7 +255,9 @@ def test_pareto_frontier_keeps_initially_slower_parallel_choice():
         def _dp_parallel_stage_cpu_cost(self, variant):
             return 1
 
-        def _dp_accumulate_objective_cost(self, previous, extra, block):
+        def _dp_accumulate_objective_cost(
+            self, previous, extra, block, prev_mask
+        ):
             if block.variant == PipeVariantType.RAY:
                 return DpObjectiveCost(
                     previous.local_serial,
@@ -327,7 +329,9 @@ def test_bottleneck_objective_balances_two_parallel_stages():
         def _dp_parallel_stage_cpu_cost(self, variant):
             return 1
 
-        def _dp_accumulate_objective_cost(self, previous, extra, block):
+        def _dp_accumulate_objective_cost(
+            self, previous, extra, block, prev_mask
+        ):
             return DpObjectiveCost(
                 previous.local_serial,
                 max(previous.parallel_bottleneck, extra),

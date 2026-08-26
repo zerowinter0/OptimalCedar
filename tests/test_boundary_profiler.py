@@ -1,11 +1,34 @@
+import pickle
+
 import pytest
 
 from cedar.client import boundary_profiler
 from cedar.client.boundary_profiler import (
+    DEFAULT_PAYLOAD_BYTES,
     fit_boundary_model,
+    profile_object_marshalling,
     profile_stage_boundary_cached,
 )
 from cedar.pipes import PipeVariantType
+
+
+def test_synthetic_boundary_calibration_covers_small_objects():
+    assert min(DEFAULT_PAYLOAD_BYTES) <= 512
+    assert 4 * 1024 in DEFAULT_PAYLOAD_BYTES
+
+
+def test_object_marshalling_uses_real_nested_values():
+    snapshots = [
+        pickle.dumps({"text": "x" * 100, "ids": list(range(16))})
+        for _ in range(3)
+    ]
+    result = profile_object_marshalling(
+        snapshots, PipeVariantType.SMP, max_samples=2
+    )
+    assert result["samples"] == 2
+    assert result["serialized_bytes_per_sample"] > 100
+    assert result["serialize_ms_per_sample"] >= 0
+    assert result["deserialize_ms_per_sample"] >= 0
 
 
 def test_fit_boundary_model_recovers_latency_and_bandwidth():

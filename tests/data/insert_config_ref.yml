@@ -23,26 +23,31 @@ physical_plan:
   n_local_workers: 1
   pipes:
     0:
+      execution_resource: cpu
       name: NoopPipe
       variant: INPROCESS
       variant_ctx:
         variant_type: INPROCESS
     1:
+      execution_resource: cpu
       name: NoopPipe
       variant: INPROCESS
       variant_ctx:
         variant_type: INPROCESS
     2:
+      execution_resource: cpu
       name: NoopPipe
       variant: INPROCESS
       variant_ctx:
         variant_type: INPROCESS
     3:
+      execution_resource: cpu
       name: IterSourcePipe
       variant: INPROCESS
       variant_ctx:
         variant_type: INPROCESS
     4:
+      execution_resource: cpu
       name: NoopOptimizerPipe
       variant: INPROCESS
       variant_ctx:
