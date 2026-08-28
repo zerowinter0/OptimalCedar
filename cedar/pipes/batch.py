@@ -1,5 +1,3 @@
-import torch
-import tensorflow as tf
 import logging
 from .pipe import (
     Pipe,
@@ -11,6 +9,12 @@ from .variant import (
 from .context import (
     PipeVariantType,
     InProcessPipeVariantContext,
+)
+from cedar.utils.frameworks import (
+    is_tensorflow_tensor,
+    is_torch_tensor,
+    tensorflow,
+    torch,
 )
 from .common import DataSample, cedar_pipe, CedarPipeSpec
 from typing import Optional
@@ -103,9 +107,9 @@ class InProcessBatcherPipeVariant(InProcessPipeVariant):
                             if batch_ds.do_trace:
                                 batch_ds.set_size(self.p_id, len(batch_ds.data))
 
-                            if torch.is_tensor(batch_ds.data[0]):
+                            if is_torch_tensor(batch_ds.data[0]):
                                 try:
-                                    batch_ds.data = torch.stack(
+                                    batch_ds.data = torch().stack(
                                         batch_ds.data, dim=0
                                     )
                                 except RuntimeError:
@@ -120,16 +124,18 @@ class InProcessBatcherPipeVariant(InProcessPipeVariant):
                     if len(batch_ds.data) > 0 and not self.drop_last:
                         if batch_ds.do_trace:
                             batch_ds.set_size(self.p_id, len(batch_ds.data))
-                        if torch.is_tensor(batch_ds.data[0]):
+                        if is_torch_tensor(batch_ds.data[0]):
                             try:
-                                batch_ds.data = torch.stack(
+                                batch_ds.data = torch().stack(
                                     batch_ds.data, dim=0
                                 )
                             except RuntimeError:
                                 logger.warning("Could not batch torch data")
-                        elif tf.is_tensor(batch_ds.data[0]):
+                        elif is_tensorflow_tensor(batch_ds.data[0]):
                             try:
-                                batch_ds.data = tf.stack(batch_ds.data, axis=0)
+                                batch_ds.data = tensorflow().stack(
+                                    batch_ds.data, axis=0
+                                )
                             except RuntimeError:
                                 logger.warning("Could not batch tf data")
                         yield batch_ds

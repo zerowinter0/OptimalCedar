@@ -15,6 +15,8 @@ PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-3600}"
 SELECTED_WORKLOADS="all"
 INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
 STACKEXCHANGE_DATASET_PATH="${STACKEXCHANGE_DATASET_PATH:-datasets/stackexchange/redpajama-stackexchange-400000.jsonl}"
+COMMONVOICE_SAMPLES="${COMMONVOICE_SAMPLES:-240000}"
+COMMONVOICE_DATASET_PATHS="${COMMONVOICE_DATASET_PATHS:-datasets/commonvoice/cv15_en_train_5shards;evaluation/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips}"
 export INCREMENTAL_BACKEND_COMPUTE
 
 usage() {
@@ -278,7 +280,9 @@ fi
 
 failures=()
 run_selected_profile coco evaluation/pipelines/coco/cedar_dataset.py || failures+=(coco)
-run_selected_profile commonvoice evaluation/pipelines/commonvoice/cedar_dataset.py || failures+=(commonvoice)
+run_selected_profile commonvoice evaluation/pipelines/commonvoice/cedar_dataset.py \
+  "dataset_paths=${COMMONVOICE_DATASET_PATHS},max_samples=${COMMONVOICE_SAMPLES}" \
+  || failures+=(commonvoice)
 run_selected_profile commonvoice_cache evaluation/pipelines/commonvoice/cedar_cache_dataset.py || failures+=(commonvoice_cache)
 run_selected_profile llava_pretrain evaluation/pipelines/llava_pretrain/cedar_dataset.py \
   "dataset_path=evaluation/datasets/llava_pretrain/blip_laion_cc_sbu_20000_dj_fmt_only_caption.jsonl,image_root=evaluation/datasets/llava_pretrain" || failures+=(llava_pretrain)
@@ -301,7 +305,7 @@ run_selected_profile video_self_evolution \
 run_selected_profile pile_europarl evaluation/pipelines/pile_europarl/cedar_dataset.py \
   "dataset_path=datasets/pile_europarl/pile-europarl-raw.jsonl" || failures+=(pile_europarl)
 run_selected_profile redpajama_code evaluation/pipelines/redpajama_code/cedar_dataset.py \
-  "dataset_path=datasets/redpajama_code/redpajama-github-raw-50000.jsonl" || failures+=(redpajama_code)
+  "dataset_path=${REDPAJAMA_CODE_DATASET_PATH:-datasets/redpajama_code/redpajama-github-raw-100000.jsonl}" || failures+=(redpajama_code)
 run_selected_profile pile_hackernews evaluation/pipelines/pile_hackernews/cedar_dataset.py \
   "dataset_path=datasets/pile_hackernews/pile-hackernews-raw-100000.jsonl" || failures+=(pile_hackernews)
 run_selected_profile pile_pubmed_abstracts evaluation/pipelines/pile_pubmed_abstracts/cedar_dataset.py \

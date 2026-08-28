@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import ray
 import time
 from collections import deque
-from typing import Optional, List, Any, Callable
+from typing import TYPE_CHECKING, Optional, List, Any, Callable
 from .registry import register_optimizer_pipe
 from ..pipe import (
     Pipe,
@@ -32,7 +34,10 @@ from ..common import (
 from ..filter import is_dropped_sample
 from cedar.service import SMPActor, RayActor
 
-import tensorflow as tf
+from cedar.utils.frameworks import tensorflow
+
+if TYPE_CHECKING:
+    import tensorflow as tf
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +322,7 @@ class TFFusedOptimizerPipeVariant(TFPipeVariant):
         variant_ctx: TFPipeVariantContext,
         tf_spec: tf.TensorSpec,
     ):
+        tf = tensorflow()
         super().__init__(input_pipe_variant)
         self.variant_ctx = variant_ctx
         self.dataset = tf.data.Dataset.from_generator(
@@ -345,6 +351,7 @@ class TFFusedOptimizerPipeVariant(TFPipeVariant):
                 return
 
     def _iter_impl(self):
+        tf = tensorflow()
         while True:
             try:
                 data = self.dataset_iter.get_next()
@@ -371,6 +378,7 @@ class TFRayActorFusedOptimizerPipeVariant(RayActor):
         tf_spec: tf.TensorSpec,
         num_parallel_calls: Optional[int],
     ) -> None:
+        tf = tensorflow()
         print("Started TF on RAY actor for {}".format(name))
         super().__init__(name)
 

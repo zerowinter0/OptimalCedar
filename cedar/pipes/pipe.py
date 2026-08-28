@@ -4,7 +4,7 @@ import abc
 import logging
 import threading
 import functools
-from typing import List, Optional, Callable, Tuple
+from typing import TYPE_CHECKING, List, Optional, Callable, Tuple
 
 from cedar.config import CedarContext
 from .context import (
@@ -38,7 +38,10 @@ from .variant import (
 from .ray_variant import RayPipeVariant
 from .tf import TFTensorDontCare, TFOutputHint
 
-import tensorflow as tf
+from cedar.utils.frameworks import tensorflow
+
+if TYPE_CHECKING:
+    import tensorflow as tf
 
 logger = logging.getLogger(__name__)
 
@@ -742,6 +745,7 @@ class Pipe(abc.ABC):
         """
         Generates the tf.TensorSpec that this pipe will output.
         """
+        tf = tensorflow()
         if not self.is_tf() and self._output_tf_spec is None:
             raise RuntimeError(f"{self.id} is not a TF pipe.")
 

@@ -1,6 +1,9 @@
-from typing import Union, List
+from __future__ import annotations
 
-import tensorflow as tf
+from typing import TYPE_CHECKING, Union, List
+
+if TYPE_CHECKING:
+    import tensorflow as tf
 
 
 class TFTensorDontCare:

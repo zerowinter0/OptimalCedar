@@ -6,8 +6,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RESULT_ROOT="${RESULT_ROOT:-${REPO_ROOT}/outputs/chapter6_experiments/stationary_formal_sequential_v2}"
-WORKLOADS="${WORKLOADS_OVERRIDE:-stackexchange,alpaca_cot,simclrv2_cache,pile_europarl,pile_hackernews,pile_pubmed_abstracts,pile_uspto_backgrounds,redpajama_code,general_video_refine}"
+WORKLOADS="${WORKLOADS_OVERRIDE:-alpaca_cot,simclrv2_cache,pile_europarl,pile_hackernews,pile_pubmed_abstracts,pile_uspto_backgrounds,redpajama_code,general_video_refine,stackexchange,commonvoice}"
 RESUME_COMPLETED_WORKLOADS="${RESUME_COMPLETED_WORKLOADS:-1}"
+PROFILE_RUN_LABEL="${PROFILE_RUN_LABEL:-v2}"
 RUNNER="${REPO_ROOT}/evaluation/chapter6_experiments/run_unified_formal_seven_all_ten.sh"
 
 cd "${REPO_ROOT}"
@@ -41,7 +42,7 @@ for workload in "${workload_list[@]}"; do
 
   RESULT_ROOT="${workload_root}" \
   WORKLOADS_OVERRIDE="${workload}" \
-  PROFILE_RUN_ID="stationary_sequential_${workload}_v2" \
+  PROFILE_RUN_ID="stationary_sequential_${workload}_${PROFILE_RUN_LABEL}" \
   REUSE_COMPLETED_PROFILES="${reuse_profile}" \
   RESUME_FORMAL_RESULTS=1 \
     bash "${RUNNER}"

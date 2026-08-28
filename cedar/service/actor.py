@@ -2,10 +2,10 @@ import abc
 import logging
 import queue
 import multiprocessing as mp
-import torch
 import time
 from typing import Any
 
+from cedar.utils.frameworks import torch
 from cedar.utils.threading import limit_native_threadpools
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,10 @@ class SMPActor(mp.Process):
     def run(self):
         # Need to set this to reduce contention in torch threads...
         if self.disable_torch_parallelism:
+            torch_module = torch()
             native_threadpool_limiter = limit_native_threadpools(1)  # noqa: F841
-            torch.set_num_threads(1)
-            torch.set_num_interop_threads(1)
+            torch_module.set_num_threads(1)
+            torch_module.set_num_interop_threads(1)
         logger.info(f"Running SMPActor for {self.name}.")
         if self.req_q is None or self.resp_q is None:
             logger.error("SMPActor not registered!")

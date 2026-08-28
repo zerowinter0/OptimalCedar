@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 import logging
 import time
@@ -8,7 +10,7 @@ from typing import Any, Dict, Iterator, Tuple, Optional
 
 from cedar.pipes import Pipe, DataSample, Partition
 
-import tensorflow as tf
+from cedar.utils.frameworks import tensorflow
 
 TRACE_FREQUENCY_SEC = 0.1
 DISABLE_DATASAMPLES = False  # for benchmarking only
@@ -431,6 +433,7 @@ class SourcePipeVariantMixin:
         Raises:
             StopIteration when source is exhausted
         """
+        tf = tensorflow()
         if self.sharded:
             curr_idx = self.world_size - self.rank - 1
         while True:

@@ -4,10 +4,14 @@ import logging
 import pickle
 import threading
 import time
-import torch
-import tensorflow as tf
 import PIL
 from pympler import asizeof
+
+from cedar.utils.frameworks import (
+    is_tensorflow_tensor,
+    is_torch_tensor,
+    tensorflow,
+)
 
 from .context import PipeVariantType
 
@@ -300,9 +304,10 @@ def get_sizeof_data(x: Any) -> int:
     """
     if x is None:
         return 0
-    elif torch.is_tensor(x):
+    elif is_torch_tensor(x):
         return x.untyped_storage().nbytes()
-    elif tf.is_tensor(x):
+    elif is_tensorflow_tensor(x):
+        tf = tensorflow()
         if x.dtype == tf.string:
             byte_tensor = tf.io.decode_raw(x, tf.uint8)
             size = tf.size(byte_tensor, out_type=tf.int32).numpy()

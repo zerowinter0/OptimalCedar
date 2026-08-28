@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 import ray
 import time
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 from collections import deque
 
 from cedar.service import (
@@ -37,7 +39,10 @@ from .context import (
 from .common import cedar_pipe, CedarPipeSpec, DataSample
 from .tf import TFOutputHint
 
-import tensorflow as tf
+from cedar.utils.frameworks import tensorflow
+
+if TYPE_CHECKING:
+    import tensorflow as tf
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +361,7 @@ class TFMapperPipeVariant(TFPipeVariant):
         tf_spec: tf.TensorSpec,
         variant_ctx: TFPipeVariantContext,
     ):
+        tf = tensorflow()
         super().__init__(input_pipe_variant)
         self.fn = fn
 
@@ -389,6 +395,7 @@ class TFMapperPipeVariant(TFPipeVariant):
                 return
 
     def _iter_impl(self):
+        tf = tensorflow()
         while True:
             try:
                 data = self.dataset_iter.get_next()
@@ -419,6 +426,7 @@ class TFRayActorMapperPipeVariant(RayActor):
         tf_spec: tf.TensorSpec,
         num_parallel_calls: Optional[int],
     ):
+        tf = tensorflow()
         print("Started TF on RAY actor for {}".format(name))
         super().__init__(name)
         self.fn = fn

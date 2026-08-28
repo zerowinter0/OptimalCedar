@@ -2413,7 +2413,7 @@ class DataSet:
         )
         scaling_min_records_per_worker = int(
             os.environ.get(
-                "CEDAR_PROFILE_SCALING_MIN_RECORDS_PER_WORKER", "100"
+                "CEDAR_PROFILE_SCALING_MIN_RECORDS_PER_WORKER", "4"
             )
         )
         if scaling_ray_batch_size < 1 or scaling_min_records_per_worker < 1:

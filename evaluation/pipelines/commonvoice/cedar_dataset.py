@@ -54,17 +54,22 @@ class CommonvoiceFeature(Feature):
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:
     data_dir = (spec.kwargs or {}).get("dataset_path")
-    if not data_dir:
-        data_dir = (
+    data_dirs = (spec.kwargs or {}).get("dataset_paths")
+    if data_dir and data_dirs:
+        raise ValueError("Set only one of dataset_path and dataset_paths")
+    if data_dirs:
+        data_dir = [path for path in data_dirs.split(";") if path]
+        if not data_dir:
+            raise ValueError("dataset_paths must contain at least one path")
+    elif not data_dir:
+        data_dir = str(
             pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
         )
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
     max_samples = (spec.kwargs or {}).get("max_samples")
     max_samples = int(max_samples) if max_samples is not None else None
-    source = LocalFSSource(
-        str(data_dir), recursive=True, max_samples=max_samples
-    )
+    source = LocalFSSource(data_dir, recursive=True, max_samples=max_samples)
     feature = CommonvoiceFeature(batch_size=spec.batch_size)
     feature.apply(source)
 

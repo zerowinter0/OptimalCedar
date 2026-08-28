@@ -11,6 +11,8 @@ MATRIX_ROOT="${RESULT_ROOT}/formal_runs"
 WORKLOADS="${WORKLOADS_OVERRIDE:-general_video_refine,pile_hackernews,pile_europarl,stackexchange,pile_pubmed_abstracts,pile_uspto_backgrounds,alpaca_cot,simclrv2_cache,commonvoice,redpajama_code}"
 PROFILE_RUN_ID="${PROFILE_RUN_ID:-joint_actor_budget_formal_all_ten_v1}"
 MIN_AVAILABLE_GIB="${CEDAR_PROFILE_MIN_AVAILABLE_GIB:-64}"
+MIN_FORMAL_RUNTIME_SEC="${MIN_FORMAL_RUNTIME_SEC:-1800}"
+RUNTIME_FLOOR_WORKLOADS="${RUNTIME_FLOOR_WORKLOADS:-commonvoice,stackexchange,general_video_refine,pile_europarl,pile_hackernews,pile_pubmed_abstracts,pile_uspto_backgrounds,redpajama_code}"
 
 cd "${REPO_ROOT}"
 source env/bin/activate
@@ -39,8 +41,10 @@ The temporary PICO-Add ablation is excluded.
   legal per-worker stage width 1..6. Width 1 runs for at least 3 seconds and 30
   observations, stopping at RSE <= 10% or 30 seconds; additional widths use
   the same confidence target with a 20-second cap. Scaling curves use Ray
-  batch size 1 and at least 100 records per worker so high-width points measure
-  sustained contention rather than two synchronized startup batches.
+  batch size 1 and epochs of at least four records per worker. Cheap operators
+  repeat epochs until confidence converges; expensive operators therefore
+  exercise every worker without allowing a fixed 100-record floor to override
+  the per-width duration budget.
 - Real legal objects provide Ray/SMP marshalling and boundary measurements.
 - Width points that reach the confidence target are eligible for PICO's cost
   interpolation. Time-capped points remain in the profile with their RSE for
@@ -56,6 +60,12 @@ The temporary PICO-Add ablation is excluded.
 - Non-cache workloads disable cache. SimCLR-cache is independently warmed
   before formal measurement.
 - Each optimizer runs three times in round-robin order.
+- For every workload with sufficient source capacity, the median execution
+  time of the slowest optimizer that completes all three rounds must be at
+  least ${MIN_FORMAL_RUNTIME_SEC} seconds. The run is rejected rather than
+  marked complete when this condition is not met.
+- Alpaca-CoT and SimCLR-cache are capacity-limited exceptions: their frozen
+  sources cannot provide enough distinct records to reach the duration floor.
 - Optimization and first execution share one 3600-second deadline. A timeout
   skips that optimizer's remaining two rounds for the workload.
 - PICO uses its current throughput objective without a total-work Pareto
@@ -83,7 +93,7 @@ export CEDAR_PROFILE_SCALING_TOP_K=0
 export CEDAR_PROFILE_SCALING_WIDTHS="1,8,16,24,32,40,48"
 export CEDAR_PROFILE_SCALING_MAX_SEC=20
 export CEDAR_PROFILE_SCALING_RAY_BATCH_SIZE=1
-export CEDAR_PROFILE_SCALING_MIN_RECORDS_PER_WORKER=100
+export CEDAR_PROFILE_SCALING_MIN_RECORDS_PER_WORKER=4
 export CEDAR_PROFILE_BOUNDARY_MODEL=1
 export CEDAR_PROFILE_INFER_COMPUTE_SCALING=1
 export CEDAR_PROFILE_RAY_ACTORS=1
@@ -277,6 +287,14 @@ for workload in workloads:
     summary[workload] = row
 output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 PY
+
+python evaluation/chapter6_experiments/verify_runtime_floor.py \
+  --matrix-root "${MATRIX_ROOT}" \
+  --workloads "${WORKLOADS}" \
+  --required-workloads "${RUNTIME_FLOOR_WORKLOADS}" \
+  --minimum-seconds "${MIN_FORMAL_RUNTIME_SEC}" \
+  --required-rounds 3 \
+  --output "${RESULT_ROOT}/runtime_floor_validation.json"
 
 printf 'complete\n' > "${RESULT_ROOT}/COMPLETE"
 printf '[%s] COMPLETE unified seven-optimizer matrix\n' "$(date -Is)"
