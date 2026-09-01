@@ -13,8 +13,9 @@ OPTIMIZERS = (
     "dj_two_stage_optimizer",
 )
 OBJECTIVE_RE = re.compile(
-    r"DP objective: throughput_bottleneck "
-    r"local_serial=([0-9.eE+-]+) parallel_bottleneck=([0-9.eE+-]+)"
+    r"DP objective: resource_family_sum "
+    r"local_serial=([0-9.eE+-]+) ray_serial=([0-9.eE+-]+) "
+    r"smp_serial=([0-9.eE+-]+) gpu_serial=([0-9.eE+-]+)"
 )
 
 
@@ -22,11 +23,15 @@ def _read_cost(log_path: Path) -> dict[str, float]:
     matches = list(OBJECTIVE_RE.finditer(log_path.read_text(errors="replace")))
     if not matches:
         raise RuntimeError(f"No DP objective found in {log_path}")
-    local_serial, parallel_bottleneck = map(float, matches[-1].groups())
+    local_serial, ray_serial, smp_serial, gpu_serial = map(
+        float, matches[-1].groups()
+    )
     return {
         "local_serial": local_serial,
-        "parallel_bottleneck": parallel_bottleneck,
-        "score": max(local_serial, parallel_bottleneck),
+        "ray_serial": ray_serial,
+        "smp_serial": smp_serial,
+        "gpu_serial": gpu_serial,
+        "score": max(local_serial, ray_serial, smp_serial, gpu_serial),
     }
 
 
@@ -61,13 +66,15 @@ def main() -> int:
             tolerance = 1e-9
             no_worse = (
                 dp["local_serial"] <= other["local_serial"] + tolerance
-                and dp["parallel_bottleneck"]
-                <= other["parallel_bottleneck"] + tolerance
+                and dp["ray_serial"] <= other["ray_serial"] + tolerance
+                and dp["smp_serial"] <= other["smp_serial"] + tolerance
+                and dp["gpu_serial"] <= other["gpu_serial"] + tolerance
             )
             strictly_better = (
                 dp["local_serial"] < other["local_serial"] - tolerance
-                or dp["parallel_bottleneck"]
-                < other["parallel_bottleneck"] - tolerance
+                or dp["ray_serial"] < other["ray_serial"] - tolerance
+                or dp["smp_serial"] < other["smp_serial"] - tolerance
+                or dp["gpu_serial"] < other["gpu_serial"] - tolerance
             )
             passed = no_worse and strictly_better
             comparisons[optimizer] = {

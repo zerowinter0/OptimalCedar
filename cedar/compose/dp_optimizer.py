@@ -2,6 +2,7 @@ import logging
 import math
 import multiprocessing as mp
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -15,21 +16,93 @@ from .optimizer import OptimizerOptions, PhysicalPlan, PipeDesc, PipeVariantType
 logger = logging.getLogger(__name__)
 
 
-_FORK_SEARCH_OPTIMIZER = None
-_FORK_SEARCH_INNER_OPS = None
+_FORK_LAYER_SEARCH = None
+_FORK_LAYER_DP = None
+_FORK_LAYER_BACK = None
+_FORK_LAYER_PREDECESSORS = None
+_FORK_LAYER_INCUMBENT = float("inf")
+_USE_CONFIGURED_RESOURCE_LIMIT = object()
 
 
-def _initialize_conditioned_search_worker(optimizer, inner_ops) -> None:
-    global _FORK_SEARCH_OPTIMIZER, _FORK_SEARCH_INNER_OPS
-    _FORK_SEARCH_OPTIMIZER = optimizer
-    _FORK_SEARCH_INNER_OPS = inner_ops
+def _initialize_mask_layer_worker(
+    search, dp, back, predecessors, incumbent_score
+) -> None:
+    global _FORK_LAYER_SEARCH, _FORK_LAYER_DP, _FORK_LAYER_BACK
+    global _FORK_LAYER_PREDECESSORS, _FORK_LAYER_INCUMBENT
+    _FORK_LAYER_SEARCH = search
+    _FORK_LAYER_DP = dp
+    _FORK_LAYER_BACK = back
+    _FORK_LAYER_PREDECESSORS = predecessors
+    _FORK_LAYER_INCUMBENT = incumbent_score
 
 
-def _run_conditioned_search_worker(assumed_total: int):
-    if _FORK_SEARCH_OPTIMIZER is None or _FORK_SEARCH_INNER_OPS is None:
-        raise RuntimeError("Conditioned DP worker was not initialized.")
-    return _FORK_SEARCH_OPTIMIZER._run_conditioned_dp_search(
-        _FORK_SEARCH_INNER_OPS, assumed_total
+def _run_mask_layer_worker(next_mask: int):
+    if (
+        _FORK_LAYER_SEARCH is None
+        or _FORK_LAYER_DP is None
+        or _FORK_LAYER_BACK is None
+        or _FORK_LAYER_PREDECESSORS is None
+    ):
+        raise RuntimeError("Mask-layer DP worker was not initialized.")
+    search = _FORK_LAYER_SEARCH
+    before = (
+        search._transition_pairs,
+        search._upper_bound_pruned,
+        search._suffix_lower_bound_pruned,
+        search._cell_candidates,
+        search._cell_replacements,
+        search._frontier_cap_pruned,
+    )
+    if search._can_use_exact_batch_frontier():
+        search._compute_exact_batch_frontier(
+            _FORK_LAYER_DP,
+            _FORK_LAYER_BACK,
+            next_mask,
+            _FORK_LAYER_PREDECESSORS[next_mask],
+            _FORK_LAYER_INCUMBENT,
+        )
+    else:
+        for prev_mask in _FORK_LAYER_PREDECESSORS[next_mask]:
+            if not _FORK_LAYER_DP[prev_mask]:
+                continue
+            block_mask = next_mask ^ prev_mask
+            if block_mask:
+                search._transition_pairs += 1
+                search._try_extend(
+                    _FORK_LAYER_DP,
+                    _FORK_LAYER_BACK,
+                    prev_mask,
+                    next_mask,
+                    block_mask,
+                    _FORK_LAYER_INCUMBENT,
+                )
+    if search.pareto_step_epsilon > 0.0 and search.use_cell_frontier:
+        search._finalize_cell_frontiers(
+            _FORK_LAYER_DP, _FORK_LAYER_BACK, next_mask
+        )
+    after = (
+        search._transition_pairs,
+        search._upper_bound_pruned,
+        search._suffix_lower_bound_pruned,
+        search._cell_candidates,
+        search._cell_replacements,
+        search._frontier_cap_pruned,
+    )
+    deltas = tuple(right - left for left, right in zip(before, after))
+    return (
+        next_mask,
+        _FORK_LAYER_DP[next_mask],
+        _FORK_LAYER_BACK[next_mask],
+        deltas,
+    )
+
+
+def _is_infeasible_conditioned_search_error(exc: RuntimeError) -> bool:
+    """Recognize the two failure modes of an exact resource slice."""
+    message = str(exc)
+    return (
+        "required parallel CPU total" in message
+        or message == "Extensible DP failed: no feasible final state."
     )
 
 
@@ -53,6 +126,46 @@ def _volume_prod(optimizer: "DpOptimizer", mask: int) -> float:
 
 
 @dataclass(frozen=True)
+class DpResourceUsage:
+    """Per-local-worker reservations on the two physical CPU pools."""
+
+    ray_cpus: int = 0
+    smp_cpus: int = 0
+
+    def __add__(self, other: "DpResourceUsage") -> "DpResourceUsage":
+        if not isinstance(other, DpResourceUsage):
+            return NotImplemented
+        return DpResourceUsage(
+            self.ray_cpus + other.ray_cpus,
+            self.smp_cpus + other.smp_cpus,
+        )
+
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        return self.__add__(other)
+
+    def __le__(self, other: "DpResourceUsage") -> bool:
+        if not isinstance(other, DpResourceUsage):
+            return NotImplemented
+        return (
+            self.ray_cpus <= other.ray_cpus
+            and self.smp_cpus <= other.smp_cpus
+        )
+
+    def __gt__(self, other: "DpResourceUsage") -> bool:
+        if not isinstance(other, DpResourceUsage):
+            return NotImplemented
+        return (
+            self.ray_cpus > other.ray_cpus
+            or self.smp_cpus > other.smp_cpus
+        )
+
+    def as_dict(self) -> Dict[str, int]:
+        return {"ray_cpus": self.ray_cpus, "smp_cpus": self.smp_cpus}
+
+
+@dataclass(frozen=True)
 class DpStateSummary:
     """
     Compact state carried by the outer DP.
@@ -63,7 +176,7 @@ class DpStateSummary:
     """
 
     cache_active: bool = False
-    parallel_stage_cpus: int = 0
+    parallel_stage_cpus: DpResourceUsage = DpResourceUsage()
 
 
 @dataclass(frozen=True)
@@ -126,6 +239,12 @@ class _BlockCostIndex:
                     self.per_byte[i] = costs[i] / denominator
         self._costs: Dict[Tuple[int, int], float] = {}
         self._orders: Dict[Tuple[int, int], Tuple[int, ...]] = {}
+        self._endpoint_costs: Dict[
+            Tuple[int, int], Dict[Tuple[int, int], float]
+        ] = {}
+        self._endpoint_orders: Dict[
+            Tuple[int, int], Dict[Tuple[int, int], Tuple[int, ...]]
+        ] = {}
 
     def get(
         self, mask: int, prefix_mask: int = 0
@@ -136,6 +255,25 @@ class _BlockCostIndex:
         key = (prefix_mask, mask)
         return self._costs[key] * self.source_size, self._orders[key]
 
+    def get_endpoint_minima(
+        self, mask: int, prefix_mask: int = 0
+    ) -> List[Tuple[float, Tuple[int, ...]]]:
+        """Return the minimum-compute order for every legal endpoint pair.
+
+        Boundary calibration and cache placement may depend on the first and
+        last operator of a fused block. For fixed endpoints, however, every
+        other transition property is identical, so a higher-compute internal
+        order is losslessly dominated.
+        """
+        if mask & prefix_mask:
+            raise ValueError("A DP block cannot overlap its prefix.")
+        self._compute(prefix_mask, mask)
+        key = (prefix_mask, mask)
+        return [
+            (self._endpoint_costs[key][endpoints] * self.source_size, order)
+            for endpoints, order in self._endpoint_orders[key].items()
+        ]
+
     def _compute(self, prefix_mask: int, mask: int) -> None:
         key = (prefix_mask, mask)
         if key in self._costs:
@@ -143,10 +281,14 @@ class _BlockCostIndex:
         if mask == 0:
             self._costs[key] = 0.0
             self._orders[key] = tuple()
+            self._endpoint_costs[key] = {}
+            self._endpoint_orders[key] = {}
             return
 
         best = float("inf")
         best_order: Tuple[int, ...] = tuple()
+        endpoint_costs: Dict[Tuple[int, int], float] = {}
+        endpoint_orders: Dict[Tuple[int, int], Tuple[int, ...]] = {}
         remaining = mask
         while remaining:
             bit = remaining & -remaining
@@ -159,22 +301,42 @@ class _BlockCostIndex:
             # is already present in ``prev``.
             if prev & self.successor_masks[i]:
                 continue
-            self._compute(prefix_mask, prev)
-            prev_key = (prefix_mask, prev)
-            prev_cost = self._costs[prev_key]
-            if prev_cost == float("inf"):
-                continue
-            candidate = (
-                prev_cost
-                + _work_prod(self.optimizer, prefix_mask | prev, i)
+            operator_cost = (
+                _work_prod(self.optimizer, prefix_mask | prev, i)
                 * self.per_byte[i]
             )
-            if candidate < best:
-                best = candidate
-                best_order = self._orders[prev_key] + (i,)
+            if prev == 0:
+                predecessors = [(i, 0.0, tuple())]
+            else:
+                self._compute(prefix_mask, prev)
+                prev_key = (prefix_mask, prev)
+                predecessors = [
+                    (
+                        endpoints[0],
+                        prev_cost,
+                        self._endpoint_orders[prev_key][endpoints],
+                    )
+                    for endpoints, prev_cost in self._endpoint_costs[
+                        prev_key
+                    ].items()
+                ]
+            for first, prev_cost, prev_order in predecessors:
+                if prev_cost == float("inf"):
+                    continue
+                candidate = prev_cost + operator_cost
+                order = prev_order + (i,)
+                endpoints = (first, i)
+                if candidate < endpoint_costs.get(endpoints, float("inf")):
+                    endpoint_costs[endpoints] = candidate
+                    endpoint_orders[endpoints] = order
+                if candidate < best:
+                    best = candidate
+                    best_order = order
 
         self._costs[key] = best
         self._orders[key] = best_order
+        self._endpoint_costs[key] = endpoint_costs
+        self._endpoint_orders[key] = endpoint_orders
 
 
 @dataclass(frozen=True)
@@ -196,18 +358,32 @@ class BackPointer:
 
 @dataclass(frozen=True)
 class DpObjectiveCost:
-    """Exact service-demand coordinates retained by the subset DP.
+    """Resource-family service coordinates retained by the subset DP.
 
-    In-process CPU operators share a serial worker lane, while distinct CPU
-    Ray/SMP blocks form concurrently active pipeline stages. CUDA blocks use a
-    separate serial coordinate because all of them share the same physical GPU
-    in the formal single-GPU setting. Their service demands therefore add even
-    when Cedar materializes them as different Ray stages.
+    Local and CUDA work add within their resource coordinates. CPU-Ray and
+    CPU-SMP stages reserve independent integer widths in the DP state. Their
+    service coordinates are stored canonically as the common external
+    bottleneck ``max(R,S)`` because no future transition can distinguish the
+    two values once exact resource usage is fixed. The predicted end-to-end
+    bottleneck remains exactly ``max(L,R,S,G)``.
     """
 
     local_serial: float = 0.0
-    parallel_bottleneck: float = 0.0
+    ray_serial: float = 0.0
+    smp_serial: float = 0.0
     gpu_serial: float = 0.0
+
+    @property
+    def parallel_bottleneck(self) -> float:
+        """Canonical service coordinate shared by Ray and SMP stages.
+
+        Ray and SMP retain independent feasibility budgets, but their service
+        coordinates enter the objective only through ``max(R, S)`` and every
+        future external-stage transition is another ``max``. Consequently the
+        two histories are suffix-equivalent once this maximum and their exact
+        resource usages agree.
+        """
+        return max(self.ray_serial, self.smp_serial)
 
     @property
     def score(self) -> float:
@@ -259,6 +435,8 @@ class BlockCandidateProvider:
             Tuple[int, PipeVariantType], bool
         ] = {}
         self._execution_resources: Dict[int, PipeExecutionResource] = {}
+        self._shared_cost_indexes: Dict[Tuple[float, ...], _BlockCostIndex] = {}
+        self._endpoint_sensitive_variants: set[PipeVariantType] = set()
 
     def prepare(self) -> None:
         opt = self.optimizer
@@ -323,9 +501,40 @@ class BlockCandidateProvider:
                 candidate_variants.append(vt)
 
         self._candidate_variants = candidate_variants
+        logger.info(
+            "[DpOptimizer] Candidate backends=%s resource_limits=%s",
+            [variant.name for variant in candidate_variants],
+            opt._dp_parallel_stage_cpu_limit(),
+        )
         self._fusion_allowed_flags = [
             opt._allowed_fusion(p_id) for p_id in self.inner_ops
         ]
+        object_boundaries = (
+            opt.profiled_stats.get("physical_model", {}).get(
+                "object_boundary", {}
+            )
+        )
+        if not isinstance(object_boundaries, dict):
+            object_boundaries = {}
+        for variant in candidate_variants:
+            key = (
+                PipeVariantType.RAY.name
+                if variant == PipeVariantType.TF_RAY
+                else variant.name
+            )
+            backend = object_boundaries.get(key, {})
+            operators = (
+                backend.get("operators", {})
+                if isinstance(backend, dict)
+                else {}
+            )
+            if isinstance(operators, dict) and operators:
+                self._endpoint_sensitive_variants.add(variant)
+        # SMP transport feasibility additionally depends on the first and
+        # last physical operators even when no endpoint boundary profile is
+        # present. Ray transport has no such restriction.
+        if PipeVariantType.SMP in candidate_variants:
+            self._endpoint_sensitive_variants.add(PipeVariantType.SMP)
         for vt in candidate_variants:
             max_parallelism = opt._dp_max_candidate_parallelism(vt)
             for parallelism in range(1, max_parallelism + 1):
@@ -341,15 +550,22 @@ class BlockCandidateProvider:
                         for p_id, cost in zip(self.inner_ops, costs)
                     ]
                 key = (vt, parallelism)
-                self._variant_indexes[key] = _BlockCostIndex(
-                    opt, self.inner_ops, costs
-                )
+                # Resource-matched profiles price every candidate width at
+                # the same family-wide contention level; width then changes
+                # stage service through the explicit ``cost / width`` term.
+                # In that common case the per-operator cost vectors are
+                # identical. Reuse the exact subset-order index instead of
+                # recomputing every internal fused order once per width.
+                signature = tuple(costs)
+                index = self._shared_cost_indexes.get(signature)
+                if index is None:
+                    index = _BlockCostIndex(opt, self.inner_ops, costs)
+                    self._shared_cost_indexes[signature] = index
+                self._variant_indexes[key] = index
                 if vt != PipeVariantType.INPROCESS:
                     # Fusion removes intermediate boundaries, while compute
-                    # remains the sum of its members at the selected width.
-                    self._fused_variant_indexes[key] = _BlockCostIndex(
-                        opt, self.inner_ops, costs
-                    )
+                    # remains exactly the same sum as an unfused block.
+                    self._fused_variant_indexes[key] = index
 
     def candidates_for(self, mask: int) -> Iterable[BlockCandidate]:
         return self.candidates_for_prefix(0, mask)
@@ -416,42 +632,29 @@ class BlockCandidateProvider:
                 vt, execution_resource
             )
             for parallelism in parallelisms:
-                assumed_total = getattr(
-                    opt, "_dp_assumed_total_parallel_stage_cpus", None
-                )
-                if (
-                    assumed_total is not None
-                    and vt
-                    in (
-                        PipeVariantType.RAY,
-                        PipeVariantType.TF_RAY,
-                        PipeVariantType.SMP,
-                    )
-                    and parallelism > assumed_total
-                ):
-                    # This resource-conditioned search must finish at exactly
-                    # ``assumed_total`` remote slots. A single block wider
-                    # than that total can never participate in a feasible
-                    # suffix, so do not even evaluate its subset-order cost.
-                    continue
                 variant_key = (vt, parallelism)
                 index = self._variant_indexes[variant_key]
                 if is_multi and variant_key in self._fused_variant_indexes:
                     index = self._fused_variant_indexes[variant_key]
-                block_cost, order = index.get(mask, prefix_mask)
-                if block_cost == float("inf") or not order:
-                    continue
-                candidates.append(
-                    BlockCandidate(
-                        mask=mask,
-                        order=order,
-                        variant=vt,
-                        cost=block_cost,
-                        materializes_fusion=is_multi,
-                        execution_resource=execution_resource,
-                        parallelism=parallelism,
+                endpoint_orders = [index.get(mask, prefix_mask)]
+                if is_multi and vt in self._endpoint_sensitive_variants:
+                    endpoint_orders = index.get_endpoint_minima(
+                        mask, prefix_mask
                     )
-                )
+                for block_cost, order in endpoint_orders:
+                    if block_cost == float("inf") or not order:
+                        continue
+                    candidates.append(
+                        BlockCandidate(
+                            mask=mask,
+                            order=order,
+                            variant=vt,
+                            cost=block_cost,
+                            materializes_fusion=is_multi,
+                            execution_resource=execution_resource,
+                            parallelism=parallelism,
+                        )
+                    )
 
         # Placement-dependent feasibility remains in the outer DP. Keep every
         # backend alternative for this mask.
@@ -486,11 +689,11 @@ class BlockCandidateProvider:
     ) -> BlockCandidate:
         """Build the exact DP block cost for one materialized block order.
 
-        ``candidates_for`` returns only the best internal order for a mask.
-        Cost-model validation must instead replay the order stored in a fixed
-        physical plan.  This method uses the same per-byte backend costs and
-        work-product recurrence as ``_BlockCostIndex`` without re-optimizing
-        the block's order.
+        ``candidates_for`` retains the minimum-compute order for every endpoint
+        pair. Cost-model validation must instead replay the exact order stored
+        in a fixed physical plan. This method uses the same per-byte backend
+        costs and work-product recurrence as ``_BlockCostIndex`` without
+        re-optimizing the block's order.
         """
         ordered = tuple(order)
         if not ordered or len(set(ordered)) != len(ordered):
@@ -611,7 +814,7 @@ class CacheTransitionPolicy:
         prev_state: DpStateSummary,
         regular_cost: float,
         block: BlockCandidate,
-        next_parallel_stage_cpus: Optional[int] = None,
+        next_parallel_stage_cpus: Optional[DpResourceUsage] = None,
     ) -> Iterable[TransitionChoice]:
         if next_parallel_stage_cpus is None:
             next_parallel_stage_cpus = prev_state.parallel_stage_cpus
@@ -698,8 +901,9 @@ class ExtensibleDpSearch:
         inner_ops: List[int],
         block_provider: BlockCandidateProvider,
         cache_policy: CacheTransitionPolicy,
-        parallel_stage_cpu_limit: Optional[int] = None,
-        required_final_parallel_stage_cpus: Optional[int] = None,
+        parallel_stage_cpu_limit: Any = _USE_CONFIGURED_RESOURCE_LIMIT,
+        required_final_parallel_stage_cpus: Optional[DpResourceUsage] = None,
+        initial_incumbent_score: float = float("inf"),
     ) -> None:
         self.optimizer = optimizer
         self.inner_ops = inner_ops
@@ -707,23 +911,32 @@ class ExtensibleDpSearch:
         self.full_mask = 1 << self.n
         self.block_provider = block_provider
         self.cache_policy = cache_policy
+        self.collapse_external_service_coordinates = bool(
+            getattr(
+                optimizer,
+                "collapse_external_service_coordinates",
+                False,
+            )
+        )
         configured_limit = optimizer._dp_parallel_stage_cpu_limit()
         self.parallel_stage_cpu_limit = (
             configured_limit
-            if parallel_stage_cpu_limit is None
+            if parallel_stage_cpu_limit
+            is _USE_CONFIGURED_RESOURCE_LIMIT
             else parallel_stage_cpu_limit
         )
         self.required_final_parallel_stage_cpus = (
             required_final_parallel_stage_cpus
         )
+        self.initial_incumbent_score = initial_incumbent_score
         global_epsilon = float(
-            os.environ.get("CEDAR_DP_PARETO_EPSILON", "0.10")
+            os.environ.get("CEDAR_DP_PARETO_EPSILON", "0")
         )
         if not math.isfinite(global_epsilon) or global_epsilon < 0.0:
             raise ValueError("CEDAR_DP_PARETO_EPSILON must be finite and non-negative")
-        # Small optimality/scalability cases remain exact. For complex formal
-        # workloads, multiplicative trimming bounds the worst-case accumulated
-        # coordinate error by global_epsilon across at most n prefix steps.
+        # Exact Pareto retention is the production default. Experiments may
+        # explicitly request multiplicative trimming; global_epsilon then
+        # bounds its accumulated coordinate error across at most n steps.
         self.pareto_global_epsilon = global_epsilon if self.n > 8 else 0.0
         self.pareto_step_epsilon = (
             (1.0 + self.pareto_global_epsilon) ** (1.0 / self.n) - 1.0
@@ -731,17 +944,24 @@ class ExtensibleDpSearch:
             else 0.0
         )
         self._upper_bound_pruned = 0
+        self._suffix_lower_bound_pruned = 0
         self._transition_pairs = 0
+        self._mandatory_local_suffix_cost: Dict[int, float] = {}
         self._frontier_cells: Dict[
             Tuple[int, DpStateSummary],
-            Dict[Tuple[Optional[int], Optional[int], Optional[int]], DpObjectiveCost],
+            Dict[
+                Tuple[
+                    Optional[int], Optional[int], Optional[int]
+                ],
+                DpObjectiveCost,
+            ],
         ] = {}
         self._cell_candidates = 0
         self._cell_replacements = 0
         self.use_cell_frontier = (
             os.environ.get("CEDAR_DP_CELL_FRONTIER", "0") == "1"
         )
-        frontier_cap_raw = os.environ.get("CEDAR_DP_FRONTIER_CAP", "8")
+        frontier_cap_raw = os.environ.get("CEDAR_DP_FRONTIER_CAP", "0")
         try:
             configured_frontier_cap = int(frontier_cap_raw)
         except ValueError as exc:
@@ -756,7 +976,15 @@ class ExtensibleDpSearch:
                 configured_frontier_cap = max(
                     1,
                     configured_frontier_cap
-                    // (2 ** max(0, int(assumed_total) - 2)),
+                    // (
+                        2
+                        ** max(
+                            0,
+                            assumed_total.ray_cpus
+                            + assumed_total.smp_cpus
+                            - 2,
+                        )
+                    ),
                 )
             self.frontier_cap = configured_frontier_cap
         else:
@@ -779,40 +1007,163 @@ class ExtensibleDpSearch:
         legal_masks, legal_predecessors = self._search_topology()
         legal_mask_set = set(legal_masks)
         incumbent_score = self._initial_incumbent_score()
-        for next_mask in legal_masks[1:]:
-            # Enumerate only actual subsets of next_mask. Scanning every pair
-            # of dependency-closed masks and rejecting non-subsets approaches
-            # 4**n on weakly constrained filter chains; subset enumeration is
-            # 3**n over the complete search while visiting the exact same
-            # (previous prefix, appended block) transitions.
-            if legal_predecessors is not None:
-                prev_masks = legal_predecessors[next_mask]
-            else:
-                prev_masks = []
-                prev_mask = (next_mask - 1) & next_mask
-                while True:
-                    if prev_mask in legal_mask_set:
-                        prev_masks.append(prev_mask)
-                    if prev_mask == 0:
-                        break
-                    prev_mask = (prev_mask - 1) & next_mask
-                prev_masks.reverse()
-            for prev_mask in prev_masks:
-                if not dp[prev_mask]:
-                    continue
-                block_mask = next_mask ^ prev_mask
-                if block_mask:
-                    self._transition_pairs += 1
-                    self._try_extend(
+        self._prepare_mandatory_suffix_lower_bounds(legal_masks)
+        layer_workers_raw = os.environ.get(
+            "CEDAR_DP_MASK_LAYER_WORKERS",
+            str(min(32, os.cpu_count() or 1)),
+        )
+        try:
+            layer_workers = int(layer_workers_raw)
+        except ValueError as exc:
+            raise ValueError(
+                "CEDAR_DP_MASK_LAYER_WORKERS must be an integer"
+            ) from exc
+        if layer_workers < 1:
+            raise ValueError("CEDAR_DP_MASK_LAYER_WORKERS must be positive")
+        parallel_layers = (
+            self.n > 8
+            and layer_workers > 1
+            and legal_predecessors is not None
+            and "fork" in mp.get_all_start_methods()
+        )
+        masks_by_cardinality = [
+            [mask for mask in legal_masks if mask.bit_count() == cardinality]
+            for cardinality in range(1, self.n + 1)
+        ]
+        if parallel_layers:
+            logger.info(
+                "[DpOptimizer] Searching independent mask layers with up to "
+                "%d processes.",
+                layer_workers,
+            )
+        search_started = time.monotonic()
+        for cardinality, layer_masks in enumerate(
+            masks_by_cardinality, start=1
+        ):
+            if not layer_masks:
+                continue
+            layer_started = time.monotonic()
+            if parallel_layers and len(layer_masks) > 1:
+                process_count = min(layer_workers, len(layer_masks))
+                context = mp.get_context("fork")
+                with context.Pool(
+                    processes=process_count,
+                    initializer=_initialize_mask_layer_worker,
+                    initargs=(
+                        self,
                         dp,
                         back,
-                        prev_mask,
+                        legal_predecessors,
+                        incumbent_score,
+                    ),
+                ) as pool:
+                    results = pool.map(
+                        _run_mask_layer_worker,
+                        layer_masks,
+                        chunksize=max(1, len(layer_masks) // (4 * process_count)),
+                    )
+                for next_mask, frontier, pointers, deltas in results:
+                    dp[next_mask] = frontier
+                    back[next_mask] = pointers
+                    (
+                        transition_pairs,
+                        upper_bound_pruned,
+                        suffix_lower_bound_pruned,
+                        cell_candidates,
+                        cell_replacements,
+                        frontier_cap_pruned,
+                    ) = deltas
+                    self._transition_pairs += transition_pairs
+                    self._upper_bound_pruned += upper_bound_pruned
+                    self._suffix_lower_bound_pruned += (
+                        suffix_lower_bound_pruned
+                    )
+                    self._cell_candidates += cell_candidates
+                    self._cell_replacements += cell_replacements
+                    self._frontier_cap_pruned += frontier_cap_pruned
+                logger.info(
+                    "[DpOptimizer] Exact layer %d/%d masks=%d states=%d "
+                    "max_frontier=%d layer_sec=%.3f total_sec=%.3f",
+                    cardinality,
+                    self.n,
+                    len(layer_masks),
+                    sum(
+                        sum(len(values) for values in dp[mask].values())
+                        for mask in layer_masks
+                    ),
+                    max(
+                        (
+                            sum(len(values) for values in dp[mask].values())
+                            for mask in layer_masks
+                        ),
+                        default=0,
+                    ),
+                    time.monotonic() - layer_started,
+                    time.monotonic() - search_started,
+                )
+                continue
+
+            for next_mask in layer_masks:
+                # Enumerate only actual subsets of next_mask. Scanning every
+                # pair of dependency-closed masks and rejecting non-subsets
+                # approaches 4**n; these are exactly the 3**n transitions.
+                if legal_predecessors is not None:
+                    prev_masks = legal_predecessors[next_mask]
+                else:
+                    prev_masks = []
+                    prev_mask = (next_mask - 1) & next_mask
+                    while True:
+                        if prev_mask in legal_mask_set:
+                            prev_masks.append(prev_mask)
+                        if prev_mask == 0:
+                            break
+                        prev_mask = (prev_mask - 1) & next_mask
+                    prev_masks.reverse()
+                if self._can_use_exact_batch_frontier():
+                    self._compute_exact_batch_frontier(
+                        dp,
+                        back,
                         next_mask,
-                        block_mask,
+                        prev_masks,
                         incumbent_score,
                     )
-            if self.pareto_step_epsilon > 0.0 and self.use_cell_frontier:
-                self._finalize_cell_frontiers(dp, back, next_mask)
+                else:
+                    for prev_mask in prev_masks:
+                        if not dp[prev_mask]:
+                            continue
+                        block_mask = next_mask ^ prev_mask
+                        if block_mask:
+                            self._transition_pairs += 1
+                            self._try_extend(
+                                dp,
+                                back,
+                                prev_mask,
+                                next_mask,
+                                block_mask,
+                                incumbent_score,
+                            )
+                if self.pareto_step_epsilon > 0.0 and self.use_cell_frontier:
+                    self._finalize_cell_frontiers(dp, back, next_mask)
+            logger.info(
+                "[DpOptimizer] Exact layer %d/%d masks=%d states=%d "
+                "max_frontier=%d layer_sec=%.3f total_sec=%.3f",
+                cardinality,
+                self.n,
+                len(layer_masks),
+                sum(
+                    sum(len(values) for values in dp[mask].values())
+                    for mask in layer_masks
+                ),
+                max(
+                    (
+                        sum(len(values) for values in dp[mask].values())
+                        for mask in layer_masks
+                    ),
+                    default=0,
+                ),
+                time.monotonic() - layer_started,
+                time.monotonic() - search_started,
+            )
 
         final_mask = self.full_mask - 1
         if not dp[final_mask]:
@@ -845,14 +1196,24 @@ class ExtensibleDpSearch:
             for mask in legal_masks
         ]
         search_stats = {
-            "objective": "throughput_bottleneck_pareto",
+            "objective": "resource_family_bottleneck_pareto",
             "legal_prefix_masks": len(legal_masks),
             "retained_states": sum(state_counts),
             "maximum_frontier": max(state_counts, default=0),
-            "parallel_stage_cpu_limit": self.parallel_stage_cpu_limit,
-            "required_final_parallel_stage_cpus": (
-                self.required_final_parallel_stage_cpus
+            "parallel_stage_cpu_limit": (
+                self.parallel_stage_cpu_limit.as_dict()
+                if self.parallel_stage_cpu_limit is not None
+                else None
             ),
+            "required_final_parallel_stage_cpus": (
+                self.required_final_parallel_stage_cpus.as_dict()
+                if self.required_final_parallel_stage_cpus is not None
+                else None
+            ),
+            "final_resource_states": [
+                state.parallel_stage_cpus.as_dict()
+                for state in dp[final_mask]
+            ],
             "pareto_global_epsilon": self.pareto_global_epsilon,
             "pareto_step_epsilon": self.pareto_step_epsilon,
             "transition_pairs": self._transition_pairs,
@@ -860,11 +1221,14 @@ class ExtensibleDpSearch:
                 incumbent_score if math.isfinite(incumbent_score) else None
             ),
             "upper_bound_pruned": self._upper_bound_pruned,
+            "suffix_lower_bound_pruned": self._suffix_lower_bound_pruned,
             "cell_candidates": self._cell_candidates,
             "cell_replacements": self._cell_replacements,
             "frontier_cap": self.frontier_cap,
             "frontier_cap_pruned": self._frontier_cap_pruned,
             "final_local_serial": final_objective.local_serial,
+            "final_ray_serial": final_objective.ray_serial,
+            "final_smp_serial": final_objective.smp_serial,
             "final_parallel_bottleneck": (
                 final_objective.parallel_bottleneck
             ),
@@ -875,6 +1239,101 @@ class ExtensibleDpSearch:
         return self._reconstruct(
             back, final_mask, final_state, final_objective
         )
+
+    def _prepare_mandatory_suffix_lower_bounds(
+        self, legal_masks: Iterable[int]
+    ) -> None:
+        """Precompute an admissible lower bound on unfinished local work.
+
+        Some operators have no feasible Ray/SMP/GPU implementation in the
+        profiled search space and therefore must eventually execute on the
+        additive local lane.  Fusion does not discount operator compute, so
+        the sum of each such operator's cheapest legal-prefix local cost is a
+        lower bound for every completion of a prefix.  The bound is used only
+        for incumbent pruning and cannot remove an optimal plan.
+        """
+        self._mandatory_local_suffix_cost = {}
+        if getattr(self.cache_policy, "enabled", False):
+            return
+        indexes = getattr(self.block_provider, "_variant_indexes", {})
+        local_index = indexes.get((PipeVariantType.INPROCESS, 1))
+        if local_index is None:
+            return
+        candidate_variants = getattr(
+            self.block_provider, "_candidate_variants", ()
+        )
+        legal = tuple(legal_masks)
+        mandatory_cost = [0.0] * self.n
+        for idx in range(self.n):
+            bit = 1 << idx
+            execution_resource = self.block_provider._execution_resource_for_mask(
+                bit
+            )
+            if execution_resource != PipeExecutionResource.CPU:
+                continue
+            has_nonlocal_implementation = False
+            for variant in candidate_variants:
+                if variant == PipeVariantType.INPROCESS:
+                    continue
+                for (indexed_variant, _), index in indexes.items():
+                    if (
+                        indexed_variant == variant
+                        and math.isfinite(index.per_byte[idx])
+                    ):
+                        has_nonlocal_implementation = True
+                        break
+                if has_nonlocal_implementation:
+                    break
+            if has_nonlocal_implementation or not math.isfinite(
+                local_index.per_byte[idx]
+            ):
+                continue
+            minimum_work = min(
+                (
+                    _work_prod(self.optimizer, prefix, idx)
+                    for prefix in legal
+                    if not prefix & bit
+                    and self.optimizer._dp_valid_single_last(prefix, idx)
+                ),
+                default=0.0,
+            )
+            mandatory_cost[idx] = (
+                local_index.per_byte[idx]
+                * local_index.source_size
+                * minimum_work
+            )
+
+        full_mask = self.full_mask - 1
+        for prefix in legal:
+            remaining = full_mask ^ prefix
+            lower_bound = 0.0
+            while remaining:
+                bit = remaining & -remaining
+                remaining ^= bit
+                lower_bound += mandatory_cost[bit.bit_length() - 1]
+            self._mandatory_local_suffix_cost[prefix] = lower_bound
+
+    def _exceeds_incumbent_with_suffix_bound(
+        self,
+        next_mask: int,
+        local_serial: float,
+        ray_serial: float,
+        smp_serial: float,
+        gpu_serial: float,
+        incumbent_score: float,
+    ) -> bool:
+        """Return whether a partial label cannot beat a feasible incumbent."""
+        if not math.isfinite(incumbent_score):
+            return False
+        unavoidable_local = self._mandatory_local_suffix_cost.get(
+            next_mask, 0.0
+        )
+        return max(
+            local_serial + unavoidable_local,
+            ray_serial,
+            smp_serial,
+            gpu_serial,
+        ) > incumbent_score + 1e-12
 
     def _initial_objective(self) -> DpObjectiveCost:
         method = getattr(self.optimizer, "_dp_initial_objective_cost", None)
@@ -898,16 +1357,23 @@ class ExtensibleDpSearch:
         if method is None:
             return DpObjectiveCost(
                 local_serial=previous.local_serial + extra_cost,
-                parallel_bottleneck=previous.parallel_bottleneck,
+                ray_serial=previous.ray_serial,
+                smp_serial=previous.smp_serial,
                 gpu_serial=previous.gpu_serial,
             )
         return method(previous, extra_cost, block, prev_mask)
 
-    @staticmethod
     def _dominates(
-        left: DpObjectiveCost, right: DpObjectiveCost
+        self, left: DpObjectiveCost, right: DpObjectiveCost
     ) -> bool:
         tolerance = 1e-12
+        if not self.collapse_external_service_coordinates:
+            return (
+                left.local_serial <= right.local_serial + tolerance
+                and left.ray_serial <= right.ray_serial + tolerance
+                and left.smp_serial <= right.smp_serial + tolerance
+                and left.gpu_serial <= right.gpu_serial + tolerance
+            )
         return (
             left.local_serial <= right.local_serial + tolerance
             and left.parallel_bottleneck
@@ -921,6 +1387,26 @@ class ExtensibleDpSearch:
         if self.pareto_step_epsilon == 0.0:
             return self._dominates(left, right)
         factor = 1.0 + self.pareto_step_epsilon
+        if not self.collapse_external_service_coordinates:
+            forward = (
+                left.local_serial <= factor * right.local_serial
+                and left.ray_serial <= factor * right.ray_serial
+                and left.smp_serial <= factor * right.smp_serial
+                and left.gpu_serial <= factor * right.gpu_serial
+            )
+            if not forward:
+                return False
+            reverse = (
+                right.local_serial <= factor * left.local_serial
+                and right.ray_serial <= factor * left.ray_serial
+                and right.smp_serial <= factor * left.smp_serial
+                and right.gpu_serial <= factor * left.gpu_serial
+            )
+            if not reverse:
+                return True
+            return self._objective_order_key(left) <= self._objective_order_key(
+                right
+            )
         forward = (
             left.local_serial <= factor * right.local_serial
             and left.parallel_bottleneck
@@ -950,7 +1436,13 @@ class ExtensibleDpSearch:
         )
 
     def _legal_prefix_masks(self) -> List[int]:
-        """Return every dependency-closed subset in deterministic order."""
+        """Generate dependency-closed subsets without scanning ``2**N``.
+
+        Starting from the empty ideal, add only operators whose predecessor
+        masks are already present. Fixed-position operators are represented by
+        dependency edges, so long fixed prefixes/suffixes reduce work in
+        direct proportion to the number of actually reachable prefix sets.
+        """
         pred_masks = []
         for predecessors in self.optimizer._dp_pred_indices:
             mask = 0
@@ -958,20 +1450,21 @@ class ExtensibleDpSearch:
                 mask |= 1 << predecessor
             pred_masks.append(mask)
 
-        legal = []
-        for mask in range(self.full_mask):
-            remaining = mask
-            valid = True
-            while remaining:
-                bit = remaining & -remaining
-                remaining ^= bit
-                idx = bit.bit_length() - 1
-                if pred_masks[idx] & ~mask:
-                    valid = False
-                    break
-            if valid:
-                legal.append(mask)
-        return legal
+        discovered = {0}
+        frontier = [0]
+        while frontier:
+            mask = frontier.pop()
+            for idx, predecessors in enumerate(pred_masks):
+                bit = 1 << idx
+                if mask & bit or predecessors & ~mask:
+                    continue
+                candidate = mask | bit
+                if candidate not in discovered:
+                    discovered.add(candidate)
+                    frontier.append(candidate)
+        # Numeric order preserves the deterministic predecessor ordering used
+        # by the former exhaustive scan and therefore plan tie behavior.
+        return sorted(discovered)
 
     def _search_topology(
         self,
@@ -1022,7 +1515,7 @@ class ExtensibleDpSearch:
         self._greedy_full_block_result = None
         cache_enabled = getattr(self.cache_policy, "enabled", None)
         if cache_enabled is None or cache_enabled:
-            return float("inf")
+            return self.initial_incumbent_score
         candidate_for_order = getattr(
             self.block_provider, "candidate_for_order", None
         )
@@ -1030,12 +1523,45 @@ class ExtensibleDpSearch:
             self.block_provider, "_candidate_variants", None
         )
         if candidate_for_order is None or not candidate_variants:
-            return float("inf")
+            return self.initial_incumbent_score
+
+        restricted_start = time.monotonic()
+        restricted_result = self._fixed_order_physical_incumbent()
+        if os.environ.get("CEDAR_DP_LEGACY_SUBSET_INCUMBENT", "0") == "1":
+            legacy_result = self._single_parallel_block_incumbent()
+            if (
+                legacy_result is not None
+                and (
+                    restricted_result is None
+                    or legacy_result.cost < restricted_result.cost
+                )
+            ):
+                restricted_result = legacy_result
+        restricted_elapsed = time.monotonic() - restricted_start
+        if restricted_result is not None:
+            self._greedy_full_block_result = restricted_result
+            logger.info(
+                "[DpOptimizer] Fixed-order feasible incumbent cost=%s "
+                "elapsed_sec=%.3f blocks=%s",
+                restricted_result.cost,
+                restricted_elapsed,
+                restricted_result.blocks,
+            )
+        else:
+            logger.info(
+                "[DpOptimizer] Fixed-order feasible incumbent unavailable "
+                "elapsed_sec=%.3f",
+                restricted_elapsed,
+            )
 
         full_mask = self.full_mask - 1
         initial_state = self.cache_policy.initial_state()
         initial_objective = self._initial_objective()
-        best = float("inf")
+        best = (
+            restricted_result.cost
+            if restricted_result is not None
+            else float("inf")
+        )
         blocks = []
         for variant in candidate_variants:
             is_remote = variant in (
@@ -1142,7 +1668,394 @@ class ExtensibleDpSearch:
                         cost=objective.score,
                         objective=objective,
                     )
-        return best
+        return min(best, self.initial_incumbent_score)
+
+    def _fixed_order_physical_incumbent(self) -> Optional[SearchResult]:
+        """Construct a strong feasible upper bound in a small plan subspace.
+
+        The exact subset DP is still responsible for the final answer.  This
+        routine first obtains several legal orders (the original topological
+        order plus cheap compute-greedy orders), then performs a bounded
+        fixed-order search over fusion, placement, and integer width. Every
+        retained label is a fully feasible physical plan, so even though this
+        preliminary search is deliberately small, its best score is a safe
+        branch-and-bound incumbent and does not weaken exactness.
+        """
+        provider = self.block_provider
+        candidate_for_order = getattr(provider, "candidate_for_order", None)
+        variants = tuple(getattr(provider, "_candidate_variants", ()))
+        indexes = getattr(provider, "_variant_indexes", {})
+        resource_limit = self.parallel_stage_cpu_limit
+        if (
+            candidate_for_order is None
+            or not variants
+            or resource_limit is None
+        ):
+            return None
+
+        full_mask = self.full_mask - 1
+        orders: List[Tuple[int, ...]] = []
+
+        def add_order(order: Iterable[int]) -> None:
+            value = tuple(order)
+            if (
+                len(value) == self.n
+                and len(set(value)) == self.n
+                and value not in orders
+            ):
+                orders.append(value)
+
+        add_order(self.optimizer._dp_topo_order_in_mask(full_mask))
+        # A greedy order is O(N^2), dependency aware, and provides useful
+        # diversity without enumerating the logical-order search space.
+        width_one_indexes = [
+            index
+            for (variant, width), index in indexes.items()
+            if width == 1 and variant in variants
+        ]
+        for index in width_one_indexes:
+            prefix = 0
+            order = []
+            while len(order) < self.n:
+                available = [
+                    idx
+                    for idx in range(self.n)
+                    if not prefix & (1 << idx)
+                    and self.optimizer._dp_valid_single_last(prefix, idx)
+                    and math.isfinite(index.per_byte[idx])
+                ]
+                if not available:
+                    order = []
+                    break
+                selected = min(
+                    available,
+                    key=lambda idx: (
+                        _work_prod(self.optimizer, prefix, idx)
+                        * index.per_byte[idx],
+                        idx,
+                    ),
+                )
+                order.append(selected)
+                prefix |= 1 << selected
+            add_order(order)
+
+        try:
+            beam_width = int(os.environ.get("CEDAR_DP_INCUMBENT_BEAM", "48"))
+        except ValueError as exc:
+            raise ValueError("CEDAR_DP_INCUMBENT_BEAM must be an integer") from exc
+        if beam_width < 1:
+            raise ValueError("CEDAR_DP_INCUMBENT_BEAM must be positive")
+
+        best_result: Optional[SearchResult] = None
+        initial_state = self.cache_policy.initial_state()
+        initial_objective = self._initial_objective()
+
+        def retain(labels):
+            unique = {}
+            for state, objective, blocks in labels:
+                key = (state, objective)
+                old = unique.get(key)
+                if old is None or len(blocks) < len(old[2]):
+                    unique[key] = (state, objective, blocks)
+            return sorted(
+                unique.values(),
+                key=lambda item: self._objective_order_key(item[1]),
+            )[:beam_width]
+
+        for order in orders:
+            prefix_masks = [0]
+            for idx in order:
+                prefix_masks.append(prefix_masks[-1] | (1 << idx))
+            block_cache: Dict[Tuple[int, int], List[BlockCandidate]] = {}
+            beams = [[] for _ in range(self.n + 1)]
+            beams[0] = [(initial_state, initial_objective, tuple())]
+
+            for start in range(self.n):
+                if not beams[start]:
+                    continue
+                beams[start] = retain(beams[start])
+                prev_mask = prefix_masks[start]
+                for end in range(start + 1, self.n + 1):
+                    cache_key = (start, end)
+                    blocks = block_cache.get(cache_key)
+                    if blocks is None:
+                        block_order = order[start:end]
+                        block_mask = prefix_masks[end] ^ prev_mask
+                        execution_resource = (
+                            provider._execution_resource_for_mask(block_mask)
+                        )
+                        blocks = []
+                        for variant in variants:
+                            if (
+                                execution_resource
+                                == PipeExecutionResource.CUDA
+                                and variant
+                                not in (
+                                    PipeVariantType.RAY,
+                                    PipeVariantType.TF_RAY,
+                                )
+                            ):
+                                continue
+                            for width in self.optimizer._dp_candidate_parallelisms(
+                                variant, execution_resource
+                            ):
+                                try:
+                                    block = candidate_for_order(
+                                        block_order,
+                                        variant,
+                                        prefix_mask=prev_mask,
+                                        parallelism=width,
+                                    )
+                                except ValueError:
+                                    continue
+                                if self._block_can_follow(prev_mask, block):
+                                    blocks.append(block)
+                        blocks = self._prune_dominated_blocks(prev_mask, blocks)
+                        block_cache[cache_key] = blocks
+                    if not blocks:
+                        continue
+                    destination = beams[end]
+                    for state, objective, chosen in beams[start]:
+                        for block in blocks:
+                            next_usage = (
+                                state.parallel_stage_cpus
+                                + self.optimizer._dp_parallel_stage_cpu_cost(
+                                    block
+                                )
+                            )
+                            if next_usage > resource_limit:
+                                continue
+                            regular_cost = self.optimizer._dp_regular_transition_cost(
+                                prev_mask, block
+                            )
+                            next_objective = self._accumulate_objective(
+                                objective,
+                                regular_cost,
+                                block,
+                                False,
+                                prev_mask,
+                            )
+                            if (
+                                best_result is not None
+                                and next_objective.score
+                                > best_result.cost + 1e-12
+                            ):
+                                continue
+                            destination.append(
+                                (
+                                    DpStateSummary(
+                                        cache_active=False,
+                                        parallel_stage_cpus=next_usage,
+                                    ),
+                                    next_objective,
+                                    chosen + (block,),
+                                )
+                            )
+                    if len(destination) > 4 * beam_width:
+                        beams[end] = retain(destination)
+
+            if not beams[self.n]:
+                continue
+            state, objective, blocks = min(
+                retain(beams[self.n]),
+                key=lambda item: self._objective_order_key(item[1]),
+            )
+            del state
+            if best_result is not None and objective.score >= best_result.cost:
+                continue
+            result_order: List[int] = []
+            result_blocks: List[List[int]] = []
+            variants_by_idx = {}
+            parallelism_by_idx = {}
+            for block in blocks:
+                block_order = list(block.order)
+                result_order.extend(block_order)
+                result_blocks.append(block_order)
+                for idx in block.order:
+                    variants_by_idx[idx] = block.variant
+                    parallelism_by_idx[idx] = block.parallelism
+            best_result = SearchResult(
+                order=result_order,
+                blocks=result_blocks,
+                variants_by_idx=variants_by_idx,
+                parallelism_by_idx=parallelism_by_idx,
+                cache_after_idx=None,
+                cost=objective.score,
+                objective=objective,
+            )
+        return best_result
+
+    def _single_parallel_block_incumbent(self) -> Optional[SearchResult]:
+        """Find a strong feasible bound in an O(MP2**N) subspace.
+
+        The restricted space contains every legal plan with exactly one
+        parallel block placed either before or after a sequence of local
+        singleton operators.  It is used only as an upper bound for the full
+        exact DP; no label below the returned score is discarded.
+        """
+        resource_limit = self.parallel_stage_cpu_limit
+        if resource_limit is None:
+            # The relaxed main DP deliberately drops resource coordinates, but
+            # its pruning incumbent must still be a physically feasible plan.
+            # Use the configured pool capacities solely to validate this upper
+            # bound; doing so cannot exclude any plan below the bound.
+            resource_limit = self.optimizer._dp_parallel_stage_cpu_limit()
+        if resource_limit is None or (
+            resource_limit.ray_cpus <= 0
+            and resource_limit.smp_cpus <= 0
+        ):
+            return None
+        provider = self.block_provider
+        candidate_for_order = getattr(provider, "candidate_for_order", None)
+        candidate_for_prefix = getattr(
+            provider, "candidates_for_prefix", None
+        )
+        variant_indexes = getattr(provider, "_variant_indexes", {})
+        local_index = variant_indexes.get((PipeVariantType.INPROCESS, 1))
+        if (
+            candidate_for_order is None
+            or candidate_for_prefix is None
+            or local_index is None
+        ):
+            return None
+
+        full_mask = self.full_mask - 1
+        legal_masks, _ = self._search_topology()
+        parallel_variants = {
+            PipeVariantType.RAY,
+            PipeVariantType.TF_RAY,
+            PipeVariantType.SMP,
+        }
+        best_result: Optional[SearchResult] = None
+
+        def local_singletons(mask: int, prefix_mask: int):
+            if mask == 0:
+                return []
+            cost, order = local_index.get(mask, prefix_mask)
+            if not math.isfinite(cost) or not order:
+                return None
+            blocks = []
+            current_prefix = prefix_mask
+            for idx in order:
+                try:
+                    block = candidate_for_order(
+                        (idx,),
+                        PipeVariantType.INPROCESS,
+                        prefix_mask=current_prefix,
+                        parallelism=1,
+                    )
+                except ValueError:
+                    return None
+                if not self._block_can_follow(current_prefix, block):
+                    return None
+                blocks.append(block)
+                current_prefix |= block.mask
+            return blocks
+
+        def evaluate(blocks: List[BlockCandidate]) -> None:
+            nonlocal best_result
+            state = self.cache_policy.initial_state()
+            objective = self._initial_objective()
+            prev_mask = 0
+            for block in blocks:
+                if not self._block_can_follow(prev_mask, block):
+                    return
+                next_mask = prev_mask | block.mask
+                next_parallel_cpus = (
+                    state.parallel_stage_cpus
+                    + self.optimizer._dp_parallel_stage_cpu_cost(block)
+                )
+                if next_parallel_cpus > resource_limit:
+                    return
+                regular_cost = self.optimizer._dp_regular_transition_cost(
+                    prev_mask, block
+                )
+                choices = [
+                    choice
+                    for choice in self.cache_policy.transitions(
+                        prev_mask,
+                        next_mask,
+                        state,
+                        regular_cost,
+                        block,
+                        next_parallel_cpus,
+                    )
+                    if choice.cache_after_idx is None
+                ]
+                if len(choices) != 1:
+                    return
+                choice = choices[0]
+                objective = self._accumulate_objective(
+                    objective,
+                    choice.extra_cost,
+                    block,
+                    choice.replaces_prefix_cost,
+                    prev_mask,
+                )
+                state = choice.state
+                prev_mask = next_mask
+            if (
+                prev_mask != full_mask
+                or not math.isfinite(objective.score)
+            ):
+                return
+            if best_result is not None and objective.score >= best_result.cost:
+                return
+            variants_by_idx = {}
+            parallelism_by_idx = {}
+            result_blocks = []
+            order = []
+            for block in blocks:
+                block_order = list(block.order)
+                result_blocks.append(block_order)
+                order.extend(block_order)
+                for idx in block.order:
+                    variants_by_idx[idx] = block.variant
+                    parallelism_by_idx[idx] = block.parallelism
+            best_result = SearchResult(
+                order=order,
+                blocks=result_blocks,
+                variants_by_idx=variants_by_idx,
+                parallelism_by_idx=parallelism_by_idx,
+                cache_after_idx=None,
+                cost=objective.score,
+                objective=objective,
+            )
+
+        def parallel_candidates(prefix_mask: int, block_mask: int):
+            if block_mask == 0:
+                return []
+            return [
+                block
+                for block in candidate_for_prefix(prefix_mask, block_mask)
+                if block.variant in parallel_variants
+                and not (
+                    self.optimizer._dp_parallel_stage_cpu_cost(block)
+                    > resource_limit
+                )
+            ]
+
+        # Parallel block first, followed by the best legal local order.
+        for parallel_mask in legal_masks[1:]:
+            suffix_mask = full_mask ^ parallel_mask
+            suffix = local_singletons(suffix_mask, parallel_mask)
+            if suffix is None:
+                continue
+            for parallel_block in parallel_candidates(0, parallel_mask):
+                evaluate([parallel_block] + suffix)
+
+        # Best legal local prefix followed by one parallel block.
+        for prefix_mask in legal_masks[:-1]:
+            parallel_mask = full_mask ^ prefix_mask
+            prefix = local_singletons(prefix_mask, 0)
+            if prefix is None:
+                continue
+            for parallel_block in parallel_candidates(
+                prefix_mask, parallel_mask
+            ):
+                evaluate(prefix + [parallel_block])
+
+        return best_result
 
     def _try_extend(
         self,
@@ -1174,6 +2087,25 @@ class ExtensibleDpSearch:
             regular_cost = self.optimizer._dp_regular_transition_cost(
                 prev_mask, block
             )
+            # The non-cache transition vector depends only on the prefix and
+            # block, not on a retained Pareto label.  In particular, boundary
+            # calibration used to be recomputed once per label here, which is
+            # hundreds of millions of identical calls for a 19-op workload.
+            # Compute the vector once, then combine additive lanes with + and
+            # pipelined Ray/SMP bottleneck coordinates with max below.
+            objective_delta = self._accumulate_objective(
+                DpObjectiveCost(),
+                regular_cost,
+                block,
+                False,
+                prev_mask,
+            )
+            if objective_delta.score > incumbent_score + 1e-12:
+                # Every objective coordinate is monotone. A block that alone
+                # exceeds a feasible complete-plan bound cannot extend any
+                # retained prefix, so reject it before the label cross product.
+                self._upper_bound_pruned += 1
+                continue
             for prev_state, prev_objectives in dp[prev_mask].items():
                 if self.parallel_stage_cpu_limit is None:
                     # Resource use cannot affect feasibility or any future
@@ -1181,7 +2113,7 @@ class ExtensibleDpSearch:
                     # this otherwise irrelevant state coordinate so plans
                     # with different accumulated stage widths can dominate
                     # one another by score.
-                    next_parallel_stage_cpus = 0
+                    next_parallel_stage_cpus = DpResourceUsage()
                 else:
                     next_parallel_stage_cpus = (
                         prev_state.parallel_stage_cpus
@@ -1203,15 +2135,76 @@ class ExtensibleDpSearch:
                 )
                 for prev_objective in list(prev_objectives):
                     for choice in choices:
-                        candidate = self._accumulate_objective(
-                            prev_objective,
-                            choice.extra_cost,
-                            block,
-                            choice.replaces_prefix_cost,
-                            prev_mask,
-                        )
-                        if candidate.score > incumbent_score + 1e-12:
+                        if choice.replaces_prefix_cost:
+                            # A cache hit discards every upstream service
+                            # coordinate and resumes on the local lane.
+                            local_serial = choice.extra_cost
+                            ray_serial = 0.0
+                            smp_serial = 0.0
+                            gpu_serial = 0.0
+                        else:
+                            local_serial = (
+                                prev_objective.local_serial
+                                + objective_delta.local_serial
+                            )
+                            if self.collapse_external_service_coordinates:
+                                parallel_bottleneck = max(
+                                    prev_objective.ray_serial,
+                                    prev_objective.smp_serial,
+                                    objective_delta.ray_serial,
+                                    objective_delta.smp_serial,
+                                )
+                                ray_serial = parallel_bottleneck
+                                smp_serial = parallel_bottleneck
+                            else:
+                                ray_serial = max(
+                                    prev_objective.ray_serial,
+                                    objective_delta.ray_serial,
+                                )
+                                smp_serial = max(
+                                    prev_objective.smp_serial,
+                                    objective_delta.smp_serial,
+                                )
+                            gpu_serial = (
+                                prev_objective.gpu_serial
+                                + objective_delta.gpu_serial
+                            )
+                        # All coordinates are non-negative.  Test the safe
+                        # incumbent bound before allocating a frozen objective
+                        # object; most complex-workload candidates die here.
+                        if self._exceeds_incumbent_with_suffix_bound(
+                            next_mask,
+                            local_serial,
+                            ray_serial,
+                            smp_serial,
+                            gpu_serial,
+                            incumbent_score,
+                        ):
                             self._upper_bound_pruned += 1
+                            if (
+                                local_serial <= incumbent_score + 1e-12
+                                and ray_serial <= incumbent_score + 1e-12
+                                and smp_serial <= incumbent_score + 1e-12
+                                and gpu_serial <= incumbent_score + 1e-12
+                            ):
+                                self._suffix_lower_bound_pruned += 1
+                            continue
+                        candidate = DpObjectiveCost(
+                            local_serial=local_serial,
+                            ray_serial=ray_serial,
+                            smp_serial=smp_serial,
+                            gpu_serial=gpu_serial,
+                        )
+                        if (
+                            self.required_final_parallel_stage_cpus is not None
+                            and next_mask == self.full_mask - 1
+                            and choice.state.parallel_stage_cpus
+                            != self.required_final_parallel_stage_cpus
+                        ):
+                            # No suffix remains that could repair an incomplete
+                            # resource reservation.  The old implementation
+                            # retained these labels and discarded them only
+                            # after the entire final frontier was built.
                             continue
                         if self.required_final_parallel_stage_cpus is not None:
                             if (
@@ -1250,8 +2243,14 @@ class ExtensibleDpSearch:
                                         abs_tol=1e-12,
                                     )
                                     and math.isclose(
-                                        old.parallel_bottleneck,
-                                        candidate.parallel_bottleneck,
+                                        old.ray_serial,
+                                        candidate.ray_serial,
+                                        rel_tol=1e-12,
+                                        abs_tol=1e-12,
+                                    )
+                                    and math.isclose(
+                                        old.smp_serial,
+                                        candidate.smp_serial,
                                         rel_tol=1e-12,
                                         abs_tol=1e-12,
                                     )
@@ -1370,8 +2369,14 @@ class ExtensibleDpSearch:
                                     abs_tol=1e-12,
                                 )
                                 and math.isclose(
-                                    old.parallel_bottleneck,
-                                    candidate.parallel_bottleneck,
+                                    old.ray_serial,
+                                    candidate.ray_serial,
+                                    rel_tol=1e-12,
+                                    abs_tol=1e-12,
+                                )
+                                and math.isclose(
+                                    old.smp_serial,
+                                    candidate.smp_serial,
                                     rel_tol=1e-12,
                                     abs_tol=1e-12,
                                 )
@@ -1432,6 +2437,311 @@ class ExtensibleDpSearch:
                             cache_after_idx=choice.cache_after_idx,
                         )
 
+    def _can_use_exact_batch_frontier(self) -> bool:
+        """Whether a mask can use the exact offline skyline implementation."""
+        return (
+            getattr(self.cache_policy, "enabled", None) is False
+            and self.pareto_step_epsilon == 0.0
+            and self.frontier_cap == 0
+        )
+
+    @staticmethod
+    def _prefer_pointer(
+        current: BackPointer, candidate: BackPointer
+    ) -> BackPointer:
+        """Preserve the legacy deterministic tie preference for fusion."""
+        current_width = (
+            current.block.mask.bit_count()
+            if current.block.materializes_fusion
+            else 0
+        )
+        candidate_width = (
+            candidate.block.mask.bit_count()
+            if candidate.block.materializes_fusion
+            else 0
+        )
+        return candidate if candidate_width > current_width else current
+
+    def _exact_skyline(
+        self,
+        candidates: Dict[DpObjectiveCost, BackPointer],
+    ) -> List[Tuple[DpObjectiveCost, BackPointer]]:
+        """Return the complete non-dominated objective set.
+
+        Separate Ray/SMP resource use remains in :class:`DpStateSummary`.
+        Service demand is suffix-equivalent under ``E=max(R,S)``, reducing a
+        CPU-only frontier to the two coordinates ``(L,E)``. Sorting by local
+        demand and retaining a strictly decreasing external bottleneck gives
+        the exact skyline in ``O(K log K)``.
+        """
+        if not self.collapse_external_service_coordinates:
+            items = list(candidates.items())
+            retained = []
+            for objective, pointer in items:
+                if any(
+                    self._dominates(other, objective)
+                    for other, _ in items
+                    if other != objective
+                ):
+                    continue
+                retained.append((objective, pointer))
+            return retained
+
+        effective = {}
+        for objective, pointer in candidates.items():
+            canonical = DpObjectiveCost(
+                local_serial=objective.local_serial,
+                ray_serial=objective.parallel_bottleneck,
+                smp_serial=objective.parallel_bottleneck,
+                gpu_serial=objective.gpu_serial,
+            )
+            old = effective.get(canonical)
+            if old is None:
+                effective[canonical] = pointer
+            elif isinstance(old, BackPointer) and isinstance(
+                pointer, BackPointer
+            ):
+                effective[canonical] = self._prefer_pointer(old, pointer)
+            else:
+                # Prefix resource skylines store ``(state, pointer)`` values.
+                # Equal effective objectives are suffix-equivalent; retaining
+                # the first deterministic representative is sufficient.
+                effective[canonical] = old
+        items = list(effective.items())
+        if not items:
+            return []
+        if any(objective.gpu_serial != 0.0 for objective, _ in items):
+            # GPU workloads are much smaller. Keep the generic exact 3-D rule.
+            retained = []
+            for objective, pointer in items:
+                if any(
+                    self._dominates(old_objective, objective)
+                    for old_objective, _ in items
+                    if old_objective is not objective
+                ):
+                    continue
+                retained.append((objective, pointer))
+            return retained
+
+        items.sort(
+            key=lambda item: (
+                item[0].local_serial,
+                item[0].parallel_bottleneck,
+            )
+        )
+        retained = []
+        tolerance = 1e-12
+        best_parallel = float("inf")
+        for objective, pointer in items:
+            if best_parallel <= objective.parallel_bottleneck + tolerance:
+                continue
+            retained.append((objective, pointer))
+            best_parallel = objective.parallel_bottleneck
+        return retained
+
+    def _compute_exact_batch_frontier(
+        self,
+        dp: List[Dict[DpStateSummary, List[DpObjectiveCost]]],
+        back: List[
+            Dict[Tuple[DpStateSummary, DpObjectiveCost], BackPointer]
+        ],
+        next_mask: int,
+        prev_masks: Iterable[int],
+        incumbent_score: float,
+    ) -> None:
+        """Generate one mask and compute its exact Pareto set in one batch."""
+        collected: Dict[
+            DpStateSummary, Dict[DpObjectiveCost, BackPointer]
+        ] = {}
+        final_mask = self.full_mask - 1
+        required_cpus = self.required_final_parallel_stage_cpus
+
+        for prev_mask in prev_masks:
+            if not dp[prev_mask]:
+                continue
+            block_mask = next_mask ^ prev_mask
+            if not block_mask:
+                continue
+            self._transition_pairs += 1
+            prefix_candidates = getattr(
+                self.block_provider, "candidates_for_prefix", None
+            )
+            blocks = (
+                prefix_candidates(prev_mask, block_mask)
+                if prefix_candidates is not None
+                else self.block_provider.candidates_for(block_mask)
+            )
+            blocks = self._prune_dominated_blocks(prev_mask, blocks)
+            for block in blocks:
+                if not self._block_can_follow(prev_mask, block):
+                    continue
+                regular_cost = self.optimizer._dp_regular_transition_cost(
+                    prev_mask, block
+                )
+                delta = self._accumulate_objective(
+                    DpObjectiveCost(),
+                    regular_cost,
+                    block,
+                    False,
+                    prev_mask,
+                )
+                if delta.score > incumbent_score + 1e-12:
+                    self._upper_bound_pruned += 1
+                    continue
+                block_cpus = self.optimizer._dp_parallel_stage_cpu_cost(block)
+                for prev_state, prev_objectives in dp[prev_mask].items():
+                    if self.parallel_stage_cpu_limit is None:
+                        next_cpus = DpResourceUsage()
+                    else:
+                        next_cpus = (
+                            prev_state.parallel_stage_cpus + block_cpus
+                        )
+                        if next_cpus > self.parallel_stage_cpu_limit:
+                            continue
+                    if (
+                        required_cpus is not None
+                        and next_mask == final_mask
+                        and next_cpus != required_cpus
+                    ):
+                        continue
+                    next_state = DpStateSummary(
+                        cache_active=False,
+                        parallel_stage_cpus=next_cpus,
+                    )
+                    state_candidates = collected.setdefault(next_state, {})
+                    for previous in prev_objectives:
+                        local_serial = previous.local_serial + delta.local_serial
+                        if self.collapse_external_service_coordinates:
+                            parallel_bottleneck = max(
+                                previous.ray_serial,
+                                previous.smp_serial,
+                                delta.ray_serial,
+                                delta.smp_serial,
+                            )
+                            ray_serial = parallel_bottleneck
+                            smp_serial = parallel_bottleneck
+                        else:
+                            ray_serial = max(
+                                previous.ray_serial, delta.ray_serial
+                            )
+                            smp_serial = max(
+                                previous.smp_serial, delta.smp_serial
+                            )
+                        gpu_serial = previous.gpu_serial + delta.gpu_serial
+                        if self._exceeds_incumbent_with_suffix_bound(
+                            next_mask,
+                            local_serial,
+                            ray_serial,
+                            smp_serial,
+                            gpu_serial,
+                            incumbent_score,
+                        ):
+                            self._upper_bound_pruned += 1
+                            if (
+                                local_serial <= incumbent_score + 1e-12
+                                and ray_serial <= incumbent_score + 1e-12
+                                and smp_serial <= incumbent_score + 1e-12
+                                and gpu_serial <= incumbent_score + 1e-12
+                            ):
+                                self._suffix_lower_bound_pruned += 1
+                            continue
+                        objective = DpObjectiveCost(
+                            local_serial=local_serial,
+                            ray_serial=ray_serial,
+                            smp_serial=smp_serial,
+                            gpu_serial=gpu_serial,
+                        )
+                        pointer = BackPointer(
+                            prev_mask=prev_mask,
+                            prev_state=prev_state,
+                            prev_objective=previous,
+                            block=block,
+                            cache_after_idx=None,
+                        )
+                        old_pointer = state_candidates.get(objective)
+                        if old_pointer is None:
+                            state_candidates[objective] = pointer
+                        else:
+                            state_candidates[objective] = self._prefer_pointer(
+                                old_pointer, pointer
+                            )
+
+        # A relaxed search deliberately drops resource counts. If its winner
+        # fits the physical pools, it certifies the constrained global optimum
+        # because it is optimal over a superset. Only an infeasible winner
+        # requires the more expensive resource-state fallback below.
+        if self.parallel_stage_cpu_limit is None:
+            for state, candidates in collected.items():
+                skyline = self._exact_skyline(candidates)
+                if not skyline:
+                    continue
+                dp[next_mask][state] = [
+                    objective for objective, _ in skyline
+                ]
+                for objective, pointer in skyline:
+                    back[next_mask][(state, objective)] = pointer
+            return
+
+        # First compute the objective skyline for each exact resource state,
+        # then apply exact dominance across the two resource dimensions.  A
+        # label using no more Ray CPUs and no more SMP CPUs can execute every
+        # suffix available to a more resource-hungry label.  Without this
+        # second pass, splitting one scalar budget into two physical pools
+        # retains nearly every one of the (R+1)(S+1) states at every mask.
+        state_skylines = {
+            state: self._exact_skyline(candidates)
+            for state, candidates in collected.items()
+        }
+        limits = self.parallel_stage_cpu_limit
+        prefix_skylines: Dict[
+            Tuple[int, int],
+            Dict[
+                DpObjectiveCost,
+                Tuple[DpStateSummary, BackPointer],
+            ],
+        ] = {}
+        for ray_cpus in range(limits.ray_cpus + 1):
+            for smp_cpus in range(limits.smp_cpus + 1):
+                usage = DpResourceUsage(ray_cpus, smp_cpus)
+                state = DpStateSummary(
+                    cache_active=False,
+                    parallel_stage_cpus=usage,
+                )
+                prior: Dict[
+                    DpObjectiveCost,
+                    Tuple[DpStateSummary, BackPointer],
+                ] = {}
+                if ray_cpus > 0:
+                    prior.update(prefix_skylines[(ray_cpus - 1, smp_cpus)])
+                if smp_cpus > 0:
+                    for objective, value in prefix_skylines[
+                        (ray_cpus, smp_cpus - 1)
+                    ].items():
+                        prior.setdefault(objective, value)
+
+                exact = []
+                for objective, pointer in state_skylines.get(state, []):
+                    if any(
+                        self._dominates(old, objective)
+                        for old in prior
+                    ):
+                        continue
+                    exact.append((objective, pointer))
+
+                if exact:
+                    dp[next_mask][state] = [
+                        objective for objective, _ in exact
+                    ]
+                    for objective, pointer in exact:
+                        back[next_mask][(state, objective)] = pointer
+
+                combined = dict(prior)
+                for objective, pointer in exact:
+                    combined.setdefault(objective, (state, pointer))
+                prefix_skylines[(ray_cpus, smp_cpus)] = dict(
+                    self._exact_skyline(combined)
+                )
+
     def _apply_frontier_cap(
         self,
         frontier: List[DpObjectiveCost],
@@ -1451,31 +2761,29 @@ class ExtensibleDpSearch:
                     self._frontier_cap_pruned += 1
             frontier[:] = retained
             return
-        ordered = sorted(
-            frontier,
-            key=lambda objective: (
-                objective.parallel_bottleneck,
-                objective.local_serial,
-                objective.gpu_serial,
-            ),
-        )
-        selected = {0, len(ordered) - 1}
+        ordered = sorted(frontier, key=self._objective_order_key)
         best_index = min(
             range(len(ordered)),
             key=lambda index: self._objective_order_key(ordered[index]),
         )
-        selected.add(best_index)
-        if self.frontier_cap > 1:
-            for slot in range(self.frontier_cap):
-                index = round(
-                    slot * (len(ordered) - 1) / (self.frontier_cap - 1)
+        selected = {best_index}
+        coordinates = (
+            lambda objective: objective.local_serial,
+            lambda objective: objective.parallel_bottleneck,
+            lambda objective: objective.gpu_serial,
+        )
+        for coordinate in coordinates:
+            for chooser in (min, max):
+                if len(selected) >= self.frontier_cap:
+                    break
+                selected.add(
+                    chooser(
+                        range(len(ordered)),
+                        key=lambda index: coordinate(ordered[index]),
+                    )
                 )
-                selected.add(index)
         if len(selected) < self.frontier_cap:
-            for index in sorted(
-                range(len(ordered)),
-                key=lambda item: self._objective_order_key(ordered[item]),
-            ):
+            for index in range(len(ordered)):
                 selected.add(index)
                 if len(selected) == self.frontier_cap:
                     break
@@ -1502,11 +2810,7 @@ class ExtensibleDpSearch:
             return math.floor(math.log(value) / log_base)
 
         return (
-            (
-                None
-                if objective.gpu_serial <= 1e-12
-                else coordinate(objective.local_serial)
-            ),
+            coordinate(objective.local_serial),
             coordinate(objective.parallel_bottleneck),
             coordinate(objective.gpu_serial),
         )
@@ -1534,20 +2838,8 @@ class ExtensibleDpSearch:
         cell = self._objective_cell(candidate)
         cells = self._frontier_cells.setdefault((next_mask, state), {})
         old = cells.get(cell)
-        if candidate.gpu_serial <= 1e-12:
-            candidate_key = (
-                candidate.local_serial,
-                candidate.parallel_bottleneck,
-                candidate.score,
-            )
-            old_key = (
-                old.local_serial,
-                old.parallel_bottleneck,
-                old.score,
-            ) if old is not None else None
-        else:
-            candidate_key = self._objective_order_key(candidate)
-            old_key = self._objective_order_key(old) if old is not None else None
+        candidate_key = self._objective_order_key(candidate)
+        old_key = self._objective_order_key(old) if old is not None else None
         if old_key is not None and old_key <= candidate_key:
             return
         if old is not None:
@@ -1570,38 +2862,16 @@ class ExtensibleDpSearch:
             candidates = list(self._frontier_cells.pop(key).values())
             if not candidates:
                 continue
-            if all(candidate.gpu_serial <= 1e-12 for candidate in candidates):
-                ordered = sorted(
-                    candidates,
-                    key=lambda objective: (
-                        objective.parallel_bottleneck,
-                        objective.local_serial,
-                        objective.score,
-                    ),
-                )
-                retained = []
-                best_local = float("inf")
-                factor = 1.0 + self.pareto_step_epsilon
-                for candidate in ordered:
-                    if (
-                        best_local
-                        <= factor * candidate.local_serial + 1e-12
-                    ):
-                        back[next_mask].pop((state, candidate), None)
-                        continue
+            retained = []
+            for candidate in candidates:
+                if any(
+                    self._dominates(other, candidate)
+                    for other in candidates
+                    if other is not candidate
+                ):
+                    back[next_mask].pop((state, candidate), None)
+                else:
                     retained.append(candidate)
-                    best_local = min(best_local, candidate.local_serial)
-            else:
-                retained = []
-                for candidate in candidates:
-                    if any(
-                        self._dominates(other, candidate)
-                        for other in candidates
-                        if other is not candidate
-                    ):
-                        back[next_mask].pop((state, candidate), None)
-                    else:
-                        retained.append(candidate)
             if retained:
                 dp[next_mask][state] = retained
 
@@ -1610,14 +2880,16 @@ class ExtensibleDpSearch:
         prev_mask: int,
         blocks: Iterable[BlockCandidate],
     ) -> List[BlockCandidate]:
-        """Remove exact same-resource transition-vector dominance.
+        """Remove exact transition-vector and resource dominance.
 
         Once a block has covered ``block.mask``, its internal backend and
         order are absent from the future DP state.  Therefore, among blocks
-        that reserve the same number of remote CPUs, one whose incremental
-        local/parallel/GPU service vector is component-wise no better can
-        never lead to a better suffix.  Cache transitions retain all choices
-        because the physical cache marker records the block's terminal pipe.
+        a block that reserves no fewer Ray/SMP CPUs and has a component-wise
+        no-better local/Ray/SMP/GPU service vector can never lead to a better
+        suffix.  When an API caller requests an exact final resource total we
+        conservatively compare only equal-resource candidates. Cache
+        transitions retain all choices because the physical cache marker
+        records the block's terminal pipe.
         """
         candidates = list(blocks)
         required_methods = (
@@ -1646,16 +2918,24 @@ class ExtensibleDpSearch:
                 vector = (
                     boundary_local,
                     0.0,
+                    0.0,
                     self.optimizer._dp_gpu_worker_multiplier()
                     * (block.cost + boundary_parallel),
                 )
             elif block.variant in (
                 PipeVariantType.RAY,
                 PipeVariantType.TF_RAY,
-                PipeVariantType.SMP,
             ):
                 vector = (
                     boundary_local,
+                    block.cost / block.parallelism + boundary_parallel,
+                    0.0,
+                    0.0,
+                )
+            elif block.variant == PipeVariantType.SMP:
+                vector = (
+                    boundary_local,
+                    0.0,
                     block.cost / block.parallelism + boundary_parallel,
                     0.0,
                 )
@@ -1664,6 +2944,7 @@ class ExtensibleDpSearch:
                     self.optimizer._dp_regular_transition_cost(
                         prev_mask, block
                     ),
+                    0.0,
                     0.0,
                     0.0,
                 )
@@ -1676,7 +2957,13 @@ class ExtensibleDpSearch:
             for other_index, (_, other_resource, other_vector) in enumerate(
                 vectors
             ):
-                if index == other_index or resource_cost != other_resource:
+                if index == other_index:
+                    continue
+                if self.required_final_parallel_stage_cpus is not None:
+                    resource_dominates = other_resource == resource_cost
+                else:
+                    resource_dominates = other_resource <= resource_cost
+                if not resource_dominates:
                     continue
                 no_worse = all(
                     left <= right + tolerance
@@ -1686,8 +2973,11 @@ class ExtensibleDpSearch:
                     left < right - tolerance
                     for left, right in zip(other_vector, vector)
                 )
+                strictly_less_resource = other_resource != resource_cost
                 if no_worse and (
-                    strictly_better or other_index < index
+                    strictly_better
+                    or strictly_less_resource
+                    or other_index < index
                 ):
                     dominated = True
                     break
@@ -1765,6 +3055,9 @@ class DpOptimizer(MyOptimizer):
     """
 
     joint_actor_allocation = True
+    # For fixed resource usage, future Ray/SMP transitions and the final
+    # objective observe the two service coordinates only through max(R, S).
+    collapse_external_service_coordinates = True
 
     def _allocate_final_remote_stage_resources(self) -> None:
         """Materialize the actor/process counts selected by joint DP."""
@@ -1794,7 +3087,9 @@ class DpOptimizer(MyOptimizer):
                 desc.variant_ctx.n_procs = width
 
     def _dp_max_candidate_parallelism(
-        self, variant: PipeVariantType
+        self,
+        variant: PipeVariantType,
+        execution_resource: PipeExecutionResource = PipeExecutionResource.CPU,
     ) -> int:
         if not self.joint_actor_allocation or variant not in (
             PipeVariantType.RAY,
@@ -1802,7 +3097,14 @@ class DpOptimizer(MyOptimizer):
             PipeVariantType.SMP,
         ):
             return 1
-        return max(1, self._dp_parallel_stage_cpu_limit() or 1)
+        if execution_resource == PipeExecutionResource.CUDA:
+            return 1
+        limits = self._dp_parallel_stage_cpu_limit()
+        if limits is None:
+            return 1
+        if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            return max(1, limits.ray_cpus)
+        return max(1, limits.smp_cpus)
 
     def _dp_candidate_parallelisms(
         self,
@@ -1819,7 +3121,15 @@ class DpOptimizer(MyOptimizer):
             )
         ):
             return (1,)
-        return tuple(range(1, self._dp_max_candidate_parallelism(variant) + 1))
+        return tuple(
+            range(
+                1,
+                self._dp_max_candidate_parallelism(
+                    variant, execution_resource
+                )
+                + 1,
+            )
+        )
 
     def _dp_regular_transition_cost(
         self, prev_mask: int, block: BlockCandidate
@@ -1871,7 +3181,8 @@ class DpOptimizer(MyOptimizer):
         if block.execution_resource == PipeExecutionResource.CUDA:
             return DpObjectiveCost(
                 local_serial=previous.local_serial + boundary_local,
-                parallel_bottleneck=previous.parallel_bottleneck,
+                ray_serial=previous.ray_serial,
+                smp_serial=previous.smp_serial,
                 gpu_serial=(
                     previous.gpu_serial
                     + self._dp_gpu_worker_multiplier()
@@ -1881,19 +3192,26 @@ class DpOptimizer(MyOptimizer):
         if block.variant in (
             PipeVariantType.RAY,
             PipeVariantType.TF_RAY,
-            PipeVariantType.SMP,
         ):
             stage_cost = block.cost / block.parallelism + boundary_parallel
             return DpObjectiveCost(
                 local_serial=previous.local_serial + boundary_local,
-                parallel_bottleneck=max(
-                    previous.parallel_bottleneck, stage_cost
-                ),
+                ray_serial=max(previous.ray_serial, stage_cost),
+                smp_serial=previous.smp_serial,
+                gpu_serial=previous.gpu_serial,
+            )
+        if block.variant == PipeVariantType.SMP:
+            stage_cost = block.cost / block.parallelism + boundary_parallel
+            return DpObjectiveCost(
+                local_serial=previous.local_serial + boundary_local,
+                ray_serial=previous.ray_serial,
+                smp_serial=max(previous.smp_serial, stage_cost),
                 gpu_serial=previous.gpu_serial,
             )
         return DpObjectiveCost(
             local_serial=previous.local_serial + extra_cost,
-            parallel_bottleneck=previous.parallel_bottleneck,
+            ray_serial=previous.ray_serial,
+            smp_serial=previous.smp_serial,
             gpu_serial=previous.gpu_serial,
         )
 
@@ -2008,7 +3326,7 @@ class DpOptimizer(MyOptimizer):
                 raise ValueError("Materialized block is infeasible in DP search.")
 
             if search.parallel_stage_cpu_limit is None:
-                next_parallel_stage_cpus = 0
+                next_parallel_stage_cpus = DpResourceUsage()
             else:
                 next_parallel_stage_cpus = (
                     state.parallel_stage_cpus
@@ -2086,24 +3404,7 @@ class DpOptimizer(MyOptimizer):
                 )
         else:
             block_specs = self._dp_blocks_from_physical_plan(plan, ops)
-        total_parallel_cpus = sum(
-            parallelism
-            for _, variant, _, parallelism in block_specs
-            if variant
-            in (
-                PipeVariantType.RAY,
-                PipeVariantType.TF_RAY,
-                PipeVariantType.SMP,
-            )
-        )
-        previous_total = getattr(
-            self, "_dp_assumed_total_parallel_stage_cpus", None
-        )
-        self._dp_assumed_total_parallel_stage_cpus = total_parallel_cpus
-        try:
-            return self._replay_dp_objective(block_specs, ops).score
-        finally:
-            self._dp_assumed_total_parallel_stage_cpus = previous_total
+        return self._replay_dp_objective(block_specs, ops).score
 
     def run(
         self, profiled_data: Union[str, Dict[str, Any]], options: OptimizerOptions
@@ -2164,79 +3465,106 @@ class DpOptimizer(MyOptimizer):
         self._log_optimized_pipeline(tag="DpOptimizer")
         return self.physical_plan
 
-    def _dp_parallel_stage_cpu_limit(self) -> Optional[int]:
-        """Return the per-worker parallel-stage budget for a fixed-W run.
-
-        Strict profile matching accounts one CPU for the local worker plus the
-        profiled actor/process width of every active Ray/SMP stage.  Keeping
-        this constraint in the DP state prevents selecting a cheap plan that
-        cannot subsequently be materialized under the experiment's unified
-        CPU budget.
-        """
+    def _dp_parallel_stage_cpu_limit(
+        self,
+    ) -> Optional[DpResourceUsage]:
+        """Return independent per-worker Ray and SMP CPU capacities."""
         if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") != "1":
             return None
         fixed_workers_raw = os.environ.get(
             "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
         )
-        cpu_budget_raw = os.environ.get("CEDAR_PROFILE_MATCH_CPU_BUDGET")
-        if fixed_workers_raw is None or cpu_budget_raw is None:
+        local_budget_raw = os.environ.get("CEDAR_PROFILE_MATCH_CPU_BUDGET")
+        if fixed_workers_raw is None or local_budget_raw is None:
             return None
         try:
             fixed_workers = int(fixed_workers_raw)
-            cpu_budget = int(cpu_budget_raw)
+            local_budget = int(local_budget_raw)
+            ray_budget = int(
+                os.environ.get(
+                    "CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET",
+                    local_budget_raw,
+                )
+            )
         except ValueError as exc:
             raise RuntimeError(
                 "Invalid fixed-worker CPU budget configuration"
             ) from exc
-        if fixed_workers < 1 or cpu_budget < fixed_workers:
+        if (
+            fixed_workers < 1
+            or local_budget < fixed_workers
+            or ray_budget < fixed_workers
+        ):
             raise RuntimeError(
-                "Fixed local workers cannot fit under the unified CPU budget: "
-                f"fixed={fixed_workers}, budget={cpu_budget}"
+                "Fixed workers cannot fit under the local/Ray CPU budgets: "
+                f"fixed={fixed_workers}, local={local_budget}, "
+                f"ray={ray_budget}"
             )
-        per_worker_budget = cpu_budget // fixed_workers
-        reserve_raw = os.environ.get(
+        local_reserve_raw = os.environ.get(
             "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1"
         )
+        ray_reserve_raw = os.environ.get(
+            "CEDAR_DP_RAY_CPU_RESERVE_PER_WORKER", "1"
+        )
         try:
-            runtime_reserve = int(reserve_raw)
+            local_reserve = int(local_reserve_raw)
+            ray_reserve = int(ray_reserve_raw)
         except ValueError as exc:
             raise RuntimeError(
-                "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER must be an integer"
+                "DP local/Ray CPU reserves must be integers"
             ) from exc
-        if runtime_reserve < 0:
+        if local_reserve < 0 or ray_reserve < 0:
             raise RuntimeError(
-                "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER must be non-negative"
+                "DP local/Ray CPU reserves must be non-negative"
             )
-        # One slot is occupied by the local data worker. Keep one additional
-        # slot by default for the Ray driver, queue threads and multiprocessing
-        # coordination; plans that reserve every CPU have repeatedly stalled
-        # before yielding their first record despite nominal feasibility.
-        return max(0, per_worker_budget - 1 - runtime_reserve)
+        return DpResourceUsage(
+            ray_cpus=max(
+                0, ray_budget // fixed_workers - ray_reserve
+            ),
+            smp_cpus=max(
+                0,
+                local_budget // fixed_workers - 1 - local_reserve,
+            ),
+        )
 
-    def _dp_parallel_stage_cpu_cost(self, block: BlockCandidate) -> int:
-        if block.variant in (
-            PipeVariantType.RAY,
-            PipeVariantType.TF_RAY,
-            PipeVariantType.SMP,
-        ):
-            return block.parallelism
-        return 0
+    def _dp_parallel_stage_cpu_cost(
+        self, block: BlockCandidate
+    ) -> DpResourceUsage:
+        if block.variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            return DpResourceUsage(ray_cpus=block.parallelism)
+        if block.variant == PipeVariantType.SMP:
+            return DpResourceUsage(smp_cpus=block.parallelism)
+        return DpResourceUsage()
 
     def _run_conditioned_dp_search(
         self,
         inner_ops: List[int],
-        assumed_total: Optional[int],
+        resource_limits: Optional[DpResourceUsage],
+        enforce_resource_limits: bool = True,
     ):
-        self._dp_assumed_total_parallel_stage_cpus = assumed_total
+        self._dp_assumed_total_parallel_stage_cpus = resource_limits
         block_provider = BlockCandidateProvider(self, inner_ops)
         block_provider.prepare()
         cache_policy = CacheTransitionPolicy(self, inner_ops)
         search_kwargs = {}
-        if assumed_total is not None:
-            search_kwargs = {
-                "parallel_stage_cpu_limit": assumed_total,
-                "required_final_parallel_stage_cpus": assumed_total,
-            }
+        search_kwargs = {
+            "parallel_stage_cpu_limit": (
+                resource_limits if enforce_resource_limits else None
+            )
+        }
+        incumbent_raw = os.environ.get("CEDAR_DP_INITIAL_UPPER_BOUND")
+        if incumbent_raw is not None:
+            try:
+                incumbent_score = float(incumbent_raw)
+            except ValueError as exc:
+                raise RuntimeError(
+                    "CEDAR_DP_INITIAL_UPPER_BOUND must be numeric"
+                ) from exc
+            if not math.isfinite(incumbent_score) or incumbent_score <= 0.0:
+                raise RuntimeError(
+                    "CEDAR_DP_INITIAL_UPPER_BOUND must be finite and positive"
+                )
+            search_kwargs["initial_incumbent_score"] = incumbent_score
         search = ExtensibleDpSearch(
             optimizer=self,
             inner_ops=inner_ops,
@@ -2244,51 +3572,9 @@ class DpOptimizer(MyOptimizer):
             cache_policy=cache_policy,
             **search_kwargs,
         )
-        shortcut_raw = os.environ.get(
-            "CEDAR_DP_GREEDY_HIGH_BUDGET_THRESHOLD", "4"
-        )
-        try:
-            shortcut_threshold = int(shortcut_raw)
-        except ValueError as exc:
-            raise RuntimeError(
-                "CEDAR_DP_GREEDY_HIGH_BUDGET_THRESHOLD must be an integer."
-            ) from exc
-        cpu_only = all(
-            self.logical_pipes[p_id].execution_resource
-            == PipeExecutionResource.CPU
-            for p_id in inner_ops
-        )
-        if (
-            len(inner_ops) > 8
-            and assumed_total is not None
-            and assumed_total >= shortcut_threshold
-            and not cache_policy.enabled
-            and cpu_only
-        ):
-            search._initial_incumbent_score()
-            candidate_result = search._greedy_full_block_result
-            if candidate_result is not None:
-                stats = {
-                    "objective": "greedy_full_fusion_high_budget",
-                    "parallel_stage_cpu_limit": assumed_total,
-                    "required_final_parallel_stage_cpus": assumed_total,
-                    "frontier_cap": search.frontier_cap,
-                    "cost": candidate_result.cost,
-                }
-                self._dp_last_search_stats = stats
-                logger.info(
-                    "[DpOptimizer] High-budget bounded search stats: %s",
-                    stats,
-                )
-                return assumed_total, candidate_result, stats
-        try:
-            candidate_result = search.run()
-        except RuntimeError as exc:
-            if "required parallel CPU total" in str(exc):
-                return None
-            raise
+        candidate_result = search.run()
         return (
-            assumed_total,
+            resource_limits,
             candidate_result,
             dict(self._dp_last_search_stats),
         )
@@ -2302,98 +3588,29 @@ class DpOptimizer(MyOptimizer):
         if self._base_cost_map is None:
             raise RuntimeError("Base cost map is not initialized.")
 
-        resource_limit = self._dp_parallel_stage_cpu_limit()
-        assumed_totals = (
-            [None]
-            if resource_limit is None
-            else list(range(resource_limit + 1))
-        )
+        resource_limits = self._dp_parallel_stage_cpu_limit()
         forced_total_raw = os.environ.get("CEDAR_DP_FORCED_PARALLEL_TOTAL")
         if forced_total_raw is not None:
-            if resource_limit is None:
-                raise RuntimeError(
-                    "CEDAR_DP_FORCED_PARALLEL_TOTAL requires strict resource matching."
-                )
-            try:
-                forced_total = int(forced_total_raw)
-            except ValueError as exc:
-                raise RuntimeError(
-                    "CEDAR_DP_FORCED_PARALLEL_TOTAL must be an integer."
-                ) from exc
-            if forced_total < 0 or forced_total > resource_limit:
-                raise RuntimeError(
-                    "CEDAR_DP_FORCED_PARALLEL_TOTAL is outside the feasible "
-                    f"range [0, {resource_limit}]."
-                )
-            assumed_totals = [forced_total]
-        worker_raw = os.environ.get(
-            "CEDAR_DP_RESOURCE_SEARCH_WORKERS",
-            str(min(len(assumed_totals), os.cpu_count() or 1)),
-        )
-        try:
-            search_workers = int(worker_raw)
-        except ValueError as exc:
             raise RuntimeError(
-                "CEDAR_DP_RESOURCE_SEARCH_WORKERS must be an integer."
-            ) from exc
-        if search_workers < 1:
-            raise RuntimeError(
-                "CEDAR_DP_RESOURCE_SEARCH_WORKERS must be positive."
+                "CEDAR_DP_FORCED_PARALLEL_TOTAL is incompatible with separate "
+                "Ray/SMP pools; use the physical pool budgets instead."
             )
-        use_parallel_search = (
-            len(inner_ops) > 8
-            and len(assumed_totals) > 1
-            and search_workers > 1
-            and "fork" in mp.get_all_start_methods()
+        # Resource-matched formal plans go directly through the exact
+        # constrained state space. The previous relaxed-first fast path was
+        # lossless only when its winner happened to fit; on complex workloads
+        # it completed one full exponential search merely to discover an
+        # infeasible winner and then repeated all work with resource states.
+        candidate = self._run_conditioned_dp_search(
+            inner_ops,
+            resource_limits,
+            enforce_resource_limits=resource_limits is not None,
         )
-        conditioned_results = []
-        if use_parallel_search:
-            # Precompute dependency topology in the parent. Forked workers
-            # inherit it copy-on-write and only rebuild B-specific cost tables.
-            topology_search = ExtensibleDpSearch(
-                optimizer=self,
-                inner_ops=inner_ops,
-                block_provider=None,
-                cache_policy=None,
-            )
-            topology_search._search_topology()
-            process_count = min(search_workers, len(assumed_totals))
-            logger.info(
-                "[DpOptimizer] Searching %d resource totals on %d processes.",
-                len(assumed_totals),
-                process_count,
-            )
-            context = mp.get_context("fork")
-            with context.Pool(
-                processes=process_count,
-                initializer=_initialize_conditioned_search_worker,
-                initargs=(self, inner_ops),
-            ) as pool:
-                results = pool.map(
-                    _run_conditioned_search_worker, assumed_totals
-                )
-            conditioned_results.extend(
-                result for result in results if result is not None
-            )
-        else:
-            for assumed_total in assumed_totals:
-                candidate = self._run_conditioned_dp_search(
-                    inner_ops, assumed_total
-                )
-                if candidate is not None:
-                    conditioned_results.append(candidate)
-        if not conditioned_results:
+        if candidate is None:
             raise RuntimeError(
                 "Resource-conditioned DP found no feasible plan."
             )
-        assumed_total, result, selected_stats = min(
-            conditioned_results,
-            key=lambda item: (
-                item[1].cost,
-                item[0] if item[0] is not None else 0,
-            ),
-        )
-        self._dp_assumed_total_parallel_stage_cpus = assumed_total
+        resource_limits, result, selected_stats = candidate
+        self._dp_assumed_total_parallel_stage_cpus = resource_limits
         self._dp_last_search_stats = selected_stats
         replayed_objective = self._replay_dp_objective(
             [
@@ -2418,11 +3635,24 @@ class DpOptimizer(MyOptimizer):
                 "DP objective replay diverged from search: "
                 f"search={result.cost}, replay={replayed_cost}"
             )
+        # Search frontiers canonically store E=max(R,S). Replaying the chosen
+        # plan restores the true per-family coordinates for diagnostics and
+        # paper artifacts without changing the optimized score.
+        selected_stats["final_ray_serial"] = replayed_objective.ray_serial
+        selected_stats["final_smp_serial"] = replayed_objective.smp_serial
+        selected_stats["final_parallel_bottleneck"] = (
+            replayed_objective.parallel_bottleneck
+        )
+        self._dp_last_search_stats = selected_stats
         self._last_dp_state_cost = replayed_cost
         self._last_dp_search_result = result
+        # Width is a first-class DP decision. Materialization must preserve it
+        # exactly; a post-search allocator would change the objective that was
+        # optimized and invalidate the optimality guarantee.
         self._dp_selected_stage_parallelism = {
-            tuple(inner_ops[index] for index in block):
-            result.parallelism_by_idx.get(block[0], 1)
+            tuple(inner_ops[idx] for idx in block): (
+                result.parallelism_by_idx.get(block[0], 1)
+            )
             for block in result.blocks
         }
 
@@ -2439,11 +3669,11 @@ class DpOptimizer(MyOptimizer):
 
         logger.info("[DpOptimizer] DP objective cost (inner ops only): %s", replayed_cost)
         logger.info(
-            "[DpOptimizer] DP objective: throughput_bottleneck "
-            "local_serial=%s parallel_bottleneck=%s "
-            "gpu_serial=%s",
+            "[DpOptimizer] DP objective: resource_family_bottleneck "
+            "local_serial=%s ray_serial=%s smp_serial=%s gpu_serial=%s",
             replayed_objective.local_serial,
-            replayed_objective.parallel_bottleneck,
+            replayed_objective.ray_serial,
+            replayed_objective.smp_serial,
             replayed_objective.gpu_serial,
         )
 

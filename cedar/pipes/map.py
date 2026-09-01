@@ -25,7 +25,7 @@ from .variant import (
     SMPPipeVariant,
     TFPipeVariant,
 )
-from .ray_variant import RayPipeVariant
+from .ray_variant import RayPipeVariant, get_ray_actor_options
 from .context import (
     InProcessPipeVariantContext,
     MultiprocessPipeVariantContext,
@@ -349,7 +349,7 @@ class RayMapperPipeVariant(RayPipeVariant):
 
     def _create_actor(self) -> ray.actor.ActorClass:
         return RayActorMapperPipeVariant.options(
-            num_gpus=self.variant_ctx.num_gpus
+            **get_ray_actor_options(self.variant_ctx.num_gpus)
         ).remote(self.name, self.fn)
 
 
@@ -478,7 +478,7 @@ class TFRayMapperPipeVariant(RayPipeVariant):
 
     def _create_actor(self) -> ray.actor.ActorClass:
         return TFRayActorMapperPipeVariant.options(
-            num_gpus=self.variant_ctx.num_gpus
+            **get_ray_actor_options(self.variant_ctx.num_gpus)
         ).remote(
             self.name,
             self.fn,

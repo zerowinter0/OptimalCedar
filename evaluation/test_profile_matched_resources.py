@@ -36,38 +36,30 @@ def test_mixed_plan_uses_final_active_stages_and_budget():
         },
     )
 
-    signature = apply_profile_matched_resources(plan, _profile(), 64)
+    signature = apply_profile_matched_resources(
+        plan, _profile(), 64, fixed_local_workers=8
+    )
 
-    assert plan.n_local_workers == 21
-    assert plan.pipe_descs[7].variant_ctx.n_actors == 1
-    assert plan.pipe_descs[6].variant_ctx.n_procs == 1
-    assert signature == {
-        "cpu_budget": 64,
-        "local_workers": 21,
-        "local_worker_policy": "max_under_cpu_budget",
-        "ray_stages": 1,
-        "smp_stages": 1,
-        "ray_actors_per_stage_per_worker": 1,
-        "smp_procs_per_stage_per_worker": 1,
-        "global_ray_actors": 21,
-        "global_smp_procs": 21,
-        "gpu_ray_stages": 0,
-        "global_gpu_actors": 0,
-        "gpu_fraction_per_actor": 0.0,
-        "total_accounted_gpus": 0.0,
-        "total_accounted_cpus": 63,
-    }
+    assert plan.n_local_workers == 8
+    assert plan.pipe_descs[7].variant_ctx.n_actors == 7
+    assert plan.pipe_descs[6].variant_ctx.n_procs == 6
+    assert signature["ray_budget_per_worker"] == 7
+    assert signature["smp_budget_per_worker"] == 6
+    assert signature["global_ray_actors"] == 56
+    assert signature["global_smp_procs"] == 48
+    assert signature["total_accounted_local_cpus"] == 56
+    assert signature["total_accounted_ray_cpus"] == 56
 
 
-def test_rejects_profile_with_different_width():
+def test_rejects_profile_with_nonpositive_width():
     plan = PhysicalPlan(
         graph={0: set()},
         pipe_descs={0: _desc(PipeVariantType.RAY)},
     )
     try:
-        apply_profile_matched_resources(plan, _profile(width=8), 64)
+        apply_profile_matched_resources(plan, _profile(width=0), 64)
     except RuntimeError as exc:
-        assert "actors_per_stage=1" in str(exc)
+        assert "must be >= 1" in str(exc)
     else:
         raise AssertionError("mismatched profile width was accepted")
 
@@ -86,7 +78,7 @@ def test_rejects_active_ray_ds_stage():
         raise AssertionError("active RAY_DS stage was accepted")
 
 
-def test_fixed_local_worker_ablation_preserves_stage_widths():
+def test_fixed_local_worker_ablation_allocates_each_pool_independently():
     plan = PhysicalPlan(
         graph={0: {7}, 7: {6}, 6: set()},
         pipe_descs={
@@ -97,13 +89,13 @@ def test_fixed_local_worker_ablation_preserves_stage_widths():
     )
 
     signature = apply_profile_matched_resources(
-        plan, _profile(), 64, fixed_local_workers=1
+        plan, _profile(), 64, fixed_local_workers=8
     )
 
-    assert plan.n_local_workers == 1
-    assert plan.pipe_descs[7].variant_ctx.n_actors == 1
-    assert plan.pipe_descs[6].variant_ctx.n_procs == 1
+    assert plan.n_local_workers == 8
+    assert plan.pipe_descs[7].variant_ctx.n_actors == 7
+    assert plan.pipe_descs[6].variant_ctx.n_procs == 6
     assert signature["local_worker_policy"] == "fixed_ablation"
-    assert signature["global_ray_actors"] == 1
-    assert signature["global_smp_procs"] == 1
-    assert signature["total_accounted_cpus"] == 3
+    assert signature["global_ray_actors"] == 56
+    assert signature["global_smp_procs"] == 48
+    assert signature["total_accounted_cpus"] == 112

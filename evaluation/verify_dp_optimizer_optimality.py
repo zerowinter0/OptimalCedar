@@ -1,9 +1,10 @@
 """Randomized exhaustive optimality verifier for :class:`DpOptimizer`.
 
 Each generated case has exactly six reorderable operators.  The verifier
-enumerates every legal topological order, every fusion partition, and every
-assignment of the three physical backends used by the case, then compares
-that independent oracle with the plan produced by DpOptimizer.
+enumerates every legal topological order, every fusion partition, every
+assignment of the three physical backends used by the case, and (when a pool
+limit is supplied) every feasible integer stage-width assignment. It then
+compares that independent oracle with the plan produced by DpOptimizer.
 
 All optimizer passes except caching are enabled. Prefetch and local parallelism
 do not alter this cost model, but enabling them exercises the requested setup.
@@ -162,17 +163,16 @@ def _plan_cost(
     case: GeneratedCase,
     blocks: Sequence[Sequence[int]],
     block_backends: Sequence[str],
+    block_widths: Sequence[int],
 ) -> float:
-    """Independent steady-state throughput-bottleneck objective."""
+    """Independent width-aware resource-family bottleneck objective."""
     item_size = 1.0
     cardinality = 1.0
     volume = 1.0
     local_serial = 0.0
-    parallel_bottleneck = 0.0
-    baseline_scale = sum(
-        operator.costs["INPROCESS"] for operator in case.operators
-    )
-    for block, backend in zip(blocks, block_backends):
+    ray_serial = 0.0
+    smp_serial = 0.0
+    for block, backend, width in zip(blocks, block_backends, block_widths):
         block_input = volume
         block_compute = 0.0
         if backend == "SMP":
@@ -203,19 +203,22 @@ def _plan_cost(
             )
         if backend == "INPROCESS":
             local_serial += block_compute
-        else:
-            stage_cost = block_compute + boundary_work
-            parallel_bottleneck = max(
-                parallel_bottleneck, stage_cost
+        elif backend == "RAY":
+            ray_serial = max(
+                ray_serial, block_compute / width + boundary_work
             )
-    return max(local_serial, parallel_bottleneck)
+        else:
+            smp_serial = max(
+                smp_serial, block_compute / width + boundary_work
+            )
+    return max(local_serial, ray_serial, smp_serial)
 
 
 def exhaustive_oracle(
     case: GeneratedCase,
     parallel_stage_limit: int | None = None,
 ) -> ExhaustiveResult:
-    """Enumerate every legal order, fusion partition, and block backend."""
+    """Enumerate every legal order, partition, backend, and integer width."""
     best_cost = math.inf
     best_order: Tuple[int, ...] = ()
     best_backends: Tuple[str, ...] = ()
@@ -228,29 +231,51 @@ def exhaustive_oracle(
         for boundary_mask in range(1 << (NUM_OPERATORS - 1)):
             blocks = _partition_order(order, boundary_mask)
             for block_backends in itertools.product(BACKENDS, repeat=len(blocks)):
-                if (
-                    parallel_stage_limit is not None
-                    and sum(
-                        backend != "INPROCESS"
-                        for backend in block_backends
+                max_width = parallel_stage_limit or 1
+                width_choices = [
+                    (1,)
+                    if backend == "INPROCESS"
+                    else tuple(range(1, max_width + 1))
+                    for backend in block_backends
+                ]
+                for block_widths in itertools.product(*width_choices):
+                    if parallel_stage_limit is not None:
+                        ray_width = sum(
+                            width
+                            for backend, width in zip(
+                                block_backends, block_widths
+                            )
+                            if backend == "RAY"
+                        )
+                        smp_width = sum(
+                            width
+                            for backend, width in zip(
+                                block_backends, block_widths
+                            )
+                            if backend == "SMP"
+                        )
+                        if (
+                            ray_width > parallel_stage_limit
+                            or smp_width > parallel_stage_limit
+                        ):
+                            continue
+                    enumerated_plans += 1
+                    cost = _plan_cost(
+                        case,
+                        blocks,
+                        block_backends,
+                        block_widths,
                     )
-                    > parallel_stage_limit
-                ):
-                    continue
-                enumerated_plans += 1
-                cost = _plan_cost(
-                    case,
-                    blocks,
-                    block_backends,
-                )
-                if cost < best_cost:
-                    best_cost = cost
-                    best_order = order
-                    best_backends = tuple(
-                        backend
-                        for block, backend in zip(blocks, block_backends)
-                        for _ in block
-                    )
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_order = order
+                        best_backends = tuple(
+                            backend
+                            for block, backend in zip(
+                                blocks, block_backends
+                            )
+                            for _ in block
+                        )
     if not best_order:
         raise RuntimeError("Generated dependency graph has no legal order")
     return ExhaustiveResult(

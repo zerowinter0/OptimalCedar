@@ -438,14 +438,24 @@ class MyOptimizer(Optimizer):
                     raise RuntimeError(
                         "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be positive"
                     )
-        # Price every remote block under the final plan's total concurrently
-        # active remote CPU slots, since all stages share the same host.
+        # Price a block under the concurrency of its own physical CPU pool.
+        # SMP shares the local host with the fixed local workers; Ray stages
+        # share the separately provisioned Ray host. Older callers supplied
+        # one integer because both were charged to a synthetic common budget;
+        # the joint DP now supplies a resource object with independent fields.
         assumed_total = getattr(
             self, "_dp_assumed_total_parallel_stage_cpus", None
         )
         contention_parallelism = parallelism
         if assumed_total is not None:
-            contention_parallelism = max(parallelism, int(assumed_total))
+            if hasattr(assumed_total, "ray_cpus"):
+                if variant_type == PipeVariantType.SMP:
+                    family_total = int(assumed_total.smp_cpus)
+                else:
+                    family_total = int(assumed_total.ray_cpus)
+            else:
+                family_total = int(assumed_total)
+            contention_parallelism = max(parallelism, family_total)
         global_concurrency = formal_workers * contention_parallelism
         mean = self._dp_scaling_mean(entry, global_concurrency)
         if mean is None:

@@ -9,8 +9,11 @@ RUN_ROOT="${RESULT_ROOT}/profile_runs/${RUN_ID}"
 LOG_ROOT="${RUN_ROOT}/logs"
 STAGING_ROOT="${RUN_ROOT}/profiles"
 ARCHIVE_ROOT="${RUN_ROOT}/replaced_profiles"
-RAY_ADDRESS="127.0.0.1:6379"
-CPU_BUDGET=64
+RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
+REMOTE_RAY_ONLY="${REMOTE_RAY_ONLY:-0}"
+REMOTE_RAY_NODE_IP="${REMOTE_RAY_NODE_IP:-}"
+REMOTE_RAY_RESOURCE="${REMOTE_RAY_RESOURCE:-cedar_remote}"
+CPU_BUDGET="${CPU_BUDGET:-64}"
 PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-3600}"
 SELECTED_WORKLOADS="all"
 INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
@@ -72,6 +75,28 @@ export CEDAR_PROFILE_SMP_PROCS=1
 export CEDAR_PROFILE_FILTER_SELECTIVITY=1
 unset CEDAR_LOCAL_WORKERS
 ulimit -n 65536
+
+if [[ "${REMOTE_RAY_ONLY}" == "1" ]]; then
+  [[ -n "${REMOTE_RAY_NODE_IP}" ]] || {
+    echo "REMOTE_RAY_NODE_IP is required when REMOTE_RAY_ONLY=1." >&2
+    exit 2
+  }
+  [[ -n "${REMOTE_RAY_RESOURCE}" ]] || {
+    echo "REMOTE_RAY_RESOURCE is required when REMOTE_RAY_ONLY=1." >&2
+    exit 2
+  }
+  export CEDAR_RAY_PLACEMENT_RESOURCE="${REMOTE_RAY_RESOURCE}"
+  remote_ray_host="${RAY_ADDRESS#ray://}"
+  remote_ray_host="${remote_ray_host%%:*}"
+  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}${remote_ray_host}"
+  export no_proxy="${no_proxy:+${no_proxy},}${remote_ray_host}"
+  unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
+elif [[ "${REMOTE_RAY_ONLY}" != "0" ]]; then
+  echo "REMOTE_RAY_ONLY must be 0 or 1." >&2
+  exit 2
+else
+  unset CEDAR_RAY_PLACEMENT_RESOURCE
+fi
 
 mkdir -p "${PROFILE_ROOT}" "${LOG_ROOT}" "${STAGING_ROOT}" "${ARCHIVE_ROOT}"
 exec > >(tee -a "${RUN_ROOT}/profile_matrix.log") 2>&1
@@ -271,11 +296,55 @@ echo "[$(date -Is)] Incremental backend compute: ${INCREMENTAL_BACKEND_COMPUTE}"
 echo "[$(date -Is)] Profile width: local_workers=1 ray_actors_per_stage=1 smp_procs_per_stage=1"
 
 echo "[$(date -Is)] Per-workload profile timeout: ${PROFILE_TIMEOUT_SEC}s"
-timeout 60s ray stop --force >/dev/null 2>&1 || true
-if ! ray start --head --node-ip-address=127.0.0.1 --port=6379 \
-  --num-cpus="${CPU_BUDGET}" --disable-usage-stats; then
-  echo "[$(date -Is)] FAILED to start Ray"
-  exit 1
+ray_healthy() {
+  timeout 45s python - "${RAY_ADDRESS}" "${CPU_BUDGET}" \
+    "${REMOTE_RAY_NODE_IP}" "${CEDAR_RAY_PLACEMENT_RESOURCE:-}" \
+    <<'PY' >/dev/null 2>&1
+import ray
+import sys
+
+ray.init(address=sys.argv[1], logging_level="ERROR")
+resources = ray.cluster_resources()
+required_cpus = int(sys.argv[2])
+expected_node_ip = sys.argv[3]
+placement_resource = sys.argv[4]
+assert resources.get("CPU", 0) >= required_cpus, resources
+if expected_node_ip:
+    alive_node_ips = {
+        node["NodeManagerAddress"]
+        for node in ray.nodes()
+        if node["Alive"] and node["Resources"].get("CPU", 0) > 0
+    }
+    assert alive_node_ips == {expected_node_ip}, alive_node_ips
+    resource_node_ips = {
+        node["NodeManagerAddress"]
+        for node in ray.nodes()
+        if node["Alive"]
+        and node["Resources"].get(placement_resource, 0) > 0
+    }
+    assert resource_node_ips == {expected_node_ip}, resource_node_ips
+
+    @ray.remote(num_cpus=0, resources={placement_resource: 0.001})
+    def placement_probe():
+        return ray._private.services.get_node_ip_address()
+
+    assert ray.get(placement_probe.remote()) == expected_node_ip
+ray.shutdown()
+PY
+}
+
+if [[ "${REMOTE_RAY_ONLY}" == "1" ]]; then
+  if ! ray_healthy; then
+    echo "[$(date -Is)] FAILED remote-only Ray validation at ${RAY_ADDRESS}; refusing local fallback"
+    exit 1
+  fi
+else
+  timeout 60s ray stop --force >/dev/null 2>&1 || true
+  if ! ray start --head --node-ip-address=127.0.0.1 --port=6379 \
+    --num-cpus="${CPU_BUDGET}" --disable-usage-stats; then
+    echo "[$(date -Is)] FAILED to start Ray"
+    exit 1
+  fi
 fi
 
 failures=()
@@ -319,7 +388,9 @@ run_selected_profile simclrv2_cache evaluation/pipelines/simclrv2/cedar_cache_da
 run_selected_profile wikitext103 evaluation/pipelines/wikitext103/cedar_dataset.py || failures+=(wikitext103)
 run_selected_profile wikitext103_cache evaluation/pipelines/wikitext103/cedar_cache_dataset.py || failures+=(wikitext103_cache)
 
-timeout 60s ray stop --force >/dev/null 2>&1 || true
+if [[ "${REMOTE_RAY_ONLY}" != "1" ]]; then
+  timeout 60s ray stop --force >/dev/null 2>&1 || true
+fi
 if (( ${#failures[@]} )); then
   printf '[%s] Profile run completed with failures:' "$(date -Is)"
   printf ' %s' "${failures[@]}"

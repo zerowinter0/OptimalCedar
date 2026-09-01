@@ -142,7 +142,8 @@ class _PolicyTwoStageOptimizer(DpTwoStageOptimizer):
                     key = (
                         objective.score,
                         objective.local_serial,
-                        objective.parallel_bottleneck,
+                        objective.ray_serial,
+                        objective.smp_serial,
                         objective.gpu_serial,
                         len(blocks),
                         tuple(variant.value for variant in assignment),

@@ -18,7 +18,7 @@ from .variant import (
     MultiprocessPipeVariant,
     SMPPipeVariant,
 )
-from .ray_variant import RayPipeVariant
+from .ray_variant import RayPipeVariant, get_ray_actor_options
 from .context import (
     InProcessPipeVariantContext,
     MultiprocessPipeVariantContext,
@@ -304,7 +304,7 @@ class RayFilterPipeVariant(RayPipeVariant):
 
     def _create_actor(self) -> ray.actor.ActorClass:
         return RayActorFilterPipeVariant.options(
-            num_gpus=self.variant_ctx.num_gpus
+            **get_ray_actor_options(self.variant_ctx.num_gpus)
         ).remote(self.name, self.fn)
 
     def _get_next_result(self, timeout: float = 1.0) -> DataSample:

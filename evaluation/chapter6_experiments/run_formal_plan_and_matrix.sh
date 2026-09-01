@@ -12,10 +12,15 @@ BASE_DIR="${REPO_ROOT}/evaluation/chapter6_experiments"
 PROFILE_DIR="${PROFILE_DIR:-${BASE_DIR}/formal_results/paper_artifacts/optimizer/profiles}"
 MATRIX_OUTPUT_ROOT="${MATRIX_OUTPUT_ROOT:-${REPO_ROOT}/outputs/chapter6_experiments/optimizer_matrix}"
 RAY_ADDRESS="${RAY_ADDRESS:-127.0.0.1:6379}"
+REMOTE_RAY_ONLY="${REMOTE_RAY_ONLY:-0}"
+REMOTE_RAY_NODE_IP="${REMOTE_RAY_NODE_IP:-}"
+REMOTE_RAY_RESOURCE="${REMOTE_RAY_RESOURCE:-cedar_remote}"
 CPU_BUDGET="${CPU_BUDGET:-64}"
+RAY_CPU_BUDGET="${RAY_CPU_BUDGET:-64}"
 LOCAL_WORKERS="${LOCAL_WORKERS:-8}"
 REPEATS="${REPEATS:-1}"
 TASK_TIMEOUT_SEC="${TASK_TIMEOUT_SEC:-3600}"
+DP_PLAN_TIMEOUT_SEC="${DP_PLAN_TIMEOUT_SEC:-${TASK_TIMEOUT_SEC}}"
 RESUME_EXISTING="${RESUME_EXISTING:-0}"
 OPTIMIZER_SET="${OPTIMIZER_SET:-all}"
 PLAN_ONLY="${PLAN_ONLY:-0}"
@@ -57,6 +62,8 @@ OPTIMIZER_SET=dj_two_stage_only runs only dj_two_stage_optimizer.
 OPTIMIZER_SET=simple_dp_only runs the joint DP with Cedar's original profile
 and cost model.
 OPTIMIZER_SET=pico_simple_gate compares PICO and Simple-DP round-robin.
+OPTIMIZER_SET=quick_model_gate runs the four tractable optimizers used for
+one-round cost-model screening (DJ, Pecan, Simple-DP, and PICO).
 OPTIMIZER_SET=legacy_and_two_stage runs original Cedar and the DP two-stage
 ablation for supplementing older formal matrices.
 OPTIMIZER_SET=operator_scaling_study runs the revised DP optimizer plus
@@ -141,6 +148,14 @@ case "${OPTIMIZER_SET}" in
   pico_simple_gate)
     OPTIMIZERS=(simple_dp_optimizer dp_optimizer)
     ;;
+  quick_model_gate)
+    OPTIMIZERS=(
+      dj_optimizer
+      pecan_optimizer
+      simple_dp_optimizer
+      dp_optimizer
+    )
+    ;;
   legacy_and_two_stage)
     OPTIMIZERS=(optimizer dp_two_stage_optimizer)
     ;;
@@ -174,6 +189,28 @@ export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 export TF_CPP_MIN_LOG_LEVEL="${TF_CPP_MIN_LOG_LEVEL:-2}"
 ulimit -n 65536
 
+if [[ "${REMOTE_RAY_ONLY}" == "1" ]]; then
+  [[ -n "${REMOTE_RAY_NODE_IP}" ]] || {
+    echo "REMOTE_RAY_NODE_IP is required when REMOTE_RAY_ONLY=1." >&2
+    exit 2
+  }
+  [[ -n "${REMOTE_RAY_RESOURCE}" ]] || {
+    echo "REMOTE_RAY_RESOURCE is required when REMOTE_RAY_ONLY=1." >&2
+    exit 2
+  }
+  export CEDAR_RAY_PLACEMENT_RESOURCE="${REMOTE_RAY_RESOURCE}"
+  remote_ray_host="${RAY_ADDRESS#ray://}"
+  remote_ray_host="${remote_ray_host%%:*}"
+  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}${remote_ray_host}"
+  export no_proxy="${no_proxy:+${no_proxy},}${remote_ray_host}"
+  unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
+elif [[ "${REMOTE_RAY_ONLY}" != "0" ]]; then
+  echo "REMOTE_RAY_ONLY must be 0 or 1." >&2
+  exit 2
+else
+  unset CEDAR_RAY_PLACEMENT_RESOURCE
+fi
+
 if [[ "${LOCAL_WORKERS}" != "8" ]]; then
   echo "This script is the fixed-W=8 ablation; LOCAL_WORKERS must be 8." >&2
   exit 2
@@ -194,6 +231,10 @@ if [[ ! "${TASK_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
   echo "TASK_TIMEOUT_SEC must be a positive integer: ${TASK_TIMEOUT_SEC}" >&2
   exit 2
 fi
+if [[ ! "${DP_PLAN_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "DP_PLAN_TIMEOUT_SEC must be a positive integer: ${DP_PLAN_TIMEOUT_SEC}" >&2
+  exit 2
+fi
 for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES COMMONVOICE_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES STACKEXCHANGE_SAMPLES; do
   sample_value="${!sample_setting}"
   if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
@@ -203,18 +244,47 @@ for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES COMMONVOICE_SAMPLES REDPAJ
 done
 
 ray_healthy() {
-  timeout 20s python - "${RAY_ADDRESS}" <<'PY' >/dev/null 2>&1
+  timeout 45s python - "${RAY_ADDRESS}" "${CPU_BUDGET}" \
+    "${REMOTE_RAY_NODE_IP}" "${CEDAR_RAY_PLACEMENT_RESOURCE:-}" \
+    <<'PY' >/dev/null 2>&1
 import ray
 import sys
 
 ray.init(address=sys.argv[1], logging_level="ERROR")
 resources = ray.cluster_resources()
+required_cpus = int(sys.argv[2])
+expected_node_ip = sys.argv[3]
+placement_resource = sys.argv[4]
+assert resources.get("CPU", 0) >= required_cpus, resources
+if expected_node_ip:
+    alive_node_ips = {
+        node["NodeManagerAddress"]
+        for node in ray.nodes()
+        if node["Alive"] and node["Resources"].get("CPU", 0) > 0
+    }
+    assert alive_node_ips == {expected_node_ip}, alive_node_ips
+    resource_node_ips = {
+        node["NodeManagerAddress"]
+        for node in ray.nodes()
+        if node["Alive"]
+        and node["Resources"].get(placement_resource, 0) > 0
+    }
+    assert resource_node_ips == {expected_node_ip}, resource_node_ips
+
+    @ray.remote(num_cpus=0, resources={placement_resource: 0.001})
+    def placement_probe():
+        return ray._private.services.get_node_ip_address()
+
+    assert ray.get(placement_probe.remote()) == expected_node_ip
 ray.shutdown()
-assert resources.get("CPU", 0) >= 64, resources
 PY
 }
 
 if ! ray_healthy; then
+  if [[ "${REMOTE_RAY_ONLY}" == "1" ]]; then
+    echo "Remote-only Ray cluster is unhealthy at ${RAY_ADDRESS}; refusing local fallback." >&2
+    exit 1
+  fi
   ray stop --force >/dev/null 2>&1 || true
   ray start --head --node-ip-address=127.0.0.1 --port=6379 \
     --num-cpus="${CPU_BUDGET}" --disable-usage-stats >/dev/null
@@ -259,19 +329,30 @@ write_metadata() {
     printf 'measurement_protocol=fixed_w8_%s_round_robin_repeats\n' "${REPEATS}"
     printf 'profile_source=%s\n' "${profile#${REPO_ROOT}/}"
     printf 'cpu_budget=%s\n' "${CPU_BUDGET}"
+    printf 'ray_cpu_budget=%s\n' "${RAY_CPU_BUDGET}"
+    printf 'ray_address=%s\n' "${RAY_ADDRESS}"
+    printf 'ray_placement=%s\n' \
+      "$([[ "${REMOTE_RAY_ONLY}" == "1" ]] && printf remote_only || printf local)"
+    printf 'ray_node_ip=%s\n' "${REMOTE_RAY_NODE_IP}"
+    printf 'ray_placement_resource=%s\n' \
+      "${CEDAR_RAY_PLACEMENT_RESOURCE:-none}"
     printf 'dp_runtime_cpu_reserve_per_worker=%s\n' \
       "${CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER:-1}"
     printf 'local_workers=%s\n' "${LOCAL_WORKERS}"
     printf 'repeats=%s\n' "${REPEATS}"
     printf 'task_timeout_sec=%s\n' "${TASK_TIMEOUT_SEC}"
+    printf 'dp_plan_timeout_sec=%s\n' "${DP_PLAN_TIMEOUT_SEC}"
     printf 'task_boundary=optimization_plus_first_execution\n'
     printf 'timeout_policy=skip_remaining_repeats_and_continue_matrix\n'
     printf 'cache=%s\n' "${cache_mode}"
     printf 'samples=%s\n' "${samples}"
     printf 'optimizers=%s\n' "${OPTIMIZERS[*]}"
     if [[ " ${OPTIMIZERS[*]} " == *" dp_optimizer "* || " ${OPTIMIZERS[*]} " == *" pecan_two_stage_optimizer "* || " ${OPTIMIZERS[*]} " == *" dj_two_stage_optimizer "* ]]; then
-      printf 'dp_objective=multi_bottleneck\n'
-      printf 'dp_pareto_global_epsilon=%s\n' "${CEDAR_DP_PARETO_EPSILON:-0.10}"
+      printf 'dp_objective=max_resource_family_sums_L_R_S_G\n'
+      printf 'dp_pareto_global_epsilon=%s\n' "${CEDAR_DP_PARETO_EPSILON:-0}"
+      printf 'dp_frontier_cap=%s\n' "${CEDAR_DP_FRONTIER_CAP:-0}"
+      printf 'dp_mask_layer_workers=%s\n' \
+        "${CEDAR_DP_MASK_LAYER_WORKERS:-32}"
       printf 'dp_gpu_objective=single_shared_gpu_serial_service_demand\n'
       printf 'ray_gpu_accounting=fractional_sum_exactly_one_gpu\n'
     fi
@@ -348,6 +429,7 @@ generate_plan() {
     --enable_local_parallelism
     --match_profile_resources
     --cpu_budget "${CPU_BUDGET}"
+    --ray_cpu_budget "${RAY_CPU_BUDGET}"
     --fixed_local_workers_ablation "${LOCAL_WORKERS}"
     --optimizer_time_limit_sec "${timeout_sec}"
     --disable_cedar_runtime_timeout
@@ -637,7 +719,7 @@ run_workload() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
   local cache_mode="$5" kwargs="$6"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
-  local optimizer round offset i tag
+  local optimizer round offset i tag plan_timeout
   local -a available_optimizers=()
   local -A execution_timed_out=()
 
@@ -689,8 +771,13 @@ run_workload() {
     fi
     if [[ "${RESUME_EXISTING}" != "1" || \
           ! -f "${root}/plans/${optimizer}.yaml" ]]; then
+      plan_timeout="${TASK_TIMEOUT_SEC}"
+      if [[ "${optimizer}" == "dp_optimizer" && \
+            "${DP_PLAN_TIMEOUT_SEC}" -lt "${plan_timeout}" ]]; then
+        plan_timeout="${DP_PLAN_TIMEOUT_SEC}"
+      fi
       generate_plan "${workload}" "${dataset}" "${profile}" "${samples}" \
-        "${cache_mode}" "${kwargs}" "${optimizer}" "${TASK_TIMEOUT_SEC}"
+        "${cache_mode}" "${kwargs}" "${optimizer}" "${plan_timeout}"
     fi
     if [[ ! -f "${root}/plans/${optimizer}.yaml" ]]; then
       if [[ -f "${root}/plans/${optimizer}.unavailable.json" ]] && \

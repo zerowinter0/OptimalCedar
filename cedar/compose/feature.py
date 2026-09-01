@@ -54,14 +54,15 @@ def apply_profile_matched_resources(
     cpu_budget: int,
     fixed_local_workers: Optional[int] = None,
     preserve_optimizer_widths: bool = False,
+    num_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Apply one strict remote-worker budget without forcing width one.
+    """Apply independent local-SMP and remote-Ray CPU budgets.
 
-    The profile width describes measurement, not the final plan width. With W
-    local workers and one runtime-reserve slot per worker, every optimizer gets
-    the same remote budget ``floor(CPU_BUDGET / W) - 2``. Baselines distribute
-    it Cedar-style over fixed stages; joint DP may preserve an optimized
-    allocation that fits the same budget.
+    The profile width describes measurement, not the final plan width.  Local
+    workers and SMP processes consume the local host, while Ray and CUDA-Ray
+    actors consume the separately provisioned Ray host.  Baselines share each
+    pool independently; joint DP may preserve an optimized allocation that
+    fits both capacities and the profiled GPU-width cap.
     """
     if cpu_budget < 1:
         raise RuntimeError(
@@ -132,26 +133,62 @@ def apply_profile_matched_resources(
         local_worker_policy = "fixed_ablation"
     plan.set_local_workers(local_workers)
 
-    runtime_reserve = int(
+    local_reserve = int(
         os.environ.get("CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1")
     )
-    if runtime_reserve < 0:
-        raise RuntimeError("Runtime CPU reserve must be non-negative.")
-    remote_budget = cpu_budget // local_workers - 1 - runtime_reserve
-    # Preserve physical graph order so the deterministic remainder allocation
-    # does not systematically favour one backend when Ray and SMP coexist.
-    remote_descs = [
+    ray_cpu_budget = int(
+        os.environ.get("CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET", str(cpu_budget))
+    )
+    ray_reserve = int(
+        os.environ.get("CEDAR_DP_RAY_CPU_RESERVE_PER_WORKER", "1")
+    )
+    if local_reserve < 0 or ray_reserve < 0:
+        raise RuntimeError("Local and Ray CPU reserves must be non-negative.")
+    if ray_cpu_budget < local_workers:
+        raise RuntimeError(
+            "Ray CPU budget must provide at least one slot per local worker: "
+            f"workers={local_workers}, budget={ray_cpu_budget}"
+        )
+
+    # Local workers and SMP processes share the local host.  Ray actors live
+    # on the separately provisioned Ray node, so charging both backends to one
+    # synthetic budget needlessly idles one machine whenever the other is in
+    # use.  Widths remain per local-worker replica; these are the independently
+    # enforceable per-replica capacities of the two physical CPU pools.
+    smp_budget = max(
+        0, cpu_budget // local_workers - 1 - local_reserve
+    )
+    ray_budget = max(
+        0, ray_cpu_budget // local_workers - ray_reserve
+    )
+    ray_descs_all = [
         desc
         for desc in active_descs
-        if desc.variant_type
-        in (PipeVariantType.RAY, PipeVariantType.TF_RAY, PipeVariantType.SMP)
+        if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
     ]
-    if remote_descs and remote_budget < len(remote_descs):
+    smp_descs_all = [
+        desc
+        for desc in active_descs
+        if desc.variant_type == PipeVariantType.SMP
+    ]
+    if ray_descs_all and ray_budget < len(ray_descs_all):
         raise RuntimeError(
-            "Physical plan has more remote stages than the common actor "
-            f"budget: stages={len(remote_descs)}, budget={remote_budget}"
+            "Physical plan has more Ray stages than the remote Ray CPU "
+            f"budget: stages={len(ray_descs_all)}, budget={ray_budget}"
         )
+    if smp_descs_all and smp_budget < len(smp_descs_all):
+        raise RuntimeError(
+            "Physical plan has more SMP stages than the residual local CPU "
+            f"budget: stages={len(smp_descs_all)}, budget={smp_budget}"
+        )
+    gpu_remote_descs = [
+        desc
+        for desc in ray_descs_all + smp_descs_all
+        if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+        and desc.execution_resource == PipeExecutionResource.CUDA
+    ]
     if preserve_optimizer_widths:
+        optimized_descs = ray_descs_all + smp_descs_all
         widths = [
             _positive_resource_int(
                 (
@@ -162,29 +199,96 @@ def apply_profile_matched_resources(
                 ),
                 "optimized stage width",
             )
-            for desc in remote_descs
+            for desc in optimized_descs
         ]
-        if sum(widths) > remote_budget:
+        for desc, width in zip(optimized_descs, widths):
+            if desc in gpu_remote_descs and width > ray_width:
+                raise RuntimeError(
+                    "Optimizer-selected CUDA stage width exceeds the "
+                    "profiled GPU-safe width: "
+                    f"selected={width}, profiled={ray_width}"
+                )
+        ray_widths = widths[: len(ray_descs_all)]
+        smp_widths = widths[len(ray_descs_all) :]
+        if sum(ray_widths) > ray_budget:
             raise RuntimeError(
-                "Optimizer-selected widths exceed the common remote budget: "
-                f"widths={widths}, budget={remote_budget}"
+                "Optimizer-selected Ray widths exceed the remote Ray CPU "
+                f"budget: widths={ray_widths}, budget={ray_budget}"
             )
-        allocation_policy = "joint_dp"
-    elif remote_descs:
-        quotient, remainder = divmod(remote_budget, len(remote_descs))
-        widths = [
-            quotient + (1 if index < remainder else 0)
-            for index in range(len(remote_descs))
-        ]
-        allocation_policy = "cedar_equal_share_exact_budget"
+        if sum(smp_widths) > smp_budget:
+            raise RuntimeError(
+                "Optimizer-selected SMP widths exceed the residual local CPU "
+                f"budget: widths={smp_widths}, budget={smp_budget}"
+            )
+        allocation_policy = "joint_dp_separate_pools"
     else:
-        widths = []
-        allocation_policy = "no_remote_stages"
-    for desc, width in zip(remote_descs, widths):
-        if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
-            desc.variant_ctx.n_actors = width
-        else:
-            desc.variant_ctx.n_procs = width
+        # Baseline optimizers receive the same two physical capacities.  Each
+        # family is shared equally only within that family; GPU Ray stages keep
+        # their profiled memory-safe width and also consume remote CPU slots.
+        gpu_width_total = ray_width * len(gpu_remote_descs)
+        cpu_ray_descs = [
+            desc for desc in ray_descs_all if desc not in gpu_remote_descs
+        ]
+        cpu_ray_budget = ray_budget - gpu_width_total
+        if cpu_ray_budget < len(cpu_ray_descs):
+            raise RuntimeError(
+                "GPU-safe widths leave too little remote CPU budget for the "
+                "remaining Ray stages: "
+                f"gpu_width_total={gpu_width_total}, "
+                f"cpu_stages={len(cpu_ray_descs)}, "
+                f"ray_budget={ray_budget}"
+            )
+        ray_width_by_id: Dict[int, int] = {}
+        if cpu_ray_descs:
+            quotient, remainder = divmod(
+                cpu_ray_budget, len(cpu_ray_descs)
+            )
+            ray_width_by_id = {
+                id(desc): quotient + (1 if index < remainder else 0)
+                for index, desc in enumerate(cpu_ray_descs)
+            }
+        ray_widths = [
+            (
+                ray_width
+                if desc in gpu_remote_descs
+                else ray_width_by_id[id(desc)]
+            )
+            for desc in ray_descs_all
+        ]
+        smp_widths = []
+        if smp_descs_all:
+            quotient, remainder = divmod(smp_budget, len(smp_descs_all))
+            smp_widths = [
+                quotient + (1 if index < remainder else 0)
+                for index in range(len(smp_descs_all))
+            ]
+        allocation_policy = "separate_pool_equal_share"
+
+    for desc, width in zip(ray_descs_all, ray_widths):
+        desc.variant_ctx.n_actors = width
+    for desc, width in zip(smp_descs_all, smp_widths):
+        desc.variant_ctx.n_procs = width
+
+    finite_workload_ray_batch_cap = None
+    if num_samples is not None:
+        try:
+            parsed_num_samples = int(num_samples)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Invalid optimizer num_samples={num_samples!r}"
+            ) from exc
+        if parsed_num_samples > 0:
+            finite_workload_ray_batch_cap = max(
+                1,
+                (parsed_num_samples + local_workers - 1) // local_workers,
+            )
+            for desc in ray_descs:
+                desc.variant_ctx.set_submit_batch_size(
+                    min(
+                        int(desc.variant_ctx.submit_batch_size),
+                        finite_workload_ray_batch_cap,
+                    )
+                )
 
     gpu_ray_descs = [
         desc
@@ -206,17 +310,25 @@ def apply_profile_matched_resources(
 
     ray_widths = [desc.variant_ctx.n_actors for desc in ray_descs]
     smp_widths = [desc.variant_ctx.n_procs for desc in smp_descs]
-    used_remote_width = sum(ray_widths) + sum(smp_widths)
+    used_ray_width = sum(ray_widths)
+    used_smp_width = sum(smp_widths)
+    accounted_local_cpus = local_workers * (1 + used_smp_width)
+    accounted_ray_cpus = local_workers * used_ray_width
     signature = {
         "cpu_budget": cpu_budget,
+        "ray_cpu_budget": ray_cpu_budget,
         "local_workers": local_workers,
         "local_worker_policy": local_worker_policy,
-        "runtime_reserve_per_worker": runtime_reserve,
-        "remote_budget_per_worker": remote_budget,
-        "remote_width_used_per_worker": used_remote_width,
+        "local_runtime_reserve_per_worker": local_reserve,
+        "ray_runtime_reserve_per_worker": ray_reserve,
+        "smp_budget_per_worker": smp_budget,
+        "ray_budget_per_worker": ray_budget,
+        "smp_width_used_per_worker": used_smp_width,
+        "ray_width_used_per_worker": used_ray_width,
         "allocation_policy": allocation_policy,
         "profile_ray_actors_per_stage": ray_width,
         "profile_smp_procs_per_stage": smp_width,
+        "finite_workload_ray_batch_cap": finite_workload_ray_batch_cap,
         "ray_stages": len(ray_descs),
         "smp_stages": len(smp_descs),
         "ray_actor_widths_per_stage_per_worker": ray_widths,
@@ -229,15 +341,21 @@ def apply_profile_matched_resources(
         "total_accounted_gpus": (
             global_gpu_actors * gpu_fraction_per_actor
         ),
-        "total_accounted_cpus": local_workers * (1 + used_remote_width),
+        "total_accounted_local_cpus": accounted_local_cpus,
+        "total_accounted_ray_cpus": accounted_ray_cpus,
+        "total_accounted_cpus": accounted_local_cpus + accounted_ray_cpus,
     }
 
-    if signature["total_accounted_cpus"] > cpu_budget:
+    if signature["total_accounted_local_cpus"] > cpu_budget:
         raise RuntimeError(
-            f"Resource policy exceeded CPU budget: {signature}"
+            f"Resource policy exceeded local CPU budget: {signature}"
+        )
+    if signature["total_accounted_ray_cpus"] > ray_cpu_budget:
+        raise RuntimeError(
+            f"Resource policy exceeded remote Ray CPU budget: {signature}"
         )
     logger.warning(
-        "Applied common remote-resource budget: %s",
+        "Applied separate local-SMP and remote-Ray resource budgets: %s",
         signature,
     )
     return signature
@@ -1339,6 +1457,11 @@ class Feature(abc.ABC):
                             "joint_actor_allocation",
                             False,
                         )
+                    ),
+                    num_samples=getattr(
+                        getattr(self.optimizer, "options", None),
+                        "num_samples",
+                        None,
                     ),
                 )
             )

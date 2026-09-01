@@ -42,8 +42,8 @@ cat > "${STUDY_ROOT}/PROTOCOL.md" <<'EOF'
 - Execution: W=8, CPU budget 64, three round-robin repeats, cache disabled,
   3600-second plan and per-repeat execution limits. A first-repeat timeout
   skips later repeats.
-- DP objective: throughput bottleneck over the local serial lane and the
-  slowest asynchronous RAY/SMP stage. Pipelines with at most eight operators
+- DP objective: the maximum accumulated service demand among local, Ray, SMP,
+  and GPU resource families. Pipelines with at most eight operators
   use an exact Pareto frontier; larger pipelines use deterministic
   multiplicative trimming with a 10% whole-search error bound
   (`CEDAR_DP_PARETO_EPSILON=0.10`).

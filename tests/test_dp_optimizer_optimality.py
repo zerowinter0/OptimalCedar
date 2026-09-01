@@ -14,10 +14,12 @@ from cedar.compose.dp_optimizer import (
     BlockCandidate,
     DpObjectiveCost,
     DpOptimizer,
+    DpResourceUsage,
     DpStateSummary,
     ExtensibleDpSearch,
     TransitionChoice,
     _BlockCostIndex,
+    _is_infeasible_conditioned_search_error,
 )
 from cedar.compose import constants
 from cedar.compose.my_optimizer import MyOptimizer
@@ -28,6 +30,18 @@ from cedar.sources import IterSource
 
 def test_unconstrained_six_operator_plan_count():
     assert unconstrained_plan_count() == 2_211_840
+
+
+def test_only_expected_infeasible_conditioned_search_errors_are_skipped():
+    assert _is_infeasible_conditioned_search_error(
+        RuntimeError("Extensible DP failed: no feasible final state.")
+    )
+    assert _is_infeasible_conditioned_search_error(
+        RuntimeError("No plan reaches required parallel CPU total 6.")
+    )
+    assert not _is_infeasible_conditioned_search_error(
+        RuntimeError("profile data is malformed")
+    )
 
 
 def test_generated_profile_preserves_direct_backend_costs():
@@ -74,6 +88,46 @@ def test_dp_optimizer_matches_exhaustive_oracle():
         assert result.oracle.enumerated_plans > 0
 
 
+def test_width_aware_dp_matches_integer_width_exhaustive_oracle():
+    result = verify_case(generate_case(31), parallel_stage_limit=2)
+    assert math.isclose(
+        result.dp_cost,
+        result.oracle.cost,
+        rel_tol=1e-10,
+        abs_tol=1e-10,
+    )
+
+
+def test_external_service_coordinates_are_losslessly_collapsed():
+    class OptimizerStub:
+        collapse_external_service_coordinates = True
+        _dp_pred_indices = [[]]
+
+        def _dp_parallel_stage_cpu_limit(self):
+            return DpResourceUsage(ray_cpus=1, smp_cpus=1)
+
+    class ProviderStub:
+        pass
+
+    class PolicyStub:
+        enabled = False
+
+    search = ExtensibleDpSearch(
+        OptimizerStub(), [0], ProviderStub(), PolicyStub()
+    )
+    skyline = search._exact_skyline(
+        {
+            DpObjectiveCost(ray_serial=10.0): object(),
+            DpObjectiveCost(smp_serial=10.0): object(),
+        }
+    )
+
+    assert len(skyline) == 1
+    assert skyline[0][0] == DpObjectiveCost(
+        ray_serial=10.0, smp_serial=10.0
+    )
+
+
 def test_selectivity_aware_block_cost_moves_cheap_rejector_first():
     optimizer = DpOptimizer()
     optimizer._dp_pred_indices = [[], []]
@@ -96,6 +150,52 @@ def test_selectivity_aware_block_cost_moves_cheap_rejector_first():
 
     assert order == (0, 1)
     assert math.isclose(cost, 2.0)
+
+
+def test_block_index_retains_exact_minimum_for_each_endpoint_pair():
+    optimizer = DpOptimizer()
+    optimizer._dp_pred_indices = [[], [], []]
+    optimizer._dp_compute_scalings = [PipeComputeScaling.PER_BYTE] * 3
+    ratios = [0.25, 0.5, 0.8]
+    optimizer._dp_r_prod = [1.0] * 8
+    optimizer._dp_volume_prod = [1.0] * 8
+    for mask in range(1, 8):
+        product = 1.0
+        for idx, ratio in enumerate(ratios):
+            if mask & (1 << idx):
+                product *= ratio
+        optimizer._dp_r_prod[mask] = product
+        optimizer._dp_volume_prod[mask] = product
+    optimizer.profiled_stats = {
+        "baseline": {
+            "input_sizes": {0: 1.0, 1: 1.0, 2: 1.0},
+            "output_sizes": {99: 1.0},
+        }
+    }
+    optimizer._get_source_p_id = lambda: 99
+    costs = [7.0, 2.0, 5.0]
+    index = _BlockCostIndex(optimizer, [0, 1, 2], costs)
+
+    expected = {}
+    for order in itertools.permutations(range(3)):
+        prefix = 0
+        cost = 0.0
+        for idx in order:
+            cost += optimizer._dp_work_prod(prefix) * costs[idx]
+            prefix |= 1 << idx
+        endpoints = (order[0], order[-1])
+        expected[endpoints] = min(expected.get(endpoints, math.inf), cost)
+
+    actual = {
+        (order[0], order[-1]): cost
+        for cost, order in index.get_endpoint_minima(0b111)
+    }
+    assert actual.keys() == expected.keys()
+    for endpoints in expected:
+        assert math.isclose(
+            actual[endpoints], expected[endpoints],
+            rel_tol=1e-12, abs_tol=1e-12,
+        )
 
 
 def test_old_profile_keeps_exact_size_only_work_product():
@@ -208,7 +308,9 @@ def test_search_drops_resource_coordinate_without_strict_limit():
 
     class PolicyStub:
         def initial_state(self):
-            return DpStateSummary(parallel_stage_cpus=7)
+            return DpStateSummary(
+                parallel_stage_cpus=DpResourceUsage(ray_cpus=7)
+            )
 
         def transitions(
             self,
@@ -233,7 +335,7 @@ def test_search_drops_resource_coordinate_without_strict_limit():
     ).run()
 
     assert result.cost == 1.0
-    assert observed_parallel_cpus == [0]
+    assert observed_parallel_cpus == [DpResourceUsage()]
     assert optimizer._dp_last_search_stats["retained_states"] == 2
 
 
@@ -260,12 +362,14 @@ def test_pareto_frontier_keeps_initially_slower_parallel_choice():
         ):
             if block.variant == PipeVariantType.RAY:
                 return DpObjectiveCost(
-                    previous.local_serial,
-                    max(previous.parallel_bottleneck, extra),
+                    local_serial=previous.local_serial,
+                    ray_serial=previous.ray_serial + extra,
+                    smp_serial=previous.smp_serial,
                 )
             return DpObjectiveCost(
-                previous.local_serial + extra,
-                previous.parallel_bottleneck,
+                local_serial=previous.local_serial + extra,
+                ray_serial=previous.ray_serial,
+                smp_serial=previous.smp_serial,
             )
 
     class ProviderStub:
@@ -304,12 +408,12 @@ def test_pareto_frontier_keeps_initially_slower_parallel_choice():
     assert result.cost == 100.0
 
 
-def test_bottleneck_objective_balances_two_parallel_stages():
+def test_resource_bottleneck_objective_pipelines_two_ray_stages():
     class OptimizerStub:
         _dp_pred_indices = [[], [0], [1], [2]]
 
         def _dp_parallel_stage_cpu_limit(self):
-            return 2
+            return DpResourceUsage(ray_cpus=2)
 
         def _dp_valid_single_last(self, prev_mask, idx):
             return idx == 0 or bool(prev_mask & (1 << (idx - 1)))
@@ -327,14 +431,15 @@ def test_bottleneck_objective_balances_two_parallel_stages():
             return block.cost
 
         def _dp_parallel_stage_cpu_cost(self, variant):
-            return 1
+            return DpResourceUsage(ray_cpus=1)
 
         def _dp_accumulate_objective_cost(
             self, previous, extra, block, prev_mask
         ):
             return DpObjectiveCost(
-                previous.local_serial,
-                max(previous.parallel_bottleneck, extra),
+                local_serial=previous.local_serial,
+                ray_serial=max(previous.ray_serial, extra),
+                smp_serial=previous.smp_serial,
             )
 
     class ProviderStub:
@@ -372,7 +477,7 @@ def test_bottleneck_objective_balances_two_parallel_stages():
     ).run()
 
     assert result.blocks == [[0, 1], [2, 3]]
-    assert result.objective == DpObjectiveCost(0.0, 2.0)
+    assert result.objective == DpObjectiveCost(ray_serial=2.0)
 
 
 def _block_objective(order, ratios, costs, input_sizes):

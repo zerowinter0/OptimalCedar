@@ -28,7 +28,7 @@ from .variant import (
     MultiprocessPipeVariant,
     SMPPipeVariant,
 )
-from .ray_variant import RayPipeVariant
+from .ray_variant import RayPipeVariant, get_ray_actor_options
 from .common import cedar_pipe, CedarPipeSpec
 
 
@@ -216,4 +216,6 @@ class RayNoopPipeVariant(RayPipeVariant):
         super().__init__(name, input_pipe_variant, variant_ctx)
 
     def _create_actor(self) -> ray.actor.ActorClass:
-        return RayActorNoopPipeVariant.remote(self.name)
+        return RayActorNoopPipeVariant.options(
+            **get_ray_actor_options()
+        ).remote(self.name)

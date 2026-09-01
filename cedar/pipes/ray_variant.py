@@ -1,7 +1,9 @@
 import abc
+import math
+import os
 import ray
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from .variant import PipeVariant, _AsyncPipeVariant
 from .common import DataSample
@@ -9,6 +11,55 @@ from .context import RayPipeVariantContext
 
 logger = logging.getLogger(__name__)
 MAX_INFLIGHT_SCALING = 5
+RAY_PLACEMENT_RESOURCE_ENV = "CEDAR_RAY_PLACEMENT_RESOURCE"
+RAY_PLACEMENT_RESOURCE_FRACTION_ENV = (
+    "CEDAR_RAY_PLACEMENT_RESOURCE_FRACTION"
+)
+DEFAULT_RAY_PLACEMENT_RESOURCE_FRACTION = 0.001
+
+
+def get_ray_actor_options(
+    num_gpus: float = 0.0, num_cpus: float = 1.0
+) -> Dict[str, Any]:
+    """Return common Ray actor options, including an optional node pin.
+
+    Every actor performs real CPU work, including actors whose primary model
+    runs on a GPU.  Requesting one Ray CPU therefore makes the remote node's
+    advertised CPU capacity an enforceable resource limit instead of relying
+    only on the optimizer's bookkeeping.  Remote-only experiments additionally
+    advertise a tiny custom resource exclusively on the remote worker; that
+    resource constrains placement without pretending to represent CPU capacity.
+    """
+    parsed_cpus = float(num_cpus)
+    if not math.isfinite(parsed_cpus) or parsed_cpus <= 0:
+        raise ValueError("num_cpus must be finite and > 0")
+    options: Dict[str, Any] = {
+        "num_cpus": parsed_cpus,
+        "num_gpus": float(num_gpus),
+    }
+    resource_name = os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip()
+    if not resource_name:
+        return options
+
+    raw_fraction = os.environ.get(
+        RAY_PLACEMENT_RESOURCE_FRACTION_ENV,
+        str(DEFAULT_RAY_PLACEMENT_RESOURCE_FRACTION),
+    )
+    try:
+        fraction = float(raw_fraction)
+    except ValueError as exc:
+        raise ValueError(
+            f"{RAY_PLACEMENT_RESOURCE_FRACTION_ENV} must be a number: "
+            f"{raw_fraction!r}"
+        ) from exc
+    if not math.isfinite(fraction) or fraction <= 0:
+        raise ValueError(
+            f"{RAY_PLACEMENT_RESOURCE_FRACTION_ENV} must be finite and > 0: "
+            f"{raw_fraction!r}"
+        )
+
+    options["resources"] = {resource_name: fraction}
+    return options
 
 
 class RayPipeVariant(_AsyncPipeVariant):

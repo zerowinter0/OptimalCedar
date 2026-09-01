@@ -288,14 +288,24 @@ def _configure_optimizer_runtime(args: argparse.Namespace) -> None:
     if args.match_profile_resources:
         os.environ["CEDAR_MATCH_PROFILE_RESOURCES"] = "1"
         os.environ["CEDAR_PROFILE_MATCH_CPU_BUDGET"] = str(args.cpu_budget)
+        ray_cpu_budget = (
+            args.ray_cpu_budget
+            if args.ray_cpu_budget is not None
+            else args.cpu_budget
+        )
+        os.environ["CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET"] = str(
+            ray_cpu_budget
+        )
         logger.warning(
-            "Enabled strict profile resource matching with unified "
-            "CPU budget=%d.",
+            "Enabled strict profile resource matching with separate "
+            "local CPU budget=%d and Ray CPU budget=%d.",
             args.cpu_budget,
+            ray_cpu_budget,
         )
     else:
         os.environ.pop("CEDAR_MATCH_PROFILE_RESOURCES", None)
         os.environ.pop("CEDAR_PROFILE_MATCH_CPU_BUDGET", None)
+        os.environ.pop("CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET", None)
 
     if args.fixed_local_workers_ablation is None:
         os.environ.pop("CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS", None)
@@ -1116,6 +1126,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--ray_cpu_budget",
+        type=int,
+        default=None,
+        help=(
+            "CPU capacity of the independently provisioned Ray node. "
+            "Defaults to --cpu_budget when profile matching is enabled."
+        ),
+    )
+    parser.add_argument(
         "--fixed_local_workers_ablation",
         type=int,
         default=None,
@@ -1236,6 +1255,8 @@ def main() -> None:
         raise ValueError("--num_repeats must be >= 1")
     if args.cpu_budget < 1:
         raise ValueError("--cpu_budget must be >= 1")
+    if args.ray_cpu_budget is not None and args.ray_cpu_budget < 1:
+        raise ValueError("--ray_cpu_budget must be >= 1")
     if args.fixed_local_workers_ablation is not None:
         if args.fixed_local_workers_ablation < 1:
             raise ValueError("--fixed_local_workers_ablation must be >= 1")
@@ -1379,6 +1400,15 @@ def main() -> None:
         ),
         "cpu_budget": (
             args.cpu_budget if args.match_profile_resources else None
+        ),
+        "ray_cpu_budget": (
+            (
+                args.ray_cpu_budget
+                if args.ray_cpu_budget is not None
+                else args.cpu_budget
+            )
+            if args.match_profile_resources
+            else None
         ),
         "optimizer_time_limit_sec": args.optimizer_time_limit_sec,
         "optimizer_rss_limit_bytes": OPTIMIZER_RSS_LIMIT_BYTES,
