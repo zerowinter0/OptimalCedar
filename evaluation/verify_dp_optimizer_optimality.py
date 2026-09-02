@@ -204,13 +204,9 @@ def _plan_cost(
         if backend == "INPROCESS":
             local_serial += block_compute
         elif backend == "RAY":
-            ray_serial = max(
-                ray_serial, block_compute / width + boundary_work
-            )
+            ray_serial += block_compute / width + boundary_work
         else:
-            smp_serial = max(
-                smp_serial, block_compute / width + boundary_work
-            )
+            smp_serial += block_compute / width + boundary_work
     return max(local_serial, ray_serial, smp_serial)
 
 

@@ -40,6 +40,7 @@ REDPAJAMA_CODE_SAMPLES="${REDPAJAMA_CODE_SAMPLES:-60000}"
 REDPAJAMA_CODE_DATASET_PATH="${REDPAJAMA_CODE_DATASET_PATH:-datasets/redpajama_code/redpajama-github-raw-100000.jsonl}"
 STACKEXCHANGE_SAMPLES="${STACKEXCHANGE_SAMPLES:-160000}"
 STACKEXCHANGE_DATASET_PATH="${STACKEXCHANGE_DATASET_PATH:-datasets/stackexchange/redpajama-stackexchange-400000.jsonl}"
+WIKITEXT103_SAMPLES="${WIKITEXT103_SAMPLES:-100000}"
 SELECTED_WORKLOADS="all"
 
 usage() {
@@ -235,7 +236,7 @@ if [[ ! "${DP_PLAN_TIMEOUT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
   echo "DP_PLAN_TIMEOUT_SEC must be a positive integer: ${DP_PLAN_TIMEOUT_SEC}" >&2
   exit 2
 fi
-for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES COMMONVOICE_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES STACKEXCHANGE_SAMPLES; do
+for sample_setting in COCO_SAMPLES ALPACA_COT_SAMPLES COMMONVOICE_SAMPLES REDPAJAMA_ARXIV_SAMPLES GENERAL_VIDEO_REFINE_SAMPLES VIDEO_SELF_EVOLUTION_SAMPLES PILE_EUROPARL_SAMPLES PILE_HACKERNEWS_SAMPLES PILE_PUBMED_SAMPLES PILE_USPTO_SAMPLES REDPAJAMA_CODE_SAMPLES STACKEXCHANGE_SAMPLES WIKITEXT103_SAMPLES; do
   sample_value="${!sample_setting}"
   if [[ ! "${sample_value}" =~ ^[1-9][0-9]*$ ]]; then
     echo "${sample_setting} must be a positive integer: ${sample_value}" >&2
@@ -963,10 +964,12 @@ run_workload simclrv2_cache \
   "${PROFILE_DIR}/simclrv2_cache.yaml" 9469 on ""
 run_workload wikitext103 \
   evaluation/pipelines/wikitext103/cedar_dataset.py \
-  "${PROFILE_DIR}/wikitext103.yaml" 100000 off "max_samples=100000"
+  "${PROFILE_DIR}/wikitext103.yaml" "${WIKITEXT103_SAMPLES}" off \
+  "max_samples=${WIKITEXT103_SAMPLES}"
 run_workload wikitext103_cache \
   evaluation/pipelines/wikitext103/cedar_cache_dataset.py \
-  "${PROFILE_DIR}/wikitext103_cache.yaml" 100000 on "max_samples=100000"
+  "${PROFILE_DIR}/wikitext103_cache.yaml" "${WIKITEXT103_SAMPLES}" on \
+  "max_samples=${WIKITEXT103_SAMPLES}"
 run_workload pile_europarl \
   evaluation/pipelines/pile_europarl/cedar_dataset.py \
   "${PROFILE_DIR}/pile_europarl.yaml" "${PILE_EUROPARL_SAMPLES}" off \

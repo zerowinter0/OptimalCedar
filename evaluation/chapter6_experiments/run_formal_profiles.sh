@@ -20,6 +20,7 @@ INCREMENTAL_BACKEND_COMPUTE="${INCREMENTAL_BACKEND_COMPUTE:-0}"
 STACKEXCHANGE_DATASET_PATH="${STACKEXCHANGE_DATASET_PATH:-datasets/stackexchange/redpajama-stackexchange-400000.jsonl}"
 COMMONVOICE_SAMPLES="${COMMONVOICE_SAMPLES:-240000}"
 COMMONVOICE_DATASET_PATHS="${COMMONVOICE_DATASET_PATHS:-datasets/commonvoice/cv15_en_train_5shards;evaluation/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips}"
+COCO_DATASET_KWARGS="${COCO_DATASET_KWARGS:-split=val2017}"
 export INCREMENTAL_BACKEND_COMPUTE
 
 usage() {
@@ -348,7 +349,8 @@ else
 fi
 
 failures=()
-run_selected_profile coco evaluation/pipelines/coco/cedar_dataset.py || failures+=(coco)
+run_selected_profile coco evaluation/pipelines/coco/cedar_dataset.py \
+  "${COCO_DATASET_KWARGS}" || failures+=(coco)
 run_selected_profile commonvoice evaluation/pipelines/commonvoice/cedar_dataset.py \
   "dataset_paths=${COMMONVOICE_DATASET_PATHS},max_samples=${COMMONVOICE_SAMPLES}" \
   || failures+=(commonvoice)

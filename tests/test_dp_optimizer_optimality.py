@@ -98,6 +98,43 @@ def test_width_aware_dp_matches_integer_width_exhaustive_oracle():
     )
 
 
+def test_legacy_threshold_request_falls_back_to_additive_exact_dp(monkeypatch):
+    monkeypatch.setenv("CEDAR_DP_THRESHOLD_FEASIBILITY", "1")
+    monkeypatch.setenv("CEDAR_DP_THRESHOLD_ITERATIONS", "24")
+    result = verify_case(
+        generate_case(11),
+        rel_tol=1e-7,
+        abs_tol=1e-7,
+        parallel_stage_limit=2,
+    )
+    assert math.isclose(
+        result.dp_cost,
+        result.oracle.cost,
+        rel_tol=1e-7,
+        abs_tol=1e-7,
+    )
+
+
+def test_complexity_predictor_uses_dependency_structure_not_operator_count():
+    optimizer = DpOptimizer()
+    optimizer._dp_pred_indices = [
+        [] if idx == 0 else [idx - 1] for idx in range(19)
+    ]
+    chain = optimizer._dp_predict_general_search_complexity(
+        list(range(19)), DpResourceUsage(ray_cpus=7, smp_cpus=6)
+    )
+    assert chain["operator_count"] == 19
+    assert chain["legal_prefixes"] == 20
+    assert not chain["high_complexity"]
+
+    optimizer._dp_pred_indices = [[] for _ in range(18)]
+    antichain = optimizer._dp_predict_general_search_complexity(
+        list(range(18)), DpResourceUsage(ray_cpus=7, smp_cpus=6)
+    )
+    assert antichain["high_complexity"]
+    assert "legal_prefixes>10000" in antichain["reasons"]
+
+
 def test_external_service_coordinates_are_losslessly_collapsed():
     class OptimizerStub:
         collapse_external_service_coordinates = True
@@ -408,7 +445,7 @@ def test_pareto_frontier_keeps_initially_slower_parallel_choice():
     assert result.cost == 100.0
 
 
-def test_resource_bottleneck_objective_pipelines_two_ray_stages():
+def test_resource_family_objective_adds_two_ray_stages():
     class OptimizerStub:
         _dp_pred_indices = [[], [0], [1], [2]]
 
@@ -438,7 +475,7 @@ def test_resource_bottleneck_objective_pipelines_two_ray_stages():
         ):
             return DpObjectiveCost(
                 local_serial=previous.local_serial,
-                ray_serial=max(previous.ray_serial, extra),
+                ray_serial=previous.ray_serial + extra,
                 smp_serial=previous.smp_serial,
             )
 
@@ -476,8 +513,7 @@ def test_resource_bottleneck_objective_pipelines_two_ray_stages():
         OptimizerStub(), list(range(4)), ProviderStub(), PolicyStub()
     ).run()
 
-    assert result.blocks == [[0, 1], [2, 3]]
-    assert result.objective == DpObjectiveCost(ray_serial=2.0)
+    assert result.objective == DpObjectiveCost(ray_serial=4.0)
 
 
 def _block_objective(order, ratios, costs, input_sizes):

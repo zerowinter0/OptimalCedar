@@ -26,6 +26,9 @@ WORKLOADS=(
   stackexchange
   general_video_refine
 )
+if [[ -n "${WORKLOADS_OVERRIDE:-}" ]]; then
+  IFS=',' read -r -a WORKLOADS <<< "${WORKLOADS_OVERRIDE}"
+fi
 
 cd "${REPO_ROOT}"
 # shellcheck source=/dev/null
@@ -51,11 +54,22 @@ one GPU. Ray actors request real remote CPUs; Ray and SMP widths are optimized
 against their own capacities. For every workload, the complete profile is
 freshly measured and immediately followed by the formal matrix.
 
-DJ, Pecan, Simple-DP, and the revised exact DP use identical profiles, data,
-switches, and round-robin three-repeat execution. Optimization plus first
-execution has a one-hour task deadline. Revised-DP plan generation additionally
-has a strict five-minute deadline. GeneralVideo runs last.
+DJ, Pecan, Simple-DP, and the revised DP use identical profiles, data, switches,
+and the configured common repeat count. PICO
+models each resource lane additively and minimizes max(L,R,S,G), where R is
+the sum of all Ray-stage services and S is the sum of all SMP-stage services.
+Optimization plus first execution has a one-hour task deadline. Revised-DP
+plan generation additionally
+has a strict five-minute internal search deadline and returns the best feasible
+incumbent found by then; a six-minute process guard leaves setup/teardown grace.
+GeneralVideo runs last.
 EOF
+{
+  printf '\nrepeat_count=%s\n' "${REPEATS:-3}"
+  printf 'workloads='
+  printf '%s ' "${WORKLOADS[@]}"
+  printf '\n'
+} >> "${OUTPUT_ROOT}/PROTOCOL.md"
 
 export RAY_ADDRESS REMOTE_RAY_NODE_IP REMOTE_RAY_RESOURCE
 export REMOTE_RAY_ONLY=1
@@ -65,14 +79,19 @@ export LOCAL_WORKERS=8
 export PROFILE_DIR
 export MATRIX_OUTPUT_ROOT="${MATRIX_ROOT}"
 export OPTIMIZER_SET=quick_model_gate
-export REPEATS=3
+export REPEATS="${REPEATS:-3}"
 export TASK_TIMEOUT_SEC=3600
-export DP_PLAN_TIMEOUT_SEC=300
+# The optimizer owns the exact five-minute search deadline and returns its
+# best feasible incumbent.  The process guard includes interpreter/Ray setup
+# and therefore needs a small grace period so it cannot kill that return path.
+export CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC=300
+export CEDAR_DP_SEARCH_MODE=auto
+export DP_PLAN_TIMEOUT_SEC=360
 export CH6_PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-10800}"
 export RESUME_EXISTING=0
 export CEDAR_DP_PARETO_EPSILON=0
 export CEDAR_DP_FRONTIER_CAP=0
-export CEDAR_DP_MASK_LAYER_WORKERS="${CEDAR_DP_MASK_LAYER_WORKERS:-64}"
+export CEDAR_DP_MASK_LAYER_WORKERS="${CEDAR_DP_MASK_LAYER_WORKERS:-1}"
 
 for workload in "${WORKLOADS[@]}"; do
   printf 'RUNNING phase=profile workload=%s time=%s\n' \
