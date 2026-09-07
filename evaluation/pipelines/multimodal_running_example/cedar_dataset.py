@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
+import os
 import pathlib
 from dataclasses import dataclass, fields
 from typing import Any, List, Mapping
@@ -38,6 +40,13 @@ RUNNING_EXAMPLE_TAGS = (
     "aesthetic",
     "clip",
     "blip",
+)
+
+# Profiling first exercises CUDA operators in process and then profiles SMP.
+# Spawn prevents those workers from inheriting the initialized CUDA runtime.
+mp.set_start_method(
+    os.environ.get("MULTIMODAL_EXAMPLE_MP_START_METHOD", "spawn"),
+    force=True,
 )
 
 
