@@ -189,8 +189,8 @@ def generate_plan(
     shutil.copyfile(generated, output_path)
     plan = load_plan(output_path)
     feature = _feature_for_scoring(threshold_path, image_root, dataset_path)
-    operator_ids = {
-        pipe_id
+    operator_ids_by_tag = {
+        pipe.tag: pipe_id
         for pipe_id, pipe in feature.logical_pipes.items()
         if pipe.tag in {"normalize", "perplexity", "sharpness", "aesthetic", "clip", "blip"}
     }
@@ -200,7 +200,10 @@ def generate_plan(
         "seconds": time.perf_counter() - started,
         "path": str(output_path),
         "sha256": sha256_file(output_path),
-        "backend_families": plan_backend_families(plan, operator_ids),
+        "backend_families": plan_backend_families(
+            plan, set(operator_ids_by_tag.values())
+        ),
+        "operator_ids": operator_ids_by_tag,
         "n_local_workers": plan.n_local_workers,
     }
 
