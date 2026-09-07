@@ -63,7 +63,7 @@ def test_single_gpu_service_demand_accumulates_across_cuda_stages(
     assert objective.score == 8 * 18.0
 
 
-def test_cpu_ray_and_smp_stages_bottleneck_within_and_across_families(
+def test_cpu_ray_and_smp_stages_add_within_and_bottleneck_across_families(
     monkeypatch,
 ):
     optimizer = DpOptimizer()
@@ -86,10 +86,10 @@ def test_cpu_ray_and_smp_stages_bottleneck_within_and_across_families(
             objective, block.cost, block, prev_mask
         )
 
-    assert objective.ray_serial == 11.0
+    assert objective.ray_serial == 18.0
     assert objective.smp_serial == 13.0
     assert objective.gpu_serial == 0.0
-    assert objective.score == 13.0
+    assert objective.score == 18.0
 
 
 def test_integer_stage_widths_match_materialized_bottleneck_counterexamples(
@@ -103,7 +103,7 @@ def test_integer_stage_widths_match_materialized_bottleneck_counterexamples(
         lambda prev_mask, block: (0.0, 1.0),
     )
 
-    # A=4, C1=C2=4, a1=a2=2 gives max(4/2+1, 4/2+1)=3.
+    # Each Ray stage contributes 4/2+1=3, so the family demand is 3+3=6.
     objective = DpObjectiveCost()
     for prev_mask in (0, 1):
         block = BlockCandidate(
@@ -117,9 +117,11 @@ def test_integer_stage_widths_match_materialized_bottleneck_counterexamples(
         objective = optimizer._dp_accumulate_objective_cost(
             objective, block.cost, block, prev_mask
         )
-    assert objective.ray_serial == 3.0
+    assert objective.ray_serial == 6.0
 
-    # A=3, C1=C2=2 admits only integer 1+2; the bottleneck is 2, not 4/3.
+    # Widths one and two contribute 2/1 and 2/2, respectively. The additive
+    # Ray-family demand is therefore 3, while the integer widths still match
+    # materialization exactly.
     monkeypatch.setattr(
         optimizer,
         "_dp_stage_boundary_components",
@@ -138,7 +140,7 @@ def test_integer_stage_widths_match_materialized_bottleneck_counterexamples(
         objective = optimizer._dp_accumulate_objective_cost(
             objective, block.cost, block, (1 << index) - 1
         )
-    assert objective.ray_serial == 2.0
+    assert objective.ray_serial == 3.0
 
 
 def test_profile_matched_plan_shares_exactly_one_gpu_across_all_actors():
