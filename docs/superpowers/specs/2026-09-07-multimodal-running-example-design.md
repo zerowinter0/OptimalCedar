@@ -17,12 +17,12 @@ units.
 ### Data
 
 Use COCO 2017 validation image--caption pairs, ordered by image ID and caption
-ID. The first 500 records form a threshold-calibration split, the next 3,500
-form the plan-comparison split, and the final 1,000 form the operator-scaling
-split. The fixture builder records the source annotation checksum, ordered
-image IDs, caption IDs, image paths, dimensions, and output checksum. Both
-optimizers and every repetition consume the same materialized comparison split
-in the same order.
+ID. The first 500 records form a threshold-calibration split, the next 500 form
+a pilot split, the following 3,000 form the formal plan-comparison split, and
+the final 1,000 form the operator-scaling split. The fixture builder records
+the source annotation checksum, ordered image IDs, caption IDs, image paths,
+dimensions, and output checksum. Both optimizers and every formal repetition
+consume the same materialized comparison split in the same order.
 
 ### Operators
 
@@ -43,14 +43,29 @@ the variance of a Laplacian response over the decoded luminance image and
 rejects blurred images. This deterministic predicate makes the CPU image work
 explicitly pixel-dependent.
 
-Filter thresholds are frozen from the 500-record calibration split before
-profiling or timing. `P` retains the 35% lowest-perplexity captions, `Q` retains
-the 80% sharpest images, `A` retains the highest-scoring 60%, and `C` and `B`
-each retain the highest-scoring 80%. Quantiles are computed independently from
-each operator's raw score on the calibration records. These retention targets
-are part of the workload definition and are not adjusted after inspecting
-optimizer plans, costs, or execution times. The comparison and scaling splits
-are never used for threshold selection.
+Candidate filter thresholds are derived only from the 500-record calibration
+split. Quantiles are computed independently from each operator's raw score.
+The initial configuration makes `P`, `Q`, `A`, `C`, and `B` retain 35%, 80%,
+60%, 80%, and 80%, respectively. A bounded pilot search may vary the `P`
+retention over {20%, 35%, 50%}, `Q` over {70%, 80%, 90%}, and `A` over
+{40%, 60%, 80%}; `C` and `B` remain fixed at 80%. This gives 27 declared
+configurations. The search changes thresholds, not operator implementations.
+
+Each candidate is profiled and planned on the calibration data, then executed
+twice in alternating optimizer order on the separate 500-record pilot split.
+A candidate qualifies when both plans are valid and output-equivalent, the
+joint plan uses at least two resource backends, its pilot median runtime is
+lower than the staged plan's, and Cedar's native score ranks the staged plan
+ahead of it. Among qualifying candidates, select the one with the largest
+pilot speedup; break ties by the largest output cardinality and then by
+lexicographic threshold tuple. This rule is fixed before pilot results are
+observed.
+
+The selected thresholds are frozen before the 3,000-record formal comparison.
+No threshold is changed after inspecting formal plans or runtimes. All 27
+pilot outcomes, including unsuccessful configurations, are archived. Neither
+the formal comparison split nor the operator-scaling split participates in
+parameter selection.
 
 The semantic constraints are
 
@@ -103,9 +118,12 @@ using the same frozen profile. Record Cedar's score and PICO's objective score
 alongside measured runtime. A Cedar ranking error is established only if
 Cedar assigns the lower score to the plan with the higher median runtime.
 
-No score, profile statistic, threshold, plan, or runtime may be modified to
-force a reversal. If Cedar ranks the pair correctly, Figure 2 reports that
-result and the paper does not claim this pair as a Cedar counterexample.
+The declared pilot search is the only permitted parameter selection. No score,
+profile statistic, plan, formal runtime, resource budget, model revision, or
+operator implementation may be modified to force a reversal. If no candidate
+qualifies, archive the complete pilot grid before proposing a revised grid;
+the formal comparison does not begin until one configuration passes the pilot
+criteria.
 
 ### Figure 2
 
@@ -119,7 +137,9 @@ Produce a full-width vector figure with three aligned panels:
 
 The caption distinguishes generated plans, measured runtime, and model scores.
 It states the number of records and repetitions and avoids presenting an
-unobserved expected layout as a result.
+unobserved expected layout as a result. The surrounding text identifies this
+as a controlled motivating counterexample selected by the archived pilot
+protocol, rather than evidence that Cedar misranks every multimodal workload.
 
 ## Experiment B: Operator Input Sensitivity
 
@@ -188,11 +208,13 @@ Before launching the formal run:
 
 An experiment failure is recorded with its command, environment metadata, and
 traceback. The launcher does not silently retry with smaller inputs, fewer
-operators, relaxed thresholds, or altered resource budgets.
+operators, or altered resource budgets. Threshold changes occur only through
+the declared pilot grid and are recorded before the formal run.
 
 ## Acceptance Criteria
 
 - The workload executes all six real operators on COCO image--caption records.
+- The selected configuration comes from the archived 27-point pilot grid.
 - Every displayed plan is optimizer-generated and semantically equivalent.
 - The staged/joint comparison follows the frozen-profile, three-round protocol.
 - Cedar scores are calculated by its native model from the same profile.
