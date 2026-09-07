@@ -184,6 +184,9 @@ cython_debug/
 /evaluation/chapter6_experiments/coco_train2017_download.nohup
 /evaluation/chapter6_experiments/paper_candidate_runs/
 
+# Agent development worktrees.
+/.worktrees/
+
 # Single canonical paper archive: exact profiles, plans, measured results,
 # source tables, figures, documentation, and checksums are all tracked here.
 /evaluation/chapter6_experiments/formal_results/*
