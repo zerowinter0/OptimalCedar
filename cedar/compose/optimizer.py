@@ -87,7 +87,8 @@ class OptimizerOptions:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
         # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
         # 7/ExpOptimizer, 8/PecanOptimizer, 9/PecanTwoStageOptimizer,
-        # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer.
+        # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer,
+        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
 
         # Maximum wall-clock time allowed for the original Optimizer reorder

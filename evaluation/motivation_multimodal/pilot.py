@@ -19,6 +19,7 @@ from evaluation.motivation_multimodal.artifacts import (
     command_metadata,
     sha256_file,
 )
+from evaluation.motivation_multimodal.runner import STAGED_OPTIMIZERS
 
 
 @dataclass(frozen=True, order=True)
@@ -58,14 +59,20 @@ def _qualifies(result: Mapping[str, Any]) -> bool:
     try:
         staged = float(result["staged_median_sec"])
         joint = float(result["joint_median_sec"])
-        cedar_staged = float(result["cedar_staged_cost"])
-        cedar_joint = float(result["cedar_joint_cost"])
+        staged_medians = result["staged_medians_sec"]
+        cedar_costs = result["cedar_costs"]
+        if set(staged_medians) != set(STAGED_OPTIMIZERS):
+            return False
+        if set(cedar_costs) != {*STAGED_OPTIMIZERS, "joint"}:
+            return False
         return (
             result["status"] == "success"
             and result["equivalent"] is True
             and int(result["joint_backend_count"]) >= 2
             and joint < staged
-            and cedar_staged < cedar_joint
+            and all(joint < float(value) for value in staged_medians.values())
+            and min(float(cedar_costs[name]) for name in STAGED_OPTIMIZERS)
+            < float(cedar_costs["joint"])
         )
     except (KeyError, TypeError, ValueError):
         return False
@@ -109,9 +116,14 @@ def _mock_result(config: ThresholdConfig) -> dict[str, Any]:
         "equivalent": True,
         "joint_backend_count": 2,
         "staged_median_sec": 10.0 + offset / 100.0,
+        "staged_medians_sec": {
+            name: 10.0 + offset / 100.0 for name in STAGED_OPTIMIZERS
+        },
+        "cedar_costs": {
+            **{name: 0.9 for name in STAGED_OPTIMIZERS},
+            "joint": 1.0,
+        },
         "joint_median_sec": 8.0 + offset / 100.0,
-        "cedar_staged_cost": 1.0,
-        "cedar_joint_cost": 2.0,
         "output_count": 10,
         "mock": True,
     }
@@ -193,8 +205,10 @@ def _run_configuration(
     calibration_path = fixture_root / "calibration.jsonl"
     pilot_path = fixture_root / "pilot.jsonl"
     profile_path = config_root / "profile.yml"
-    staged_plan = config_root / "staged_plan.yml"
-    joint_plan = config_root / "joint_plan.yml"
+    optimizer_names = (*STAGED_OPTIMIZERS, "joint")
+    plan_paths = {
+        name: config_root / f"{name}_plan.yml" for name in optimizer_names
+    }
     base = {
         "key": config.key,
         "threshold_path": str(threshold_path),
@@ -214,7 +228,8 @@ def _run_configuration(
             timeout_sec=4 * 3600,
         )
         plans = {}
-        for name, path in (("staged", staged_plan), ("joint", joint_plan)):
+        for name in optimizer_names:
+            path = plan_paths[name]
             plans[name] = _run_worker(
                 [
                     "plan",
@@ -230,36 +245,39 @@ def _run_configuration(
                 config_root / f"{name}_plan.log",
                 timeout_sec=3600,
             )
+        score_arguments = [
+            "score",
+            *calibration_args,
+            "--profile",
+            str(profile_path),
+        ]
+        for name in optimizer_names:
+            score_arguments.extend(
+                ["--named-plan", f"{name}={plan_paths[name]}"]
+            )
         scores = _run_worker(
-            [
-                "score",
-                *calibration_args,
-                "--profile",
-                str(profile_path),
-                "--staged-plan",
-                str(staged_plan),
-                "--joint-plan",
-                str(joint_plan),
-            ],
-            config_root / "scores.json",
-            config_root / "scores.log",
+            score_arguments,
+            config_root / "cedar_costs.json",
+            config_root / "cedar_costs.log",
             timeout_sec=600,
         )
-
         executions: dict[str, list[dict[str, Any]]] = {
-            "staged": [],
-            "joint": [],
+            name: [] for name in optimizer_names
         }
         pilot_args = _shared_args(pilot_path, threshold_path, image_root, 500)
         for repetition in range(2):
-            order = ("staged", "joint") if repetition == 0 else ("joint", "staged")
+            order = (
+                optimizer_names
+                if repetition == 0
+                else tuple(reversed(optimizer_names))
+            )
             for name in order:
                 result = _run_worker(
                     [
                         "execute",
                         *pilot_args,
                         "--plan",
-                        str(staged_plan if name == "staged" else joint_plan),
+                        str(plan_paths[name]),
                     ],
                     config_root / f"{name}_run_{repetition}.json",
                     config_root / f"{name}_run_{repetition}.log",
@@ -267,30 +285,36 @@ def _run_configuration(
                 )
                 executions[name].append(result)
 
-        staged_ids = [set(run["record_ids"]) for run in executions["staged"]]
-        joint_ids = [set(run["record_ids"]) for run in executions["joint"]]
-        all_ids = staged_ids + joint_ids
+        all_ids = [
+            set(run["record_ids"])
+            for name in optimizer_names
+            for run in executions[name]
+        ]
         equivalent = bool(all_ids) and all(ids == all_ids[0] for ids in all_ids[1:])
+        staged_medians = {
+            name: statistics.median(run["seconds"] for run in executions[name])
+            for name in STAGED_OPTIMIZERS
+        }
+        best_staged_name = min(
+            staged_medians, key=lambda name: (staged_medians[name], name)
+        )
         result = {
             **base,
             "status": "success",
             "profile": profile_result,
             "plans": plans,
-            "scores": scores,
             "executions": executions,
             "equivalent": equivalent,
             "output_count": len(all_ids[0]) if equivalent else 0,
             "joint_backend_count": len(plans["joint"]["backend_families"]),
-            "staged_median_sec": statistics.median(
-                run["seconds"] for run in executions["staged"]
-            ),
+            "best_staged_name": best_staged_name,
+            "staged_medians_sec": staged_medians,
+            "staged_median_sec": staged_medians[best_staged_name],
+            "cedar_costs": scores["costs"],
+            "cedar_cost_model": scores["cost_model"],
             "joint_median_sec": statistics.median(
                 run["seconds"] for run in executions["joint"]
             ),
-            "cedar_staged_cost": scores["staged"]["cedar_cost"],
-            "cedar_joint_cost": scores["joint"]["cedar_cost"],
-            "pico_staged_cost": scores["staged"]["pico_cost"],
-            "pico_joint_cost": scores["joint"]["pico_cost"],
         }
     except BaseException as exc:
         result = {

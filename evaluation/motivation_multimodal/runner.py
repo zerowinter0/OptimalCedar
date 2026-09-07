@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import time
 from pathlib import Path
@@ -12,8 +13,8 @@ from typing import Any
 import yaml
 
 from cedar.client import DataSet
-from cedar.compose import Optimizer, OptimizerOptions, PhysicalPlan
-from cedar.compose.dp_optimizer import DpOptimizer
+from cedar.compose import OptimizerOptions, PhysicalPlan
+from cedar.compose.optimizer import Optimizer
 from evaluation.cedar_utils import CedarEvalSpec
 from evaluation.motivation_multimodal.artifacts import (
     atomic_write_json,
@@ -21,7 +22,6 @@ from evaluation.motivation_multimodal.artifacts import (
     sha256_file,
 )
 from evaluation.pipelines.multimodal_running_example.cedar_dataset import (
-    DEFAULT_CPU_BUDGET,
     MultimodalRunningExampleFeature,
     Thresholds,
     get_dataset,
@@ -29,7 +29,18 @@ from evaluation.pipelines.multimodal_running_example.cedar_dataset import (
 from cedar.sources import LocalLineSource
 
 
-OPTIMIZER_SELECTORS = {"staged": 4, "joint": 2}
+STAGED_OPTIMIZERS = (
+    "staged_rfo",
+    "staged_rof",
+    "staged_fro",
+    "staged_for",
+    "staged_orf",
+    "staged_ofr",
+)
+OPTIMIZER_SELECTORS = {
+    **{name: 12 for name in STAGED_OPTIMIZERS},
+    "joint": 13,
+}
 
 
 def _dataset_kwargs(
@@ -42,22 +53,6 @@ def _dataset_kwargs(
         "threshold_path": str(threshold_path),
         "image_root": str(image_root),
     }
-
-
-def optimizer_options(selector: int, num_samples: int) -> OptimizerOptions:
-    return OptimizerOptions(
-        enable_prefetch=True,
-        est_throughput=None,
-        available_local_cpus=DEFAULT_CPU_BUDGET,
-        enable_offload=True,
-        enable_reorder=True,
-        enable_caching=False,
-        num_samples=num_samples,
-        enable_local_parallelism=True,
-        enable_fusion=True,
-        use_my_optimizer=selector,
-        reorder_timeout_sec=3600.0,
-    )
 
 
 def load_plan(path: str | Path) -> PhysicalPlan:
@@ -155,6 +150,11 @@ def generate_plan(
     num_samples: int,
 ) -> dict[str, Any]:
     selector = OPTIMIZER_SELECTORS[optimizer_name]
+    stage_order = (
+        optimizer_name.removeprefix("staged_")
+        if optimizer_name in STAGED_OPTIMIZERS
+        else None
+    )
     generated = Path("/tmp/cedar_optimized_plan.yml")
     generated.unlink(missing_ok=True)
     spec = CedarEvalSpec(
@@ -169,7 +169,7 @@ def generate_plan(
         disable_controller=True,
         disable_prefetch=False,
         disable_offload=False,
-        disable_parallelism=False,
+        disable_parallelism=True,
         disable_reorder=False,
         disable_fusion=False,
         disable_caching=True,
@@ -178,17 +178,25 @@ def generate_plan(
         reorder_timeout_sec=3600.0,
     )
     started = time.perf_counter()
+    previous_stage_order = os.environ.get("CEDAR_STAGED_OPTIMIZATION_ORDER")
     try:
+        if stage_order is not None:
+            os.environ["CEDAR_STAGED_OPTIMIZATION_ORDER"] = stage_order
         get_dataset(spec)
     except SystemExit as exc:
         if exc.code not in (None, 0):
             raise
+    finally:
+        if previous_stage_order is None:
+            os.environ.pop("CEDAR_STAGED_OPTIMIZATION_ORDER", None)
+        else:
+            os.environ["CEDAR_STAGED_OPTIMIZATION_ORDER"] = previous_stage_order
     if not generated.is_file():
         raise RuntimeError("Cedar optimizer returned without materializing a plan")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(generated, output_path)
     plan = load_plan(output_path)
-    feature = _feature_for_scoring(threshold_path, image_root, dataset_path)
+    feature = _feature_for_plan_metadata(threshold_path, image_root, dataset_path)
     operator_ids_by_tag = {
         pipe.tag: pipe_id
         for pipe_id, pipe in feature.logical_pipes.items()
@@ -197,6 +205,7 @@ def generate_plan(
     return {
         "status": "success",
         "optimizer": optimizer_name,
+        "stage_order": stage_order,
         "seconds": time.perf_counter() - started,
         "path": str(output_path),
         "sha256": sha256_file(output_path),
@@ -205,10 +214,11 @@ def generate_plan(
         ),
         "operator_ids": operator_ids_by_tag,
         "n_local_workers": plan.n_local_workers,
+        "parallelism_policy": "minimum_width",
     }
 
 
-def _feature_for_scoring(
+def _feature_for_plan_metadata(
     threshold_path: Path,
     image_root: Path,
     dataset_path: Path,
@@ -221,68 +231,57 @@ def _feature_for_scoring(
     return feature
 
 
-def score_plan(
-    plan: PhysicalPlan,
-    profile_payload: dict[str, Any],
-    threshold_path: Path,
-    image_root: Path,
-    dataset_path: Path,
-    num_samples: int,
-) -> dict[str, float]:
-    feature = _feature_for_scoring(threshold_path, image_root, dataset_path)
-    cedar = Optimizer()
-    cedar.init(feature.logical_pipes, feature.logical_adj_list)
-    cedar.profiled_stats = profile_payload
-    cedar.options = optimizer_options(0, num_samples)
-    cedar._validate_stats()
-    cedar._init_stats()
-    fused = [
-        list(desc.fused_pipes)
-        for desc in plan.pipe_descs.values()
-        if desc.fused_pipes and len(desc.fused_pipes) > 1
-    ]
-    cedar_cost = cedar.calculate_cost(
-        plan.graph,
-        physical_specs=plan.pipe_descs,
-        fused_pipes=fused or None,
-        caching_on=False,
-        plan=plan,
-    )
-
-    dp = DpOptimizer()
-    dp.init(feature.logical_pipes, feature.logical_adj_list)
-    dp.profiled_stats = profile_payload
-    dp.options = optimizer_options(2, num_samples)
-    dp._validate_stats()
-    dp._init_stats()
-    inner_ops = dp._get_linear_inner_ops()
-    if not inner_ops:
-        raise RuntimeError("Could not recover the linear optimizer subproblem")
-    dp._prepare_dp_metadata(inner_ops)
-    dp_cost = dp.calculate_dp_objective_cost(plan=plan)
-    return {"cedar_cost": float(cedar_cost), "pico_cost": float(dp_cost)}
-
-
-def score_both_plans(
-    staged_path: Path,
-    joint_path: Path,
+def score_plans_with_cedar(
+    plan_paths: dict[str, Path],
     profile_path: Path,
     threshold_path: Path,
     image_root: Path,
     dataset_path: Path,
     num_samples: int,
 ) -> dict[str, Any]:
+    """Replay materialized plans through Cedar's native cost model only."""
+
     profile_payload = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
-    return {
-        name: score_plan(
-            load_plan(path),
-            profile_payload,
-            threshold_path,
-            image_root,
-            dataset_path,
-            num_samples,
+    feature = _feature_for_plan_metadata(
+        threshold_path, image_root, dataset_path
+    )
+    optimizer = Optimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = profile_payload
+    optimizer.options = OptimizerOptions(
+        enable_prefetch=True,
+        available_local_cpus=1,
+        enable_offload=True,
+        enable_reorder=True,
+        enable_local_parallelism=False,
+        enable_fusion=True,
+        enable_caching=False,
+        num_samples=num_samples,
+    )
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    costs = {}
+    for name, path in sorted(plan_paths.items()):
+        plan = load_plan(path)
+        fused_blocks = [
+            list(desc.fused_pipes)
+            for desc in plan.pipe_descs.values()
+            if desc.fused_pipes and len(desc.fused_pipes) > 1
+        ]
+        costs[name] = float(
+            optimizer.calculate_cost(
+                plan.graph,
+                physical_specs=plan.pipe_descs,
+                fused_pipes=fused_blocks or None,
+                caching_on=False,
+                plan=plan,
+            )
         )
-        for name, path in (("staged", staged_path), ("joint", joint_path))
+    return {
+        "status": "success",
+        "cost_model": "cedar.Optimizer.calculate_cost",
+        "profile_sha256": sha256_file(profile_path),
+        "costs": costs,
     }
 
 
@@ -340,9 +339,13 @@ def main() -> None:
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--profile", type=Path)
     parser.add_argument("--plan", type=Path)
-    parser.add_argument("--staged-plan", type=Path)
-    parser.add_argument("--joint-plan", type=Path)
     parser.add_argument("--optimizer", choices=tuple(OPTIMIZER_SELECTORS))
+    parser.add_argument(
+        "--named-plan",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+    )
     parser.add_argument("--num-samples", type=int, required=True)
     parser.add_argument("--result", type=Path, required=True)
     args = parser.parse_args()
@@ -369,11 +372,18 @@ def main() -> None:
             args.num_samples,
         )
     elif args.action == "score":
-        if args.profile is None or args.staged_plan is None or args.joint_plan is None:
-            parser.error("score action requires --profile and both plans")
-        result = score_both_plans(
-            args.staged_plan,
-            args.joint_plan,
+        if args.profile is None or not args.named_plan:
+            parser.error("score action requires --profile and --named-plan")
+        named_plans = {}
+        for value in args.named_plan:
+            if "=" not in value:
+                parser.error("--named-plan must use NAME=PATH")
+            name, raw_path = value.split("=", 1)
+            if not name or name in named_plans:
+                parser.error("--named-plan names must be nonempty and unique")
+            named_plans[name] = Path(raw_path)
+        result = score_plans_with_cedar(
+            named_plans,
             args.profile,
             args.threshold,
             args.image_root,

@@ -80,10 +80,7 @@ def _formal_artifact(root: Path, repetitions: int = 3) -> Path:
             },
         },
         "executions": runs,
-        "scores": {
-            "staged": {"cedar_cost": 1.0, "pico_cost": 2.0},
-            "joint": {"cedar_cost": 1.5, "pico_cost": 1.0},
-        },
+        "cedar_costs": {"staged": 0.8, "joint": 1.0},
     }
     summary = root / "formal_summary.json"
     summary.write_text(json.dumps(payload), encoding="utf-8")
@@ -94,6 +91,16 @@ def test_plot_rejects_missing_repetition(tmp_path: Path) -> None:
     _formal_artifact(tmp_path, repetitions=2)
 
     with pytest.raises(ValueError, match="three formal repetitions"):
+        load_figure2_data(tmp_path)
+
+
+def test_plot_rejects_missing_cedar_plan_costs(tmp_path: Path) -> None:
+    summary = _formal_artifact(tmp_path)
+    payload = json.loads(summary.read_text(encoding="utf-8"))
+    payload.pop("cedar_costs")
+    summary.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Cedar costs"):
         load_figure2_data(tmp_path)
 
 

@@ -67,6 +67,12 @@ def load_figure2_data(formal_root: str | Path) -> dict[str, Any]:
         plan_path = _artifact_path(root, plan_meta.get("path", ""))
         if not plan_path.is_file() or sha256_file(plan_path) != plan_meta.get("sha256"):
             raise ValueError(f"Figure 2 {name} plan is missing or has a stale hash")
+    cedar_costs = payload.get("cedar_costs", {})
+    if not all(
+        name in cedar_costs and float(cedar_costs[name]) > 0
+        for name in ("staged", "joint")
+    ):
+        raise ValueError("Figure 2 requires Cedar costs for both plans")
     payload["_summary_path"] = summary_path
     return payload
 
@@ -263,7 +269,7 @@ def render_figure2(
         }
     )
     figure = plt.figure(figsize=(13.2, 3.15))
-    grid = figure.add_gridspec(1, 3, width_ratios=(1.5, 1.45, 1.05))
+    grid = figure.add_gridspec(1, 3, width_ratios=(1.5, 1.55, 1.05))
     logical_axis = figure.add_subplot(grid[0, 0])
     _operator_panel(logical_axis)
 
@@ -275,7 +281,7 @@ def render_figure2(
 
     result_grid = grid[0, 2].subgridspec(1, 2, wspace=0.42)
     runtime_axis = figure.add_subplot(result_grid[0, 0])
-    score_axis = figure.add_subplot(result_grid[0, 1])
+    cost_axis = figure.add_subplot(result_grid[0, 1])
     names = ("staged", "joint")
     colors = ("#999999", "#0072B2")
     runtimes = [
@@ -292,21 +298,16 @@ def render_figure2(
     bars = runtime_axis.bar(names, medians, yerr=errors, color=colors, capsize=2, width=0.62)
     runtime_axis.bar_label(bars, fmt="%.2f", fontsize=6, padding=2)
     runtime_axis.set_ylabel("Execution time (s)")
-    runtime_axis.set_title("(c) Measurement", fontsize=9, fontweight="bold")
+    runtime_axis.set_title("(c) Measured", fontsize=8, fontweight="bold")
 
-    x = np.arange(2)
-    width = 0.34
-    cedar_raw = [data["scores"][name]["cedar_cost"] for name in names]
-    pico_raw = [data["scores"][name]["pico_cost"] for name in names]
-    cedar = [value / cedar_raw[0] for value in cedar_raw]
-    pico = [value / pico_raw[0] for value in pico_raw]
-    score_axis.bar(x - width / 2, cedar, width, label="Cedar", color="#E69F00")
-    score_axis.bar(x + width / 2, pico, width, label="PICO", color="#009E73")
-    score_axis.set_xticks(x, ("Staged", "Joint"))
-    score_axis.set_ylabel("Normalized score\n(staged = 1)")
-    score_axis.set_title("Model scores", fontsize=8)
-    score_axis.legend(frameon=False, fontsize=6, loc="upper center")
-    for axis in (runtime_axis, score_axis):
+    raw_costs = [float(data["cedar_costs"][name]) for name in names]
+    normalized_costs = [value / raw_costs[0] for value in raw_costs]
+    cost_bars = cost_axis.bar(names, normalized_costs, color=colors, width=0.62)
+    cost_axis.bar_label(cost_bars, fmt="%.2f", fontsize=6, padding=2)
+    cost_axis.set_ylabel("Normalized cost\n(staged = 1)")
+    cost_axis.set_title("Cedar estimate", fontsize=8, fontweight="bold")
+
+    for axis in (runtime_axis, cost_axis):
         axis.spines[["top", "right"]].set_visible(False)
         axis.tick_params(axis="x", labelrotation=18, labelsize=6.5)
         axis.tick_params(axis="y", labelsize=6.5)

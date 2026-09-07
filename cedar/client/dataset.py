@@ -800,7 +800,8 @@ class DataSet:
         # 0/default Optimizer, 1/MyOptimizer, 2/DpOptimizer, 3/DjOptimizer,
         # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
         # 7/ExpOptimizer, 8/PecanOptimizer, 9/PecanTwoStageOptimizer,
-        # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer.
+        # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer,
+        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
@@ -866,9 +867,23 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(SimpleDpOptimizer())
+        elif optimizer_selector == 12:
+            from cedar.compose.sequential_exhaustive_optimizer import (
+                SequentialExhaustiveOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(SequentialExhaustiveOptimizer())
+        elif optimizer_selector == 13:
+            from cedar.compose.sequential_exhaustive_optimizer import (
+                MinimalParallelDpOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(MinimalParallelDpOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 11."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 13."
             )
 
         if len(self.features) == 0:
