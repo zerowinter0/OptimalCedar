@@ -20,7 +20,7 @@ from evaluation.motivation_multimodal.plot_figure2 import RenderedFigure
 DISPLAY = {
     "normalize": "N: Normalize",
     "perplexity": "P: Perplexity",
-    "sharpness": "Q: Sharpness",
+    "safety": "S: Safety",
     "aesthetic": "A: Aesthetic",
     "clip": "C: CLIP similarity",
     "blip": "B: BLIP matching",
@@ -121,7 +121,7 @@ def render_figure5(
     figure, axes = plt.subplots(2, 3, figsize=(7.15, 4.25), constrained_layout=True)
     _line_panel(axes[0, 0], rows, "normalize", "text_tokens", "Caption tokens")
     _line_panel(axes[0, 1], rows, "perplexity", "text_tokens", "Caption tokens")
-    _line_panel(axes[0, 2], rows, "sharpness", "image_side", "Decoded image (MP)")
+    _line_panel(axes[0, 2], rows, "safety", "image_side", "Decoded image (MP)")
     _line_panel(axes[1, 0], rows, "aesthetic", "image_side", "Decoded image (MP)")
     _heatmap(axes[1, 1], rows, "clip")
     _heatmap(axes[1, 2], rows, "blip")

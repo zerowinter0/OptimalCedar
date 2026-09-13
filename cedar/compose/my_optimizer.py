@@ -339,6 +339,8 @@ class MyOptimizer(Optimizer):
             self.profiled_stats["baseline"]["input_sizes"][p_id]
         )
         cost = mean
+        if getattr(self, "_dp_affine_enabled", False):
+            return self._dp_affine_worker_cost(p_id, mean, input_size)
         scaling = self._dp_compute_scaling_for_pipe(p_id)
         if scaling == PipeComputeScaling.PER_RECORD:
             cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
@@ -464,6 +466,8 @@ class MyOptimizer(Optimizer):
             self.profiled_stats["baseline"]["input_sizes"][p_id]
         )
         cost = mean
+        if getattr(self, "_dp_affine_enabled", False):
+            return self._dp_affine_worker_cost(p_id, mean, baseline_input)
         scaling = self._dp_compute_scaling_for_pipe(p_id)
         if scaling == PipeComputeScaling.PER_RECORD:
             cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
@@ -557,6 +561,22 @@ class MyOptimizer(Optimizer):
             PipeVariantType.SMP,
             PipeVariantType.RAY,
             PipeVariantType.TF_RAY,
+        )
+
+    def _dp_has_supported_fusion_replay_cost(
+        self, variant_type: PipeVariantType
+    ) -> bool:
+        """Return whether a materialized fused block can be cross-scored.
+
+        INPROCESS fusion is executable but has no separately calibrated
+        fusion discount. Replay it conservatively with the ordinary local
+        per-operator costs; candidate generation remains governed by
+        ``_dp_has_supported_fusion_cost`` and therefore does not add this
+        uncalibrated choice to PICO's own search space.
+        """
+        return (
+            variant_type == PipeVariantType.INPROCESS
+            or self._dp_has_supported_fusion_cost(variant_type)
         )
 
     def _dp_fusion_transport_feasible(self, prev_mask: int, block) -> bool:
@@ -863,10 +883,20 @@ class MyOptimizer(Optimizer):
             * input_records
             / submit_batch
         )
+        # Latency hiding (Little's law). A driver can only keep a bounded number
+        # of items outstanding per stage. When the round-trip of one submitted
+        # task is long relative to the stage's per-record service, the stage is
+        # starved and its effective service exceeds the pure compute/transport
+        # demand. This term is zero unless the configured in-flight capacity is
+        # smaller than the round-trip requirement, and it is calibrated from the
+        # same boundary measurements used above.
+        inflight_inflation = self._dp_inflight_inflation(
+            block, submit_batch, transported_bytes_ms, fixed_ms
+        )
         block_order = getattr(block, "order", ())
         inner_ops = getattr(self, "_dp_inner_ops", ())
         if not block_order or not inner_ops:
-            return 0.0, transported_bytes_ms + fixed_ms
+            return 0.0, (transported_bytes_ms + fixed_ms) * inflight_inflation
         first_p_id = inner_ops[block_order[0]]
         last_p_id = inner_ops[block_order[-1]]
         input_entry = self._dp_object_boundary_operator(
@@ -943,8 +973,54 @@ class MyOptimizer(Optimizer):
                             residuals.append(residual)
                     if residuals:
                         local_stage_ms += max(residuals) * input_records
-                return local_stage_ms, transported_bytes_ms
-        return 0.0, transported_bytes_ms + fixed_ms
+                return local_stage_ms, transported_bytes_ms * inflight_inflation
+        return 0.0, (transported_bytes_ms + fixed_ms) * inflight_inflation
+
+    def _dp_inflight_inflation(
+        self,
+        block,
+        submit_batch: int,
+        transported_bytes_ms: float,
+        fixed_ms: float,
+    ) -> float:
+        """Return the Little's-law starvation factor for one parallel stage.
+
+        ``unlimited`` (the default) keeps the historical model. Otherwise the
+        stage is provisioned with ``inflight_per_width * width`` outstanding
+        items, and the factor inflates the stage's transport demand whenever the
+        task round trip needs more outstanding items than that to sustain the
+        modeled record rate.
+        """
+        raw = os.environ.get("CEDAR_DP_INFLIGHT_PER_WIDTH")
+        if raw is None:
+            calibration = (self.profiled_stats or {}).get("calibration", {})
+            raw = calibration.get("inflight_per_width")
+        if raw is None:
+            return 1.0
+        try:
+            inflight_per_width = float(raw)
+        except (TypeError, ValueError):
+            return 1.0
+        if not math.isfinite(inflight_per_width) or inflight_per_width <= 0:
+            return 1.0
+        if block.variant not in (
+            PipeVariantType.RAY,
+            PipeVariantType.TF_RAY,
+            PipeVariantType.SMP,
+        ):
+            return 1.0
+        width = max(1, int(getattr(block, "parallelism", 1) or 1))
+        per_item_work_ms = transported_bytes_ms + block.cost / width
+        fixed_per_task_ms = fixed_ms * submit_batch
+        round_trip_ms = fixed_per_task_ms + submit_batch * per_item_work_ms
+        per_record_service_ms = block.cost / width + transported_bytes_ms + fixed_ms
+        if per_record_service_ms <= 0.0 or round_trip_ms <= 0.0:
+            return 1.0
+        required_inflight = round_trip_ms / per_record_service_ms
+        available_inflight = inflight_per_width * width
+        if available_inflight >= required_inflight:
+            return 1.0
+        return required_inflight / available_inflight
 
     def _dp_work_prod(self, mask: int) -> float:
         """Aggregate byte-volume multiplier for one source record.
@@ -1272,6 +1348,15 @@ class MyOptimizer(Optimizer):
         if self.profiled_stats["baseline"]["input_sizes"][source_p_id] <= 0:
             self.profiled_stats["baseline"]["input_sizes"][source_p_id]=self.profiled_stats["baseline"]["output_sizes"][source_p_id]
         n = len(inner_ops)
+        # The exact DP materializes 2^n subset tables. Multi-view workloads
+        # (DINO/SwAV expose 60+ operators) would otherwise fail with an
+        # out-of-memory or overflow error deep inside the metadata build.
+        if n > 26:
+            raise ValueError(
+                "DP exact subset metadata requires 2^n tables; "
+                f"{n} reorderable operators exceed the supported limit (26). "
+                "Use a staged optimizer or reduce the pipeline."
+            )
         full_mask = 1 << n
         r_prod = [1.0] * full_mask
         for mask in range(1, full_mask):
@@ -1345,6 +1430,8 @@ class MyOptimizer(Optimizer):
         )
         self._dp_compute_scalings = []
         for p_id in inner_ops:
+            if getattr(self, "_dp_affine_enabled", False):
+                continue  # Affine DP never reads PERDATA/PERRECORD annotations.
             pipe = self.logical_pipes[p_id]
             scaling = pipe.compute_scaling
             if not getattr(pipe, "compute_scaling_explicit", False):
@@ -2288,7 +2375,17 @@ class MyOptimizer(Optimizer):
             self._materialize_pending_fusions()
 
         # 5. 仅复用基类的 local parallelism 调优逻辑
-        if self.options.enable_local_parallelism:
+        selected_workers = getattr(self, "_dp_selected_workers", None)
+        if selected_workers:
+            # The worker-count search owns this decision; the base heuristic
+            # would otherwise overwrite it with the unconstrained CPU count.
+            logger.info(
+                "[MyOptimizer] Using %d local workers (from the DP worker "
+                "search).",
+                selected_workers,
+            )
+            self.physical_plan.set_local_workers(int(selected_workers))
+        elif self.options.enable_local_parallelism:
             num_local_workers = self._calculate_local_parallelism(
                 self.physical_plan.graph, self.options
             )

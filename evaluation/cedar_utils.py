@@ -1,4 +1,4 @@
-from typing import Optional, Union, Dict
+from typing import Any, Optional, Union, Dict
 from cedar.config import RayConfig
 
 
@@ -12,6 +12,7 @@ class CedarEvalSpec:
         kwargs: Dict[str, str] = None,
         use_ray: bool = False,
         ray_ip: str = "",
+        ray_runtime_env: Optional[Dict[str, Any]] = None,
         iteration_time: Optional[float] = None,
         profiled_stats: str = "",
         run_profiling: bool = False,
@@ -34,6 +35,7 @@ class CedarEvalSpec:
         self.kwargs = kwargs
         self.use_ray = use_ray
         self.ray_ip = ray_ip
+        self.ray_runtime_env = ray_runtime_env
         self.iteration_time = iteration_time
         self.profiled_stats = profiled_stats
         self.run_profiling = run_profiling
@@ -57,4 +59,4 @@ class CedarEvalSpec:
         if not self.use_ray:
             return None
 
-        return RayConfig(self.ray_ip)
+        return RayConfig(self.ray_ip, runtime_env=self.ray_runtime_env)

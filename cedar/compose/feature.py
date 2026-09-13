@@ -54,6 +54,7 @@ def apply_profile_matched_resources(
     cpu_budget: int,
     fixed_local_workers: Optional[int] = None,
     preserve_optimizer_widths: bool = False,
+    force_minimum_widths: bool = False,
     num_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Apply independent local-SMP and remote-Ray CPU budgets.
@@ -131,7 +132,6 @@ def apply_profile_matched_resources(
             fixed_local_workers, "fixed_local_workers"
         )
         local_worker_policy = "fixed_ablation"
-    plan.set_local_workers(local_workers)
 
     local_reserve = int(
         os.environ.get("CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1")
@@ -144,6 +144,53 @@ def apply_profile_matched_resources(
     )
     if local_reserve < 0 or ray_reserve < 0:
         raise RuntimeError("Local and Ray CPU reserves must be non-negative.")
+    if fixed_local_workers is None:
+        # The optimizer chose the worker count, but that count may not fit the
+        # physical pools once every stage of its own plan is instantiated
+        # (Cedar's rule asks for one worker per CPU, which leaves no room for a
+        # Ray actor per worker).  Clamp to the largest count that can host the
+        # plan instead of rejecting the run: the alternatives are to abort a
+        # valid plan or to silently oversubscribe the host.
+        def _declared_width(desc) -> int:
+            ctx = desc.variant_ctx
+            width = getattr(ctx, "n_actors", None)
+            if width is None:
+                width = getattr(ctx, "n_procs", None)
+            try:
+                return max(1, int(width))
+            except (TypeError, ValueError):
+                return 1
+
+        # Count the cores the plan actually claims, so a plan with one wide
+        # stage is bounded the same way as one with several narrow stages.
+        min_local_slots = sum(_declared_width(desc) for desc in smp_descs)
+        min_ray_slots = sum(_declared_width(desc) for desc in ray_descs)
+        max_local_workers = max(
+            1,
+            cpu_budget // (1 + local_reserve + min_local_slots)
+            if min_local_slots
+            else cpu_budget // (1 + local_reserve),
+        )
+        max_ray_workers = (
+            max(1, ray_cpu_budget // (ray_reserve + min_ray_slots))
+            if ray_descs
+            else local_workers
+        )
+        feasible_workers = min(local_workers, max_local_workers, max_ray_workers)
+        if feasible_workers < 1:
+            raise RuntimeError(
+                "No feasible worker count hosts the plan's parallel stages "
+                f"under budgets local={cpu_budget}, ray={ray_cpu_budget}"
+            )
+        if feasible_workers != local_workers:
+            logger.info(
+                "Clamping optimizer-selected local workers from %s to %s so "
+                "its parallel stages fit the local/Ray CPU budgets.",
+                local_workers,
+                feasible_workers,
+            )
+            local_workers = feasible_workers
+    plan.set_local_workers(local_workers)
     if ray_cpu_budget < local_workers:
         raise RuntimeError(
             "Ray CPU budget must provide at least one slot per local worker: "
@@ -187,7 +234,17 @@ def apply_profile_matched_resources(
         if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
         and desc.execution_resource == PipeExecutionResource.CUDA
     ]
-    if preserve_optimizer_widths:
+    if force_minimum_widths:
+        ray_widths = [1] * len(ray_descs_all)
+        smp_widths = [1] * len(smp_descs_all)
+        if sum(ray_widths) > ray_budget or sum(smp_widths) > smp_budget:
+            raise RuntimeError(
+                "Minimum-width stages exceed the configured resource pools: "
+                f"ray_stages={len(ray_widths)}, ray_budget={ray_budget}, "
+                f"smp_stages={len(smp_widths)}, smp_budget={smp_budget}"
+            )
+        allocation_policy = "forced_minimum_width"
+    elif preserve_optimizer_widths:
         optimized_descs = ray_descs_all + smp_descs_all
         widths = [
             _positive_resource_int(
@@ -1423,6 +1480,7 @@ class Feature(abc.ABC):
             raise RuntimeError("{} not found".format(profiled_data))
 
         plan = self.optimizer.run(profiled_data, options)
+        plan = self._constrain_physical_plan(plan)
         if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") == "1":
             cpu_budget_raw = os.environ.get(
                 "CEDAR_PROFILE_MATCH_CPU_BUDGET"
@@ -1454,9 +1512,16 @@ class Feature(abc.ABC):
                     preserve_optimizer_widths=bool(
                         getattr(
                             self.optimizer,
-                            "joint_actor_allocation",
-                            False,
+                            "preserve_optimizer_widths",
+                            getattr(
+                                self.optimizer,
+                                "joint_actor_allocation",
+                                False,
+                            ),
                         )
+                    ),
+                    force_minimum_widths=(
+                        os.environ.get("CEDAR_MOTIVATION_MINIMUM_WIDTH") == "1"
                     ),
                     num_samples=getattr(
                         getattr(self.optimizer, "options", None),
@@ -1465,6 +1530,16 @@ class Feature(abc.ABC):
                     ),
                 )
             )
+        return plan
+
+    def _constrain_physical_plan(self, plan: PhysicalPlan) -> PhysicalPlan:
+        """Apply workload-specific hard physical constraints before sizing.
+
+        Most features have no such constraints. A feature may override this
+        hook when an operator is deliberately fixed to the same physical
+        backend in every candidate plan.
+        """
+
         return plan
 
     def shard_source(self, rank_spec: Tuple[int, int]):

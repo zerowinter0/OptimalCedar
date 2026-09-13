@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from cedar.pipes import Pipe, PipeExecutionResource
 
 from .my_optimizer import MyOptimizer
+from .affine_dp_cost import AffineDpCostMixin
 from . import constants
 from .optimizer import OptimizerOptions, PhysicalPlan, PipeDesc, PipeVariantType
 
@@ -28,9 +29,16 @@ class _DpSearchDeadlineExceeded(RuntimeError):
     """Internal control flow used to return the best feasible DP incumbent."""
 
 
-def _raise_if_dp_deadline_exceeded(optimizer: "DpOptimizer") -> None:
+_DP_DECLARED_RAY_INFLIGHT = 100
+
+
+def _raise_if_dp_deadline_exceeded(
+    optimizer: "DpOptimizer", force: bool = False
+) -> None:
     deadline = getattr(optimizer, "_dp_search_deadline", None)
-    if deadline is not None and time.monotonic() >= deadline:
+    if force or (
+        deadline is not None and time.monotonic() >= deadline
+    ):
         raise _DpSearchDeadlineExceeded(
             "DP optimization reached its configured time limit."
         )
@@ -496,6 +504,51 @@ class _ThresholdBackPointer:
     block: BlockCandidate
 
 
+def _parse_exposure(raw: Optional[str]) -> Dict[str, float]:
+    """Parse a lane-exposure specification such as ``ray=0.6,smp=1.0``."""
+    exposure = {"local": 0.0, "ray": 0.0, "smp": 0.0, "gpu": 0.0}
+    if not raw:
+        return exposure
+    for item in raw.split(","):
+        key, _, value = item.partition("=")
+        key = key.strip().lower()
+        if key not in exposure:
+            continue
+        try:
+            parsed = float(value)
+        except ValueError:
+            continue
+        if math.isfinite(parsed):
+            exposure[key] = max(0.0, min(1.0, parsed))
+    return exposure
+
+
+# Per-family exposure of non-bottleneck service to the end-to-end score.
+# 0.0 reproduces the historical ``max`` objective (fully overlapped lanes);
+# 1.0 makes the score the sum of all families (fully serialized lanes).
+# Values in between are calibrated from executed plans, see
+# ``calibration.lane_exposure`` in the profile.
+_LANE_EXPOSURE: Dict[str, float] = {
+    "local": 0.0,
+    "ray": 0.0,
+    "smp": 0.0,
+    "gpu": 0.0,
+}
+
+
+def set_lane_exposure(exposure: Optional[Dict[str, float]]) -> None:
+    """Install the calibrated lane-exposure vector for this process."""
+    for key, value in (exposure or {}).items():
+        if key in _LANE_EXPOSURE and isinstance(value, (int, float)):
+            value = float(value)
+            if math.isfinite(value):
+                _LANE_EXPOSURE[key] = max(0.0, min(1.0, value))
+
+
+def lane_exposure() -> Dict[str, float]:
+    return dict(_LANE_EXPOSURE)
+
+
 @dataclass(frozen=True)
 class DpObjectiveCost:
     """Resource-family service coordinates retained by the subset DP.
@@ -503,13 +556,23 @@ class DpObjectiveCost:
     Work assigned to the same resource family is additive: local blocks form
     ``L``, Ray blocks form ``R``, SMP blocks form ``S``, and CUDA blocks form
     ``G``. Ray and SMP additionally reserve independent integer widths in the
-    DP state. The predicted end-to-end bottleneck is ``max(L,R,S,G)``.
+    DP state.
+
+    The bottleneck family always contributes its full service. Every other
+    family contributes its service times its calibrated exposure, so
+    ``exposure = 0`` recovers the historical ``max`` objective and
+    ``exposure = 1`` models fully serialized families.
     """
 
     local_serial: float = 0.0
     ray_serial: float = 0.0
     smp_serial: float = 0.0
     gpu_serial: float = 0.0
+    # When set, the Ray coordinate is served by the same driver that runs the
+    # local operators, so the record pays both (see
+    # ``_replay_concurrency_aware_objective``).  Default False keeps the
+    # historical "every family overlaps" semantics.
+    ray_serializes_with_local: bool = False
 
     @property
     def parallel_bottleneck(self) -> float:
@@ -518,11 +581,28 @@ class DpObjectiveCost:
 
     @property
     def score(self) -> float:
-        return max(
-            self.local_serial,
-            self.parallel_bottleneck,
-            self.gpu_serial,
-        )
+        lanes = {
+            "local": self.local_serial,
+            "ray": self.ray_serial,
+            "smp": self.smp_serial,
+            "gpu": self.gpu_serial,
+        }
+        if self.ray_serializes_with_local:
+            bottleneck = max(
+                self.local_serial + self.ray_serial,
+                self.smp_serial,
+                self.gpu_serial,
+            )
+            return bottleneck
+        bottleneck = max(lanes.values())
+        if not any(_LANE_EXPOSURE.values()):
+            return bottleneck
+        exposed = 0.0
+        for name, value in lanes.items():
+            if value >= bottleneck:
+                continue
+            exposed += _LANE_EXPOSURE[name] * value
+        return bottleneck + exposed
 
 @dataclass
 class SearchResult:
@@ -760,13 +840,22 @@ class BlockCandidateProvider:
         candidates: List[BlockCandidate] = []
         execution_resource = self._execution_resource_for_mask(mask)
         for vt in self._candidate_variants:
-            if (
-                execution_resource == PipeExecutionResource.CUDA
-                and vt
-                not in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+            # The logical PipeSpec is the source of truth for placement
+            # legality. This also covers fixed singleton operators, whose
+            # ``mutable`` flag is false but whose declared INPROCESS variant
+            # must remain executable.
+            if any(
+                vt
+                not in opt.logical_pipes[self.inner_ops[i]]
+                .get_spec()
+                .mutable_variants
+                for i in range(self.n)
+                if mask & (1 << i)
             ):
-                # CUDA work must be isolated in a Ray actor so the physical
-                # plan can declare and account its share of the single GPU.
+                continue
+            if not opt._dp_variant_allowed_for_execution_resource(
+                vt, execution_resource
+            ):
                 continue
             if is_multi and not opt._dp_has_supported_fusion_cost(vt):
                 continue
@@ -903,9 +992,8 @@ class BlockCandidateProvider:
         execution_resource = self._execution_resource_for_mask(mask)
         curves: List[Tuple[BlockCandidate, ...]] = []
         for vt in self._candidate_variants:
-            if (
-                execution_resource == PipeExecutionResource.CUDA
-                and vt not in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+            if not opt._dp_variant_allowed_for_execution_resource(
+                vt, execution_resource
             ):
                 continue
             if is_multi and not opt._dp_has_supported_fusion_cost(vt):
@@ -1068,7 +1156,9 @@ class BlockCandidateProvider:
                 raise ValueError("A fused plan is outside the disabled fusion space.")
             if not all(self._fusion_allowed_flags[idx] for idx in ordered):
                 raise ValueError("The materialized block contains a non-fusable operator.")
-            if not self.optimizer._dp_has_supported_fusion_cost(variant):
+            if not self.optimizer._dp_has_supported_fusion_replay_cost(
+                variant
+            ):
                 raise ValueError(
                     f"DP has no supported fused-block cost for {variant.name}."
                 )
@@ -1387,12 +1477,38 @@ class ExtensibleDpSearch:
                 layer_workers,
             )
         search_started = time.monotonic()
+        previous_layer_sec = 0.0
         for cardinality, layer_masks in enumerate(
             masks_by_cardinality, start=1
         ):
             _raise_if_dp_deadline_exceeded(self.optimizer)
             if not layer_masks:
                 continue
+            # Do not start a layer we almost certainly cannot finish: mask
+            # layers grow several-fold, so an in-flight layer that cannot fit
+            # in the remaining budget would only delay the incumbent.
+            # Optimizers that reuse this search without a configured deadline
+            # (e.g. the SimpleDp baseline) have no ``_dp_search_deadline``;
+            # treat that as "no budget" instead of failing the whole search.
+            deadline = getattr(self.optimizer, "_dp_search_deadline", None)
+            remaining = (
+                deadline - time.monotonic()
+                if deadline is not None
+                else math.inf
+            )
+            expected_layer_sec = max(20.0, 0.4 * previous_layer_sec)
+            if previous_layer_sec > 0.0 and remaining < expected_layer_sec:
+                logger.info(
+                    "[DpOptimizer] Stopping before layer %d/%d: %.1fs "
+                    "remaining is below the expected layer time (%.1fs).",
+                    cardinality,
+                    self.n,
+                    remaining,
+                    expected_layer_sec,
+                )
+                _raise_if_dp_deadline_exceeded(
+                    self.optimizer, force=True
+                )
             layer_started = time.monotonic()
             if parallel_layers and len(layer_masks) > 1:
                 process_count = min(layer_workers, len(layer_masks))
@@ -1408,11 +1524,18 @@ class ExtensibleDpSearch:
                         incumbent_score,
                     ),
                 ) as pool:
-                    results = pool.map(
-                        _run_mask_layer_worker,
-                        layer_masks,
-                        chunksize=max(1, len(layer_masks) // (4 * process_count)),
-                    )
+                    # Consume completed masks incrementally so the wall-clock
+                    # budget is honoured per mask instead of per layer: one
+                    # wide layer can otherwise run minutes past the deadline
+                    # before the next check, and the caller would then have to
+                    # report a much later finish time than the configured
+                    # optimality budget.
+                    results = []
+                    for result in pool.imap(
+                        _run_mask_layer_worker, layer_masks, chunksize=1
+                    ):
+                        _raise_if_dp_deadline_exceeded(self.optimizer)
+                        results.append(result)
                 for next_mask, frontier, pointers, deltas in results:
                     dp[next_mask] = frontier
                     back[next_mask] = pointers
@@ -2475,6 +2598,29 @@ class ExtensibleDpSearch:
                     )
                     if next_parallel_stage_cpus > self.parallel_stage_cpu_limit:
                         continue
+                    if self.optimizer._dp_concurrency_aware_enabled() and (
+                        block.variant
+                        in (
+                            PipeVariantType.RAY,
+                            PipeVariantType.TF_RAY,
+                            PipeVariantType.SMP,
+                        )
+                    ):
+                        # Concurrency-aware mode: a family's price is the
+                        # slowest stage in it (stages of one backend pipeline
+                        # next to the worker chain), so a second stage in the
+                        # same family can only add resource pressure. Keeping
+                        # one stage per family also keeps the state space and
+                        # therefore the search time bounded.
+                        used = prev_state.parallel_stage_cpus
+                        family_used = (
+                            used.ray_cpus
+                            if block.variant
+                            in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+                            else used.smp_cpus
+                        )
+                        if family_used > 0:
+                            continue
                 choices = list(
                     self.cache_policy.transitions(
                         prev_mask,
@@ -2831,6 +2977,28 @@ class ExtensibleDpSearch:
 
         effective = {}
         for objective, pointer in candidates.items():
+            if self.optimizer._dp_concurrency_aware_enabled():
+                # A Ray stage is already folded into the local coordinate in
+                # this mode (its round trip sits on the worker's path), so the
+                # canonical "parallel bottleneck" coordinate must only carry
+                # the SMP lane; copying it into ``ray_serial`` as well would
+                # charge the same stage twice.
+                canonical = DpObjectiveCost(
+                    local_serial=objective.local_serial,
+                    ray_serial=0.0,
+                    smp_serial=objective.smp_serial,
+                    gpu_serial=objective.gpu_serial,
+                )
+                old = effective.get(canonical)
+                if old is None:
+                    effective[canonical] = pointer
+                elif isinstance(old, BackPointer) and isinstance(
+                    pointer, BackPointer
+                ):
+                    effective[canonical] = self._prefer_pointer(old, pointer)
+                else:
+                    effective[canonical] = old
+                continue
             canonical = DpObjectiveCost(
                 local_serial=objective.local_serial,
                 ray_serial=objective.parallel_bottleneck,
@@ -3865,7 +4033,7 @@ class ThresholdFeasibilityDpSearch:
         )
 
 
-class DpOptimizer(MyOptimizer):
+class DpOptimizer(AffineDpCostMixin, MyOptimizer):
     """
     Extensible DP optimizer.
 
@@ -3876,10 +4044,97 @@ class DpOptimizer(MyOptimizer):
     """
 
     joint_actor_allocation = True
+    # Resource matching must not overwrite widths selected by the DP.  Keep
+    # this policy separate from joint_actor_allocation: ablation optimizers may
+    # deliberately fix every candidate at width one while still requiring the
+    # materialized plan to preserve that decision.
+    preserve_optimizer_widths = True
     external_stage_cost_aggregation = "sum"
     # R and S are additive and future transitions can affect either lane, so
     # they must remain separate Pareto coordinates.
     collapse_external_service_coordinates = False
+
+    def configure_lane_exposure(self) -> Dict[str, float]:
+        """Load the calibrated inter-lane exposure vector.
+
+        The bottleneck family always contributes its full service. Other
+        families contribute ``exposure * service``, so the objective can range
+        from the historical ``max`` (all exposures zero) to a fully serialized
+        sum (all exposures one). Values come from ``calibration.lane_exposure``
+        in the profile, optionally overridden by ``CEDAR_DP_LANE_EXPOSURE``
+        (for example ``ray=0.6,smp=0.4``).
+        """
+        exposure: Dict[str, float] = {}
+        profile = self.profiled_stats if isinstance(self.profiled_stats, dict) else {}
+        calibrated = (profile.get("calibration") or {}).get("lane_exposure")
+        if isinstance(calibrated, dict):
+            for key, value in calibrated.items():
+                try:
+                    exposure[str(key)] = float(value)
+                except (TypeError, ValueError):
+                    continue
+        override = os.environ.get("CEDAR_DP_LANE_EXPOSURE")
+        if override:
+            for item in override.split(","):
+                key, _, value = item.partition("=")
+                key = key.strip().lower()
+                if key not in ("local", "ray", "smp", "gpu"):
+                    continue
+                try:
+                    parsed = float(value)
+                except ValueError:
+                    continue
+                if math.isfinite(parsed):
+                    exposure[key] = max(0.0, min(1.0, parsed))
+        stage_factors = (profile.get("calibration") or {}).get("stage_factors")
+        self._dp_stage_factors = (
+            dict(stage_factors) if isinstance(stage_factors, dict) else {}
+        )
+        set_lane_exposure(exposure)
+        if any(exposure.values()):
+            logger.info(
+                "[DpOptimizer] Lane exposure calibrated: %s", lane_exposure()
+            )
+        return lane_exposure()
+
+    def _dp_stage_factor(self, variant: PipeVariantType) -> float:
+        """Return the measured in-plan service factor of a parallel family.
+
+        Isolated profiles measure a stage on its own; the materialized plan runs
+        it next to every other stage. Replaying executed plans against their
+        worker-side service timings (``calibration.stage_factors``) measures the
+        residual as the per-record service divided by the modeled
+        ``block.cost / width``. The default is one, which preserves the
+        uncalibrated model.
+        """
+        factors = getattr(self, "_dp_stage_factors", None) or {}
+        raw = factors.get(variant.name, factors.get(str(variant.name)))
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return 1.0
+        if not math.isfinite(value) or value <= 0.0:
+            return 1.0
+        return value
+
+    def _dp_variant_allowed_for_execution_resource(
+        self,
+        variant: PipeVariantType,
+        execution_resource: PipeExecutionResource,
+    ) -> bool:
+        """Return whether a backend can safely host a resource family.
+
+        CUDA work may execute locally or through a GPU-aware Ray backend. SMP
+        remains invalid because it has no accelerator resource scheduling.
+        Per-operator PipeSpecs further restrict this global capability set.
+        """
+        if execution_resource == PipeExecutionResource.CUDA:
+            return variant in (
+                PipeVariantType.INPROCESS,
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            )
+        return True
 
     def _allocate_final_remote_stage_resources(self) -> None:
         """Materialize the actor/process counts selected by joint DP."""
@@ -3988,6 +4243,9 @@ class DpOptimizer(MyOptimizer):
                         "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be positive"
                     )
                 return workers
+            selected = getattr(self, "_dp_selected_workers", None)
+            if selected is not None:
+                return max(1, int(selected))
         return max(1, int(self.physical_plan.n_local_workers))
 
     def _dp_accumulate_objective_cost(
@@ -4015,7 +4273,48 @@ class DpOptimizer(MyOptimizer):
             PipeVariantType.RAY,
             PipeVariantType.TF_RAY,
         ):
-            stage_cost = block.cost / block.parallelism + boundary_parallel
+            stage_cost = (
+                block.cost * self._dp_stage_factor(block.variant)
+            ) / block.parallelism + boundary_parallel
+            if self._dp_concurrency_aware_enabled():
+                # A Ray stage is submitted per record, so its lane service and
+                # driver-side marshalling form the record's offload path; the
+                # path also cannot beat the interconnect: every record must
+                # cross the host boundary, so the per-record service is at
+                # least ``bytes * W / aggregate_bandwidth``.  Only one stage
+                # per backend is allowed in this mode, so taking the maximum of
+                # the two here keeps the coordinate additive per path.
+                offload_path = (
+                    stage_cost
+                    + boundary_local
+                    + self._dp_cross_host_round_trip_ms(
+                        self._dp_stage_transport_bytes(prev_mask, block)
+                    )
+                )
+                transport_floor = self._dp_transport_floor_ms(
+                    self._dp_stage_transport_bytes(prev_mask, block)
+                )
+                scaled_floor = self._dp_cross_host_lane_ms(
+                    self._dp_stage_transport_bytes(prev_mask, block),
+                    self._dp_formal_worker_count(),
+                    window_bytes=self._dp_ray_window_bytes(
+                        block.order,
+                        block.parallelism,
+                        declared_inflight=_DP_DECLARED_RAY_INFLIGHT,
+                        stage_bytes=self._dp_order_transport_bytes(block.order),
+                    ),
+                )
+                if scaled_floor is not None:
+                    transport_floor = scaled_floor
+                return DpObjectiveCost(
+                    local_serial=(
+                        previous.local_serial
+                        + max(offload_path, transport_floor)
+                    ),
+                    ray_serial=previous.ray_serial + offload_path,
+                    smp_serial=previous.smp_serial,
+                    gpu_serial=previous.gpu_serial,
+                )
             return DpObjectiveCost(
                 local_serial=previous.local_serial + boundary_local,
                 ray_serial=previous.ray_serial + stage_cost,
@@ -4023,7 +4322,22 @@ class DpOptimizer(MyOptimizer):
                 gpu_serial=previous.gpu_serial,
             )
         if block.variant == PipeVariantType.SMP:
-            stage_cost = block.cost / block.parallelism + boundary_parallel
+            stage_cost = (
+                block.cost * self._dp_stage_factor(block.variant)
+            ) / block.parallelism + boundary_parallel
+            if self._dp_concurrency_aware_enabled():
+                # An SMP stage owns its processes and pipelines next to the
+                # worker chain; the measured worker-side service of an SMP
+                # stage already contains its marshalling, so the boundary stays
+                # on the stage's own lane instead of the worker's.
+                return DpObjectiveCost(
+                    local_serial=previous.local_serial,
+                    ray_serial=previous.ray_serial,
+                    smp_serial=(
+                        previous.smp_serial + stage_cost + boundary_local
+                    ),
+                    gpu_serial=previous.gpu_serial,
+                )
             return DpObjectiveCost(
                 local_serial=previous.local_serial + boundary_local,
                 ray_serial=previous.ray_serial,
@@ -4190,6 +4504,460 @@ class DpOptimizer(MyOptimizer):
             raise ValueError("DP replay did not reach the complete operator set.")
         return objective
 
+    def _dp_concurrency_aware_enabled(self) -> bool:
+        """Whether plan scoring uses per-backend concurrency semantics."""
+        legacy = os.environ.get("CEDAR_DP_LEGACY_OBJECTIVE")
+        if legacy is not None:
+            return legacy.strip() not in ("1", "true", "True", "yes")
+        raw = os.environ.get("CEDAR_DP_CONCURRENCY_AWARE")
+        if raw is not None:
+            return raw.strip() in ("1", "true", "True", "yes")
+        return True
+
+    def _dp_formal_worker_count(self) -> int:
+        """Local worker count the plan is priced at."""
+        if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") == "1":
+            raw = os.environ.get("CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS")
+            if raw is not None:
+                try:
+                    workers = int(raw)
+                except ValueError as exc:
+                    raise RuntimeError(
+                        "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be an "
+                        "integer"
+                    ) from exc
+                if workers >= 1:
+                    return workers
+            selected = getattr(self, "_dp_selected_workers", None)
+            if selected is not None:
+                return max(1, int(selected))
+        return max(1, int(getattr(self.physical_plan, "n_local_workers", 1) or 1))
+
+    def _dp_aggregate_transport_bandwidth(self) -> Optional[float]:
+        """Cluster-wide bytes/second available to cross-host stage payloads.
+
+        ``physical_model.boundary`` measures one transfer in isolation, which
+        understates what a saturated plan pays: every record crosses the link,
+        so the achievable record rate is bounded by
+        ``bandwidth / bytes_per_record``.  This value is a property of the
+        interconnect, not of an operator, and is calibrated once per cluster.
+        """
+        transport = (
+            self.profiled_stats.get("physical_model", {}).get("transport", {})
+        )
+        if not isinstance(transport, dict):
+            return None
+        raw = transport.get("aggregate_bandwidth_bytes_per_sec")
+        try:
+            bandwidth = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(bandwidth) or bandwidth <= 0.0:
+            return None
+        return bandwidth
+
+    def _dp_cross_host_round_trip_ms(self, bytes_per_record: float = 0.0) -> float:
+        """Per-record latency of one offload round trip, in milliseconds.
+
+        ``tmp_analysis/measure_ray_transport.py`` measures an echo round trip
+        between the driver and remote actors with the payload sizes of the
+        SimCLRv2 Ray stage: ~3.0 ms per record, and the aggregate rate barely
+        moves between 1 and 56 actors (315 -> 375 records/s).  The transfer is
+        therefore a *per-record latency*, not a bandwidth budget, and it is
+        additional to the driver-side marshalling that the boundary layer
+        already measures.  Value comes from the profile; 0 disables the term.
+        """
+        transport = (
+            self.profiled_stats.get("physical_model", {}).get("transport", {})
+        )
+        if not isinstance(transport, dict):
+            return 0.0
+        raw = transport.get("cross_host_round_trip_ms")
+        try:
+            latency = float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(latency) or latency <= 0.0:
+            return 0.0
+        # The echo sweep is flat in the actor count for payloads at or above
+        # the calibrated reference size, and small payloads complete far
+        # faster (1 KB round trips measure ~0.08 ms), so scale down below the
+        # reference instead of charging a large fixed latency to text stages.
+        reference_raw = transport.get("cross_host_reference_bytes")
+        try:
+            reference = float(reference_raw)
+        except (TypeError, ValueError):
+            reference = 0.0
+        if reference <= 0.0 or bytes_per_record <= 0.0:
+            return latency
+        fraction = min(1.0, max(0.0, bytes_per_record) / reference)
+        return latency * fraction
+
+    def _dp_stage_transport_bytes(self, prev_mask: int, block) -> float:
+        """Per-record bytes that cross the host boundary for one stage.
+
+        The payload of a stage is the *real* per-record size of its input plus
+        its output: the profiled input size of the first operator in the block
+        and the profiled output size of the last one.  The previous basis was
+        the size-ratio product relative to the source pipe, whose "record" is a
+        file path (~162 B); it understated expanding stages (``to_float``
+        multiplies the payload by four) by roughly an order of magnitude, which
+        made offloading look far cheaper than it is.
+        """
+        baseline = self.profiled_stats.get("baseline", {})
+        input_sizes = baseline.get("input_sizes", {})
+        output_sizes = baseline.get("output_sizes", {})
+        return self._dp_order_transport_bytes(getattr(block, "order", ()))
+
+    def _dp_order_transport_bytes(self, order: Iterable[int]) -> float:
+        """Per-record payload a stage moves, from its first and last operator."""
+        baseline = self.profiled_stats.get("baseline", {})
+        input_sizes = baseline.get("input_sizes", {})
+        output_sizes = baseline.get("output_sizes", {})
+        members = [self._dp_inner_ops[i] for i in (order or ())]
+        if not members:
+            return 0.0
+
+        def _size(mapping, pid):
+            raw = mapping.get(pid, mapping.get(str(pid)))
+            try:
+                return max(0.0, float(raw))
+            except (TypeError, ValueError):
+                return 0.0
+
+        return _size(input_sizes, members[0]) + _size(output_sizes, members[-1])
+
+    def _dp_transport_floor_ms(
+        self, bytes_per_record: float, workers: Optional[int] = None
+    ) -> float:
+        """Lower bound on per-record service imposed by the interconnect.
+
+        ``workers`` defaults to the worker count the *search* is pricing at
+        (fixed ablation, else the DP-selected count).  Scoring an already
+        materialized plan must pass that plan's own worker count instead: a
+        plan that ships payloads from 32 workers pays 32 times the per-worker
+        byte budget of a plan that ships the same payload from 8.
+        """
+        bandwidth = self._dp_aggregate_transport_bandwidth()
+        if bandwidth is None or bytes_per_record <= 0.0:
+            return 0.0
+        if workers is None:
+            workers = self._dp_formal_worker_count()
+        # Aggregate rate <= bandwidth / bytes, and the plan runs W workers.
+        return bytes_per_record * workers / bandwidth * 1000.0
+
+    def _dp_cross_host_byte_model(self) -> Optional[Dict[str, float]]:
+        """In-plan cross-host payload budget parameters.
+
+        The isolated echo sweep (``aggregate_bandwidth_bytes_per_sec``) moves
+        one cached object per round trip and therefore reports a rate no
+        running plan reaches.  The in-plan calibration instead measures the
+        payload rate a *stage of a running pipeline* sustains, which is the
+        quantity a plan's per-record service is bounded by:
+
+          * ``bytes_per_worker_per_sec`` -- what one local worker can push
+            across the host boundary while the rest of its chain runs;
+          * ``link_bytes_per_sec`` -- the aggregate rate all workers share;
+          * ``prefetch_budget_bytes`` -- the per-worker payload the stage may
+            keep resident (input in flight + results prefetched) before the
+            driver pays for it.  A stage whose window is sized in *records*
+            (``submit_batch_size * n_actors * 3``) can hold hundreds of
+            megabytes of multimodal payload and lose throughput accordingly.
+        """
+        raw_switch = os.environ.get("CEDAR_DP_INPLAN_CROSS_HOST")
+        if raw_switch is not None and raw_switch.strip() not in (
+            "1",
+            "true",
+            "True",
+            "yes",
+        ):
+            return None
+        transport = (
+            self.profiled_stats.get("physical_model", {}).get("transport", {})
+        )
+        if not isinstance(transport, dict):
+            return None
+        try:
+            per_worker = float(
+                transport["cross_host_bytes_per_worker_per_sec"]
+            )
+            link = float(transport["cross_host_link_bytes_per_sec"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not (
+            math.isfinite(per_worker)
+            and math.isfinite(link)
+            and per_worker > 0.0
+            and link > 0.0
+        ):
+            return None
+        try:
+            budget = float(transport["cross_host_prefetch_budget_bytes"])
+        except (KeyError, TypeError, ValueError):
+            budget = 0.0
+        if not math.isfinite(budget) or budget < 0.0:
+            budget = 0.0
+        try:
+            penalty = float(transport["cross_host_oversized_window_penalty"])
+        except (KeyError, TypeError, ValueError):
+            penalty = 0.0
+        if not math.isfinite(penalty) or penalty < 1.0:
+            penalty = 0.0
+        return {
+            "per_worker_bytes_per_sec": per_worker,
+            "link_bytes_per_sec": link,
+            "prefetch_budget_bytes": budget,
+            "oversized_window_penalty": penalty,
+        }
+
+    def _dp_cross_host_lane_ms(
+        self,
+        bytes_per_record: float,
+        workers: int,
+        window_bytes: float = 0.0,
+    ) -> Optional[float]:
+        """Lane service imposed by the payload every record must ship.
+
+        Returns ``None`` when the profile carries no in-plan calibration, so
+        callers can fall back to the legacy isolated-bandwidth floor.
+        """
+        model = self._dp_cross_host_byte_model()
+        if model is None or bytes_per_record <= 0.0:
+            return None
+        workers = max(1, int(workers))
+        aggregate = min(
+            model["per_worker_bytes_per_sec"] * workers,
+            model["link_bytes_per_sec"],
+        )
+        lane_ms = bytes_per_record * workers / aggregate * 1000.0
+        budget = model["prefetch_budget_bytes"]
+        penalty = model["oversized_window_penalty"]
+        if budget > 0.0 and penalty > 1.0 and window_bytes > budget:
+            # Measured behaviour of the Ray Data-style plan: once the window
+            # holds more transient payload than a worker can keep hot, the
+            # achieved cross-host rate drops by a constant factor instead of
+            # degrading smoothly (the window either fits or it does not).
+            lane_ms *= penalty
+        return lane_ms
+
+    def _dp_ray_window_bytes(
+        self,
+        order: Iterable[int],
+        parallelism: int,
+        declared_inflight: Optional[int] = None,
+        stage_bytes: Optional[float] = None,
+    ) -> float:
+        """Resident payload of one Ray stage's prefetch window.
+
+        The runtime sizes the window from the submit batch
+        (``submit_batch_size * n_actors * 3``) and keeps at most one batch per
+        actor outstanding; the declared ``max_inflight`` is a floor.  Window
+        payload is what the worker holds before the actor answers.
+        """
+        inner_ops = getattr(self, "_dp_inner_ops", ())
+        order = tuple(order or ())
+        if not order or not inner_ops:
+            return 0.0
+        first_p_id = inner_ops[order[0]]
+        baseline = self.profiled_stats.get("baseline", {})
+        input_sizes = baseline.get("input_sizes", {})
+        raw = input_sizes.get(first_p_id, input_sizes.get(str(first_p_id), 0.0))
+        try:
+            input_bytes = max(0.0, float(raw))
+        except (TypeError, ValueError):
+            input_bytes = 0.0
+        if input_bytes <= 0.0:
+            return 0.0
+        if stage_bytes is None:
+            stage_bytes = input_bytes * 2.0
+        submit_batch = self._dp_ray_submit_batch_size(stage_bytes, 0.0)
+        actors = max(1, int(parallelism or 1))
+        window_records = max(
+            int(declared_inflight or 0),
+            submit_batch * actors * 3,
+            actors * 5,
+            submit_batch + 1,
+        )
+        return input_bytes * window_records
+
+    def _dp_plan_ray_windows(
+        self, plan: PhysicalPlan, blocks: Iterable[Tuple[Any, ...]]
+    ) -> Dict[int, float]:
+        """Prefetch-window payload of the Ray stages a materialized plan holds.
+
+        The plan's own variant context is the ground truth here: baseline
+        systems declare their submit batch and in-flight window on the pipe,
+        and the DP charges what that configuration actually keeps resident.
+        """
+        contexts: Dict[int, Tuple[int, int]] = {}
+        for p_id, desc in plan.pipe_descs.items():
+            if desc.variant_type not in (
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            ):
+                continue
+            ctx = desc.variant_ctx
+            declared = getattr(ctx, "max_inflight", None)
+            if declared is None:
+                continue
+            try:
+                submit_batch = int(getattr(ctx, "submit_batch_size", 0) or 0)
+                contexts[int(p_id)] = (int(declared), submit_batch)
+            except (TypeError, ValueError):
+                continue
+        if not contexts:
+            return {}
+        members = {}
+        for p_id, desc in plan.pipe_descs.items():
+            fused = getattr(desc, "fused_pipes", None) or ()
+            for member in fused:
+                members[int(member)] = int(p_id)
+        windows: Dict[int, float] = {}
+        for order, variant, _wants_cache, parallelism in blocks:
+            if variant not in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+                continue
+            if not order:
+                continue
+            first_p_id = int(self._dp_inner_ops[order[0]])
+            owner = members.get(first_p_id, first_p_id)
+            entry = contexts.get(int(owner))
+            if entry is None:
+                continue
+            declared, submit_batch = entry
+            # The runtime raises the declared window to keep three submit
+            # batches per actor outstanding whenever the plan asks for a
+            # larger submit batch than the DP's byte rule would.
+            declared = max(declared, submit_batch * max(1, parallelism) * 3)
+            mask = 0
+            for idx in order:
+                mask |= 1 << idx
+            windows[mask] = self._dp_ray_window_bytes(
+                order,
+                parallelism,
+                declared_inflight=declared,
+                stage_bytes=self._dp_order_transport_bytes(order),
+            )
+        return windows
+
+    def _replay_concurrency_aware_objective(
+        self,
+        block_specs: Iterable[
+            Tuple[Tuple[int, ...], PipeVariantType, bool, int]
+        ],
+        inner_ops: List[int],
+        workers: Optional[int] = None,
+        window_bytes_by_mask: Optional[Dict[int, float]] = None,
+    ) -> DpObjectiveCost:
+        """Score a plan with the concurrency each backend really provides.
+
+        The additive per-family objective assumes that the local chain, Ray
+        stages and SMP stages all overlap, which holds for the plans our search
+        produces but not for the plans the baseline systems produce.  Measured
+        behaviour of the three backends:
+
+          * INPROCESS operators are threads inside one worker process, so their
+            per-record CPU work adds up on that worker's core.
+          * An SMP stage owns its processes and pipelines next to the worker
+            chain, so the slower of the two paces the pipeline (max).
+          * A Ray stage is submitted by the worker and its payload crosses the
+            network for every record; the driver-side serialization plus the
+            round trip sit on the record's path, so it adds to the worker
+            chain instead of overlapping with it.
+        """
+        provider = BlockCandidateProvider(self, inner_ops)
+        provider.prepare()
+        local = 0.0
+        ray = 0.0
+        smp = 0.0
+        gpu = 0.0
+        prev_mask = 0
+        for order, variant, _wants_cache, parallelism in block_specs:
+            block = provider.candidate_for_order(
+                order,
+                variant,
+                prefix_mask=prev_mask,
+                parallelism=parallelism,
+            )
+            if block.mask & prev_mask:
+                raise ValueError("DP replay contains a duplicate operator.")
+            boundary_local, boundary_parallel = (
+                self._dp_stage_boundary_components(prev_mask, block)
+            )
+            if block.execution_resource == PipeExecutionResource.CUDA:
+                gpu += self._dp_gpu_worker_multiplier() * (
+                    block.cost + boundary_parallel
+                )
+            elif variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+                offload_path = (
+                    (
+                        block.cost * self._dp_stage_factor(variant)
+                    )
+                    / max(1, block.parallelism)
+                    + boundary_parallel
+                    + boundary_local
+                    + self._dp_cross_host_round_trip_ms(
+                        self._dp_stage_transport_bytes(prev_mask, block)
+                    )
+                )
+                transport_floor = self._dp_transport_floor_ms(
+                    self._dp_stage_transport_bytes(prev_mask, block),
+                    workers=workers
+                    if workers is not None
+                    else max(1, int(self.physical_plan.n_local_workers or 1)),
+                )
+                # In-plan calibration: the payload rate a *running* stage
+                # sustains, including the cost of an oversized prefetch
+                # window, is far below the isolated echo sweep.  When the
+                # profile carries that calibration it replaces the floor.
+                scaled_floor = self._dp_cross_host_lane_ms(
+                    self._dp_stage_transport_bytes(prev_mask, block),
+                    workers
+                    if workers is not None
+                    else max(1, int(self.physical_plan.n_local_workers or 1)),
+                    window_bytes=(
+                        window_bytes_by_mask[block.mask]
+                        if window_bytes_by_mask
+                        and block.mask in window_bytes_by_mask
+                        else self._dp_ray_window_bytes(
+                            block.order,
+                            block.parallelism,
+                            declared_inflight=_DP_DECLARED_RAY_INFLIGHT,
+                            stage_bytes=self._dp_order_transport_bytes(
+                                block.order
+                            ),
+                        )
+                    ),
+                )
+                if scaled_floor is not None:
+                    transport_floor = scaled_floor
+                # The record's offload path sits on the same critical path as
+                # the worker chain (the driver serializes the payload, ships it
+                # and consumes the result for that record), so it is charged to
+                # the worker lane; the Ray coordinate keeps the raw path for
+                # diagnostics.  A calibrated interconnect floor raises the
+                # path when a whole plan cannot beat the link's byte budget.
+                local += max(offload_path, transport_floor)
+                ray += offload_path
+            elif variant == PipeVariantType.SMP:
+                smp = max(
+                    smp,
+                    (block.cost * self._dp_stage_factor(variant))
+                    / max(1, block.parallelism)
+                    + boundary_parallel
+                    + boundary_local,
+                )
+            else:
+                local += block.cost
+            prev_mask |= block.mask
+        if prev_mask != (1 << len(inner_ops)) - 1:
+            raise ValueError("DP replay did not reach the complete operator set.")
+        return DpObjectiveCost(
+            local_serial=local,
+            ray_serial=ray,
+            smp_serial=smp,
+            gpu_serial=gpu,
+        )
+
     def calculate_dp_objective_cost(
         self,
         plan: Optional[PhysicalPlan] = None,
@@ -4208,6 +4976,7 @@ class DpOptimizer(MyOptimizer):
         ops = list(inner_ops if inner_ops is not None else self._dp_inner_ops)
         if not ops or self._dp_inner_ops != ops:
             raise RuntimeError("DP metadata is not prepared for these operators.")
+        self.configure_lane_exposure()
         if search_result is not None:
             block_specs = []
             for block in search_result.blocks:
@@ -4226,6 +4995,28 @@ class DpOptimizer(MyOptimizer):
                 )
         else:
             block_specs = self._dp_blocks_from_physical_plan(plan, ops)
+        if self._dp_concurrency_aware_enabled():
+            # Score with the worker count of the plan under evaluation: the
+            # interconnect floor scales with the number of workers that ship
+            # each record, and that is a property of the scored plan.
+            scored_workers = (
+                int(plan.n_local_workers or 1)
+                if plan is not None
+                else max(1, int(self.physical_plan.n_local_workers or 1))
+            )
+            # A materialized plan carries its own prefetch window, which the
+            # runtime derives from the stage's submit batch and actor count.
+            windows = (
+                self._dp_plan_ray_windows(plan, block_specs)
+                if plan is not None
+                else {}
+            )
+            return self._replay_concurrency_aware_objective(
+                block_specs,
+                ops,
+                workers=max(1, scored_workers),
+                window_bytes_by_mask=windows,
+            ).score
         return self._replay_dp_objective(block_specs, ops).score
 
     def run(
@@ -4252,6 +5043,7 @@ class DpOptimizer(MyOptimizer):
         self.options = options
         self._validate_stats()
         self._init_stats()
+        self.configure_lane_exposure()
 
         logger.info("[DpOptimizer] Running extensible DP optimization pass...")
         self._logical_opt()
@@ -4269,10 +5061,24 @@ class DpOptimizer(MyOptimizer):
             if search_cost is not None and not math.isclose(
                 optimized_cost, search_cost, rel_tol=1e-10, abs_tol=1e-10
             ):
-                raise RuntimeError(
-                    "Materialized plan objective diverged from DP search: "
-                    f"search={search_cost}, plan={optimized_cost}"
-                )
+                if self._dp_concurrency_aware_enabled():
+                    # The search still optimizes the additive family
+                    # objective; the concurrency-aware score answers a
+                    # different question (what the plan costs when the
+                    # backends do not overlap), so the two legitimately
+                    # differ. Keep the plan, report both numbers.
+                    logger.info(
+                        "[DpOptimizer] Concurrency-aware score %s differs "
+                        "from the additive search objective %s (expected: "
+                        "the search space is optimized for the latter).",
+                        optimized_cost,
+                        search_cost,
+                    )
+                else:
+                    raise RuntimeError(
+                        "Materialized plan objective diverged from DP search: "
+                        f"search={search_cost}, plan={optimized_cost}"
+                    )
             self._last_dp_state_cost = optimized_cost
             logger.info(
                 "[DpOptimizer] Optimized DP objective cost = %s",
@@ -4290,38 +5096,46 @@ class DpOptimizer(MyOptimizer):
     def _dp_parallel_stage_cpu_limit(
         self,
     ) -> Optional[DpResourceUsage]:
-        """Return independent per-worker Ray and SMP CPU capacities."""
+        """Return independent per-worker Ray and SMP CPU capacities.
+
+        The worker count comes from the fixed-W ablation when it is set, from
+        the optimizer's own worker search when that ran, and otherwise from the
+        plan itself (``optimizer_selected``), which is how re-scoring an
+        already materialized plan sees the same budget it was built for.
+        """
+        fixed_workers_raw = os.environ.get("CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS")
+        if fixed_workers_raw is not None:
+            return self._dp_limits_for_workers(
+                fixed_workers_raw, validate_fixed=True
+            )
+        selected_workers = getattr(self, "_dp_selected_workers", None)
+        if selected_workers is None:
+            if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") != "1":
+                return None
+            selected_workers = int(
+                getattr(self.physical_plan, "n_local_workers", 1) or 1
+            )
+        return self._dp_limits_for_workers(selected_workers)
+
+    def _dp_worker_budget(self) -> Optional[Tuple[int, int, int, int]]:
+        """Return (local_budget, ray_budget, local_reserve, ray_reserve)."""
         if os.environ.get("CEDAR_MATCH_PROFILE_RESOURCES") != "1":
             return None
-        fixed_workers_raw = os.environ.get(
-            "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS"
-        )
         local_budget_raw = os.environ.get("CEDAR_PROFILE_MATCH_CPU_BUDGET")
-        if fixed_workers_raw is None or local_budget_raw is None:
+        if local_budget_raw is None:
             return None
         try:
-            fixed_workers = int(fixed_workers_raw)
-            local_budget = int(local_budget_raw)
             ray_budget = int(
                 os.environ.get(
                     "CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET",
                     local_budget_raw,
                 )
             )
+            local_budget = int(local_budget_raw)
         except ValueError as exc:
             raise RuntimeError(
                 "Invalid fixed-worker CPU budget configuration"
             ) from exc
-        if (
-            fixed_workers < 1
-            or local_budget < fixed_workers
-            or ray_budget < fixed_workers
-        ):
-            raise RuntimeError(
-                "Fixed workers cannot fit under the local/Ray CPU budgets: "
-                f"fixed={fixed_workers}, local={local_budget}, "
-                f"ray={ray_budget}"
-            )
         local_reserve_raw = os.environ.get(
             "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1"
         )
@@ -4339,15 +5153,268 @@ class DpOptimizer(MyOptimizer):
             raise RuntimeError(
                 "DP local/Ray CPU reserves must be non-negative"
             )
+        return local_budget, ray_budget, local_reserve, ray_reserve
+
+    def _dp_limits_for_workers(
+        self,
+        workers: Union[int, str, None],
+        validate_fixed: bool = False,
+    ) -> Optional[DpResourceUsage]:
+        """Per-worker SMP/Ray capacities for an explicit worker count."""
+        budget = self._dp_worker_budget()
+        if budget is None:
+            return None
+        try:
+            workers_int = int(workers)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be an integer"
+            ) from exc
+        local_budget, ray_budget, local_reserve, ray_reserve = budget
+        if workers_int < 1:
+            raise RuntimeError(
+                "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS must be positive"
+            )
+        if validate_fixed and (
+            local_budget < workers_int or ray_budget < workers_int
+        ):
+            raise RuntimeError(
+                "Fixed workers cannot fit under the local/Ray CPU budgets: "
+                f"fixed={workers_int}, local={local_budget}, "
+                f"ray={ray_budget}"
+            )
+        if local_budget < workers_int or ray_budget < workers_int:
+            return None
         return DpResourceUsage(
-            ray_cpus=max(
-                0, ray_budget // fixed_workers - ray_reserve
-            ),
+            ray_cpus=max(0, ray_budget // workers_int - ray_reserve),
             smp_cpus=max(
                 0,
-                local_budget // fixed_workers - 1 - local_reserve,
+                local_budget // workers_int - 1 - local_reserve,
             ),
         )
+
+    def _dp_worker_search_enabled(self) -> bool:
+        """Whether the optimizer picks the local worker count itself.
+
+        Default on: the worker count is a first-class decision, because it
+        trades record-level concurrency against per-worker stage width under a
+        fixed CPU budget, and the model prices that trade-off through the
+        measured worker contention plus the per-worker width budget.
+        ``CEDAR_DP_WORKER_SEARCH=0`` restores the fixed-worker protocol used
+        for ablations.
+        """
+        raw = os.environ.get("CEDAR_DP_WORKER_SEARCH")
+        if raw is None:
+            return True
+        return raw.strip() in ("1", "true", "True", "yes")
+
+    def _dp_worker_search_candidates(self) -> List[int]:
+        """Worker counts to try when the DP also chooses the shuffle width."""
+        raw = os.environ.get("CEDAR_WORKER_SEARCH_SET", "1,2,4,8,16,32")
+        candidates: List[int] = []
+        for token in str(raw).split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                workers = int(token)
+            except ValueError:
+                continue
+            if workers < 1:
+                continue
+            limits = self._dp_limits_for_workers(workers)
+            if limits is None:
+                continue
+            if limits.ray_cpus < 1 and limits.smp_cpus < 1:
+                continue
+            candidates.append(workers)
+        if not candidates:
+            # A profile without matched-resource budgets has no per-worker
+            # SMP/Ray capacity to search over (unit tests, uncalibrated
+            # profiles).  Report "no candidates" so the caller keeps the
+            # plan's own worker count instead of failing the optimization.
+            if self._dp_worker_budget() is None:
+                return []
+            raise RuntimeError(
+                "Worker search has no feasible worker count under the "
+                "configured local/Ray CPU budgets."
+            )
+        return sorted(set(candidates))
+
+    def _dp_worker_contention_points(self) -> Dict[int, float]:
+        """Measured per-worker cost inflation as a function of the worker count.
+
+        The DP objective is a per-record service time for one worker, so it
+        implicitly assumes that ``W`` workers scale throughput by ``W``.  On a
+        fixed host that is false: every extra worker competes for the same
+        memory bandwidth, storage path and scheduler, and leaves one more core
+        to the per-worker runtime reserve.  ``physical_model.worker_contention``
+        records, for a handful of worker counts, the ratio between the measured
+        per-record time and the model's prediction for the same plan; the DP
+        multiplies its prediction by that factor.  It is the worker-count
+        analogue of ``physical_model.scaling`` (width) and
+        ``physical_model.boundary`` (stage crossings), and defaults to 1.0, so
+        an uncalibrated profile behaves exactly as before.
+        """
+        raw = os.environ.get("CEDAR_DP_WORKER_CONTENTION")
+        if raw is None:
+            entry = (
+                self.profiled_stats.get("physical_model", {})
+                .get("worker_contention", {})
+            )
+            if isinstance(entry, dict):
+                raw_points = entry.get("points", entry)
+            else:
+                raw_points = None
+        else:
+            raw_points = dict(
+                token.split(":", 1)
+                for token in str(raw).split(",")
+                if ":" in token
+            )
+        points: Dict[int, float] = {}
+        if isinstance(raw_points, dict):
+            for key, value in raw_points.items():
+                try:
+                    workers = int(key)
+                    factor = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if workers >= 1 and math.isfinite(factor) and factor > 0.0:
+                    points[workers] = factor
+        return points
+
+    def _dp_worker_contention_factor(self, workers: int) -> float:
+        """Interpolated contention factor for one worker count (1.0 if unset)."""
+        points = self._dp_worker_contention_points()
+        if not points:
+            return 1.0
+        ordered = sorted(points.items())
+        for width, factor in ordered:
+            if width == workers:
+                return factor
+        lower = [item for item in ordered if item[0] < workers]
+        upper = [item for item in ordered if item[0] > workers]
+        if lower and upper:
+            left_width, left_factor = lower[-1]
+            right_width, right_factor = upper[0]
+            fraction = (workers - left_width) / (right_width - left_width)
+            return left_factor + fraction * (right_factor - left_factor)
+        # Outside the calibrated range, stay with the nearest measurement
+        # rather than assuming workers become cheaper.
+        return (lower[-1] if lower else upper[0])[1]
+
+    def _dp_select_worker_count(self, inner_ops: List[int]) -> int:
+        """Choose the worker count with the DP's own end-to-end objective.
+
+        Every candidate worker count ``W`` fixes the per-worker SMP/Ray CPU
+        budgets, so the plan search runs once per ``W``.  The model scores a
+        plan in per-record per-worker service time ``cost``; the aggregate
+        per-record time is ``cost / W``, which is what we minimize.
+        """
+        time_budget_raw = os.environ.get(
+            "CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC", "900"
+        )
+        try:
+            time_budget = float(time_budget_raw)
+        except ValueError as exc:
+            raise RuntimeError(
+                "CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC must be numeric"
+            ) from exc
+        if not math.isfinite(time_budget) or time_budget <= 0.0:
+            raise RuntimeError(
+                "CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC must be finite and "
+                "positive"
+            )
+        previous_time_limit = os.environ.get(
+            "CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC"
+        )
+        started = time.monotonic()
+        cache: Dict[int, Any] = {}
+        best: Optional[Tuple[float, int]] = None
+        candidates = self._dp_worker_search_candidates()
+        if not candidates:
+            workers = max(
+                1, int(getattr(self.physical_plan, "n_local_workers", 1) or 1)
+            )
+            logger.info(
+                "[DpOptimizer] Worker search skipped: the profile carries no "
+                "matched local/Ray CPU budget; keeping W=%s.",
+                workers,
+            )
+            self._dp_selected_workers = workers
+            self._dp_worker_search_cache = {}
+            return workers
+        for workers in candidates:
+            remaining = time_budget - (time.monotonic() - started)
+            if remaining <= 1.0:
+                logger.info(
+                    "[DpOptimizer] Worker search time budget exhausted after "
+                    "%s s; skipping W=%s",
+                    round(time.monotonic() - started, 1),
+                    workers,
+                )
+                break
+            limits = self._dp_limits_for_workers(workers)
+            if limits is None:
+                continue
+            os.environ["CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC"] = str(
+                min(remaining, time_budget)
+            )
+            self._dp_selected_workers = workers
+            # Keep every worker-count-dependent model term (GPU multiplier,
+            # lane exposure, budget derivation) consistent between this trial
+            # search and the replay validation that follows it.
+            self.physical_plan.set_local_workers(workers)
+            try:
+                candidate = self._run_conditioned_dp_search(
+                    inner_ops,
+                    limits,
+                    enforce_resource_limits=True,
+                )
+            except RuntimeError as exc:  # noqa: BLE001 - infeasible/timeout
+                logger.info(
+                    "[DpOptimizer] Worker search W=%s failed: %s",
+                    workers,
+                    exc,
+                )
+                candidate = None
+            if candidate is None:
+                continue
+            cache[workers] = candidate
+            contention = self._dp_worker_contention_factor(workers)
+            predicted = candidate[1].cost * contention / workers
+            logger.info(
+                "[DpOptimizer] Worker search W=%s smp_cpus=%s ray_cpus=%s "
+                "per-record=%.4f ms contention=%.3f aggregate=%.4f ms",
+                workers,
+                limits.smp_cpus,
+                limits.ray_cpus,
+                candidate[1].cost,
+                contention,
+                predicted,
+            )
+            if best is None or predicted < best[0]:
+                best = (predicted, workers)
+        if previous_time_limit is None:
+            os.environ.pop("CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC", None)
+        else:
+            os.environ[
+                "CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC"
+            ] = previous_time_limit
+        if best is None:
+            raise RuntimeError("Worker search found no feasible plan.")
+        predicted, workers = best
+        self._dp_selected_workers = workers
+        self._dp_worker_search_cache = cache
+        self.physical_plan.set_local_workers(workers)
+        logger.info(
+            "[DpOptimizer] Worker search selected W=%s (aggregate %.4f ms per "
+            "record)",
+            workers,
+            predicted,
+        )
+        return workers
 
     def _dp_parallel_stage_cpu_cost(
         self, block: BlockCandidate
@@ -4504,7 +5571,26 @@ class DpOptimizer(MyOptimizer):
             )
 
         search_started = time.monotonic()
-        self._dp_search_deadline = search_started + time_limit_sec
+        # Returning an incumbent is only useful if it happens inside the
+        # caller's wall-clock budget, so finish the exact search with a reserve
+        # for plan materialization and for the layer that is in flight when the
+        # budget expires.
+        reserve_frac_raw = os.environ.get(
+            "CEDAR_DP_DEADLINE_RESERVE_FRAC", "0.15"
+        )
+        try:
+            reserve_frac = float(reserve_frac_raw)
+        except ValueError as exc:
+            raise RuntimeError(
+                "CEDAR_DP_DEADLINE_RESERVE_FRAC must be numeric"
+            ) from exc
+        if not (0.0 <= reserve_frac < 1.0):
+            raise RuntimeError(
+                "CEDAR_DP_DEADLINE_RESERVE_FRAC must be in [0, 1)"
+            )
+        reserve_sec = max(30.0, reserve_frac * time_limit_sec)
+        search_budget = max(1.0, time_limit_sec - reserve_sec)
+        self._dp_search_deadline = search_started + search_budget
         self._dp_assumed_total_parallel_stage_cpus = resource_limits
         search = None
         prediction: Dict[str, Any] = {}
@@ -4658,16 +5744,36 @@ class DpOptimizer(MyOptimizer):
                 "CEDAR_DP_FORCED_PARALLEL_TOTAL is incompatible with separate "
                 "Ray/SMP pools; use the physical pool budgets instead."
             )
+        worker_search = self._dp_worker_search_enabled()
+        if worker_search:
+            self._dp_select_worker_count(inner_ops)
+            resource_limits = self._dp_parallel_stage_cpu_limit()
+            # ``_dp_select_worker_count`` returns without searching when the
+            # profile carries no matched local/Ray CPU budget (unit tests and
+            # uncalibrated profiles); in that case there is no worker-count
+            # decision to preserve and the plan keeps its own worker count.
+            if not getattr(self, "_dp_worker_search_cache", None):
+                worker_search = False
         # Resource-matched formal plans go directly through the exact
         # constrained state space. The previous relaxed-first fast path was
         # lossless only when its winner happened to fit; on complex workloads
         # it completed one full exponential search merely to discover an
         # infeasible winner and then repeated all work with resource states.
-        candidate = self._run_conditioned_dp_search(
-            inner_ops,
-            resource_limits,
-            enforce_resource_limits=resource_limits is not None,
+        selected_workers = getattr(self, "_dp_selected_workers", None)
+        candidate = getattr(self, "_dp_worker_search_cache", {}).get(
+            selected_workers
         )
+        if worker_search and candidate is None:
+            raise RuntimeError(
+                "Worker search did not retain a feasible plan for the "
+                f"selected worker count W={selected_workers}."
+            )
+        if candidate is None:
+            candidate = self._run_conditioned_dp_search(
+                inner_ops,
+                resource_limits,
+                enforce_resource_limits=resource_limits is not None,
+            )
         if candidate is None:
             raise RuntimeError(
                 "Resource-conditioned DP found no feasible plan."

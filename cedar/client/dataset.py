@@ -23,6 +23,7 @@ from cedar.pipes import (
     Pipe,
     PipeVariant,
     DataSample,
+    PipeExecutionResource,
     PipeVariantType,
     PipeVariantContext,
     InProcessPipeVariantContext,
@@ -108,6 +109,16 @@ def _minimum_parallel_epoch_records(
     else:
         per_worker = max(4, minimum_records_per_worker or 0)
     return width * per_worker
+
+
+def _ray_profile_gpu_fraction(pipe: Pipe, width: int) -> float:
+    """Reserve one GPU in total when profiling a CUDA Ray stage."""
+
+    if width < 1:
+        raise ValueError("Ray profile width must be positive")
+    if pipe.execution_resource == PipeExecutionResource.CUDA:
+        return 1.0 / width
+    return 0.0
 
 
 def _accept_profile_value(value: Any) -> bool:
@@ -801,13 +812,15 @@ class DataSet:
         # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
         # 7/ExpOptimizer, 8/PecanOptimizer, 9/PecanTwoStageOptimizer,
         # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer,
-        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer.
+        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer,
+        # 14/SingleWorkerCudaDpOptimizer, 15/SimpleDpRayCandidateOptimizer, 16/CmOptimizer.
         optimizer_selector = 0
         if self.optimizer_options is not None:
             optimizer_selector = int(
                 getattr(self.optimizer_options, "use_my_optimizer", 0)
             )
         self._legacy_cedar_profile = optimizer_selector == 11
+        self._cm_profile = optimizer_selector in (2, 16)
         if optimizer_selector == 1:
             from cedar.compose.my_optimizer import MyOptimizer
 
@@ -881,9 +894,39 @@ class DataSet:
 
             for _, feature in self.features.items():
                 feature.set_optimizer(MinimalParallelDpOptimizer())
+        elif optimizer_selector == 14:
+            from cedar.compose.sequential_exhaustive_optimizer import (
+                SingleWorkerCudaDpOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(SingleWorkerCudaDpOptimizer())
+        elif optimizer_selector == 15:
+            from cedar.compose.simple_dp_ray_candidate_optimizer import (
+                SimpleDpRayCandidateOptimizer,
+            )
+
+            for _, feature in self.features.items():
+                feature.set_optimizer(SimpleDpRayCandidateOptimizer())
+        elif optimizer_selector == 16:
+            from cedar.compose.cm_optimizer import CmOptimizer
+            for feature in self.features.values():
+                feature.set_optimizer(CmOptimizer())
+        elif optimizer_selector == 17:
+            from cedar.compose.old_dp_optimizer import OldDpOptimizer
+            for feature in self.features.values():
+                feature.set_optimizer(OldDpOptimizer())
+        elif optimizer_selector == 18:
+            from cedar.compose.plumber_optimizer import PlumberOptimizer
+            for feature in self.features.values():
+                feature.set_optimizer(PlumberOptimizer())
+        elif optimizer_selector == 19:
+            from cedar.compose.raydata_optimizer import RayDataOptimizer
+            for feature in self.features.values():
+                feature.set_optimizer(RayDataOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 13."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 19."
             )
 
         if len(self.features) == 0:
@@ -1290,7 +1333,44 @@ class DataSet:
             self.ctx.init_ray()
         self.ctx_initialized = True
 
-    def _profile(
+    def _profile(self, f_name, n_samples=None, output_file=None):
+        if not (getattr(self, "_cm_profile", False)
+                or os.environ.get("CEDAR_PROFILE_CM") == "1"):
+            return self._profile_standard(f_name, n_samples, output_file)
+        from cedar.client.linear_cost_profile import profile_linear_feature
+        # Reuse the enhanced DP profiling route (including backend worker timing).
+        # The additional instrumented local pass is excluded from its baseline.
+        from threadpoolctl import threadpool_limits
+        import torch
+        env = {"CEDAR_PROFILE_FILTER_SELECTIVITY": "1", "OMP_NUM_THREADS": "1",
+               "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1",
+               "NUMEXPR_NUM_THREADS": "1"}
+        previous = {key: os.environ.get(key) for key in env}
+        settings = {key: globals()[key] for key in
+                    ("RAY_PROFILE_N_ACTORS", "SMP_PROFILE_N_PROCS")}
+        old_threads = torch.get_num_threads()
+        os.environ.update(env)
+        globals().update(RAY_PROFILE_N_ACTORS=1, SMP_PROFILE_N_PROCS=1)
+        try:
+            torch.set_num_threads(1)
+            with threadpool_limits(limits=1):
+                profile = self._profile_standard(f_name, n_samples, output_file)
+                profile["cm_model"] = profile_linear_feature(
+                    self.features[f_name], self.ctx, PROFILE_TIME_SEC, n_samples)
+        finally:
+            globals().update(settings)
+            torch.set_num_threads(old_threads)
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        destination = output_file or f"/tmp/{f_name}_profile.yml"
+        with open(destination, "w") as stream:
+            yaml.safe_dump(profile, stream)
+        return profile
+
+    def _profile_standard(
         self,
         f_name: str,
         n_samples: Optional[int] = None,
@@ -2052,6 +2132,7 @@ class DataSet:
                     else RAY_PROFILE_SUBMIT_BATCH_SIZE
                 ),
                 profile_backend_compute=True,
+                num_gpus=_ray_profile_gpu_fraction(pipe, width),
             )
         elif variant_type == PipeVariantType.TF_RAY:
             variant_ctx = TFRayPipeVariantContext(
@@ -2061,6 +2142,7 @@ class DataSet:
                 use_threads=True,
                 submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
                 profile_backend_compute=True,
+                num_gpus=_ray_profile_gpu_fraction(pipe, width),
             )
         elif variant_type == PipeVariantType.SMP:
             variant_ctx = SMPPipeVariantContext(
@@ -2580,6 +2662,12 @@ class DataSet:
                         use_threads=True,
                         submit_batch_size=RAY_PROFILE_SUBMIT_BATCH_SIZE,
                         profile_backend_compute=profile_backend_compute,
+                        num_gpus=(
+                            1.0 / RAY_PROFILE_N_ACTORS
+                            if pipe.execution_resource
+                            == PipeExecutionResource.CUDA
+                            else 0.0
+                        ),
                     )
 
                     profile = self._profile_feature(

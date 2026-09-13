@@ -28,10 +28,10 @@ def feature(tmp_path: Path) -> MultimodalRunningExampleFeature:
     result = MultimodalRunningExampleFeature(
         thresholds=Thresholds(
             perplexity_max=100.0,
-            sharpness_min=10.0,
+            safety_max=0.2,
             aesthetic_min=0.4,
             clip_min=0.2,
-            blip_min=0.5,
+            blip_min=0.2,
         )
     )
     result.apply(LocalLineSource(str(source_path)))
@@ -46,15 +46,15 @@ def test_feature_has_six_operators_and_declared_constraints(
     assert signature["tags"] == [
         "normalize",
         "perplexity",
-        "sharpness",
+        "safety",
         "aesthetic",
         "clip",
         "blip",
     ]
     assert set(signature["dependencies"]) == {
         ("normalize", "perplexity"),
-        ("sharpness", "aesthetic"),
         ("perplexity", "clip"),
+        ("safety", "clip"),
         ("aesthetic", "clip"),
         ("clip", "blip"),
     }
@@ -64,32 +64,32 @@ def test_feature_has_six_operators_and_declared_constraints(
 def test_representative_legal_orders_retain_identical_records() -> None:
     thresholds = {
         "perplexity": ("max", 100.0),
-        "sharpness": ("min", 10.0),
+        "safety": ("max", 0.2),
         "aesthetic": ("min", 0.4),
         "clip": ("min", 0.2),
-        "blip": ("min", 0.5),
+        "blip": ("min", 0.2),
     }
     scores = {
         "keep": {
             "perplexity": 50.0,
-            "sharpness": 20.0,
+            "safety": 0.1,
             "aesthetic": 0.8,
             "clip": 0.4,
-            "blip": 0.9,
+            "blip": 0.4,
         },
         "drop-text": {
             "perplexity": 150.0,
-            "sharpness": 20.0,
+            "safety": 0.1,
             "aesthetic": 0.8,
             "clip": 0.4,
-            "blip": 0.9,
+            "blip": 0.4,
         },
         "drop-image": {
             "perplexity": 50.0,
-            "sharpness": 5.0,
+            "safety": 0.3,
             "aesthetic": 0.8,
             "clip": 0.4,
-            "blip": 0.9,
+            "blip": 0.4,
         },
     }
 
@@ -110,8 +110,8 @@ def test_representative_legal_orders_retain_identical_records() -> None:
             }
         return retained
 
-    assert execute(("normalize", "perplexity", "sharpness", "aesthetic", "clip", "blip")) == execute(
-        ("sharpness", "aesthetic", "normalize", "perplexity", "clip", "blip")
+    assert execute(("normalize", "perplexity", "safety", "aesthetic", "clip", "blip")) == execute(
+        ("aesthetic", "safety", "normalize", "perplexity", "clip", "blip")
     ) == {"keep"}
 
 

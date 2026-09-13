@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 from PIL import Image
 
 from evaluation.pipelines.multimodal_running_example.operators import (
@@ -11,9 +12,11 @@ from evaluation.pipelines.multimodal_running_example.operators import (
     BlipPredicate,
     ClipPredicate,
     PerplexityPredicate,
+    SafetyPredicate,
     SharpnessPredicate,
     TextNormalizer,
 )
+from pico_multimodal.operators import _get_safety_model
 
 
 @pytest.fixture
@@ -79,13 +82,21 @@ def test_model_revisions_are_frozen() -> None:
         "clip": "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
         "blip": "bed8ad38cb2d04a5a4bdf2d071b3c3c0a4aa724c",
         "aesthetic": "684098de3856fa4678bf800efc05635de5b6cde5",
+        "safety": "04367978d3474804ab1a00a9bd6548b741764069",
     }
 
 
 def test_gpu_scores_are_finite(sample_record: dict[str, object]) -> None:
     for predicate in (
+        SafetyPredicate(max_score=1.0),
         AestheticPredicate(min_score=0.0),
         ClipPredicate(min_score=0.0),
         BlipPredicate(min_score=0.0),
     ):
         assert math.isfinite(predicate.score(sample_record))
+
+
+def test_safety_model_uses_the_declared_cpu_resource() -> None:
+    _, model = _get_safety_model()
+
+    assert next(model.parameters()).device.type == "cpu"

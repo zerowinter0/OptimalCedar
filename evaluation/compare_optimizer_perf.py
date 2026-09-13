@@ -31,6 +31,8 @@ import yaml
 from evaluation.cedar_utils import CedarEvalSpec
 from evaluation.eval_cedar import _get_profiler as _get_workload_runner
 from evaluation.eval_cedar import import_module_from_path
+from cedar.compose.dp_optimizer import DpOptimizer
+from cedar.compose.optimizer import Optimizer
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,10 @@ logger = logging.getLogger(__name__)
 OPTIMIZERS = {
     "dj_optimizer": 3,
     "optimizer": 0,
+    "cm_optimizer": 16,
+    "old_dp_optimizer": 17,
+    "plumber_optimizer": 18,
+    "raydata_optimizer": 19,
     "dp_optimizer": 2,
     "dp_two_stage_optimizer": 4,
     # Backward-compatible CLI spellings; omitted from the default order.
@@ -50,6 +56,7 @@ OPTIMIZERS = {
     "pecan_two_stage_optimizer": 9,
     "dj_two_stage_optimizer": 10,
     "simple_dp_optimizer": 11,
+    "simple_dp_ray_candidate_optimizer": 15,
 }
 
 DEFAULT_OPTIMIZER_ORDER = [
@@ -417,27 +424,28 @@ def _make_spec(
         )
 
     return CedarEvalSpec(
-        args.batch_size,
-        data_num_total_samples,
-        args.num_epochs,
-        None,
-        _parse_dataset_kwargs(args.dataset_kwargs),
-        args.use_ray,
-        args.ray_ip,
-        args.iteration_time,
-        args.profiled_stats,
-        False,
-        False,
-        not args.enable_controller,
-        False,
-        args.disable_offload,
-        not args.enable_local_parallelism,
-        False,
-        False,
-        args.disable_caching,
-        use_my_optimizer,
-        False,
-        reorder_timeout_sec,
+        batch_size=args.batch_size,
+        num_total_samples=data_num_total_samples,
+        num_epochs=args.num_epochs,
+        config=None,
+        kwargs=_parse_dataset_kwargs(args.dataset_kwargs),
+        use_ray=args.use_ray,
+        ray_ip=args.ray_ip,
+        ray_runtime_env=None,
+        iteration_time=args.iteration_time,
+        profiled_stats=args.profiled_stats,
+        run_profiling=False,
+        disable_optimizer=False,
+        disable_controller=not args.enable_controller,
+        disable_prefetch=False,
+        disable_offload=args.disable_offload,
+        disable_parallelism=not args.enable_local_parallelism,
+        disable_reorder=False,
+        disable_fusion=False,
+        disable_caching=args.disable_caching,
+        use_my_optimizer=use_my_optimizer,
+        generate_plan=False,
+        reorder_timeout_sec=reorder_timeout_sec,
     )
 
 
@@ -476,6 +484,7 @@ def _summarize_setup_only(
     skip_reason: str,
     plan_cost: Optional[float] = None,
     plan_costs_by_feature: Optional[Dict[str, float]] = None,
+    plan_evidence: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     result = {
         "optimizer": name,
@@ -493,6 +502,8 @@ def _summarize_setup_only(
     if plan_cost is not None:
         result["plan_cost"] = plan_cost
         result["plan_costs_by_feature"] = plan_costs_by_feature or {}
+    if plan_evidence:
+        result.update(plan_evidence)
     return result
 
 
@@ -537,6 +548,98 @@ def _calculate_plan_costs(
             plan=plan,
         )
     return costs
+
+
+def _calculate_cedar_plan_costs(
+    dataset: Any, profiled_stats: Optional[str] = None
+) -> Dict[str, float]:
+    """Score all materialized plans with the same native Cedar cost model."""
+    profile = _load_profile(profiled_stats or "")
+    if profile is None:
+        raise RuntimeError("A readable profile is required for Cedar rescoring.")
+    if getattr(dataset, "feature_plans", None) is None:
+        raise RuntimeError("Dataset did not produce optimized feature plans.")
+
+    costs: Dict[str, float] = {}
+    features = getattr(dataset, "features", {})
+    for f_name, plan in dataset.feature_plans.items():
+        feature = features.get(f_name)
+        if feature is None and features:
+            feature = next(iter(features.values()))
+        if feature is None:
+            raise RuntimeError(f"Could not find logical feature {f_name}.")
+
+        scorer = Optimizer()
+        scorer.init(feature.logical_pipes, feature.logical_adj_list)
+        scorer.profiled_stats = profile
+        scorer._init_stats()
+        caching_on = scorer._get_cache_pid(plan) is not None
+        fused_blocks = [
+            list(desc.fused_pipes)
+            for desc in plan.pipe_descs.values()
+            if getattr(desc, "fused_pipes", None)
+            and len(getattr(desc, "fused_pipes", [])) > 1
+        ]
+        costs[f_name] = scorer.calculate_cost(
+            plan.graph,
+            physical_specs=plan.pipe_descs,
+            fused_pipes=fused_blocks or None,
+            caching_on=caching_on,
+            plan=plan,
+        )
+    return costs
+
+
+def _calculate_pico_plan_costs(
+    dataset: Any, profiled_stats: Optional[str] = None
+) -> Dict[str, float]:
+    """Score all materialized plans with PICO's DP objective."""
+    profile = _load_profile(profiled_stats or "")
+    if profile is None:
+        raise RuntimeError("A readable profile is required for PICO rescoring.")
+    if getattr(dataset, "feature_plans", None) is None:
+        raise RuntimeError("Dataset did not produce optimized feature plans.")
+
+    costs: Dict[str, float] = {}
+    features = getattr(dataset, "features", {})
+    for f_name, plan in dataset.feature_plans.items():
+        feature = features.get(f_name)
+        if feature is None and features:
+            feature = next(iter(features.values()))
+        if feature is None:
+            raise RuntimeError(f"Could not find logical feature {f_name}.")
+
+        scorer = DpOptimizer()
+        scorer.init(feature.logical_pipes, feature.logical_adj_list)
+        scorer.profiled_stats = profile
+        scorer.options = dataset.optimizer_options
+        scorer._init_stats()
+        inner_ops = scorer._get_linear_inner_ops()
+        if not inner_ops:
+            raise RuntimeError(f"Could not recover linear PICO operators for {f_name}.")
+        scorer._prepare_dp_metadata(inner_ops)
+        costs[f_name] = scorer.calculate_dp_objective_cost(plan=plan)
+    return costs
+
+
+def _collect_plan_evidence(
+    dataset: Any, profiled_stats: Optional[str]
+) -> Dict[str, Any]:
+    own_costs = _calculate_plan_costs(dataset, profiled_stats)
+    cedar_costs = _calculate_cedar_plan_costs(dataset, profiled_stats)
+    pico_costs = _calculate_pico_plan_costs(dataset, profiled_stats)
+    return {
+        "plan_cost": sum(own_costs.values()),
+        "plan_costs_by_feature": own_costs,
+        "cedar_plan_cost": sum(cedar_costs.values()),
+        "cedar_plan_costs_by_feature": cedar_costs,
+        "pico_plan_cost": sum(pico_costs.values()),
+        "pico_plan_costs_by_feature": pico_costs,
+        "physical_plans_by_feature": {
+            f_name: plan.to_dict()
+            for f_name, plan in dataset.feature_plans.items()
+        },
+    }
 
 
 def _dataset_has_object_disk_cache(dataset: Any) -> bool:
@@ -657,6 +760,8 @@ def _average_repeat_results(
         "time_per_sample_us",
         "cache_warmup_wall_time_sec",
         "plan_cost",
+        "cedar_plan_cost",
+        "pico_plan_cost",
     )
     for field in numeric_fields:
         values = [
@@ -721,6 +826,37 @@ def _average_repeat_results(
             for feature_name in sorted(feature_names)
         }
 
+    if all("cedar_plan_costs_by_feature" in item for item in repeat_results):
+        feature_names = set()
+        for item in repeat_results:
+            feature_names.update(item["cedar_plan_costs_by_feature"].keys())
+        result["cedar_plan_costs_by_feature"] = {
+            feature_name: _mean(
+                [
+                    item["cedar_plan_costs_by_feature"][feature_name]
+                    for item in repeat_results
+                    if feature_name in item["cedar_plan_costs_by_feature"]
+                ]
+            )
+            for feature_name in sorted(feature_names)
+        }
+
+
+    if all("pico_plan_costs_by_feature" in item for item in repeat_results):
+        feature_names = set()
+        for item in repeat_results:
+            feature_names.update(item["pico_plan_costs_by_feature"].keys())
+        result["pico_plan_costs_by_feature"] = {
+            feature_name: _mean(
+                [
+                    item["pico_plan_costs_by_feature"][feature_name]
+                    for item in repeat_results
+                    if feature_name in item["pico_plan_costs_by_feature"]
+                ]
+            )
+            for feature_name in sorted(feature_names)
+        }
+
     result["cache_warmup_excluded"] = any(
         item.get("cache_warmup_excluded", False) for item in repeat_results
     )
@@ -752,6 +888,7 @@ def _run_one(
     workload_runner = None
     dataset = None
     cache_warmup_wall_time_sec = 0.0
+    plan_evidence: Optional[Dict[str, Any]] = None
 
     logger.info("Preparing dataset with %s...", optimizer_name)
     try:
@@ -767,8 +904,9 @@ def _run_one(
                     )
                     dataset_getter = getattr(module, args.dataset_func)
                     dataset = dataset_getter(spec)
-                    plan_costs_by_feature = _calculate_plan_costs(dataset, args.profiled_stats)
-                    plan_cost = sum(plan_costs_by_feature.values())
+                    plan_evidence = _collect_plan_evidence(dataset, args.profiled_stats)
+                    plan_costs_by_feature = plan_evidence["plan_costs_by_feature"]
+                    plan_cost = plan_evidence["plan_cost"]
                     logger.info(
                         "%s optimized plan cost (calculate_cost) = %s",
                         optimizer_name,
@@ -788,6 +926,9 @@ def _run_one(
                 else:
                     workload_runner = _get_workload_runner(
                         args.dataset_file, args.dataset_func, spec
+                    )
+                    plan_evidence = _collect_plan_evidence(
+                        workload_runner.dataset, args.profiled_stats
                     )
         except _OptimizerResourceExceeded as e:
             setup_time_sec = time.perf_counter() - setup_start
@@ -846,6 +987,7 @@ def _run_one(
                 "calculate_plan_cost",
                 plan_cost,
                 plan_costs_by_feature,
+                plan_evidence,
             )
 
         if args.plan_only:
@@ -909,13 +1051,16 @@ def _run_one(
         workload_start = time.perf_counter()
         workload_runner.run()
         workload_wall_time_sec = time.perf_counter() - workload_start
-        return _summarize_results(
+        result = _summarize_results(
             optimizer_name,
             setup_time_sec,
             workload_wall_time_sec,
             workload_runner.get_results(),
             cache_warmup_wall_time_sec,
         )
+        if plan_evidence:
+            result.update(plan_evidence)
+        return result
     finally:
         _close_workload_runner(workload_runner)
         if dataset is not None and (

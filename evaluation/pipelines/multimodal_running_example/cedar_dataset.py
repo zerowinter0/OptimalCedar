@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import multiprocessing as mp
 import os
@@ -18,17 +19,19 @@ from cedar.pipes import (
     Pipe,
     PipeComputeScaling,
     PipeExecutionResource,
+    PipeVariantType,
 )
 from cedar.sources import LocalLineSource
 
 from evaluation.cedar_utils import CedarEvalSpec
-from evaluation.pipelines.multimodal_running_example.operators import (
+from pico_multimodal.operators import (
     AestheticPredicate,
     BlipPredicate,
     ClipPredicate,
     PerplexityPredicate,
-    SharpnessPredicate,
+    SafetyPredicate,
     TextNormalizer,
+    parse_json_record as ray_parse_json_record,
 )
 
 
@@ -36,7 +39,7 @@ DEFAULT_CPU_BUDGET = 64
 RUNNING_EXAMPLE_TAGS = (
     "normalize",
     "perplexity",
-    "sharpness",
+    "safety",
     "aesthetic",
     "clip",
     "blip",
@@ -53,7 +56,7 @@ mp.set_start_method(
 @dataclass(frozen=True)
 class Thresholds:
     perplexity_max: float
-    sharpness_min: float
+    safety_max: float
     aesthetic_min: float
     clip_min: float
     blip_min: float
@@ -95,6 +98,15 @@ def _per_record(pipe: Pipe, *, cuda: bool = False) -> Pipe:
     pipe.set_compute_scaling(PipeComputeScaling.PER_RECORD)
     if cuda:
         pipe.set_execution_resource(PipeExecutionResource.CUDA)
+    if os.environ.get("PICO_MULTIMODAL_DISABLE_SMP") == "1":
+        # Decorated Pipe classes share their default PipeSpec. Copy it before
+        # narrowing this experiment's variants to avoid changing class state.
+        pipe.pipe_spec = copy.copy(pipe.pipe_spec)
+        pipe.pipe_spec.mutable_variants = [
+            variant
+            for variant in pipe.pipe_spec.mutable_variants
+            if variant != PipeVariantType.SMP
+        ]
     return pipe
 
 
@@ -112,7 +124,7 @@ class MultimodalRunningExampleFeature(Feature):
 
     def _compose(self, source_pipes: List[Pipe]) -> Pipe:
         fp = _per_record(
-            MapperPipe(source_pipes[0], parse_json_record, tag="parse")
+            MapperPipe(source_pipes[0], ray_parse_json_record, tag="parse")
         ).fix()
         fp = _per_record(MapperPipe(fp, TextNormalizer(), tag="normalize"))
         fp = _per_record(
@@ -125,11 +137,11 @@ class MultimodalRunningExampleFeature(Feature):
         fp = _per_record(
             FilterPipe(
                 fp,
-                SharpnessPredicate(
-                    self.thresholds.sharpness_min,
+                SafetyPredicate(
+                    self.thresholds.safety_max,
                     self.image_root,
                 ),
-                tag="sharpness",
+                tag="safety",
             )
         )
         fp = _per_record(
@@ -142,7 +154,7 @@ class MultimodalRunningExampleFeature(Feature):
                 tag="aesthetic",
             ),
             cuda=True,
-        ).depends_on(["sharpness"])
+        )
         fp = _per_record(
             FilterPipe(
                 fp,
@@ -150,7 +162,7 @@ class MultimodalRunningExampleFeature(Feature):
                 tag="clip",
             ),
             cuda=True,
-        ).depends_on(["perplexity", "aesthetic"])
+        ).depends_on(["perplexity", "safety", "aesthetic"])
         return _per_record(
             FilterPipe(
                 fp,

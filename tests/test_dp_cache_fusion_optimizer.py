@@ -1,3 +1,4 @@
+import copy
 import math
 from typing import List, Type
 
@@ -10,6 +11,7 @@ from cedar.compose.dp_optimizer import (
     DpOptimizer,
 )
 from cedar.compose.dp_two_stage_optimizer import DpTwoStageOptimizer
+from cedar.compose.dj_optimizer import DjOptimizer
 from cedar.compose.my_optimizer import MyOptimizer
 from cedar.compose.optimizer import (
     Optimizer,
@@ -17,6 +19,7 @@ from cedar.compose.optimizer import (
     PhysicalPlan,
     PipeDesc,
 )
+from cedar.compose.pecan_optimizer import PecanOptimizer
 from cedar.pipes import (
     InProcessPipeVariantContext,
     MapperPipe,
@@ -106,6 +109,51 @@ def _run_optimizer(optimizer_cls: Type[Optimizer]):
         ),
     )
     return optimizer, plan, feature
+
+
+@pytest.mark.parametrize(
+    "optimizer_cls", [Optimizer, DjOptimizer, PecanOptimizer]
+)
+def test_cedar_physical_block_breakdown_matches_final_plan_cost(
+    caplog, optimizer_cls
+):
+    with caplog.at_level("INFO"):
+        optimizer, plan, _ = _run_optimizer(optimizer_cls)
+
+    breakdown = optimizer.calculate_final_plan_cost_breakdown(plan)
+    fused_blocks = [
+        list(desc.fused_pipes)
+        for desc in plan.pipe_descs.values()
+        if desc.fused_pipes and len(desc.fused_pipes) > 1
+    ]
+    expected = optimizer.calculate_cost(
+        plan.graph,
+        physical_specs=plan.pipe_descs,
+        fused_pipes=fused_blocks or None,
+        caching_on=optimizer._get_cache_pid(plan) is not None,
+        plan=plan,
+    )
+
+    assert breakdown["total_predicted_time_ms_per_input"] == pytest.approx(
+        expected
+    )
+    assert sum(
+        block["predicted_time_ms_per_input"]
+        for block in breakdown["blocks"]
+    ) == pytest.approx(expected)
+    assert [
+        block["physical_pipe_id"] for block in breakdown["blocks"]
+    ] == optimizer._get_critical_path(
+        plan.graph,
+        optimizer._get_source_p_id(),
+        optimizer._get_output_p_id(plan.graph),
+        plan,
+    )[0]
+    assert (
+        f"[CedarCostBreakdown] optimizer={optimizer_cls.__name__} block="
+        in caplog.text
+    )
+    assert "total_predicted_ms_per_input=" in caplog.text
 
 
 @pytest.mark.parametrize("optimizer_cls", [MyOptimizer, DpOptimizer])
@@ -261,11 +309,87 @@ def test_cuda_operator_is_not_an_smp_candidate():
 
     assert PipeVariantType.RAY in variants
     assert PipeVariantType.SMP not in variants
-    assert PipeVariantType.INPROCESS not in variants
+    assert PipeVariantType.INPROCESS in variants
     assert all(
         candidate.execution_resource == PipeExecutionResource.CUDA
         for candidate in provider.candidates_for(1 << cuda_idx)
     )
+
+
+def test_local_only_cuda_operator_has_only_inprocess_candidate():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    cuda_pipe = next(
+        pipe
+        for pipe in feature.logical_pipes.values()
+        if isinstance(pipe, MapperPipe)
+    )
+    cuda_pipe.set_execution_resource(PipeExecutionResource.CUDA)
+    cuda_pipe.pipe_spec = copy.copy(cuda_pipe.pipe_spec)
+    cuda_pipe.pipe_spec.mutable_variants = [PipeVariantType.INPROCESS]
+    cuda_pipe.pipe_spec.is_fusable = False
+
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = _ray_profile_for(feature)
+    optimizer.options = OptimizerOptions(enable_offload=True)
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    provider = BlockCandidateProvider(optimizer, inner_ops)
+    provider.prepare()
+    cuda_idx = inner_ops.index(cuda_pipe.id)
+    variants = {
+        candidate.variant
+        for candidate in provider.candidates_for(1 << cuda_idx)
+    }
+
+    assert variants == {PipeVariantType.INPROCESS}
+
+
+def test_inprocess_fusion_can_be_replayed_without_entering_dp_search():
+    feature = TwoMapFeature()
+    feature.apply(IterSource([1, 2, 3]))
+    optimizer = DpOptimizer()
+    optimizer.init(feature.logical_pipes, feature.logical_adj_list)
+    optimizer.profiled_stats = _ray_profile_for(feature)
+    optimizer.options = OptimizerOptions(
+        enable_offload=True,
+        enable_fusion=True,
+    )
+    optimizer._validate_stats()
+    optimizer._init_stats()
+    inner_ops = optimizer._get_linear_inner_ops()
+    optimizer._prepare_dp_metadata(inner_ops)
+
+    provider = BlockCandidateProvider(optimizer, inner_ops)
+    provider.prepare()
+    full_mask = (1 << len(inner_ops)) - 1
+
+    # PICO has no calibrated local-fusion discount, so it must not generate
+    # INPROCESS fusion as a search candidate.
+    assert all(
+        candidate.variant != PipeVariantType.INPROCESS
+        for candidate in provider.candidates_for(full_mask)
+    )
+
+    # A plan produced by another optimizer can still contain executable local
+    # fusion. Cross-model evaluation conservatively replays it as the same
+    # sequential compute as its constituent INPROCESS operators.
+    first = provider.candidate_for_order(
+        (0,), PipeVariantType.INPROCESS, prefix_mask=0
+    )
+    second = provider.candidate_for_order(
+        (1,), PipeVariantType.INPROCESS, prefix_mask=1
+    )
+    fused = provider.candidate_for_order(
+        (0, 1), PipeVariantType.INPROCESS, prefix_mask=0
+    )
+
+    assert fused.materializes_fusion
+    assert fused.cost == pytest.approx(first.cost + second.cost)
 
 
 def test_single_smp_stage_pays_placement_dependent_boundary_cost():

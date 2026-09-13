@@ -23,7 +23,7 @@ from evaluation.motivation_multimodal.artifacts import atomic_write_json, sha256
 TAG_LABELS = {
     "normalize": "N\nNormalize",
     "perplexity": "P\nPerplexity",
-    "sharpness": "Q\nSharpness",
+    "safety": "S\nSafety",
     "aesthetic": "A\nAesthetic",
     "clip": "C\nCLIP",
     "blip": "B\nBLIP",
@@ -142,14 +142,14 @@ def _operator_panel(axis: plt.Axes) -> None:
     positions = {
         "normalize": (0, 0.75),
         "perplexity": (1.25, 0.75),
-        "sharpness": (0, -0.25),
+        "safety": (0, -0.25),
         "aesthetic": (1.25, -0.25),
         "clip": (3.15, 0.25),
         "blip": (4.75, 0.25),
     }
     dependencies = (
         ("normalize", "perplexity"),
-        ("sharpness", "aesthetic"),
+        ("safety", "clip"),
         ("perplexity", "clip"),
         ("aesthetic", "clip"),
         ("clip", "blip"),
@@ -170,7 +170,7 @@ def _operator_panel(axis: plt.Axes) -> None:
     modality = {
         "normalize": "#F0E442",
         "perplexity": "#F0E442",
-        "sharpness": "#009E73",
+        "safety": "#009E73",
         "aesthetic": "#009E73",
         "clip": "#0072B2",
         "blip": "#0072B2",

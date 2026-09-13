@@ -2,7 +2,7 @@
 Config file for cedar
 """
 
-from typing import Type, TypeVar, Optional
+from typing import Any, Dict, Type, TypeVar, Optional
 import ray
 import logging
 
@@ -24,9 +24,15 @@ class RayConfig:
     Configuration class for Ray
     """
 
-    def __init__(self, ip: str = "", n_cpus: Optional[int] = None):
+    def __init__(
+        self,
+        ip: str = "",
+        n_cpus: Optional[int] = None,
+        runtime_env: Optional[Dict[str, Any]] = None,
+    ):
         self.ip = ip
         self.n_cpus = n_cpus
+        self.runtime_env = runtime_env
 
 
 class CedarContext:
@@ -46,6 +52,11 @@ class CedarContext:
         if self.ray_config is None:
             raise RuntimeError("Ray config not specified.")
 
+        runtime_kwargs = (
+            {"runtime_env": self.ray_config.runtime_env}
+            if self.ray_config.runtime_env is not None
+            else {}
+        )
         if ray.is_initialized():
             logger.warning("Ray already initialized. Defaulting to it.")
         elif self.ray_config.ip != "":
@@ -54,9 +65,11 @@ class CedarContext:
             logger.info(f"Connecting to ray cluster at {self.ray_config.ip}")
             if ":" in self.ray_config.ip:
                 # A host:port value is a native Ray GCS address.
-                ray.init(address=self.ray_config.ip)
+                ray.init(address=self.ray_config.ip, **runtime_kwargs)
             else:
-                ray.init(f"ray://{self.ray_config.ip}:10001")
+                ray.init(
+                    f"ray://{self.ray_config.ip}:10001", **runtime_kwargs
+                )
         else:
             logger.info("Launching to local ray instance")
             if self.ray_config.n_cpus is not None:
@@ -65,9 +78,11 @@ class CedarContext:
                         self.ray_config.n_cpus
                     )
                 )
-                ray.init(num_cpus=self.ray_config.n_cpus)
+                ray.init(
+                    num_cpus=self.ray_config.n_cpus, **runtime_kwargs
+                )
             else:
-                ray.init()
+                ray.init(**runtime_kwargs)
 
     @classmethod
     def from_yaml(cls: Type[T], config_file: str) -> T:

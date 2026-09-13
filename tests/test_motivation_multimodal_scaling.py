@@ -20,7 +20,7 @@ def test_each_point_has_seven_trials() -> None:
         ScalingRow("normalize", 16, None, trial, 100 + trial)
         for trial in range(7)
     ] + [
-        ScalingRow("sharpness", None, 128, trial, 200 + trial)
+        ScalingRow("safety", None, 128, trial, 200 + trial)
         for trial in range(7)
     ]
 

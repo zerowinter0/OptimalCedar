@@ -3,6 +3,9 @@ from itertools import permutations
 from cedar.compose.optimizer import PipeVariantType
 from cedar.pipes import PipeExecutionResource
 from cedar.compose.sequential_exhaustive_optimizer import (
+    MinimalParallelDpOptimizer,
+    SingleWorkerCudaDpOptimizer,
+    SequentialExhaustiveOptimizer,
     SequentialPlan,
     enumerate_fusion_candidates,
     enumerate_reorder_candidates,
@@ -71,11 +74,33 @@ def test_all_six_stage_orders_are_declared() -> None:
     assert declared == {"rfo", "rof", "fro", "for", "orf", "ofr"}
 
 
+def test_minimum_width_optimizers_preserve_their_selected_widths() -> None:
+    for optimizer_type in (
+        MinimalParallelDpOptimizer,
+        SequentialExhaustiveOptimizer,
+    ):
+        assert optimizer_type.joint_actor_allocation is False
+        assert optimizer_type.preserve_optimizer_widths is True
+
+
 def test_cuda_blocks_can_only_use_ray_backends() -> None:
     assert variant_allowed_for_execution_resource(RAY, PipeExecutionResource.CUDA)
     assert not variant_allowed_for_execution_resource(
         LOCAL, PipeExecutionResource.CUDA
     )
     assert not variant_allowed_for_execution_resource(
+        PipeVariantType.SMP, PipeExecutionResource.CUDA
+    )
+
+
+def test_single_worker_dp_also_considers_inprocess_cuda() -> None:
+    optimizer = SingleWorkerCudaDpOptimizer()
+    assert optimizer._dp_variant_allowed_for_execution_resource(
+        LOCAL, PipeExecutionResource.CUDA
+    )
+    assert optimizer._dp_variant_allowed_for_execution_resource(
+        RAY, PipeExecutionResource.CUDA
+    )
+    assert not optimizer._dp_variant_allowed_for_execution_resource(
         PipeVariantType.SMP, PipeExecutionResource.CUDA
     )

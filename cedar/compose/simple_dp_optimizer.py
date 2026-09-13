@@ -144,6 +144,11 @@ class SimpleDpOptimizer(DpOptimizer):
     """Joint DP whose objective is exactly Cedar's original scalar cost."""
 
     joint_actor_allocation = False
+    # DpOptimizer preserves widths selected jointly inside its DP state.
+    # Simple-DP delegates parallelism to Cedar/MyOptimizer after plan search,
+    # so its provisional widths must be normalized by the shared resource
+    # allocator just like Cedar's staged optimizer widths.
+    preserve_optimizer_widths = False
 
     def _allocate_final_remote_stage_resources(self) -> None:
         MyOptimizer._allocate_final_remote_stage_resources(self)

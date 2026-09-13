@@ -591,6 +591,24 @@ if (
 PY
 }
 
+result_epoch_samples() {
+  local result="$1"
+  python - "${result}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1]) as handle:
+    result = json.load(handle)
+samples = result.get("epoch_num_samples")
+if not isinstance(samples, list) or len(samples) != 1:
+    raise SystemExit(1)
+value = int(samples[0])
+if value <= 0:
+    raise SystemExit(1)
+print(value)
+PY
+}
+
 plan_has_cache() {
   grep -q "ObjectDiskCachePipe" "$1"
 }
@@ -720,6 +738,8 @@ run_workload() {
   local workload="$1" dataset="$2" profile="$3" samples="$4"
   local cache_mode="$5" kwargs="$6"
   local root="${MATRIX_OUTPUT_ROOT}/${workload}"
+  local requested_samples="${samples}"
+  local exhaustion_marker="${root}/source_exhaustion_samples.txt"
   local optimizer round offset i tag plan_timeout
   local -a available_optimizers=()
   local -A execution_timed_out=()
@@ -739,7 +759,33 @@ run_workload() {
     mkdir -p "${root}/plans" "${root}/results" \
       "${root}/warmup_results" "${root}/logs"
   fi
+  if [[ "${RESUME_EXISTING}" == "1" ]]; then
+    if [[ -s "${exhaustion_marker}" ]]; then
+      samples="$(<"${exhaustion_marker}")"
+    else
+      local existing_result actual_samples
+      for existing_result in "${root}"/results/round1__*.json; do
+        [[ -s "${existing_result}" ]] || continue
+        actual_samples="$(result_epoch_samples "${existing_result}" 2>/dev/null || true)"
+        if [[ "${actual_samples}" =~ ^[1-9][0-9]*$ ]] && \
+           ((actual_samples < samples)); then
+          samples="${actual_samples}"
+          printf '%s\n' "${samples}" > "${exhaustion_marker}"
+          printf '[%s] RECOVER source exhaustion workload=%s requested=%s actual=%s from=%s\n' \
+            "$(date -Is)" "${workload}" "${requested_samples}" \
+            "${samples}" "${existing_result}" | tee -a "${root}/nohup.log"
+          break
+        fi
+      done
+    fi
+  fi
   write_metadata "${workload}" "${profile}" "${samples}" "${cache_mode}" "${kwargs}"
+  if ((samples < requested_samples)); then
+    printf 'requested_samples_before_source_exhaustion=%s\n' \
+      "${requested_samples}" >> "${root}/metadata.txt"
+    printf 'source_exhaustion_outputs=%s\n' "${samples}" \
+      >> "${root}/metadata.txt"
+  fi
 
   # Round 1 is one unified task: optimize first, then execute with whatever
   # remains of the same one-hour deadline. A timeout suppresses later rounds.
@@ -839,6 +885,22 @@ run_workload() {
     elif [[ "${status}" -ne 0 ]]; then
       echo "Execution failed for ${workload}/round1__${optimizer}" >&2
       return "${status}"
+    fi
+    local measured_samples
+    measured_samples="$(result_epoch_samples \
+      "${root}/results/round1__${optimizer}.json")"
+    if ((measured_samples < samples)); then
+      printf '[%s] SOURCE-EXHAUSTED %s requested=%s actual=%s; adopting complete output cardinality\n' \
+        "$(date -Is)" "${workload}" "${samples}" "${measured_samples}" \
+        | tee -a "${root}/nohup.log"
+      samples="${measured_samples}"
+      printf '%s\n' "${samples}" > "${exhaustion_marker}"
+      write_metadata "${workload}" "${profile}" "${samples}" \
+        "${cache_mode}" "${kwargs}"
+      printf 'requested_samples_before_source_exhaustion=%s\n' \
+        "${requested_samples}" >> "${root}/metadata.txt"
+      printf 'source_exhaustion_outputs=%s\n' "${samples}" \
+        >> "${root}/metadata.txt"
     fi
     validate_result \
       "${root}/results/round1__${optimizer}.json" "${samples}"

@@ -1,6 +1,7 @@
 import abc
 import math
 import os
+from pathlib import Path
 import ray
 import logging
 from typing import Any, Dict, Optional
@@ -16,6 +17,7 @@ RAY_PLACEMENT_RESOURCE_FRACTION_ENV = (
     "CEDAR_RAY_PLACEMENT_RESOURCE_FRACTION"
 )
 DEFAULT_RAY_PLACEMENT_RESOURCE_FRACTION = 0.001
+RAY_PY_MODULE_ROOT_ENV = "CEDAR_RAY_PY_MODULE_ROOT"
 
 
 def get_ray_actor_options(
@@ -37,6 +39,28 @@ def get_ray_actor_options(
         "num_cpus": parsed_cpus,
         "num_gpus": float(num_gpus),
     }
+    module_root = os.environ.get(RAY_PY_MODULE_ROOT_ENV, "").strip()
+    if module_root:
+        root = Path(module_root)
+        module_paths = [root / "cedar", root / "pico_multimodal"]
+        missing = [str(path) for path in module_paths if not path.is_dir()]
+        if missing:
+            raise ValueError(
+                f"{RAY_PY_MODULE_ROOT_ENV} is missing modules: {missing}"
+            )
+        runtime_env = getattr(ray.get_runtime_context(), "runtime_env", {})
+        py_modules = runtime_env.get("py_modules", [])
+        if len(py_modules) < len(module_paths) or not all(
+            str(uri).startswith("gcs://") for uri in py_modules
+        ):
+            raise RuntimeError(
+                f"{RAY_PY_MODULE_ROOT_ENV} requires the Cedar driver to "
+                "connect with the matching job-level py_modules runtime_env"
+            )
+        # Actor-level runtime environments accept uploaded URIs, not local
+        # directories. Explicit inheritance is required because Cedar's actor
+        # classes are decorated before ray.init() establishes the job context.
+        options["runtime_env"] = {"py_modules": list(py_modules)}
     resource_name = os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip()
     if not resource_name:
         return options

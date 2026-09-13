@@ -312,11 +312,13 @@ def main():
     parser.add_argument(
         "--use_my_optimizer",
         type=int,
-        choices=list(range(9)),
+        choices=list(range(20)),
         default=0,
         help=(
             "Optimizer selector: 0 original Cedar, 6 Cedar joint enumeration, "
-            "8 Pecan AutoOrder."
+            "8 Pecan AutoOrder, 16 Cedar with affine cost model, 17 legacy DP, "
+            "18 Plumber-style per-stage width allocation, 19 Ray Data-style "
+            "even actor split with map fusion."
         ),
     )
     parser.add_argument(

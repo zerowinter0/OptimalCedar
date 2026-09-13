@@ -24,7 +24,7 @@ from evaluation.pipelines.multimodal_running_example.operators import (
     BlipPredicate,
     ClipPredicate,
     PerplexityPredicate,
-    SharpnessPredicate,
+    SafetyPredicate,
     TextNormalizer,
 )
 
@@ -38,16 +38,19 @@ def _quantile(rows: Iterable[Mapping[str, Any]], key: str, q: float) -> float:
 
 def derive_threshold_payloads(
     score_rows: list[Mapping[str, Any]],
+    configs: Iterable[Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Convert retained fractions into thresholds with explicit directions."""
 
     payloads: dict[str, dict[str, Any]] = {}
-    for config in iter_threshold_configs():
+    if configs is None:
+        configs = iter_threshold_configs()
+    for config in configs:
         payloads[config.key] = {
             "key": config.key,
             "retention_percent": {
                 "perplexity": config.p_retention,
-                "sharpness": config.q_retention,
+                "safety": config.q_retention,
                 "aesthetic": config.a_retention,
                 "clip": config.c_retention,
                 "blip": config.b_retention,
@@ -56,8 +59,8 @@ def derive_threshold_payloads(
                 "perplexity_max": _quantile(
                     score_rows, "perplexity", config.p_retention / 100.0
                 ),
-                "sharpness_min": _quantile(
-                    score_rows, "sharpness", 1.0 - config.q_retention / 100.0
+                "safety_max": _quantile(
+                    score_rows, "safety", config.q_retention / 100.0
                 ),
                 "aesthetic_min": _quantile(
                     score_rows, "aesthetic", 1.0 - config.a_retention / 100.0
@@ -80,7 +83,7 @@ def score_calibration_records(
 ) -> list[dict[str, Any]]:
     normalizer = TextNormalizer()
     perplexity = PerplexityPredicate(float("inf"))
-    sharpness = SharpnessPredicate(float("-inf"), image_root)
+    safety = SafetyPredicate(float("inf"), image_root)
     aesthetic = AestheticPredicate(float("-inf"), image_root)
     clip = ClipPredicate(float("-inf"), image_root)
     blip = BlipPredicate(float("-inf"), image_root)
@@ -92,7 +95,7 @@ def score_calibration_records(
             {
                 "record_id": str(record["record_id"]),
                 "perplexity": perplexity.score(normalized),
-                "sharpness": sharpness.score(record),
+                "safety": safety.score(record),
                 "aesthetic": aesthetic.score(record),
                 "clip": clip.score(normalized),
                 "blip": blip.score(normalized),
@@ -112,6 +115,7 @@ def run_calibration(
     fixture_root: Path,
     image_root: Path,
     output_root: Path,
+    configs: Iterable[Any] | None = None,
 ) -> dict[str, Any]:
     calibration_path = fixture_root / "calibration.jsonl"
     manifest_path = fixture_root / "manifest.json"
@@ -136,7 +140,7 @@ def run_calibration(
     scores_path = output_root / "calibration_scores.json"
     atomic_write_json(scores_path, scores_payload)
 
-    thresholds = derive_threshold_payloads(rows)
+    thresholds = derive_threshold_payloads(rows, configs=configs)
     threshold_root = output_root / "thresholds"
     for key, payload in thresholds.items():
         artifact = {

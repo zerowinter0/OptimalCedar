@@ -3,7 +3,7 @@ import multiprocessing as mp
 import logging
 import os
 from ray import cloudpickle
-from typing import Optional, Union, Dict
+from typing import Any, Optional, Union, Dict
 
 from cedar.config import CedarContext
 from cedar.compose import Feature, PhysicalPlan
@@ -20,6 +20,74 @@ logger = logging.getLogger(__name__)
 class Sentinel:
     def __init__(self, idx):
         self.idx = idx
+
+
+def _collect_service_stats(feature) -> Dict[str, Any]:
+    """Return worker-side service statistics per physical pipe."""
+    stats: Dict[str, Any] = {}
+    for p_id, pipe in getattr(feature, "physical_pipes", {}).items():
+        variant = getattr(pipe, "pipe_variant", None)
+        service = getattr(variant, "service", None)
+        if service is None:
+            service = getattr(
+                getattr(variant, "variant_ctx", None), "service", None
+            )
+        getter = getattr(service, "get_backend_compute_stats", None)
+        if not callable(getter):
+            continue
+        try:
+            entry = getter()
+        except Exception:  # noqa: BLE001
+            entry = None
+        if entry:
+            stats[str(p_id)] = entry
+    return stats
+
+
+def _dump_reconcile_profile(profiler, idx: int, directory: str, feature=None) -> None:
+    """Write one worker's per-stage trace so the model can be reconciled."""
+    import json
+    import pathlib
+
+    try:
+        input_sizes, output_sizes = profiler.calculate_avg_data_size()
+    except Exception:  # noqa: BLE001 - diagnostics must never break a run
+        input_sizes, output_sizes = {}, {}
+    payload = {
+        "worker": idx,
+        "samples": profiler.get_sample_count(),
+        "batch_size": profiler.get_batch_size(),
+        "wall_latency_ns_per_sample": profiler.calculate_avg_wall_latency_per_sample(),
+        "process_latency_ns_per_sample": profiler.calculate_avg_latency_per_sample(),
+        "buffer_sizes": profiler.calculate_avg_buffer_size(),
+        "input_sizes": input_sizes,
+        "output_sizes": output_sizes,
+        # Raw per-pipe samples let the reconciliation separate service from
+        # queueing instead of hiding it inside a mean.
+        "wall_latency_samples": {
+            str(p_id): list(values)
+            for p_id, values in profiler.wall_latencies.items()
+            if values
+        },
+        "buffer_size_samples": {
+            str(p_id): list(values)
+            for p_id, values in profiler.buffer_sizes.items()
+            if values
+        },
+        "observations": {
+            str(p_id): len(values)
+            for p_id, values in profiler.wall_latencies.items()
+        },
+    }
+    if feature is not None:
+        payload["service_stats"] = _collect_service_stats(feature)
+    try:
+        target = pathlib.Path(directory)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / f"worker_{idx}.json").write_text(json.dumps(payload))
+        logger.info("Wrote reconciliation trace for worker %s", idx)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not write reconciliation trace for %s: %s", idx, exc)
 
 
 def multiprocess_worker_loop_from_serialized_feature(
@@ -99,9 +167,56 @@ def multiprocess_worker_loop(
 
     if feature_plan is not None:
         logger.info(f"Loading feature {feature_name} from plan.")
+        # Reconciliation also wants worker-side service timings, which are only
+        # collected when the parallel variants are created in profiling mode.
+        if os.environ.get("CEDAR_RECONCILE_DIR"):
+            for desc in feature_plan.pipe_descs.values():
+                if desc.variant_type not in (
+                    PipeVariantType.RAY,
+                    PipeVariantType.TF_RAY,
+                    PipeVariantType.SMP,
+                ):
+                    continue
+                variant_ctx = getattr(desc, "variant_ctx", None)
+                if variant_ctx is None:
+                    continue
+                try:
+                    variant_ctx.profile_backend_compute = True
+                except Exception:  # noqa: BLE001
+                    pass
+                # Ray contexts build their client-side service when the plan is
+                # unpickled, which happens before this point; update it too.
+                service = getattr(variant_ctx, "service", None)
+                if service is not None and hasattr(
+                    service, "profile_backend_compute"
+                ):
+                    service.profile_backend_compute = True
         feat = feature.load_from_plan(ctx, feature_plan)
     else:
         feat = feature.load(ctx, False)
+
+    # Cost-model reconciliation (P5): when CEDAR_RECONCILE_DIR is set, trace the
+    # executed plan in this worker and dump per-stage wall-clock service so that
+    # every modeled term can be compared against the same run that produced it.
+    reconcile_dir = os.environ.get("CEDAR_RECONCILE_DIR")
+    reconcile_profiler = None
+    if reconcile_dir:
+        try:
+            # Mirror Feature.profile(): tracing data sizes requires the source
+            # variant to enable profiling, otherwise the DataSample carries no
+            # size dictionary and the profiler refuses the update.
+            for source_pipe in getattr(feature, "source_pipes", None) or []:
+                variant = source_pipe.get_variant()
+                enable = getattr(variant, "enable_profiling", None)
+                if callable(enable):
+                    enable()
+            # The profiler reads the Feature's physical pipes, so it must be
+            # constructed on the feature that load_from_plan() mutated rather
+            # than on the returned iterator.
+            reconcile_profiler = FeatureProfiler(feature, profile_mode=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Reconciliation tracing disabled: %s", exc)
+            reconcile_profiler = None
 
     if enable_controller:
         path = f"/tmp/cedar_{feature_name}_log.txt"
@@ -151,16 +266,39 @@ def multiprocess_worker_loop(
         if done.is_set():
             break
 
+        reconcile_updates = 0
         for x in feat:
             if isinstance(x, DataSample):
                 if x.dummy:
                     continue
+                if reconcile_profiler is not None:
+                    try:
+                        reconcile_profiler.update_ds(x)
+                        reconcile_updates += 1
+                        # The driver may stop the iterator early once the
+                        # requested sample count is reached and then terminate
+                        # this worker, so flush the trace periodically instead
+                        # of only at the end of the epoch.
+                        if reconcile_updates % 10 == 0:
+                            _dump_reconcile_profile(
+                                reconcile_profiler,
+                                idx,
+                                reconcile_dir,
+                                feature,
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Reconciliation update skipped: %s", exc)
+                        reconcile_profiler = None
                 if enable_controller:
                     profiler.update_ds(x)
                 queue.put(x.data)
             else:
                 queue.put(x)
 
+        if reconcile_profiler is not None:
+            _dump_reconcile_profile(
+                reconcile_profiler, idx, reconcile_dir, feature
+            )
         logger.info(f"MP worker {idx} finished epoch.")
         queue.put(Sentinel(idx))
 

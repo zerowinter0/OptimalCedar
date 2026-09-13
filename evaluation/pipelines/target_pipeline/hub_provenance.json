@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/datajuicer/data-juicer-hub.git",
+  "revision": "47fc34588b5d4258c13747cea37c2b63cf4e11b0",
+  "migration": "evaluation/pipelines/pile_recipe_registry.py",
+  "workloads": {
+    "pile_hackernews": "refined_recipes/pretrain/pile-hackernews-refine.yaml",
+    "pile_pubmed_abstracts": "refined_recipes/pretrain/pile-pubmed-abstract-refine.yaml",
+    "pile_freelaw": "refined_recipes/pretrain/pile-freelaw-refine.yaml",
+    "pile_europarl": "refined_recipes/pretrain/pile-europarl-refine.yaml",
+    "pile_uspto_backgrounds": "refined_recipes/pretrain/pile-uspto-refine.yaml"
+  },
+  "scope": "Per-record filters are retained; cross-record SimHash deduplicators remain outside Cedar's per-record optimizer search."
+}

@@ -190,7 +190,7 @@ def _points(
     points = []
     for operator in ("normalize", "perplexity"):
         points.extend((operator, tokens, None) for tokens in text_values)
-    for operator in ("sharpness", "aesthetic"):
+    for operator in ("safety", "aesthetic"):
         points.extend((operator, None, side) for side in image_values)
     mm_tokens = tuple(value for value in text_values if value <= 128)
     for operator in ("clip", "blip"):
@@ -208,7 +208,7 @@ def _operator_functions() -> tuple[
     functions = {
         "normalize": ops.TextNormalizer(),
         "perplexity": ops.PerplexityPredicate(float("inf")).score,
-        "sharpness": ops.SharpnessPredicate(float("-inf")).score,
+        "safety": ops.SafetyPredicate(float("inf")).score,
         "aesthetic": ops.AestheticPredicate(float("-inf")).score,
         "clip": ops.ClipPredicate(float("-inf")).score,
         "blip": ops.BlipPredicate(float("-inf")).score,

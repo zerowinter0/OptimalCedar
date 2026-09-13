@@ -60,7 +60,7 @@ def _formal_artifact(root: Path, repetitions: int = 3) -> Path:
                 "operator_ids": {
                     "normalize": 6,
                     "perplexity": 5,
-                    "sharpness": 4,
+                    "safety": 4,
                     "aesthetic": 3,
                     "clip": 2,
                     "blip": 1,
@@ -72,7 +72,7 @@ def _formal_artifact(root: Path, repetitions: int = 3) -> Path:
                 "operator_ids": {
                     "normalize": 6,
                     "perplexity": 5,
-                    "sharpness": 4,
+                    "safety": 4,
                     "aesthetic": 3,
                     "clip": 2,
                     "blip": 1,
@@ -132,7 +132,7 @@ def test_figure5_manifest_hashes_summary_csv(tmp_path: Path) -> None:
         for operator in ("normalize", "perplexity"):
             for tokens in (16, 32):
                 writer.writerow(dict(zip(fields, (operator, tokens, "", 7, 100, 90, 110))))
-        for operator in ("sharpness", "aesthetic"):
+        for operator in ("safety", "aesthetic"):
             for side in (128, 256):
                 writer.writerow(dict(zip(fields, (operator, "", side, 7, 200, 180, 220))))
         for operator in ("clip", "blip"):

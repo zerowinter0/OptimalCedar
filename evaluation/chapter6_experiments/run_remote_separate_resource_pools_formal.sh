@@ -88,19 +88,25 @@ export CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC=300
 export CEDAR_DP_SEARCH_MODE=auto
 export DP_PLAN_TIMEOUT_SEC=360
 export CH6_PROFILE_TIMEOUT_SEC="${CH6_PROFILE_TIMEOUT_SEC:-10800}"
-export RESUME_EXISTING=0
+export RESUME_EXISTING="${RESUME_EXISTING:-0}"
 export CEDAR_DP_PARETO_EPSILON=0
 export CEDAR_DP_FRONTIER_CAP=0
 export CEDAR_DP_MASK_LAYER_WORKERS="${CEDAR_DP_MASK_LAYER_WORKERS:-1}"
 
 for workload in "${WORKLOADS[@]}"; do
-  printf 'RUNNING phase=profile workload=%s time=%s\n' \
-    "${workload}" "$(date -Is)" > "${OUTPUT_ROOT}/STATUS"
-  CH6_RESULT_ROOT="${OUTPUT_ROOT}" \
-  CH6_PROFILE_ROOT="${PROFILE_DIR}" \
-  CH6_PROFILE_RUN_ID="${workload}_profile" \
-    bash evaluation/chapter6_experiments/run_formal_profiles.sh \
-      --workloads "${workload}"
+  if [[ "${RESUME_EXISTING}" == "1" && \
+        -s "${PROFILE_DIR}/${workload}.yaml" ]]; then
+    printf '[%s] REUSE completed profile workload=%s\n' \
+      "$(date -Is)" "${workload}"
+  else
+    printf 'RUNNING phase=profile workload=%s time=%s\n' \
+      "${workload}" "$(date -Is)" > "${OUTPUT_ROOT}/STATUS"
+    CH6_RESULT_ROOT="${OUTPUT_ROOT}" \
+    CH6_PROFILE_ROOT="${PROFILE_DIR}" \
+    CH6_PROFILE_RUN_ID="${workload}_profile" \
+      bash evaluation/chapter6_experiments/run_formal_profiles.sh \
+        --workloads "${workload}"
+  fi
 
   printf 'RUNNING phase=formal workload=%s time=%s\n' \
     "${workload}" "$(date -Is)" > "${OUTPUT_ROOT}/STATUS"

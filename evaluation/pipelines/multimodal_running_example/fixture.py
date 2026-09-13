@@ -141,8 +141,23 @@ def main() -> None:
     parser.add_argument("--annotations", type=Path, required=True)
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--calibration-size", type=int, default=500)
+    parser.add_argument("--pilot-size", type=int, default=500)
+    parser.add_argument("--formal-size", type=int, default=3000)
+    parser.add_argument("--scaling-size", type=int, default=1000)
     args = parser.parse_args()
-    manifest = build_fixture(args.annotations, args.image_root, args.output)
+    split_sizes = (
+        args.calibration_size,
+        args.pilot_size,
+        args.formal_size,
+        args.scaling_size,
+    )
+    manifest = build_fixture(
+        args.annotations,
+        args.image_root,
+        args.output,
+        split_sizes=split_sizes,
+    )
     print(json.dumps(asdict(manifest), indent=2, sort_keys=True))
 
 

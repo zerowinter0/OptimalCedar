@@ -88,7 +88,8 @@ class OptimizerOptions:
         # 4/DpTwoStageOptimizer, 5/DpCedarOptimizer, 6/CedarJointOptimizer,
         # 7/ExpOptimizer, 8/PecanOptimizer, 9/PecanTwoStageOptimizer,
         # 10/DjTwoStageOptimizer, 11/SimpleDpOptimizer,
-        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer.
+        # 12/SequentialExhaustiveOptimizer, 13/MinimalParallelDpOptimizer,
+        # 14/SingleWorkerCudaDpOptimizer, 15/SimpleDpRayCandidateOptimizer.
         self.use_my_optimizer = int(use_my_optimizer)
 
         # Maximum wall-clock time allowed for the original Optimizer reorder
@@ -390,6 +391,15 @@ class Optimizer:
                 self.__class__.__name__,
                 optimized_cost,
             )
+            if self.__class__.__name__ in {
+                "Optimizer",
+                "DjOptimizer",
+                "PecanOptimizer",
+            }:
+                breakdown = self.calculate_final_plan_cost_breakdown(
+                    self.physical_plan
+                )
+                self._log_final_plan_cost_breakdown(breakdown)
         except Exception as e:
             logger.info(
                 "[%s] Failed to calculate optimized plan cost: %s",
@@ -1334,7 +1344,7 @@ class Optimizer:
         if options.est_throughput is None:
             # unbounded...
             logger.info("[Parallelism] Unbounded throughput requested...")
-            return options.available_local_cpus
+            return self._cap_local_workers(options.available_local_cpus)
         else:
             num_workers = options.est_throughput / (
                 expected_throughput * LOCAL_PARALLELISM_SCALING_FACTOR
@@ -1352,7 +1362,39 @@ class Optimizer:
                 num_workers = options.available_local_cpus
             else:
                 num_workers = math.ceil(num_workers)
-            return num_workers
+            return self._cap_local_workers(num_workers)
+
+    def _cap_local_workers(self, workers: int) -> int:
+        """Clamp the local worker count to an explicit experimental cap.
+
+        Cedar's own rule returns every available CPU when no target
+        throughput is given.  That does not fit the per-worker resource
+        accounting used when comparing plans: with ``W`` workers each gets
+        ``cpu_budget // W`` CPUs, so a plan with a Ray stage needs
+        ``W <= cpu_budget // (1 + reserve)``.  ``CEDAR_LOCAL_WORKERS_MAX``
+        lets an experiment materialize the largest worker count that still
+        fits, instead of failing the budget validation.
+        """
+        raw = os.environ.get("CEDAR_LOCAL_WORKERS_MAX")
+        if raw is None:
+            return workers
+        try:
+            cap = int(raw)
+        except ValueError as exc:
+            raise RuntimeError(
+                "CEDAR_LOCAL_WORKERS_MAX must be an integer"
+            ) from exc
+        if cap < 1:
+            raise RuntimeError("CEDAR_LOCAL_WORKERS_MAX must be positive")
+        if workers > cap:
+            logger.info(
+                "[Parallelism] Capping local workers from %s to %s "
+                "(CEDAR_LOCAL_WORKERS_MAX)",
+                workers,
+                cap,
+            )
+            return cap
+        return workers
 
     def _pass_reordering(self) -> Dict[int, Set[int]]:
         """
@@ -1653,6 +1695,262 @@ class Optimizer:
                 curr_cost += cache_cost
 
         return curr_cost
+
+    def calculate_final_plan_cost_breakdown(
+        self, plan: Optional[PhysicalPlan] = None
+    ) -> Dict[str, Any]:
+        """Return Cedar's predicted service time for each active physical block.
+
+        The values reproduce ``calculate_cost`` exactly and retain its unit:
+        milliseconds per source input sample per CPU. They are service-time
+        contributions, not wall-clock times after actor/process parallelism.
+        """
+        if plan is None:
+            plan = self.physical_plan
+        graph = plan.graph
+        pipe_descs = plan.pipe_descs
+        source_p_id = self._get_source_p_id()
+        output_p_id = self._get_output_p_id(graph)
+        critical_path, _ = self._get_critical_path(
+            graph, source_p_id, output_p_id, plan
+        )
+        if len(critical_path) != len(graph):
+            raise RuntimeError("Failed to extract critical path.")
+
+        baseline = self.profiled_stats["baseline"]
+        curr_size = baseline["output_sizes"][critical_path[0]]
+        blocks: List[Dict[str, Any]] = []
+        input_size_map: Dict[int, float] = {
+            critical_path[0]: baseline["input_sizes"][critical_path[0]]
+        }
+        output_size_map: Dict[int, float] = {
+            critical_path[0]: curr_size
+        }
+        pipe_cost_map: Dict[int, float] = {
+            critical_path[0]: self._base_cost_map[critical_path[0]]
+        }
+
+        def variant_name(desc: PipeDesc) -> str:
+            variant = getattr(desc, "variant_type", None)
+            return variant.name if variant is not None else "INPROCESS"
+
+        def resource_name(desc: PipeDesc) -> str:
+            resource = getattr(desc, "execution_resource", None)
+            return getattr(resource, "value", str(resource or "cpu"))
+
+        source_desc = pipe_descs[critical_path[0]]
+        blocks.append(
+            {
+                "physical_pipe_id": critical_path[0],
+                "name": source_desc.name,
+                "variant": variant_name(source_desc),
+                "execution_resource": resource_name(source_desc),
+                "fused_pipes": None,
+                "fused_pipe_names": None,
+                "input_bytes": input_size_map[critical_path[0]],
+                "output_bytes": curr_size,
+                "predicted_time_ms_per_input": pipe_cost_map[
+                    critical_path[0]
+                ],
+                "parallelism": self._physical_block_parallelism(source_desc),
+                "skipped_by_cache": False,
+            }
+        )
+
+        for p_id in critical_path[1:]:
+            desc = pipe_descs[p_id]
+            if not self._is_optimizer_pipe(p_id, plan):
+                new_cost = self._calculate_pipe_cost(p_id, curr_size, desc)
+                input_size_map[p_id] = curr_size
+                pipe_cost_map[p_id] = new_cost
+                curr_size *= self._data_size_ratio_map[p_id]
+                output_size_map[p_id] = curr_size
+                blocks.append(
+                    {
+                        "physical_pipe_id": p_id,
+                        "name": desc.name,
+                        "variant": variant_name(desc),
+                        "execution_resource": resource_name(desc),
+                        "fused_pipes": None,
+                        "fused_pipe_names": None,
+                        "input_bytes": input_size_map[p_id],
+                        "output_bytes": curr_size,
+                        "predicted_time_ms_per_input": new_cost,
+                        "parallelism": self._physical_block_parallelism(desc),
+                        "skipped_by_cache": False,
+                    }
+                )
+                continue
+
+            fused_pipes = list(desc.fused_pipes or [])
+            if desc.is_fused_pipe() and len(fused_pipes) > 1:
+                fused_desc = PipeDesc(
+                    name=None,
+                    variant_type=desc.variant_type,
+                    variant_ctx=desc.variant_ctx,
+                )
+                for hist_p_id in fused_pipes:
+                    input_size_map[hist_p_id] = curr_size
+                    hist_cost = self._calculate_pipe_cost(
+                        hist_p_id, curr_size, fused_desc
+                    )
+                    pipe_cost_map[hist_p_id] = hist_cost
+                    curr_size *= self._data_size_ratio_map[hist_p_id]
+                    output_size_map[hist_p_id] = curr_size
+                fused_specs = {
+                    hist_p_id: fused_desc for hist_p_id in fused_pipes
+                }
+                _, block_cost = self._calculate_cost_fused(
+                    fused_specs,
+                    fused_pipes,
+                    input_size_map,
+                    output_size_map,
+                    pipe_cost_map,
+                )
+                input_size_map[p_id] = input_size_map[fused_pipes[0]]
+                output_size_map[p_id] = curr_size
+                pipe_cost_map[p_id] = block_cost
+                blocks.append(
+                    {
+                        "physical_pipe_id": p_id,
+                        "name": desc.name,
+                        "variant": variant_name(desc),
+                        "execution_resource": resource_name(desc),
+                        "fused_pipes": fused_pipes,
+                        "fused_pipe_names": [
+                            self.logical_pipes[x].get_logical_name()
+                            for x in fused_pipes
+                        ],
+                        "input_bytes": input_size_map[p_id],
+                        "output_bytes": curr_size,
+                        "predicted_time_ms_per_input": block_cost,
+                        "parallelism": self._physical_block_parallelism(desc),
+                        "skipped_by_cache": False,
+                    }
+                )
+            else:
+                input_size_map[p_id] = curr_size
+                output_size_map[p_id] = curr_size
+                pipe_cost_map[p_id] = 0.0
+                blocks.append(
+                    {
+                        "physical_pipe_id": p_id,
+                        "name": desc.name,
+                        "variant": variant_name(desc),
+                        "execution_resource": resource_name(desc),
+                        "fused_pipes": None,
+                        "fused_pipe_names": None,
+                        "input_bytes": curr_size,
+                        "output_bytes": curr_size,
+                        "predicted_time_ms_per_input": 0.0,
+                        "parallelism": self._physical_block_parallelism(desc),
+                        "skipped_by_cache": False,
+                    }
+                )
+
+        cache_p_id = self._get_cache_pid(plan)
+        if cache_p_id is not None:
+            cache_index = critical_path.index(cache_p_id)
+            if cache_index == 0:
+                raise RuntimeError("Cache cannot be inserted at index 0 of plan.")
+            for block in blocks[:cache_index]:
+                block["predicted_time_ms_per_input"] = 0.0
+                block["skipped_by_cache"] = True
+            pre_cache_p_id = critical_path[cache_index - 1]
+            cache_size = output_size_map[pre_cache_p_id]
+            cache_cost = 1000.0 * cache_size * self.profiled_stats[
+                "disk_info"
+            ]["read_latency"]
+            blocks[cache_index]["predicted_time_ms_per_input"] = cache_cost
+
+        total = sum(
+            float(block["predicted_time_ms_per_input"]) for block in blocks
+        )
+        fused_blocks = [
+            list(desc.fused_pipes)
+            for desc in pipe_descs.values()
+            if getattr(desc, "fused_pipes", None)
+            and len(getattr(desc, "fused_pipes", [])) > 1
+        ]
+        expected = self.calculate_cost(
+            graph,
+            physical_specs=pipe_descs,
+            fused_pipes=fused_blocks or None,
+            caching_on=cache_p_id is not None,
+            plan=plan,
+        )
+        if not math.isclose(total, expected, rel_tol=1e-9, abs_tol=1e-9):
+            raise RuntimeError(
+                "Physical-block cost breakdown does not match calculate_cost: "
+                f"blocks={total}, calculate_cost={expected}"
+            )
+        num_samples = getattr(getattr(self, "options", None), "num_samples", None)
+        return {
+            "unit": "ms_per_source_input_sample_per_cpu",
+            "n_local_workers": plan.n_local_workers,
+            "num_samples": num_samples,
+            "blocks": blocks,
+            "total_predicted_time_ms_per_input": total,
+            "total_predicted_serial_workload_time_sec": (
+                total * num_samples / 1000.0 if num_samples else None
+            ),
+        }
+
+    @staticmethod
+    def _physical_block_parallelism(desc: PipeDesc) -> int:
+        ctx = getattr(desc, "variant_ctx", None)
+        if ctx is None:
+            return 1
+        for attribute in ("n_actors", "n_procs", "num_parallel_calls"):
+            value = getattr(ctx, attribute, None)
+            if isinstance(value, int) and value > 0:
+                return value
+        return 1
+
+    def _log_final_plan_cost_breakdown(self, breakdown: Dict[str, Any]) -> None:
+        tag = self.__class__.__name__
+        num_samples = breakdown["num_samples"]
+        for index, block in enumerate(breakdown["blocks"], start=1):
+            workload_sec = (
+                block["predicted_time_ms_per_input"] * num_samples / 1000.0
+                if num_samples
+                else None
+            )
+            logger.info(
+                "[CedarCostBreakdown] optimizer=%s block=%d physical_pipe_id=%s "
+                "name=%r variant=%s resource=%s parallelism=%s "
+                "fused_pipes=%s fused_pipe_names=%s input_bytes=%.6f "
+                "output_bytes=%.6f predicted_ms_per_input=%.9f "
+                "predicted_serial_workload_sec=%s skipped_by_cache=%s",
+                tag,
+                index,
+                block["physical_pipe_id"],
+                block["name"],
+                block["variant"],
+                block["execution_resource"],
+                block["parallelism"],
+                block["fused_pipes"],
+                block["fused_pipe_names"],
+                block["input_bytes"],
+                block["output_bytes"],
+                block["predicted_time_ms_per_input"],
+                f"{workload_sec:.9f}" if workload_sec is not None else "n/a",
+                block["skipped_by_cache"],
+            )
+        logger.info(
+            "[CedarCostBreakdown] optimizer=%s total_predicted_ms_per_input=%.9f "
+            "total_predicted_serial_workload_sec=%s unit=%s n_local_workers=%s",
+            tag,
+            breakdown["total_predicted_time_ms_per_input"],
+            (
+                f"{breakdown['total_predicted_serial_workload_time_sec']:.9f}"
+                if breakdown["total_predicted_serial_workload_time_sec"]
+                is not None
+                else "n/a"
+            ),
+            breakdown["unit"],
+            breakdown["n_local_workers"],
+        )
 
     def _calculate_size_map(
         self, graph: Dict[int, Set[int]]

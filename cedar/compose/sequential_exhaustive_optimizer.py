@@ -147,6 +147,24 @@ class MinimalParallelDpOptimizer(DpOptimizer):
     """Joint DP variant whose every physical stage has width one."""
 
     joint_actor_allocation = False
+    preserve_optimizer_widths = True
+
+
+class SingleWorkerCudaDpOptimizer(MinimalParallelDpOptimizer):
+    """Width-one DP that includes Cedar's legal in-process CUDA placement."""
+
+    def _dp_variant_allowed_for_execution_resource(
+        self,
+        variant: PipeVariantType,
+        execution_resource: PipeExecutionResource,
+    ) -> bool:
+        if execution_resource == PipeExecutionResource.CUDA:
+            return variant in (
+                PipeVariantType.INPROCESS,
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            )
+        return True
 
 
 class SequentialExhaustiveOptimizer(MinimalParallelDpOptimizer):
@@ -374,6 +392,7 @@ class SequentialExhaustiveOptimizer(MinimalParallelDpOptimizer):
 
 __all__ = [
     "MinimalParallelDpOptimizer",
+    "SingleWorkerCudaDpOptimizer",
     "SequentialExhaustiveOptimizer",
     "SequentialPlan",
     "enumerate_fusion_candidates",
