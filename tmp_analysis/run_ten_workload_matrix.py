@@ -27,7 +27,6 @@ Workloads (ten, chosen for diversity across modalities and pipeline shapes)
   blip                    image-to-caption pipeline
   clip                    image + tokenizer pipeline
   dino                    multi-view image recipe (19 operators)
-  simclrv2_multimodal     multimodal image+text curation
   alpaca_cot              short text filter chain
   pile_hackernews         long text filtering pipeline (18 operators)
   pile_pubmed_abstracts   Data-Juicer Hub recipe (text curation)
@@ -67,10 +66,10 @@ WORKLOADS = [
      ["workload=blip", f"dataset_path={MANIFESTS}/blip.jsonl"], 8000),
     ("clip", f"{TARGET}/clip/cedar_dataset.py",
      ["workload=clip", f"dataset_path={MANIFESTS}/clip.jsonl"], 8000),
+    # ``dino`` is profiled fresh: the reuse copy was collected from a
+    # different pipeline shape (75 pipes) and does not match this feature.
     ("dino", f"{TARGET}/dino/cedar_dataset.py",
      ["workload=dino", f"dataset_path={MANIFESTS}/dino.jsonl", "views=2"], 3000),
-    ("simclrv2_multimodal", "evaluation/pipelines/simclrv2_multimodal/cedar_dataset.py",
-     [], 4000),
     ("alpaca_cot", "evaluation/pipelines/alpaca_cot/cedar_dataset.py", [], 20000),
     ("pile_hackernews", "evaluation/pipelines/pile_hackernews/cedar_dataset.py", [],
      20000),
@@ -96,7 +95,7 @@ REUSE_PROFILE = {
     "simclr": REFERENCE / "simclr_profile.yaml",
     "blip": REFERENCE / "blip_profile.yaml",
     "clip": REFERENCE / "clip_profile.yaml",
-    "dino": REFERENCE / "dino_profile.yaml",
+    # dino's reuse copy came from a different pipeline shape; profile it fresh.
     "alpaca_cot": ROOT / "outputs/plumber_bench_text_20260912/alpaca_cot_profile.yaml",
     "pile_hackernews": ROOT
     / "outputs/plumber_bench_text_20260912/pile_hackernews_profile.yaml",

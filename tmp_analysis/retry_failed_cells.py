@@ -22,13 +22,28 @@ RUNNER = ROOT / "tmp_analysis/run_ten_workload_matrix.py"
 RETRYABLE = {"failed", "timeout", "profile_failed"}
 
 
+def known_cells():
+    """Workload/optimizer names the runner still defines."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("matrix", RUNNER)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["matrix"] = module
+    spec.loader.exec_module(module)
+    workloads = {name for name, _, _, _ in module.WORKLOADS}
+    return {f"{name}:{opt}" for name in workloads for opt in module.OPTIMIZERS}
+
+
 def failed_cells(run_dir: Path):
     payload = json.loads((run_dir / "status.json").read_text())
     cells = payload.get("cells", {})
+    known = known_cells()
     failed = [
         key
         for key, entry in cells.items()
-        if entry.get("status") in RETRYABLE and ":" in key
+        # Cells for workloads or optimizers that no longer exist (removed
+        # workloads, per-workload profile failures) are not retryable.
+        if entry.get("status") in RETRYABLE and key in known
     ]
     workloads, optimizers = set(), set()
     for key in failed:
@@ -84,6 +99,13 @@ def main() -> None:
             if source.is_file():
                 shutil.copy2(source, run_dir / kind / source.name)
     merged = json.loads((run_dir / "status.json").read_text())
+    # Drop entries for workloads or optimizers that no longer exist (for
+    # example a removed workload's profile failure) so the summary reflects
+    # the run that was actually requested.
+    known = known_cells()
+    merged["cells"] = {
+        key: entry for key, entry in merged["cells"].items() if key in known
+    }
     merged["cells"].update(retry_cells)
     merged["retry"] = {
         "source": str(retry_dir.relative_to(ROOT)),
