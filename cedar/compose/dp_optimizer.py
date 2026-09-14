@@ -720,10 +720,13 @@ class BlockCandidateProvider:
                 candidate_variants.append(vt)
 
         self._candidate_variants = candidate_variants
+        use_stage_curve = os.environ.get("CEDAR_DP_STAGE_CURVE_COST") == "1"
         logger.info(
-            "[DpOptimizer] Candidate backends=%s resource_limits=%s",
+            "[DpOptimizer] Candidate backends=%s resource_limits=%s "
+            "stage_curve=%s",
             [variant.name for variant in candidate_variants],
             opt._dp_parallel_stage_cpu_limit(),
+            use_stage_curve,
         )
         self._fusion_allowed_flags = [
             opt._allowed_fusion(p_id) for p_id in self.inner_ops
@@ -768,7 +771,23 @@ class BlockCandidateProvider:
                 widths = range(1, max_parallelism + 1)
             for parallelism in widths:
                 costs = variant_compute_costs[vt]
-                if parallelism > 1:
+                if use_stage_curve and vt in (
+                    PipeVariantType.RAY,
+                    PipeVariantType.TF_RAY,
+                    PipeVariantType.SMP,
+                ):
+                    # Charge what a stage of this width measures per input
+                    # record instead of the isolated per-actor service.
+                    curved: List[float] = []
+                    for p_id, cost in zip(self.inner_ops, costs):
+                        measured = opt._dp_stage_curve_cost(
+                            p_id, vt, parallelism
+                        )
+                        curved.append(
+                            measured if measured is not None else cost
+                        )
+                    costs = curved
+                elif parallelism > 1:
                     costs = [
                         opt._dp_pipe_cost_at_parallelism(
                             p_id,

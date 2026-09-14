@@ -349,6 +349,74 @@ class MyOptimizer(Optimizer):
         return max(cost, 1e-12)
 
     @staticmethod
+    def _dp_scaling_end_to_end(
+        entry: Any, target_width: int
+    ) -> Optional[float]:
+        """Measured per-input-record stage cost at one width.
+
+        ``end_to_end_ms_per_input_sample`` is what a stage of that width
+        actually pays per record, so it already contains the batching and
+        in-flight overlap the runtime provides.  Unlike the actor-side mean it
+        is usable even when the adaptive profile stopped on duration rather
+        than on confidence.
+        """
+        if not isinstance(entry, dict) or target_width < 1:
+            return None
+        raw_widths = entry.get("widths")
+        timings = raw_widths if isinstance(raw_widths, dict) else None
+        if timings is None:
+            adaptive = entry.get("adaptive_profile", {})
+            if isinstance(adaptive, dict) and "width" in adaptive:
+                timings = {adaptive["width"]: entry}
+        if not isinstance(timings, dict):
+            return None
+        points = []
+        for raw_width, timing in timings.items():
+            if not isinstance(timing, dict):
+                continue
+            value = timing.get("end_to_end_ms_per_input_sample")
+            try:
+                width = int(raw_width)
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            if width >= 1 and math.isfinite(value) and value >= 0.0:
+                points.append((width, value))
+        if not points:
+            return None
+        points.sort()
+        for width, value in points:
+            if width == target_width:
+                return value
+        lower = [point for point in points if point[0] < target_width]
+        upper = [point for point in points if point[0] > target_width]
+        if lower and upper:
+            left_width, left_value = lower[-1]
+            right_width, right_value = upper[0]
+            fraction = (target_width - left_width) / (right_width - left_width)
+            return left_value + fraction * (right_value - left_value)
+        return (lower[-1] if lower else upper[0])[1]
+
+    def _dp_stage_curve_cost(
+        self, p_id: int, variant: PipeVariantType, width: int
+    ) -> Optional[float]:
+        """Stage-level measured cost of one operator at one width."""
+        key = (
+            PipeVariantType.RAY.name
+            if variant == PipeVariantType.TF_RAY
+            else variant.name
+        )
+        entries = (
+            self.profiled_stats.get("physical_model", {})
+            .get("scaling", {})
+            .get(key, {})
+        )
+        if not isinstance(entries, dict):
+            return None
+        entry = entries.get(p_id, entries.get(str(p_id)))
+        return self._dp_scaling_end_to_end(entry, width)
+
+    @staticmethod
     def _dp_scaling_mean(
         entry: Any, target_width: int
     ) -> Optional[float]:
