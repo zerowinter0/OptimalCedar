@@ -335,11 +335,20 @@ def apply_profile_matched_resources(
                 f"Invalid optimizer num_samples={num_samples!r}"
             ) from exc
         if parsed_num_samples > 0:
-            finite_workload_ray_batch_cap = max(
-                1,
-                (parsed_num_samples + local_workers - 1) // local_workers,
-            )
             for desc in ray_descs:
+                # Bound the submit batch so a finite workload still spreads
+                # work across the *whole* actor pool: a batch sized only by
+                # the per-worker record count leaves every other actor idle
+                # (a 2000-record text workload produced 8 batches for 56
+                # actors, so the stage ran at 1/7 of its width).  Ask for at
+                # least three batches per actor, and never enlarge the batch
+                # the optimizer already chose.
+                actors = max(1, int(getattr(desc.variant_ctx, "n_actors", 1) or 1))
+                rounds = 3
+                finite_workload_ray_batch_cap = max(
+                    1,
+                    -(-parsed_num_samples // (local_workers * actors * rounds)),
+                )
                 desc.variant_ctx.set_submit_batch_size(
                     min(
                         int(desc.variant_ctx.submit_batch_size),

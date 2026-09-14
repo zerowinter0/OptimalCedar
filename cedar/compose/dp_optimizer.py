@@ -5428,7 +5428,14 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 "Worker search has no feasible worker count under the "
                 "configured local/Ray CPU budgets."
             )
-        return sorted(set(candidates))
+        # Explore the classic ladder first: with a long planning budget the
+        # widened set must not delay finding a feasible plan (bloom_oscar
+        # exhausted its 1800 s budget before reporting one).
+        classic = (1, 2, 4, 8, 16, 32, 64)
+        return sorted(
+            set(candidates),
+            key=lambda workers: (workers not in classic, workers),
+        )
 
     def _dp_worker_contention_points(self) -> Dict[int, float]:
         """Measured per-worker cost inflation as a function of the worker count.
