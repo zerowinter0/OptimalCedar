@@ -757,7 +757,16 @@ class BlockCandidateProvider:
             self._endpoint_sensitive_variants.add(PipeVariantType.SMP)
         for vt in candidate_variants:
             max_parallelism = opt._dp_max_candidate_parallelism(vt)
-            for parallelism in range(1, max_parallelism + 1):
+            # Scoring a materialized plan must be able to price the widths
+            # that plan actually declares, even when they exceed what the
+            # resource-conditioned search would have explored (a baseline can
+            # ask for 62 local processes while the search stops at 6).
+            required = getattr(opt, "_dp_scoring_required_widths", None)
+            if required:
+                widths = sorted(set(required) | {1})
+            else:
+                widths = range(1, max_parallelism + 1)
+            for parallelism in widths:
                 costs = variant_compute_costs[vt]
                 if parallelism > 1:
                     costs = [
@@ -4813,6 +4822,28 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         )
         return input_bytes * window_records
 
+    def _dp_plan_stage_widths(self, plan: PhysicalPlan) -> set:
+        """Parallel widths a materialized plan declares on its stages."""
+        widths = {1}
+        for desc in plan.pipe_descs.values():
+            if desc.variant_type not in (
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+                PipeVariantType.SMP,
+            ):
+                continue
+            ctx = desc.variant_ctx
+            raw = getattr(ctx, "n_actors", None)
+            if raw is None:
+                raw = getattr(ctx, "n_procs", None)
+            try:
+                width = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if width >= 1:
+                widths.add(width)
+        return widths
+
     def _dp_plan_ray_windows(
         self, plan: PhysicalPlan, blocks: Iterable[Tuple[Any, ...]]
     ) -> Dict[int, float]:
@@ -5095,12 +5126,20 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 if plan is not None
                 else {}
             )
-            return self._replay_concurrency_aware_objective(
-                block_specs,
-                ops,
-                workers=max(1, scored_workers),
-                window_bytes_by_mask=windows,
-            ).score
+            previous_widths = getattr(self, "_dp_scoring_required_widths", None)
+            if plan is not None:
+                self._dp_scoring_required_widths = self._dp_plan_stage_widths(
+                    plan
+                )
+            try:
+                return self._replay_concurrency_aware_objective(
+                    block_specs,
+                    ops,
+                    workers=max(1, scored_workers),
+                    window_bytes_by_mask=windows,
+                ).score
+            finally:
+                self._dp_scoring_required_widths = previous_widths
         return self._replay_dp_objective(block_specs, ops).score
 
     def run(
