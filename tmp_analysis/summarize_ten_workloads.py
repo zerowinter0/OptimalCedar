@@ -16,8 +16,10 @@ print(f"state={payload.get('state')} current={payload.get('current')}")
 workloads = sorted({key.split(":")[0] for key in cells if ":" in key})
 optimizers = sorted({key.split(":", 1)[1] for key in cells if ":" in key})
 short = {
-    "dj_two_stage_optimizer": "DJ+Cedar",
-    "pecan_two_stage_optimizer": "Pecan+Cedar",
+    "dj_optimizer": "DJ+Cedar",
+    "pecan_optimizer": "Pecan+Cedar",
+    "dj_two_stage_optimizer": "DJ+Cedar(2s)",
+    "pecan_two_stage_optimizer": "Pecan+Cedar(2s)",
     "plumber_optimizer": "Plumber",
     "raydata_optimizer": "RayData",
     "optimizer": "Cedar",

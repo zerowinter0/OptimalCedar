@@ -4275,7 +4275,10 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         ):
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
-            ) / block.parallelism + boundary_parallel
+            ) / (
+                block.parallelism
+                * self._dp_stage_concurrency(block.variant)
+            ) + boundary_parallel
             if self._dp_concurrency_aware_enabled():
                 # A Ray stage is submitted per record, so its lane service and
                 # driver-side marshalling form the record's offload path; the
@@ -4324,7 +4327,10 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         if block.variant == PipeVariantType.SMP:
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
-            ) / block.parallelism + boundary_parallel
+            ) / (
+                block.parallelism
+                * self._dp_stage_concurrency(block.variant)
+            ) + boundary_parallel
             if self._dp_concurrency_aware_enabled():
                 # An SMP stage owns its processes and pipelines next to the
                 # worker chain; the measured worker-side service of an SMP
@@ -4646,6 +4652,33 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         # Aggregate rate <= bandwidth / bytes, and the plan runs W workers.
         return bytes_per_record * workers / bandwidth * 1000.0
 
+    def _dp_stage_concurrency(self, variant) -> float:
+        """Effective per-actor overlap factor of a parallel stage.
+
+        The isolated calibration measures one operator with one worker and one
+        record per submission.  A real stage receives batched submissions and
+        keeps several of them in flight, so its achieved per-record cost is a
+        fraction of the sum of the isolated per-operator costs.  The factor is
+        fitted from measured plans (``tmp_analysis/fit_stage_concurrency.py``)
+        and defaults to 1.0, i.e. the historical isolated-cost model.
+        """
+        if variant in (
+            PipeVariantType.RAY,
+            PipeVariantType.TF_RAY,
+        ):
+            raw = os.environ.get("CEDAR_DP_STAGE_CONCURRENCY_RAY", "1")
+        elif variant == PipeVariantType.SMP:
+            raw = os.environ.get("CEDAR_DP_STAGE_CONCURRENCY_SMP", "1")
+        else:
+            return 1.0
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return 1.0
+        if not math.isfinite(value) or value <= 0.0:
+            return 1.0
+        return value
+
     def _dp_cross_host_byte_model(self) -> Optional[Dict[str, float]]:
         """In-plan cross-host payload budget parameters.
 
@@ -4891,7 +4924,10 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 stage_bytes = self._dp_stage_transport_bytes(prev_mask, block)
                 stage_compute = (
                     block.cost * self._dp_stage_factor(variant)
-                ) / max(1, block.parallelism)
+                ) / (
+                    max(1, block.parallelism)
+                    * self._dp_stage_concurrency(variant)
+                )
                 round_trip = self._dp_cross_host_round_trip_ms(stage_bytes)
                 offload_path = (
                     stage_compute
@@ -4970,7 +5006,10 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             elif variant == PipeVariantType.SMP:
                 smp_cost = (
                     (block.cost * self._dp_stage_factor(variant))
-                    / max(1, block.parallelism)
+                    / (
+                        max(1, block.parallelism)
+                        * self._dp_stage_concurrency(variant)
+                    )
                     + boundary_parallel
                     + boundary_local
                 )

@@ -99,9 +99,13 @@ WORKLOADS = [
     ),
 ]
 
+# Cedar's staged optimizer with the Data-Juicer / Pecan reorder policies
+# ("dj-cedar" and "pecan-cedar").  The *_two_stage_* spellings are a different
+# system (policy reorder followed by brute-force physical enumeration) and are
+# deliberately not part of the comparison.
 OPTIMIZERS = [
-    "dj_two_stage_optimizer",
-    "pecan_two_stage_optimizer",
+    "dj_optimizer",
+    "pecan_optimizer",
     "plumber_optimizer",
     "raydata_optimizer",
     "optimizer",
