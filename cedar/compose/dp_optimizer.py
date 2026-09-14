@@ -4888,16 +4888,16 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                     block.cost + boundary_parallel
                 )
             elif variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+                stage_bytes = self._dp_stage_transport_bytes(prev_mask, block)
+                stage_compute = (
+                    block.cost * self._dp_stage_factor(variant)
+                ) / max(1, block.parallelism)
+                round_trip = self._dp_cross_host_round_trip_ms(stage_bytes)
                 offload_path = (
-                    (
-                        block.cost * self._dp_stage_factor(variant)
-                    )
-                    / max(1, block.parallelism)
+                    stage_compute
                     + boundary_parallel
                     + boundary_local
-                    + self._dp_cross_host_round_trip_ms(
-                        self._dp_stage_transport_bytes(prev_mask, block)
-                    )
+                    + round_trip
                 )
                 transport_floor = self._dp_transport_floor_ms(
                     self._dp_stage_transport_bytes(prev_mask, block),
@@ -4930,6 +4930,35 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 )
                 if scaled_floor is not None:
                     transport_floor = scaled_floor
+                if os.environ.get("CEDAR_DP_REPLAY_TRACE") == "1":
+                    print(
+                        "[replay] ops=%s variant=%s width=%s bytes=%.0f "
+                        "compute/w=%.3f bnd_local=%.3f bnd_par=%.3f rtt=%.3f "
+                        "offload=%.3f floor=%.3f charged=%.3f windowMB=%.1f"
+                        % (
+                            [inner_ops[i] for i in order],
+                            variant.name,
+                            block.parallelism,
+                            stage_bytes,
+                            stage_compute,
+                            boundary_local,
+                            boundary_parallel,
+                            round_trip,
+                            offload_path,
+                            transport_floor,
+                            max(offload_path, transport_floor),
+                            ((window_bytes_by_mask or {}).get(block.mask, 0.0)
+                             or self._dp_ray_window_bytes(
+                                 block.order,
+                                 block.parallelism,
+                                 declared_inflight=_DP_DECLARED_RAY_INFLIGHT,
+                                 stage_bytes=self._dp_order_transport_bytes(
+                                     block.order
+                                 ),
+                             )) / 1e6,
+                        ),
+                        flush=True,
+                    )
                 # The record's offload path sits on the same critical path as
                 # the worker chain (the driver serializes the payload, ships it
                 # and consumes the result for that record), so it is charged to
@@ -4939,13 +4968,29 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 local += max(offload_path, transport_floor)
                 ray += offload_path
             elif variant == PipeVariantType.SMP:
-                smp = max(
-                    smp,
+                smp_cost = (
                     (block.cost * self._dp_stage_factor(variant))
                     / max(1, block.parallelism)
                     + boundary_parallel
-                    + boundary_local,
+                    + boundary_local
                 )
+                if os.environ.get("CEDAR_DP_REPLAY_TRACE") == "1":
+                    print(
+                        "[replay] ops=%s variant=SMP width=%s bytes=%.0f "
+                        "compute/w=%.3f bnd_local=%.3f bnd_par=%.3f stage=%.3f"
+                        % (
+                            [inner_ops[i] for i in order],
+                            block.parallelism,
+                            self._dp_stage_transport_bytes(prev_mask, block),
+                            (block.cost * self._dp_stage_factor(variant))
+                            / max(1, block.parallelism),
+                            boundary_local,
+                            boundary_parallel,
+                            smp_cost,
+                        ),
+                        flush=True,
+                    )
+                smp = max(smp, smp_cost)
             else:
                 local += block.cost
             prev_mask |= block.mask
@@ -5210,7 +5255,15 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
 
     def _dp_worker_search_candidates(self) -> List[int]:
         """Worker counts to try when the DP also chooses the shuffle width."""
-        raw = os.environ.get("CEDAR_WORKER_SEARCH_SET", "1,2,4,8,16,32")
+        # Powers of two only missed the worker counts that make a
+        # one-process-per-worker parallel stage feasible: Cedar's own rule
+        # lands on counts like 21 (one reserved CPU plus one slot per worker),
+        # and the DP could not represent that plan at all.  Search a denser
+        # ladder and let the worker-search time budget cut it short.
+        raw = os.environ.get(
+            "CEDAR_WORKER_SEARCH_SET",
+            "1,2,3,4,5,6,7,8,10,12,14,16,21,24,28,32,40,48,56,64",
+        )
         candidates: List[int] = []
         for token in str(raw).split(","):
             token = token.strip()

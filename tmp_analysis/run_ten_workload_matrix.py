@@ -59,7 +59,9 @@ ENTRY = REFERENCE / "entry.py"
 MANIFESTS = ROOT / "datasets/target_pipeline_bench"
 TARGET = "evaluation/pipelines/target_pipeline"
 
-# name -> (dataset file, [dataset kwargs], samples)
+# name -> (dataset file, [dataset kwargs], samples[, dataset_func])
+# ``dataset_func`` defaults to ``get_dataset``; the Data-Juicer Hub recipe
+# modules only export ``get_target_dataset``.
 WORKLOADS = [
     ("simclr", f"{TARGET}/simclr/cedar_dataset.py", ["workload=simclr"], 8000),
     ("blip", f"{TARGET}/blip/cedar_dataset.py",
@@ -73,11 +75,28 @@ WORKLOADS = [
     ("alpaca_cot", "evaluation/pipelines/alpaca_cot/cedar_dataset.py", [], 20000),
     ("pile_hackernews", "evaluation/pipelines/pile_hackernews/cedar_dataset.py", [],
      20000),
-    ("pile_pubmed_abstracts",
-     f"{TARGET}/hub/pile_pubmed_abstracts/cedar_dataset.py", [], 20000),
-    ("pile_uspto_backgrounds",
-     f"{TARGET}/hub/pile_uspto_backgrounds/cedar_dataset.py", [], 20000),
-    ("bloom_oscar", "evaluation/pipelines/bloom_oscar/cedar_dataset.py", [], 20000),
+    (
+        "pile_pubmed_abstracts",
+        f"{TARGET}/hub/pile_pubmed_abstracts/cedar_dataset.py",
+        [],
+        20000,
+        "get_target_dataset",
+    ),
+    (
+        "pile_uspto_backgrounds",
+        f"{TARGET}/hub/pile_uspto_backgrounds/cedar_dataset.py",
+        [],
+        20000,
+        "get_target_dataset",
+    ),
+    (
+        "bloom_oscar",
+        "evaluation/pipelines/bloom_oscar/cedar_dataset.py",
+        # The default path inside the data-juicer checkout does not exist on
+        # this host; the benchmark copy lives under datasets/.
+        [f"dataset_path={ROOT}/datasets/bloom_oscar/c4_en_50000_for_bloom_oscar.jsonl"],
+        20000,
+    ),
 ]
 
 OPTIMIZERS = [
@@ -187,10 +206,11 @@ def run(command, log_path, env, timeout):
     return code, timed_out, round(time.time() - started, 1)
 
 
-def profile_command(dataset_file, kwargs, samples, profile_path):
+def profile_command(dataset_file, kwargs, samples, profile_path, dataset_func="get_dataset"):
     command = [
         sys.executable, "-u", str(ENTRY), "evaluation/eval_cedar.py",
         "--dataset_file", dataset_file,
+        "--dataset_func", dataset_func,
         "--batch_size", "4",
         "--num_total_samples", str(samples),
         "--run_profiling",
@@ -227,10 +247,19 @@ def profile_env():
     return env
 
 
-def cell_command(dataset_file, kwargs, samples, profile_path, optimizer, results):
+def cell_command(
+    dataset_file,
+    kwargs,
+    samples,
+    profile_path,
+    optimizer,
+    results,
+    dataset_func="get_dataset",
+):
     command = [
         sys.executable, "-u", str(ENTRY), "evaluation/compare_optimizer_perf.py",
         "--dataset_file", dataset_file,
+        "--dataset_func", dataset_func,
         "--batch_size", "4",
         "--num_total_samples", str(samples),
         "--full_data_run",
@@ -283,15 +312,17 @@ def main():
         shutil.copytree(REFERENCE / "modules", out / "modules")
 
     workloads = [
-        w for w in WORKLOADS if args.workloads is None or w[0] in args.workloads
+        (w + ("get_dataset",)) if len(w) == 4 else w
+        for w in WORKLOADS
+        if args.workloads is None or w[0] in args.workloads
     ]
     if args.samples is not None:
-        workloads = [(n, d, k, args.samples) for n, d, k, _ in workloads]
+        workloads = [(n, d, k, args.samples, f) for n, d, k, _, f in workloads]
     optimizers = args.optimizers or OPTIMIZERS
     summary = {}
     write_status(out, "starting", None, summary)
 
-    for name, dataset_file, kwargs, samples in workloads:
+    for name, dataset_file, kwargs, samples, dataset_func in workloads:
         profile_path = out / "profiles" / f"{name}_profile.yaml"
         if not profile_path.is_file():
             if name in REUSE_PROFILE and REUSE_PROFILE[name].is_file() and not args.reprofile:
@@ -299,7 +330,9 @@ def main():
                 log_line(f"{name}: reused profile {REUSE_PROFILE[name].name}")
             else:
                 write_status(out, f"profile:{name}", None, summary)
-                command = profile_command(dataset_file, kwargs, samples, profile_path)
+                command = profile_command(
+                    dataset_file, kwargs, samples, profile_path, dataset_func
+                )
                 code, timed_out, seconds = run(
                     command,
                     out / "logs" / f"profile_{name}.log",
@@ -326,7 +359,13 @@ def main():
             log_path = out / "logs" / f"{name}__{optimizer}.log"
             write_status(out, f"run:{key}", key, summary)
             command = cell_command(
-                dataset_file, kwargs, samples, profile_path, optimizer, results
+                dataset_file,
+                kwargs,
+                samples,
+                profile_path,
+                optimizer,
+                results,
+                dataset_func,
             )
             code, timed_out, seconds = run(
                 command, log_path, cell_env(), CELL_TIMEOUT_SEC
