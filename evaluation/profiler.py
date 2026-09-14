@@ -64,8 +64,19 @@ class Profiler:
             for _ in range(self.num_epochs):
                 curr_epoch_samples = 0
                 for x in self.dataset:
-                    curr_total_samples += self.batch_size
-                    curr_epoch_samples += self.batch_size
+                    # Count the records the sink actually received.  Adding
+                    # ``batch_size`` per yielded *batch* double counts when the
+                    # sink yields one record per batch (which is what the
+                    # drained full-pass protocol produces), so prefer the
+                    # item's length when it exposes one.
+                    try:
+                        received = len(x)
+                    except TypeError:
+                        received = 0
+                    if not isinstance(received, int) or received < 1:
+                        received = self.batch_size
+                    curr_total_samples += received
+                    curr_epoch_samples += received
                     if (
                         self.num_total_samples
                         and curr_total_samples >= self.num_total_samples

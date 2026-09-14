@@ -1,0 +1,27 @@
+[
+  {
+    "plan": "A_dp_saved",
+    "total_time_sec": 7.952,
+    "time_per_sample_us": 839.808
+  },
+  {
+    "plan": "B_old_saved",
+    "total_time_sec": 8.692,
+    "time_per_sample_us": 917.946
+  },
+  {
+    "plan": "C_dp_order_old_widths",
+    "total_time_sec": 8.407,
+    "time_per_sample_us": 887.874
+  },
+  {
+    "plan": "D_old_order_dp_widths",
+    "total_time_sec": 8.251,
+    "time_per_sample_us": 871.397
+  },
+  {
+    "plan": "E_dp_order_no_extra_stage",
+    "total_time_sec": 8.835,
+    "time_per_sample_us": 933.055
+  }
+]

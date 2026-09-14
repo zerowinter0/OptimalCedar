@@ -1,0 +1,442 @@
+{
+  "alpaca_cot": {
+    "label": "Alpaca-CoT",
+    "metadata_source": "alpaca_cot/metadata.txt",
+    "operator_count": 8,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 25.435140785994008,
+        "label": "DJ",
+        "result_source": "alpaca_cot/results/round1__dj_optimizer.json",
+        "setup_sec": 2.7170076959882863,
+        "setup_source": "alpaca_cot/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 24.844344398006797,
+        "label": "PICO",
+        "result_source": "alpaca_cot/results/round1__dp_optimizer.json",
+        "setup_sec": 23.919772159017157,
+        "setup_source": "alpaca_cot/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 25.277770560991485,
+        "label": "Pecan",
+        "result_source": "alpaca_cot/results/round1__pecan_optimizer.json",
+        "setup_sec": 2.684267111006193,
+        "setup_source": "alpaca_cot/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 26.1771992710419,
+        "label": "Simple-DP",
+        "result_source": "alpaca_cot/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 2.720014786988031,
+        "setup_source": "alpaca_cot/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 60000
+  },
+  "coco": {
+    "label": "COCO",
+    "metadata_source": "coco/metadata.txt",
+    "operator_count": 6,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": null,
+        "label": "DJ",
+        "result_source": "coco/results/round1__dj_optimizer.timeout.json",
+        "setup_sec": 2.6054515640134923,
+        "setup_source": "coco/warmup_results/plan_only__dj_optimizer.json",
+        "status": "execution_timeout"
+      },
+      "dp_optimizer": {
+        "execution_sec": 881.5596801810316,
+        "label": "PICO",
+        "result_source": "coco/results/round1__dp_optimizer.json",
+        "setup_sec": 2.833444331015926,
+        "setup_source": "coco/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": null,
+        "label": "Pecan",
+        "result_source": "coco/results/round1__pecan_optimizer.timeout.json",
+        "setup_sec": 2.6436090979841538,
+        "setup_source": "coco/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "execution_timeout"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 876.4060795819969,
+        "label": "Simple-DP",
+        "result_source": "coco/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 2.6498039700090885,
+        "setup_source": "coco/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 118287
+  },
+  "commonvoice": {
+    "label": "CommonVoice",
+    "metadata_source": "commonvoice/metadata.txt",
+    "operator_count": 7,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 1259.8383855769644,
+        "label": "DJ",
+        "result_source": "commonvoice/results/round1__dj_optimizer.json",
+        "setup_sec": 2.548172643990256,
+        "setup_source": "commonvoice/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 564.843208729988,
+        "label": "PICO",
+        "result_source": "commonvoice/results/round1__dp_optimizer.json",
+        "setup_sec": 2.680982800957281,
+        "setup_source": "commonvoice/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 1260.1128717100364,
+        "label": "Pecan",
+        "result_source": "commonvoice/results/round1__pecan_optimizer.json",
+        "setup_sec": 2.5897784819826484,
+        "setup_source": "commonvoice/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 1277.2703132780152,
+        "label": "Simple-DP",
+        "result_source": "commonvoice/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 2.54388802300673,
+        "setup_source": "commonvoice/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 240000
+  },
+  "pile_hackernews": {
+    "label": "HackerNews",
+    "metadata_source": "pile_hackernews/metadata.txt",
+    "operator_count": 18,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 2075.4337627209607,
+        "label": "DJ",
+        "result_source": "pile_hackernews/results/round1__dj_optimizer.json",
+        "setup_sec": 3.031132025993429,
+        "setup_source": "pile_hackernews/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 1308.0533564370126,
+        "label": "PICO",
+        "result_source": "pile_hackernews/results/round1__dp_optimizer.json",
+        "setup_sec": 350.3693528159638,
+        "setup_source": "pile_hackernews/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 1832.6989657550002,
+        "label": "Pecan",
+        "result_source": "pile_hackernews/results/round1__pecan_optimizer.json",
+        "setup_sec": 3.04694809805369,
+        "setup_source": "pile_hackernews/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 2419.904292976018,
+        "label": "Simple-DP",
+        "result_source": "pile_hackernews/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 40.654625194030814,
+        "setup_source": "pile_hackernews/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 99540
+  },
+  "pile_pubmed_abstracts": {
+    "label": "PubMed",
+    "metadata_source": "pile_pubmed_abstracts/metadata.txt",
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 474.69852743000956,
+        "label": "DJ",
+        "result_source": "pile_pubmed_abstracts/results/round1__dj_optimizer.json",
+        "setup_sec": 3.199834194034338,
+        "setup_source": "pile_pubmed_abstracts/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 314.76910107495496,
+        "label": "PICO",
+        "result_source": "pile_pubmed_abstracts/results/round1__dp_optimizer.json",
+        "setup_sec": 309.0711253719637,
+        "setup_source": "pile_pubmed_abstracts/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 452.69774055399466,
+        "label": "Pecan",
+        "result_source": "pile_pubmed_abstracts/results/round1__pecan_optimizer.json",
+        "setup_sec": 3.2031046230113134,
+        "setup_source": "pile_pubmed_abstracts/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 629.7539574520197,
+        "label": "Simple-DP",
+        "result_source": "pile_pubmed_abstracts/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 49.038064640015364,
+        "setup_source": "pile_pubmed_abstracts/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 96785
+  },
+  "pile_uspto_backgrounds": {
+    "label": "USPTO",
+    "metadata_source": "pile_uspto_backgrounds/metadata.txt",
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 522.0262827510014,
+        "label": "DJ",
+        "result_source": "pile_uspto_backgrounds/results/round1__dj_optimizer.json",
+        "setup_sec": 3.2054577919770963,
+        "setup_source": "pile_uspto_backgrounds/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 398.4373729689978,
+        "label": "PICO",
+        "result_source": "pile_uspto_backgrounds/results/round1__dp_optimizer.json",
+        "setup_sec": 308.58684469398577,
+        "setup_source": "pile_uspto_backgrounds/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 552.5614374940051,
+        "label": "Pecan",
+        "result_source": "pile_uspto_backgrounds/results/round1__pecan_optimizer.json",
+        "setup_sec": 3.2088102900306694,
+        "setup_source": "pile_uspto_backgrounds/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 871.734888528008,
+        "label": "Simple-DP",
+        "result_source": "pile_uspto_backgrounds/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 48.70007118297508,
+        "setup_source": "pile_uspto_backgrounds/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 50000
+  },
+  "redpajama_code": {
+    "label": "RP-Code",
+    "metadata_source": "redpajama_code/metadata.txt",
+    "operator_count": 17,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 459.4011709530023,
+        "label": "DJ",
+        "result_source": "redpajama_code/results/round1__dj_optimizer.json",
+        "setup_sec": 2.985284459020477,
+        "setup_source": "redpajama_code/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": null,
+        "label": "PICO",
+        "result_source": "redpajama_code/plans/dp_optimizer.unavailable.json",
+        "setup_sec": 360.0,
+        "setup_source": null,
+        "status": "plan_timeout"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 462.5000440120348,
+        "label": "Pecan",
+        "result_source": "redpajama_code/results/round1__pecan_optimizer.json",
+        "setup_sec": 3.0179706959752366,
+        "setup_source": "redpajama_code/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 391.59734901197953,
+        "label": "Simple-DP",
+        "result_source": "redpajama_code/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 4.529132857976947,
+        "setup_source": "redpajama_code/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 61249
+  },
+  "simclrv2": {
+    "label": "SimCLR-v2",
+    "metadata_source": "simclrv2/metadata.txt",
+    "operator_count": 9,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 56.047618977027014,
+        "label": "DJ",
+        "result_source": "simclrv2/results/round1__dj_optimizer.json",
+        "setup_sec": 2.532933075039182,
+        "setup_source": "simclrv2/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 9.64728599297814,
+        "label": "PICO",
+        "result_source": "simclrv2/results/round1__dp_optimizer.json",
+        "setup_sec": 6.343081925006118,
+        "setup_source": "simclrv2/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 56.020590025000274,
+        "label": "Pecan",
+        "result_source": "simclrv2/results/round1__pecan_optimizer.json",
+        "setup_sec": 2.551530828990508,
+        "setup_source": "simclrv2/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 28.07736215100158,
+        "label": "Simple-DP",
+        "result_source": "simclrv2/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 2.7878346490324475,
+        "setup_source": "simclrv2/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 9469
+  },
+  "simclrv2_cache": {
+    "label": "SimCLR-v2 [Cache]",
+    "metadata_source": "simclrv2_cache/metadata.txt",
+    "operator_count": 9,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 54.908220164012164,
+        "label": "DJ",
+        "result_source": "simclrv2_cache/results/round1__dj_optimizer.json",
+        "setup_sec": 2.5434961519786157,
+        "setup_source": "simclrv2_cache/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 8.375577091996092,
+        "label": "PICO",
+        "result_source": "simclrv2_cache/results/round1__dp_optimizer.json",
+        "setup_sec": 154.59331663697958,
+        "setup_source": "simclrv2_cache/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 19.525687079003546,
+        "label": "Pecan",
+        "result_source": "simclrv2_cache/results/round1__pecan_optimizer.json",
+        "setup_sec": 2.546130931004882,
+        "setup_source": "simclrv2_cache/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 6.016374847968109,
+        "label": "Simple-DP",
+        "result_source": "simclrv2_cache/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 2.7557772989966907,
+        "setup_source": "simclrv2_cache/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 9469
+  },
+  "stackexchange": {
+    "label": "StackExchange",
+    "metadata_source": "stackexchange/metadata.txt",
+    "operator_count": 19,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 1764.4287139200023,
+        "label": "DJ",
+        "result_source": "stackexchange/results/round1__dj_optimizer.json",
+        "setup_sec": 3.06749662803486,
+        "setup_source": "stackexchange/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 1117.0646646899986,
+        "label": "PICO",
+        "result_source": "stackexchange/results/round1__dp_optimizer.json",
+        "setup_sec": 312.06767093599774,
+        "setup_source": "stackexchange/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 2075.425955640967,
+        "label": "Pecan",
+        "result_source": "stackexchange/results/round1__pecan_optimizer.json",
+        "setup_sec": 2.9365102499723434,
+        "setup_source": "stackexchange/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 1125.1340956380009,
+        "label": "Simple-DP",
+        "result_source": "stackexchange/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 52.11480366298929,
+        "setup_source": "stackexchange/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 200000
+  },
+  "wikitext103_cache": {
+    "label": "WikiText-103 [Cache]",
+    "metadata_source": "wikitext103_cache/metadata.txt",
+    "operator_count": 9,
+    "optimizers": {
+      "dj_optimizer": {
+        "execution_sec": 303.24209894199157,
+        "label": "DJ",
+        "result_source": "wikitext103_cache/results/round1__dj_optimizer.json",
+        "setup_sec": 7.72402082500048,
+        "setup_source": "wikitext103_cache/warmup_results/plan_only__dj_optimizer.json",
+        "status": "success"
+      },
+      "dp_optimizer": {
+        "execution_sec": 309.2007186849951,
+        "label": "PICO",
+        "result_source": "wikitext103_cache/results/round1__dp_optimizer.json",
+        "setup_sec": 25.48276091599837,
+        "setup_source": "wikitext103_cache/warmup_results/plan_only__dp_optimizer.json",
+        "status": "success"
+      },
+      "pecan_optimizer": {
+        "execution_sec": 306.6282677280251,
+        "label": "Pecan",
+        "result_source": "wikitext103_cache/results/round1__pecan_optimizer.json",
+        "setup_sec": 7.787656697968487,
+        "setup_source": "wikitext103_cache/warmup_results/plan_only__pecan_optimizer.json",
+        "status": "success"
+      },
+      "simple_dp_optimizer": {
+        "execution_sec": 293.3293465930037,
+        "label": "Simple-DP",
+        "result_source": "wikitext103_cache/results/round1__simple_dp_optimizer.json",
+        "setup_sec": 7.768350428028498,
+        "setup_source": "wikitext103_cache/warmup_results/plan_only__simple_dp_optimizer.json",
+        "status": "success"
+      }
+    },
+    "samples": 500000
+  }
+}

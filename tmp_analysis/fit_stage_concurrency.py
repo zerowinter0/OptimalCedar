@@ -31,7 +31,28 @@ from cedar.compose import OptimizerOptions  # noqa: E402
 from cedar.compose.dp_optimizer import DpOptimizer  # noqa: E402
 from cedar.compose.optimizer import PhysicalPlan  # noqa: E402
 
+
+# Records in each workload's data set: a drained full pass processes each one
+# exactly once (verified with per-operator call counters: parse_and_format
+# calls == file lines), while the harness's sample counter can be inflated by
+# its per-batch accounting, so the audit derives throughput from these counts.
+WORKLOAD_RECORDS = {
+    "simclr": 9469,
+    "blip": 1000,
+    "clip": 1000,
+    "dino": 1000,
+    "alpaca_cot": 74771,
+    "pile_hackernews": 100000,
+    "pile_pubmed_abstracts": 100000,
+    "pile_uspto_backgrounds": 100000,
+    "bloom_oscar": 50000,
+}
+DRAINED_RUN = "pico_drained_20260914"
+
 RUNS = [
+    # Drained full-pass measurements take precedence: stop-at-N runs report
+    # the time to fill a deep in-flight window for buffered plans.
+    ROOT / "outputs/pico_drained_20260914",
     ROOT / "outputs/pico_ten_workloads_20260913b",
     ROOT / "outputs/pico_djpecan_20260914",
     ROOT / "outputs/pico_missing_20260914",
@@ -121,7 +142,7 @@ def build_feature(workload: str, profile: Path):
 def collect_plans(workload: str):
     """(planner, plan dict, measured throughput) for one workload."""
     found = {}
-    for run in RUNS:
+    for run in reversed(RUNS):
         results = run / "results"
         if not results.is_dir():
             continue
@@ -147,7 +168,11 @@ def collect_plans(workload: str):
                 pipe.setdefault(
                     "variant_ctx", {"variant_type": pipe["variant"]}
                 )
-            found[planner] = (plan, samples / perf)
+            records = WORKLOAD_RECORDS.get(workload)
+            if DRAINED_RUN in str(path) and records:
+                found[planner] = (plan, records / perf)
+            else:
+                found[planner] = (plan, samples / perf)
     return found
 
 
@@ -216,6 +241,26 @@ def main() -> None:
         names = sorted(plans)
         measured = [plans[name][1] for name in names]
         print(f"\n=== {workload}  ({len(names)} plans)")
+        # Per-plan comparison first, under the environment's current basis.
+        os.environ.setdefault("CEDAR_DP_STAGE_CONCURRENCY_RAY", "1")
+        os.environ.setdefault("CEDAR_DP_STAGE_CONCURRENCY_SMP", "1")
+        basis = os.environ.get("CEDAR_DP_STAGE_CURVE_COST", "0")
+        print(f"basis: stage_curve={basis}")
+        print(
+            f"{'planner':<30}{'W':>4}{'measured':>10}{'predicted':>11}"
+            f"{'ratio':>7}"
+        )
+        for name in names:
+            plan_dict, throughput = plans[name]
+            plan = PhysicalPlan.from_dict(plan_dict)
+            workers = max(1, int(plan.n_local_workers or 1))
+            score = optimizer.calculate_dp_objective_cost(plan=plan)
+            predicted = 1000.0 * workers / score if score > 0 else float("inf")
+            ratio = predicted / throughput if throughput else float("nan")
+            print(
+                f"{name:<30}{workers:>4}{throughput:>10.0f}"
+                f"{predicted:>11.0f}{ratio:>7.2f}"
+            )
         header = f"{'gamma':>8} {'rho':>6}  model best / measured best"
         print(header)
         best_gamma, best_rho = None, -2.0

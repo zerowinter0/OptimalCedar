@@ -1,0 +1,32 @@
+[
+  {
+    "plan": "B_old_saved",
+    "total_time_sec": 8.838,
+    "time_per_sample_us": 933.328
+  },
+  {
+    "plan": "A_dp_saved",
+    "total_time_sec": 8.739,
+    "time_per_sample_us": 922.857
+  },
+  {
+    "plan": "F_cedar_saved",
+    "error": "no summary",
+    "log": "/workspace/OptimalCedar/tmp_analysis/logs/F_cedar_saved.log"
+  },
+  {
+    "plan": "G_cm_saved",
+    "total_time_sec": 17.536,
+    "time_per_sample_us": 1851.917
+  },
+  {
+    "plan": "A_dp_saved",
+    "total_time_sec": 8.489,
+    "time_per_sample_us": 896.481
+  },
+  {
+    "plan": "B_old_saved",
+    "total_time_sec": 8.89,
+    "time_per_sample_us": 938.899
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "plan": "A_dp_saved",
+    "total_time_sec": 9.49,
+    "time_per_sample_us": 1002.266
+  },
+  {
+    "plan": "B_old_saved",
+    "total_time_sec": 8.725,
+    "time_per_sample_us": 921.437
+  },
+  {
+    "plan": "A_dp_saved",
+    "total_time_sec": 8.488,
+    "time_per_sample_us": 896.452
+  }
+]

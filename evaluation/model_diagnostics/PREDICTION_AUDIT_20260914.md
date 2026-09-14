@@ -96,6 +96,38 @@ composition.  This is the regime the current model was built for.
 
 ## Can we predict any plan on any workload?
 
+## Update — the text-workload measurements were a harness artefact
+
+An operator-call counter (`CEDAR_RAY_ACTOR_PYTHONPATH` + a `sitecustomize`
+that logs every call) settles the alpaca case.  For a 200-record request:
+
+| plan | `FlaggedWordsFilter` calls | its CPU time | harness epoch |
+|---|---|---|---|
+| unoptimized local (W=4) | 268 | 5.10 s | 0.23 s |
+| Cedar fused-Ray (W=1, 1 actor) | 2245 | 50.94 s | **0.042 s** |
+
+The fused plan does **11× more work than the request** and burns 51 s of CPU
+while the harness reports 0.042 s: with a deep in-flight window the sink
+receives records from the buffer long before the stage has processed the
+queue, and the run is torn down with thousands of records still in flight
+(`issued=5945, completed=1500` on one worker).  The harness's "total time"
+therefore measures *buffer fill*, not throughput, whenever the source
+outruns the stage.
+
+Fix: measure a **drained full pass** (`--num_total_samples 0`, iterate to
+exhaustion so the sink blocks until the pipeline is empty).  The same three
+alpaca plans under that protocol:
+
+| plan | W | wall (74.7k records) | per-record |
+|---|---|---|---|
+| Cedar fused-Ray | 32 | 34.4 s | 0.46 ms |
+| dj-cedar | 32 | 35.4 s | 0.47 ms |
+| PICO (Ray[4,7] + SMP) | 8 | 65.8 s | 0.88 ms |
+
+The 31× gap collapses to 1.9×, and the model's per-worker score for Cedar's
+plan (16.9 ms) now matches the measurement (0.46 ms × 32 = 14.7 ms) within
+15%.  All headline comparisons must use this protocol.
+
 Yes, under three conditions.
 
 1. **Measure every cost in the form the plan executes it.**  A stage cost must

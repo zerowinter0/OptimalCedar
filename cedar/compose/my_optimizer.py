@@ -3,7 +3,7 @@ import math
 import os
 import statistics
 from collections import deque
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from .optimizer import (
     Optimizer,
@@ -460,6 +460,64 @@ class MyOptimizer(Optimizer):
         # Extrapolation is deliberately conservative: use the nearest measured
         # per-actor latency rather than assuming continued linear speedup.
         return (lower[-1] if lower else upper[0])[1]
+
+    def _dp_scaling_max_width(self, entry: Any) -> Optional[int]:
+        """Largest width at which this operator's stage curve was measured."""
+        if not isinstance(entry, dict):
+            return None
+        raw_widths = entry.get("widths")
+        timings = raw_widths if isinstance(raw_widths, dict) else None
+        if timings is None:
+            adaptive = entry.get("adaptive_profile", {})
+            if isinstance(adaptive, dict) and "width" in adaptive:
+                timings = {adaptive["width"]: entry}
+        if not isinstance(timings, dict):
+            return None
+        widths = []
+        for raw_width, timing in timings.items():
+            if not isinstance(timing, dict):
+                continue
+            try:
+                width = int(raw_width)
+            except (TypeError, ValueError):
+                continue
+            if width >= 1:
+                widths.append(width)
+        return max(widths) if widths else None
+
+    def _dp_block_measured_width_cap(
+        self, variant: PipeVariantType, order: Iterable[int]
+    ) -> Optional[int]:
+        """Width beyond which a fused parallel stage has no measurement.
+
+        A stage is only as fast as its slowest operator, so the cap is the
+        minimum of the operators' measured ranges.  Without it the model
+        extrapolates the width division past the last measured point: Plumber's
+        SimCLRv2 text plan asks for 62 processes for one filter, is charged
+        ``service / 62``, and is predicted 4.6x faster than it runs.
+        """
+        key = (
+            PipeVariantType.RAY.name
+            if variant == PipeVariantType.TF_RAY
+            else variant.name
+        )
+        entries = (
+            self.profiled_stats.get("physical_model", {})
+            .get("scaling", {})
+            .get(key, {})
+        )
+        if not isinstance(entries, dict):
+            return None
+        caps = []
+        for idx in order:
+            p_id = self._dp_inner_ops[idx]
+            entry = entries.get(p_id, entries.get(str(p_id)))
+            cap = self._dp_scaling_max_width(entry)
+            if cap is not None:
+                caps.append(cap)
+        if not caps:
+            return None
+        return min(caps)
 
     def _dp_pipe_cost_at_parallelism(
         self,

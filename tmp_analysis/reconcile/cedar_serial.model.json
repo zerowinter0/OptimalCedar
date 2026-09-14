@@ -1,0 +1,91 @@
+{
+  "plan": "cedar_serial",
+  "profile": "outputs/plumber_bench_20260912/simclr_profile.yaml",
+  "path": [
+    9,
+    8,
+    3,
+    6,
+    11,
+    0,
+    10
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.845150731707317,
+      "compute_per_width": 1.845150731707317,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 1.845150731707317
+    },
+    {
+      "mask": 32,
+      "ops": [
+        3
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.9948260899433008,
+      "compute_per_width": 0.9948260899433008,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.9948260899433008
+    },
+    {
+      "mask": 4,
+      "ops": [
+        6
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 4.246440813770765,
+      "compute_per_width": 4.246440813770765,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 4.246440813770765
+    },
+    {
+      "mask": 218,
+      "ops": [
+        2,
+        5,
+        4,
+        7,
+        1
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 5.79571625927477,
+      "compute_per_width": 5.79571625927477,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 5.79571625927477
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.027444728177273774,
+      "compute_per_width": 0.027444728177273774,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.027444728177273774
+    }
+  ],
+  "stages": [
+    8,
+    3,
+    6,
+    11,
+    0
+  ]
+}

@@ -1,0 +1,124 @@
+physical_plan:
+  graph:
+    0: '11'
+    3: '10'
+    8: '3'
+    9: '8'
+    10: '0'
+    11: ''
+  n_local_workers: 8
+  pipes:
+    0:
+      execution_resource: cpu
+      name: BatcherPipe(batch_size=1)
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    1:
+      execution_resource: cpu
+      name: MapperPipe_Normalize
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    2:
+      execution_resource: cpu
+      name: MapperPipe_GaussianBlur
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    3:
+      execution_resource: cpu
+      name: MapperPipe_Grayscale
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    4:
+      execution_resource: cpu
+      name: MapperPipe_ColorJitter
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    5:
+      execution_resource: cpu
+      name: MapperPipe_RandomHorizontalFlip
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    6:
+      execution_resource: cpu
+      name: MapperPipe_RandomResizedCrop
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    7:
+      execution_resource: cpu
+      name: MapperPipe_to_float
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 1
+        use_threads: true
+        variant_type: SMP
+    8:
+      execution_resource: cpu
+      name: ImageReaderPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      execution_resource: cpu
+      name: LocalFSListerPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    10:
+      execution_resource: cpu
+      fused_pipes:
+      - 4
+      - 6
+      - 5
+      - 7
+      - 1
+      - 2
+      name: FusedPipe
+      variant: SMP
+      variant_ctx:
+        disable_torch_parallelism: true
+        max_inflight: 10
+        max_prefetch: 10
+        n_procs: 6
+        use_threads: true
+        variant_type: SMP
+    11:
+      execution_resource: cpu
+      name: PrefetcherPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS

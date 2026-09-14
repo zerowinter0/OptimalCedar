@@ -53,9 +53,30 @@ def _dump_reconcile_profile(profiler, idx: int, directory: str, feature=None) ->
         input_sizes, output_sizes = profiler.calculate_avg_data_size()
     except Exception:  # noqa: BLE001 - diagnostics must never break a run
         input_sizes, output_sizes = {}, {}
+    # Per-pipe execution counters: how many records a worker submitted to each
+    # parallel stage and how many results it consumed.  Comparing them with
+    # the harness's sample count and the backend's own service time is what
+    # separates "the plan did less work" from "the plan did the work faster",
+    # which the aggregate throughput alone cannot distinguish.
+    counters = {}
+    for p_id, pipe in getattr(feature, "physical_pipes", {}).items():
+        variant = getattr(pipe, "pipe_variant", None)
+        if variant is None:
+            continue
+        issued = getattr(variant, "issued_tasks", None)
+        completed = getattr(variant, "completed_tasks", None)
+        if issued is None and completed is None:
+            continue
+        counters[str(p_id)] = {
+            "issued": issued,
+            "completed": completed,
+            "max_inflight": getattr(variant, "max_inflight", None),
+            "max_prefetch": getattr(variant, "max_prefetch", None),
+        }
     payload = {
         "worker": idx,
         "samples": profiler.get_sample_count(),
+        "pipe_counters": counters,
         "batch_size": profiler.get_batch_size(),
         "wall_latency_ns_per_sample": profiler.calculate_avg_wall_latency_per_sample(),
         "process_latency_ns_per_sample": profiler.calculate_avg_latency_per_sample(),

@@ -1,0 +1,77 @@
+{
+  "plan": "newdp",
+  "profile": "outputs/simclrv2_scaling_20260911/profile.yaml",
+  "path": [
+    9,
+    8,
+    3,
+    10,
+    0,
+    11
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 2.057681964285714,
+      "compute_per_width": 2.057681964285714,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 2.057681964285714
+    },
+    {
+      "mask": 32,
+      "ops": [
+        3
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.3390476292521194,
+      "compute_per_width": 1.3390476292521194,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 1.3390476292521194
+    },
+    {
+      "mask": 222,
+      "ops": [
+        4,
+        6,
+        5,
+        7,
+        1,
+        2
+      ],
+      "variant": "SMP",
+      "width": 6,
+      "compute": 22.996392769374047,
+      "compute_per_width": 3.832732128229008,
+      "boundary_local": 1.414969905831522,
+      "boundary_external": 0.0,
+      "lane_total": 3.832732128229008
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.008919392857142858,
+      "compute_per_width": 0.008919392857142858,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.008919392857142858
+    }
+  ],
+  "stages": [
+    8,
+    3,
+    10,
+    0
+  ]
+}

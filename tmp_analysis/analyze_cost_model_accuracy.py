@@ -18,10 +18,29 @@ from pathlib import Path
 
 ROOT = Path("/workspace/OptimalCedar")
 RUNS = [
+    ROOT / "outputs/pico_drained_20260914/results",
     ROOT / "outputs/pico_ten_workloads_20260913b/results",
     ROOT / "outputs/pico_djpecan_20260914/results",
     ROOT / "outputs/pico_missing_20260914/results",
 ]
+
+# Records in each workload's data set: a drained full pass processes each one
+# exactly once (verified with per-operator call counters: parse_and_format
+# calls == file lines), while the harness's sample counter can be inflated by
+# its per-batch accounting, so the audit derives throughput from these counts.
+WORKLOAD_RECORDS = {
+    "simclr": 9469,
+    "blip": 1000,
+    "clip": 1000,
+    "dino": 1000,
+    "alpaca_cot": 74771,
+    "pile_hackernews": 100000,
+    "pile_pubmed_abstracts": 100000,
+    "pile_uspto_backgrounds": 100000,
+    "bloom_oscar": 50000,
+}
+DRAINED_RUN = "pico_drained_20260914"
+
 WORKLOADS = [
     "simclr",
     "blip",
@@ -69,7 +88,7 @@ def spearman(pairs):
 
 def collect():
     data = {name: {} for name in WORKLOADS}
-    for run in RUNS:
+    for run in reversed(RUNS):
         if not run.is_dir():
             continue
         for path in sorted(run.glob("*.json")):
@@ -90,8 +109,14 @@ def collect():
             model_cost = sum(costs.values()) / len(costs)
             plans = run_entry.get("physical_plans_by_feature") or {}
             workers = next(iter(plans.values()), {}).get("n_local_workers")
+            records = WORKLOAD_RECORDS.get(workload)
+            if DRAINED_RUN in str(path) and records:
+                throughput = records / perf
+                samples = records
+            else:
+                throughput = samples / perf
             data[workload][planner] = {
-                "throughput": samples / perf,
+                "throughput": throughput,
                 "samples": int(samples),
                 "model_cost": model_cost,
                 "workers": workers,

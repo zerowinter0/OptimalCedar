@@ -18,10 +18,31 @@ from pathlib import Path
 
 ROOT = Path("/workspace/OptimalCedar")
 RUNS = [
+    # Drained full-pass measurements take precedence: stop-at-N runs report
+    # the time to fill a deep in-flight window for buffered plans.
+    ROOT / "outputs/pico_drained_20260914",
     ROOT / "outputs/pico_ten_workloads_20260913b",
     ROOT / "outputs/pico_djpecan_20260914",
     ROOT / "outputs/pico_missing_20260914",
 ]
+
+# Records in each workload's data set: a drained full pass processes each one
+# exactly once (verified with per-operator call counters: parse_and_format
+# calls == file lines), while the harness's sample counter can be inflated by
+# its per-batch accounting, so the audit derives throughput from these counts.
+WORKLOAD_RECORDS = {
+    "simclr": 9469,
+    "blip": 1000,
+    "clip": 1000,
+    "dino": 1000,
+    "alpaca_cot": 74771,
+    "pile_hackernews": 100000,
+    "pile_pubmed_abstracts": 100000,
+    "pile_uspto_backgrounds": 100000,
+    "bloom_oscar": 50000,
+}
+DRAINED_RUN = "pico_drained_20260914"
+
 WORKLOADS = [
     "simclr",
     "blip",
@@ -37,6 +58,9 @@ WORKLOADS = [
 
 def collect():
     rows = []
+    seen = set()
+    # Drained measurements take precedence over stop-at-N ones for the same
+    # (workload, planner) cell.
     for run in RUNS:
         results = run / "results"
         if not results.is_dir():
@@ -61,7 +85,16 @@ def collect():
             if lane_ms <= 0:
                 continue
             predicted = 1000.0 * workers / lane_ms
-            measured = samples / perf
+            records = WORKLOAD_RECORDS.get(workload)
+            if DRAINED_RUN in str(path) and records:
+                measured = records / perf
+                samples = records
+            else:
+                measured = samples / perf
+            key = (workload, planner)
+            if key in seen:
+                continue
+            seen.add(key)
             rows.append(
                 {
                     "workload": workload,

@@ -1,0 +1,97 @@
+{
+  "plan": "pico",
+  "profile": "outputs/simclr_rerun_wide2_20260913/simclr_profile.yaml",
+  "path": [
+    9,
+    8,
+    10,
+    5,
+    0,
+    11
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.845150731707317,
+      "compute_per_width": 1.845150731707317,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 681191.2105263157,
+      "window_bytes": 970.1052631578947,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 1.845150731707317,
+      "lane_total": 1.845150731707317
+    },
+    {
+      "mask": 246,
+      "ops": [
+        3,
+        6,
+        2,
+        4,
+        7,
+        1
+      ],
+      "variant": "SMP",
+      "width": 6,
+      "compute": 16.105891052726097,
+      "compute_per_width": 2.6843151754543495,
+      "boundary_local": 1.5455289039042934,
+      "boundary_external": 0.0,
+      "stage_bytes": 952576.0,
+      "window_bytes": 25719552.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 4.229844079358643,
+      "lane_total": 2.6843151754543495
+    },
+    {
+      "mask": 8,
+      "ops": [
+        5
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.04948805685110716,
+      "compute_per_width": 0.04948805685110716,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 1428864.0,
+      "window_bytes": 3572160.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.04948805685110716,
+      "lane_total": 0.04948805685110716
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.027444728177273774,
+      "compute_per_width": 0.027444728177273774,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 476288.0,
+      "window_bytes": 2857728.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.027444728177273774,
+      "lane_total": 0.027444728177273774
+    }
+  ],
+  "stages": [
+    8,
+    10,
+    5,
+    0
+  ]
+}

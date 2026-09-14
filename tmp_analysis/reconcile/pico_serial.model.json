@@ -1,0 +1,63 @@
+{
+  "plan": "pico_serial",
+  "profile": "outputs/plumber_bench_20260912/simclr_profile.yaml",
+  "path": [
+    9,
+    8,
+    10,
+    0,
+    11
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.845150731707317,
+      "compute_per_width": 1.845150731707317,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 1.845150731707317
+    },
+    {
+      "mask": 254,
+      "ops": [
+        3,
+        6,
+        2,
+        4,
+        5,
+        7,
+        1
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 11.036983162988838,
+      "compute_per_width": 11.036983162988838,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 11.036983162988838
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.027444728177273774,
+      "compute_per_width": 0.027444728177273774,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.027444728177273774
+    }
+  ],
+  "stages": [
+    8,
+    10,
+    0
+  ]
+}

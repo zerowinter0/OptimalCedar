@@ -1,0 +1,105 @@
+{
+  "plan": "olddp",
+  "profile": "outputs/simclrv2_scaling_20260911/profile.yaml",
+  "path": [
+    9,
+    8,
+    3,
+    6,
+    10,
+    11,
+    0,
+    12
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 2.057681964285714,
+      "compute_per_width": 2.057681964285714,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 2.057681964285714
+    },
+    {
+      "mask": 32,
+      "ops": [
+        3
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.3390476292521194,
+      "compute_per_width": 1.3390476292521194,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 1.3390476292521194
+    },
+    {
+      "mask": 4,
+      "ops": [
+        6
+      ],
+      "variant": "SMP",
+      "width": 4,
+      "compute": 4.155217393802529,
+      "compute_per_width": 1.0388043484506322,
+      "boundary_local": 2.8422788118322218,
+      "boundary_external": 0.0,
+      "lane_total": 1.0388043484506322
+    },
+    {
+      "mask": 88,
+      "ops": [
+        2,
+        4,
+        5
+      ],
+      "variant": "RAY",
+      "width": 7,
+      "compute": 10.260586184386389,
+      "compute_per_width": 1.4657980263409127,
+      "boundary_local": 10.49550442311579,
+      "boundary_external": 0.0,
+      "lane_total": 1.4657980263409127
+    },
+    {
+      "mask": 130,
+      "ops": [
+        7,
+        1
+      ],
+      "variant": "SMP",
+      "width": 2,
+      "compute": 0.6638050376227301,
+      "compute_per_width": 0.33190251881136507,
+      "boundary_local": 1.7718648755107407,
+      "boundary_external": 0.0,
+      "lane_total": 0.33190251881136507
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.008919392857142858,
+      "compute_per_width": 0.008919392857142858,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.008919392857142858
+    }
+  ],
+  "stages": [
+    8,
+    3,
+    6,
+    10,
+    11,
+    0
+  ]
+}

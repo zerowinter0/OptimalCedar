@@ -1,0 +1,32 @@
+[
+  {
+    "plan": "full",
+    "total_time_sec": 9.034,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/full.log"
+  },
+  {
+    "plan": "neither",
+    "total_time_sec": null,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/neither.log"
+  },
+  {
+    "plan": "no_scaling",
+    "total_time_sec": 8.692,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/no_scaling.log"
+  },
+  {
+    "plan": "reference_old",
+    "total_time_sec": 8.528,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/reference_old.log"
+  },
+  {
+    "plan": "no_object_boundary",
+    "total_time_sec": null,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/no_object_boundary.log"
+  },
+  {
+    "plan": "chosen_new_profile",
+    "total_time_sec": 7.445,
+    "log": "/workspace/OptimalCedar/tmp_analysis/plan_runs/chosen_new_profile.log"
+  }
+]

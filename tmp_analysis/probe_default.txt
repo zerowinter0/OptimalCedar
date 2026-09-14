@@ -1,0 +1,134 @@
+===== affine cost model =====
+  affine_enabled=True inner_ops=[8, 7, 6, 5, 4, 3, 2, 1, 0]
+  reach={9: 1.0, 8: 1.0, 7: 1.0, 6: 1.0, 5: 1.0, 4: 1.0, 3: 1.0, 2: 1.0, 1: 1.0, 0: 1.0}
+  size_ratios={0: 1.0, 1: 1.0, 2: 1.0, 3: 0.3333333333333333, 4: 1.0, 5: 1.0, 6: 0.251580971503883, 7: 4.0, 8: 4669.21974852071, 9: None}
+  --- per-operator cost estimate (affine, ms/source-record) ---
+   pid name                     baseline_in  INPROCESS      RAY      SMP
+    0 BatcherPipe(batch_size=1)   238144.0    0.0078       nan       nan
+    1 MapperPipe_Normalize       238144.0    0.1212    0.2447    0.4482
+    2 MapperPipe_GaussianBlur    238144.0    9.8946   10.7122    9.3493
+    3 MapperPipe_Grayscale       714432.0    0.1960    0.6245    0.7177
+    4 MapperPipe_ColorJitter     714432.0    8.7902    9.0782    8.4810
+    5 MapperPipe_RandomHorizontalFlip   714432.0    0.0683    0.1557    0.2720
+    6 MapperPipe_RandomResizedCrop  2970722.4    1.8877    9.1746    3.7742
+    7 MapperPipe_to_float        742680.6    0.1700    8.6629    1.1267
+    8 ImageReaderPipe               159.1    2.1932       nan       nan
+    9 LocalFSListerPipe             159.1    0.0344       nan       nan
+  source base cost=0.0344
+  optimizer          score= 14.1547 local=  2.2353 ray= 14.1547 smp=  0.0000
+      blocks=[([8], 'INPROCESS', 1), ([3, 6, 2, 5, 4, 7, 1], 'RAY', 7), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.1932 compute/w=  2.1932 bnd_local=  0.0000 bnd_par=  0.0000
+        (3, 6, 2, 5, 4, 7, 1) RAY       w=7 compute= 16.1952 compute/w=  2.3136 bnd_local=  0.0000 bnd_par= 11.8411
+        (0,) INPROCESS w=1 compute=  0.0078 compute/w=  0.0078 bnd_local=  0.0000 bnd_par=  0.0000
+  cm_optimizer       score= 10.3003 local= 10.3003 ray=  0.0000 smp=  0.0000
+      blocks=[([8], 'INPROCESS', 1), ([6], 'INPROCESS', 1), ([3], 'INPROCESS', 1), ([5], 'INPROCESS', 1), ([2], 'INPROCESS', 1), ([4], 'INPROCESS', 1), ([7], 'INPROCESS', 1), ([1], 'INPROCESS', 1), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.1932 compute/w=  2.1932 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) INPROCESS w=1 compute=  1.6378 compute/w=  1.6378 bnd_local=  0.0000 bnd_par=  0.0000
+        (3,) INPROCESS w=1 compute=  0.0968 compute/w=  0.0968 bnd_local=  0.0000 bnd_par=  0.0000
+        (5,) INPROCESS w=1 compute=  0.0388 compute/w=  0.0388 bnd_local=  0.0000 bnd_par=  0.0000
+        (2,) INPROCESS w=1 compute=  5.0813 compute/w=  5.0813 bnd_local=  0.0000 bnd_par=  0.0000
+        (4,) INPROCESS w=1 compute=  1.0686 compute/w=  1.0686 bnd_local=  0.0000 bnd_par=  0.0000
+        (7,) INPROCESS w=1 compute=  0.0181 compute/w=  0.0181 bnd_local=  0.0000 bnd_par=  0.0000
+        (1,) INPROCESS w=1 compute=  0.1235 compute/w=  0.1235 bnd_local=  0.0000 bnd_par=  0.0000
+        (0,) INPROCESS w=1 compute=  0.0078 compute/w=  0.0078 bnd_local=  0.0000 bnd_par=  0.0000
+  old_dp_optimizer   score=  2.8250 local=  2.4738 ray=  2.8250 smp=  2.5723
+      blocks=[([8], 'INPROCESS', 1), ([6], 'SMP', 6), ([3], 'INPROCESS', 1), ([2, 4, 5], 'RAY', 5), ([7], 'INPROCESS', 1), ([1], 'INPROCESS', 1), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.1932 compute/w=  2.1932 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) SMP       w=6 compute=  3.2746 compute/w=  0.5458 bnd_local=  0.0000 bnd_par=  2.0266
+        (3,) INPROCESS w=1 compute=  0.0968 compute/w=  0.0968 bnd_local=  0.0000 bnd_par=  0.0000
+        (2, 4, 5) RAY       w=5 compute=  6.6932 compute/w=  1.3386 bnd_local=  0.0000 bnd_par=  1.4864
+        (7,) INPROCESS w=1 compute=  0.0181 compute/w=  0.0181 bnd_local=  0.0000 bnd_par=  0.0000
+        (1,) INPROCESS w=1 compute=  0.1235 compute/w=  0.1235 bnd_local=  0.0000 bnd_par=  0.0000
+        (0,) INPROCESS w=1 compute=  0.0078 compute/w=  0.0078 bnd_local=  0.0000 bnd_par=  0.0000
+  dp_optimizer       score=  2.5408 local=  2.4367 ray=  2.4426 smp=  2.5408
+      blocks=[([8], 'INPROCESS', 1), ([3], 'INPROCESS', 1), ([6], 'SMP', 4), ([2, 4, 5], 'RAY', 7), ([7, 1], 'SMP', 2), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.1932 compute/w=  2.1932 bnd_local=  0.0000 bnd_par=  0.0000
+        (3,) INPROCESS w=1 compute=  0.2013 compute/w=  0.2013 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) SMP       w=4 compute=  3.1636 compute/w=  0.7909 bnd_local=  0.0000 bnd_par=  0.7292
+        (2, 4, 5) RAY       w=7 compute=  6.6932 compute/w=  0.9562 bnd_local=  0.0000 bnd_par=  1.4864
+        (7, 1) SMP       w=2 compute=  0.5766 compute/w=  0.2883 bnd_local=  0.0000 bnd_par=  0.7324
+        (0,) INPROCESS w=1 compute=  0.0078 compute/w=  0.0078 bnd_local=  0.0000 bnd_par=  0.0000
+
+===== legacy cost model =====
+  affine_enabled=False inner_ops=[8, 7, 6, 5, 4, 3, 2, 1, 0]
+  size_ratios={0: 1.0, 1: 1.0, 2: 1.0, 3: 0.3333333333333333, 4: 1.0, 5: 1.0, 6: 0.24049099976490568, 7: 4.0, 8: 4669.21974852071, 9: None}
+  --- per-operator cost estimate (legacy, ms/source-record) ---
+   pid name                     baseline_in  INPROCESS      RAY      SMP
+    0 BatcherPipe(batch_size=1)   238144.0    0.0389       nan       nan
+    1 MapperPipe_Normalize       238144.0    0.2449    0.2447    0.4482
+    2 MapperPipe_GaussianBlur    238144.0    8.3885   10.7122    9.3493
+    3 MapperPipe_Grayscale       714432.0    0.3846    0.6245    0.7177
+    4 MapperPipe_ColorJitter     714432.0    9.1591    9.0782    8.4810
+    5 MapperPipe_RandomHorizontalFlip   714432.0    0.1423    0.1557    0.2720
+    6 MapperPipe_RandomResizedCrop  2970722.4    2.0204    9.1746    3.7742
+    7 MapperPipe_to_float        742680.6    0.5433    8.6629    1.1267
+    8 ImageReaderPipe               159.1    2.2145       nan       nan
+    9 LocalFSListerPipe             159.1    0.0344       nan       nan
+  source base cost=0.0344
+  optimizer          score= 12.5527 local=  2.2877 ray= 12.5527 smp=  0.0000
+      blocks=[([8], 'INPROCESS', 1), ([3, 6, 2, 5, 4, 7, 1], 'RAY', 7), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.2145 compute/w=  2.2145 bnd_local=  0.0000 bnd_par=  0.0000
+        (3, 6, 2, 5, 4, 7, 1) RAY       w=7 compute=  5.8004 compute/w=  0.8286 bnd_local=  0.0000 bnd_par= 11.7241
+        (0,) INPROCESS w=1 compute=  0.0389 compute/w=  0.0389 bnd_local=  0.0000 bnd_par=  0.0000
+  cm_optimizer       score=  6.0496 local=  6.0496 ray=  0.0000 smp=  0.0000
+      blocks=[([8], 'INPROCESS', 1), ([6], 'INPROCESS', 1), ([3], 'INPROCESS', 1), ([5], 'INPROCESS', 1), ([2], 'INPROCESS', 1), ([4], 'INPROCESS', 1), ([7], 'INPROCESS', 1), ([1], 'INPROCESS', 1), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.2145 compute/w=  2.2145 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) INPROCESS w=1 compute=  0.5051 compute/w=  0.5051 bnd_local=  0.0000 bnd_par=  0.0000
+        (3,) INPROCESS w=1 compute=  0.0961 compute/w=  0.0961 bnd_local=  0.0000 bnd_par=  0.0000
+        (5,) INPROCESS w=1 compute=  0.0119 compute/w=  0.0119 bnd_local=  0.0000 bnd_par=  0.0000
+        (2,) INPROCESS w=1 compute=  2.0971 compute/w=  2.0971 bnd_local=  0.0000 bnd_par=  0.0000
+        (4,) INPROCESS w=1 compute=  0.7633 compute/w=  0.7633 bnd_local=  0.0000 bnd_par=  0.0000
+        (7,) INPROCESS w=1 compute=  0.0436 compute/w=  0.0436 bnd_local=  0.0000 bnd_par=  0.0000
+        (1,) INPROCESS w=1 compute=  0.2449 compute/w=  0.2449 bnd_local=  0.0000 bnd_par=  0.0000
+        (0,) INPROCESS w=1 compute=  0.0389 compute/w=  0.0389 bnd_local=  0.0000 bnd_par=  0.0000
+  old_dp_optimizer   score=  2.6723 local=  2.6723 ray=  2.1174 smp=  2.1666
+      blocks=[([8], 'INPROCESS', 1), ([6], 'SMP', 6), ([3], 'INPROCESS', 1), ([2, 4, 5], 'RAY', 5), ([7], 'INPROCESS', 1), ([1], 'INPROCESS', 1), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.2145 compute/w=  2.2145 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) SMP       w=6 compute=  0.9436 compute/w=  0.1573 bnd_local=  0.0000 bnd_par=  2.0093
+        (3,) INPROCESS w=1 compute=  0.0961 compute/w=  0.0961 bnd_local=  0.0000 bnd_par=  0.0000
+        (2, 4, 5) RAY       w=5 compute=  3.4475 compute/w=  0.6895 bnd_local=  0.0000 bnd_par=  1.4279
+        (7,) INPROCESS w=1 compute=  0.0436 compute/w=  0.0436 bnd_local=  0.0000 bnd_par=  0.0000
+        (1,) INPROCESS w=1 compute=  0.2449 compute/w=  0.2449 bnd_local=  0.0000 bnd_par=  0.0000
+        (0,) INPROCESS w=1 compute=  0.0389 compute/w=  0.0389 bnd_local=  0.0000 bnd_par=  0.0000
+  dp_optimizer       score=  2.6875 local=  2.6875 ray=  1.9204 smp=  1.7750
+      blocks=[([8], 'INPROCESS', 1), ([3], 'INPROCESS', 1), ([6], 'SMP', 4), ([2, 4, 5], 'RAY', 7), ([7, 1], 'SMP', 2), ([0], 'INPROCESS', 1)]
+        (8,) INPROCESS w=1 compute=  2.2145 compute/w=  2.2145 bnd_local=  0.0000 bnd_par=  0.0000
+        (3,) INPROCESS w=1 compute=  0.3998 compute/w=  0.3998 bnd_local=  0.0000 bnd_par=  0.0000
+        (6,) SMP       w=4 compute=  0.3145 compute/w=  0.0786 bnd_local=  0.0000 bnd_par=  0.7234
+        (2, 4, 5) RAY       w=7 compute=  3.4475 compute/w=  0.4925 bnd_local=  0.0000 bnd_par=  1.4279
+        (7, 1) SMP       w=2 compute=  0.5385 compute/w=  0.2693 bnd_local=  0.0000 bnd_par=  0.7037
+        (0,) INPROCESS w=1 compute=  0.0389 compute/w=  0.0389 bnd_local=  0.0000 bnd_par=  0.0000
+
+===== cedar cost model =====
+  affine_enabled=False inner_ops=None
+  size_ratios={0: 1.0, 1: 1.0, 2: 1.0, 3: 0.3333333333333333, 4: 1.0, 5: 1.0, 6: 0.24049099976490568, 7: 4.0, 8: 4669.21974852071, 9: None}
+  --- per-operator cost estimate (cedar, ms/source-record) ---
+   pid name                     baseline_in  INPROCESS      RAY      SMP
+    0 BatcherPipe(batch_size=1)   238144.0    0.0389       nan       nan
+    1 MapperPipe_Normalize       238144.0    0.2449    0.0000    0.4482
+    2 MapperPipe_GaussianBlur    238144.0    8.3885    0.0000    0.0000
+    3 MapperPipe_Grayscale       714432.0    0.3846    0.0000    0.0000
+    4 MapperPipe_ColorJitter     714432.0    9.1591    0.0000    0.0000
+    5 MapperPipe_RandomHorizontalFlip   714432.0    0.1423    0.0000    0.0000
+    6 MapperPipe_RandomResizedCrop  2970722.4    2.0204    9.1746    0.0000
+    7 MapperPipe_to_float        742680.6    0.5433    8.6629    0.0000
+    8 ImageReaderPipe               159.1    2.2145       nan       nan
+    9 LocalFSListerPipe               0.0       nan       nan       nan
+   pid name                    latency_ms  frac_latency   R_ray   R_smp  ray_cost  smp_cost
+    0 BatcherPipe(batch_size=1)     0.0400      0.00168     nan     nan       nan       nan
+    1 MapperPipe_Normalize         0.2522      0.01057   1.039   0.991    0.0000    0.4482
+    2 MapperPipe_GaussianBlur      8.6403      0.36203   1.620   1.745    0.0000    0.0000
+    3 MapperPipe_Grayscale         0.3961      0.01660   1.666   1.690    0.0000    0.0000
+    4 MapperPipe_ColorJitter       9.4340      0.39529   1.820   2.439    0.0000    0.0000
+    5 MapperPipe_RandomHorizontalFlip     0.1466      0.00614   1.209   1.146    0.0000    0.0000
+    6 MapperPipe_RandomResizedCrop     2.0810      0.08720   0.764   1.176    9.1746    0.0000
+    7 MapperPipe_to_float          0.5596      0.02345   0.741   1.096    8.6629    0.0000
+    8 ImageReaderPipe              2.2810      0.09557     nan     nan       nan       nan
+    9 LocalFSListerPipe            0.0354      0.00148     nan     nan       nan       nan
+  source base cost=0.0344
+
+===== measured =====
+  dp_optimizer       perf=10.045s tps=942.9 plan_cost=64.425 cedar=22.879 pico=20.326
+  optimizer          perf=55.669s tps=170.1 plan_cost=23.016 cedar=23.016 pico=113.238
+  cm_optimizer       perf=17.222s tps=549.8 plan_cost=82.402 cedar=48.397 pico=82.402
+  old_dp_optimizer   perf=9.386s tps=1009.9 plan_cost=38.120 cedar=21.379 pico=22.600

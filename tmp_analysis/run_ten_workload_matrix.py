@@ -210,13 +210,20 @@ def run(command, log_path, env, timeout):
     return code, timed_out, round(time.time() - started, 1)
 
 
-def profile_command(dataset_file, kwargs, samples, profile_path, dataset_func="get_dataset"):
+def profile_command(
+    dataset_file,
+    kwargs,
+    samples,
+    profile_path,
+    dataset_func="get_dataset",
+    full_pass=False,
+):
     command = [
         sys.executable, "-u", str(ENTRY), "evaluation/eval_cedar.py",
         "--dataset_file", dataset_file,
         "--dataset_func", dataset_func,
         "--batch_size", "4",
-        "--num_total_samples", str(samples),
+        "--num_total_samples", "0" if full_pass else str(samples),
         "--run_profiling",
         "--profiled_stats", str(profile_path),
         "--use_ray", "--ray_ip", ADDRESS,
@@ -259,13 +266,14 @@ def cell_command(
     optimizer,
     results,
     dataset_func="get_dataset",
+    full_pass=False,
 ):
     command = [
         sys.executable, "-u", str(ENTRY), "evaluation/compare_optimizer_perf.py",
         "--dataset_file", dataset_file,
         "--dataset_func", dataset_func,
         "--batch_size", "4",
-        "--num_total_samples", str(samples),
+        "--num_total_samples", "0" if full_pass else str(samples),
         "--full_data_run",
         "--profiled_stats", str(profile_path),
         "--use_ray", "--ray_ip", ADDRESS,
@@ -298,6 +306,17 @@ def main():
     parser.add_argument("--workloads", nargs="+", default=None)
     parser.add_argument("--optimizers", nargs="+", default=None)
     parser.add_argument("--reprofile", action="store_true")
+    parser.add_argument(
+        "--full-pass",
+        action="store_true",
+        help=(
+            "Measure a drained full pass over the workload data "
+            "(--num_total_samples 0) instead of stopping as soon as the "
+            "requested count is yielded.  Plans with a deep in-flight window "
+            "otherwise report the time to fill their buffers rather than the "
+            "time to process the records."
+        ),
+    )
     parser.add_argument(
         "--samples",
         type=int,
@@ -335,7 +354,12 @@ def main():
             else:
                 write_status(out, f"profile:{name}", None, summary)
                 command = profile_command(
-                    dataset_file, kwargs, samples, profile_path, dataset_func
+                    dataset_file,
+                    kwargs,
+                    samples,
+                    profile_path,
+                    dataset_func,
+                    args.full_pass,
                 )
                 code, timed_out, seconds = run(
                     command,
@@ -370,6 +394,7 @@ def main():
                 optimizer,
                 results,
                 dataset_func,
+                args.full_pass,
             )
             code, timed_out, seconds = run(
                 command, log_path, cell_env(), CELL_TIMEOUT_SEC

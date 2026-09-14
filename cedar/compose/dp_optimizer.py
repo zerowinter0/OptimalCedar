@@ -4304,7 +4304,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
             ) / (
-                block.parallelism
+                self._dp_effective_parallelism(block)
                 * self._dp_stage_concurrency(block.variant)
             ) + boundary_parallel
             if self._dp_concurrency_aware_enabled():
@@ -4356,7 +4356,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
             ) / (
-                block.parallelism
+                self._dp_effective_parallelism(block)
                 * self._dp_stage_concurrency(block.variant)
             ) + boundary_parallel
             if self._dp_concurrency_aware_enabled():
@@ -4680,6 +4680,25 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         # Aggregate rate <= bandwidth / bytes, and the plan runs W workers.
         return bytes_per_record * workers / bandwidth * 1000.0
 
+    def _dp_effective_parallelism(self, block) -> int:
+        """Stage width the model is willing to extrapolate to.
+
+        ``stage service / width`` only holds while the width curve was
+        actually measured; past that point every additional process adds
+        contention without adding measured throughput.  Plans may still
+        declare such widths (Plumber asks for 62), so scoring caps the
+        division at the widest measured point of the block's operators.
+        """
+        width = max(1, int(getattr(block, "parallelism", 1) or 1))
+        order = tuple(getattr(block, "order", ()) or ())
+        variant = getattr(block, "variant", None)
+        if not order or variant is None:
+            return width
+        cap = self._dp_block_measured_width_cap(variant, order)
+        if cap is None or cap < 1:
+            return width
+        return max(1, min(width, cap))
+
     def _dp_stage_concurrency(self, variant) -> float:
         """Effective per-actor overlap factor of a parallel stage.
 
@@ -4975,7 +4994,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 stage_compute = (
                     block.cost * self._dp_stage_factor(variant)
                 ) / (
-                    max(1, block.parallelism)
+                    max(1, self._dp_effective_parallelism(block))
                     * self._dp_stage_concurrency(variant)
                 )
                 round_trip = self._dp_cross_host_round_trip_ms(stage_bytes)
@@ -5057,7 +5076,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 smp_cost = (
                     (block.cost * self._dp_stage_factor(variant))
                     / (
-                        max(1, block.parallelism)
+                        max(1, self._dp_effective_parallelism(block))
                         * self._dp_stage_concurrency(variant)
                     )
                     + boundary_parallel
@@ -5151,14 +5170,34 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                     plan
                 )
             try:
-                return self._replay_concurrency_aware_objective(
+                cost = self._replay_concurrency_aware_objective(
                     block_specs,
                     ops,
                     workers=max(1, scored_workers),
                     window_bytes_by_mask=windows,
-                ).score
+                )
             finally:
                 self._dp_scoring_required_widths = previous_widths
+            # The worker-count calibration is part of the model, not just of
+            # the search: co-locating W workers raises the per-record service
+            # (measured per workload by a same-plan worker sweep).  It applies
+            # to the work that runs on those workers' cores -- the local chain
+            # and the local process pool -- not to a remote Ray path, which
+            # leaves the host: charging it there made the Ray-fused clip plan
+            # 2.8x slower than it measures.
+            factor = self._dp_worker_contention_factor(scored_workers)
+            if factor != 1.0:
+                local_chain = max(0.0, cost.local_serial - cost.ray_serial)
+                cost = DpObjectiveCost(
+                    local_serial=(
+                        local_chain * factor
+                        + (cost.local_serial - local_chain)
+                    ),
+                    ray_serial=cost.ray_serial,
+                    smp_serial=cost.smp_serial * factor,
+                    gpu_serial=cost.gpu_serial,
+                )
+            return cost.score
         return self._replay_dp_objective(block_specs, ops).score
 
     def run(

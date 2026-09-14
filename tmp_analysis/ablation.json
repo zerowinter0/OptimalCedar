@@ -1,0 +1,626 @@
+[
+  {
+    "profile": "full",
+    "optimizer": "DpOptimizer",
+    "score": 4.863037029881306,
+    "local": 4.863037029881306,
+    "ray": 0.0,
+    "smp": 3.832732128229008,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          6,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "full",
+    "optimizer": "OldDpOptimizer",
+    "score": 5.578693941698291,
+    "local": 5.578693941698291,
+    "ray": 0.0,
+    "smp": 2.2063850208717986,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          3,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "no_scaling",
+    "optimizer": "DpOptimizer",
+    "score": 3.7772916143048416,
+    "local": 3.7772916143048416,
+    "ray": 0.0,
+    "smp": 3.3123730091186228,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          6,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "no_scaling",
+    "optimizer": "OldDpOptimizer",
+    "score": 4.796523040706802,
+    "local": 4.796523040706802,
+    "ray": 0.0,
+    "smp": 2.3811348372988745,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          6,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "no_object_boundary",
+    "optimizer": "DpOptimizer",
+    "score": 3.509690412678026,
+    "local": 2.9568042884530805,
+    "ray": 3.509690412678026,
+    "smp": 3.509087693693543,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "SMP",
+        5
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          5
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          2,
+          4
+        ],
+        "RAY",
+        7
+      ],
+      [
+        [
+          7
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          1
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "no_object_boundary",
+    "optimizer": "OldDpOptimizer",
+    "score": 3.4930480365484775,
+    "local": 3.3476242804040406,
+    "ray": 3.046636170779132,
+    "smp": 3.4930480365484775,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "SMP",
+        5
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          2,
+          4,
+          5
+        ],
+        "RAY",
+        3
+      ],
+      [
+        [
+          7
+        ],
+        "SMP",
+        1
+      ],
+      [
+        [
+          1
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "neither",
+    "optimizer": "DpOptimizer",
+    "score": 2.8554760630613343,
+    "local": 2.509187844560921,
+    "ray": 2.8554760630613343,
+    "smp": 2.7058928837026284,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          6,
+          5
+        ],
+        "SMP",
+        4
+      ],
+      [
+        [
+          2
+        ],
+        "RAY",
+        7
+      ],
+      [
+        [
+          7
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          1
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "neither",
+    "optimizer": "OldDpOptimizer",
+    "score": 3.336044991316974,
+    "local": 3.3194500694786604,
+    "ray": 3.336044991316974,
+    "smp": 3.2727250602645834,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "SMP",
+        2
+      ],
+      [
+        [
+          3,
+          2,
+          4
+        ],
+        "RAY",
+        7
+      ],
+      [
+        [
+          5
+        ],
+        "SMP",
+        1
+      ],
+      [
+        [
+          7
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          1
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "reference",
+    "optimizer": "DpOptimizer",
+    "score": 2.5408118631301506,
+    "local": 2.4366688367511213,
+    "ray": 2.442579261536979,
+    "smp": 2.5408118631301506,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "SMP",
+        4
+      ],
+      [
+        [
+          2,
+          4,
+          5
+        ],
+        "RAY",
+        7
+      ],
+      [
+        [
+          7,
+          1
+        ],
+        "SMP",
+        2
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "reference",
+    "optimizer": "OldDpOptimizer",
+    "score": 2.6723172988756825,
+    "local": 2.6723172988756825,
+    "ray": 2.117372438822476,
+    "smp": 2.1665801793461483,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          2,
+          4,
+          5
+        ],
+        "RAY",
+        5
+      ],
+      [
+        [
+          7
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          1
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "calibrated",
+    "optimizer": "DpOptimizer",
+    "score": 5.583225717381306,
+    "local": 5.583225717381306,
+    "ray": 0.0,
+    "smp": 2.6445851684780153,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          3
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          6,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  },
+  {
+    "profile": "calibrated",
+    "optimizer": "OldDpOptimizer",
+    "score": 5.578693941698291,
+    "local": 5.578693941698291,
+    "ray": 0.0,
+    "smp": 1.522405664401541,
+    "blocks": [
+      [
+        [
+          8
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          6
+        ],
+        "INPROCESS",
+        1
+      ],
+      [
+        [
+          4,
+          3,
+          5,
+          7,
+          1,
+          2
+        ],
+        "SMP",
+        6
+      ],
+      [
+        [
+          0
+        ],
+        "INPROCESS",
+        1
+      ]
+    ]
+  }
+]

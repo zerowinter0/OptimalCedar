@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "workload": "video_self_evolution",
+  "logical_block_count_including_source": 9,
+  "pipeline_operator_count_excluding_source": 8,
+  "local_workers": 8,
+  "source_plan": "evaluation/chapter6_experiments/formal_results/paper_artifacts/datajuicer_diverse/screening/video_self_evolution/plans/dp_optimizer.yaml",
+  "source_plan_sha256": "a5aeb15674f9e7f7cd3b6fec991d53b9918795875f86ef30e13cc66bd770b165",
+  "source_drawio": "my_paper/69e75a0100d7b4afeb1cfc20/figures/mixed_execution_counterexample.drawio",
+  "physical_order": [
+    "Source",
+    "Parse JSON",
+    "Set video root",
+    "Ray fused: video NSFW -> video-text similarity -> video motion",
+    "Video aesthetics",
+    "SMP: video duration",
+    "SMP: project output"
+  ],
+  "diagram_semantics": {
+    "lanes": "Ray, local, and SMP physical execution regimes.",
+    "thick_box": "One physical stage.",
+    "inner_boxes": "Logical operators that execute serially inside one fused physical stage."
+  },
+  "numeric_latency_policy": "No numeric latency or cost-model formula is plotted. The diagram uses only the archived plan's operator order, fusion, and placement."
+}

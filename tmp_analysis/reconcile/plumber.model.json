@@ -1,0 +1,192 @@
+{
+  "plan": "plumber",
+  "profile": "outputs/simclr_rerun_wide2_20260913/simclr_profile.yaml",
+  "path": [
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0,
+    10
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.845150731707317,
+      "compute_per_width": 1.845150731707317,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 681191.2105263157,
+      "window_bytes": 970.1052631578947,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 1.845150731707317,
+      "lane_total": 1.845150731707317
+    },
+    {
+      "mask": 2,
+      "ops": [
+        7
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.7819506433333334,
+      "compute_per_width": 0.7819506433333334,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 3405147.6315789474,
+      "window_bytes": 3405147.6315789474,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.7819506433333334,
+      "lane_total": 0.7819506433333334
+    },
+    {
+      "mask": 4,
+      "ops": [
+        6
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 4.936491915137615,
+      "compute_per_width": 4.936491915137615,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 3438550.1052631577,
+      "window_bytes": 13620590.52631579,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 4.936491915137615,
+      "lane_total": 4.936491915137615
+    },
+    {
+      "mask": 8,
+      "ops": [
+        5
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.07305307144983332,
+      "compute_per_width": 0.07305307144983332,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 1428864.0,
+      "window_bytes": 3572160.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.07305307144983332,
+      "lane_total": 0.07305307144983332
+    },
+    {
+      "mask": 16,
+      "ops": [
+        4
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 13.49361344260543,
+      "compute_per_width": 13.49361344260543,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 1428864.0,
+      "window_bytes": 3572160.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 13.49361344260543,
+      "lane_total": 13.49361344260543
+    },
+    {
+      "mask": 32,
+      "ops": [
+        3
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.1100742339320366,
+      "compute_per_width": 1.1100742339320366,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 952576.0,
+      "window_bytes": 4286592.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 1.1100742339320366,
+      "lane_total": 1.1100742339320366
+    },
+    {
+      "mask": 64,
+      "ops": [
+        2
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 10.951637651747964,
+      "compute_per_width": 10.951637651747964,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 476288.0,
+      "window_bytes": 2857728.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 10.951637651747964,
+      "lane_total": 10.951637651747964
+    },
+    {
+      "mask": 128,
+      "ops": [
+        1
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.12673102372624287,
+      "compute_per_width": 0.12673102372624287,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 476288.0,
+      "window_bytes": 2857728.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.12673102372624287,
+      "lane_total": 0.12673102372624287
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.027444728177273774,
+      "compute_per_width": 0.027444728177273774,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "stage_bytes": 476288.0,
+      "window_bytes": 2857728.0,
+      "cross_host_floor": null,
+      "round_trip": 3.001,
+      "charged": 0.027444728177273774,
+      "lane_total": 0.027444728177273774
+    }
+  ],
+  "stages": [
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1,
+    0
+  ]
+}

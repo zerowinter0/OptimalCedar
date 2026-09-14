@@ -61,6 +61,16 @@ def get_ray_actor_options(
         # directories. Explicit inheritance is required because Cedar's actor
         # classes are decorated before ray.init() establishes the job context.
         options["runtime_env"] = {"py_modules": list(py_modules)}
+    # Diagnostic hook: ship an extra PYTHONPATH to the actors so a
+    # sitecustomize-based counter can observe what the actor processes
+    # actually execute.  Unset in every benchmark run.
+    debug_pythonpath = os.environ.get("CEDAR_RAY_ACTOR_PYTHONPATH", "").strip()
+    if debug_pythonpath:
+        runtime_env = dict(options.get("runtime_env", {}))
+        env_vars = dict(runtime_env.get("env_vars", {}))
+        env_vars["PYTHONPATH"] = debug_pythonpath
+        runtime_env["env_vars"] = env_vars
+        options["runtime_env"] = runtime_env
     resource_name = os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip()
     if not resource_name:
         return options

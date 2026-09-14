@@ -1,0 +1,63 @@
+{
+  "plan": "win630",
+  "profile": "outputs/simclr_rerun_wide2_20260913/simclr_profile.yaml",
+  "path": [
+    9,
+    8,
+    11,
+    0,
+    10
+  ],
+  "rows": [
+    {
+      "mask": 1,
+      "ops": [
+        8
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 1.845150731707317,
+      "compute_per_width": 1.845150731707317,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 1.845150731707317
+    },
+    {
+      "mask": 254,
+      "ops": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "variant": "RAY",
+      "width": 7,
+      "compute": 51.839974807981044,
+      "compute_per_width": 7.405710686854435,
+      "boundary_local": 9.471230854349336,
+      "boundary_external": 0.0,
+      "lane_total": 7.405710686854435
+    },
+    {
+      "mask": 256,
+      "ops": [
+        0
+      ],
+      "variant": "INPROCESS",
+      "width": 1,
+      "compute": 0.027444728177273774,
+      "compute_per_width": 0.027444728177273774,
+      "boundary_local": 0.0,
+      "boundary_external": 0.0,
+      "lane_total": 0.027444728177273774
+    }
+  ],
+  "stages": [
+    8,
+    11,
+    0
+  ]
+}

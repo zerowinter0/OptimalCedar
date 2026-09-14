@@ -1,0 +1,415 @@
+#!/usr/bin/env python3
+"""Generate the editable draw.io source for the video-caption Figure 1."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+
+COLORS = {
+    "local": ("#F2F2F2", "#7F7F7F"),
+    "smp": ("#EAF2F8", "#5B9BD5"),
+    "ray_gpu": ("#EFE4F8", "#8E5CC2"),
+    "text": ("#E2F0D9", "#548235"),
+    "video": ("#FCE4D6", "#C55A11"),
+    "gpu": ("#E4DFEC", "#7030A0"),
+    "cross": ("#FFF2CC", "#BF9000"),
+    "fixed": ("#EDEDED", "#666666"),
+    "good": ("#E2F0D9", "#70AD47"),
+}
+
+
+OPERATORS = (
+    ("Parse", "Record · CPU", "fixed", "shape=document"),
+    ("Resolve Path", "Video · CPU", "fixed", "shape=folder"),
+    ("Language ID", "Text · CPU", "text", "shape=hexagon"),
+    ("Perplexity", "Text · CPU", "text", "shape=hexagon"),
+    ("Aesthetics", "Video · GPU", "gpu", "ellipse"),
+    ("Video–Text Sim.", "Video+Text · GPU", "cross", "rhombus"),
+    ("Motion", "Video · CPU", "video", "shape=process"),
+    ("NSFW", "Video · GPU", "gpu", "ellipse"),
+    ("Watermark", "Video · GPU", "gpu", "ellipse"),
+    ("Duration", "Metadata · CPU", "video", "shape=delay"),
+)
+
+CEDAR_TIMES = {
+    "Parse": (0.03, 0.03),
+    "Resolve Path": (0.02, 0.02),
+    "Language ID": (0.25, 0.35),
+    "Perplexity": (0.80, 1.20),
+    "Aesthetics": (3.20, 8.50),
+    "Video–Text Sim.": (4.00, 12.00),
+    "Motion": (1.20, 5.00),
+    "NSFW": (2.70, 6.80),
+    "Watermark": (2.50, 6.00),
+    "Duration": (0.08, 0.15),
+}
+
+PICO_TIMES = {
+    "Parse": (0.03, 0.03),
+    "Resolve Path": (0.02, 0.02),
+    "Language ID": (0.25, 0.30),
+    "Perplexity": (0.55, 0.75),
+    "Duration": (0.04, 0.06),
+    "Motion": (0.42, 0.65),
+    "Aesthetics": (0.72, 1.15),
+    "NSFW": (0.50, 0.80),
+    "Watermark": (0.46, 0.73),
+    "Video–Text Sim.": (0.70, 1.10),
+}
+
+CEDAR_STAGES = (
+    ("Local CPU", "local", ("Parse", "Resolve Path")),
+    (
+        "Ray GPU 1",
+        "ray_gpu",
+        ("Language ID", "Perplexity", "Aesthetics", "Video–Text Sim."),
+    ),
+    ("Local CPU", "local", ("Motion",)),
+    ("Ray GPU 2", "ray_gpu", ("NSFW", "Watermark")),
+    ("Local CPU", "local", ("Duration",)),
+)
+
+PICO_STAGES = (
+    ("Local CPU", "local", ("Parse", "Resolve Path")),
+    (
+        "SMP CPU",
+        "smp",
+        ("Language ID", "Perplexity", "Duration", "Motion"),
+    ),
+    (
+        "Ray GPU",
+        "ray_gpu",
+        ("Aesthetics", "NSFW", "Watermark", "Video–Text Sim."),
+    ),
+)
+
+
+def cell(root, identifier, value, style, x, y, width, height):
+    node = ET.SubElement(
+        root,
+        "mxCell",
+        {
+            "id": identifier,
+            "value": value,
+            "style": style,
+            "parent": "1",
+            "vertex": "1",
+        },
+    )
+    ET.SubElement(
+        node,
+        "mxGeometry",
+        {
+            "x": str(x),
+            "y": str(y),
+            "width": str(width),
+            "height": str(height),
+            "as": "geometry",
+        },
+    )
+    return node
+
+
+def edge(root, identifier, source, target):
+    node = ET.SubElement(
+        root,
+        "mxCell",
+        {
+            "id": identifier,
+            "style": (
+                "edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;"
+                "endArrow=block;endFill=1;strokeColor=#595959;strokeWidth=1.5;"
+            ),
+            "parent": "1",
+            "source": source,
+            "target": target,
+            "edge": "1",
+        },
+    )
+    ET.SubElement(node, "mxGeometry", {"relative": "1", "as": "geometry"})
+
+
+def text_style(size=16, align="center", bold=False):
+    return (
+        "text;html=1;whiteSpace=wrap;verticalAlign=middle;"
+        f"align={align};fontSize={size};"
+        + ("fontStyle=1;" if bold else "")
+    )
+
+
+def draw_operator_legend(root):
+    cell(root, "title", "<b>Video–Caption Refinement</b>", text_style(22, "left"), 18, 8, 350, 28)
+    cell(
+        root,
+        "subtitle",
+        "Data-Juicer-derived multimodal pipeline",
+        text_style(14, "left"),
+        370,
+        10,
+        330,
+        24,
+    )
+    start_x, gap, width = 20, 10, 145
+    for index, (name, modality, family, shape) in enumerate(OPERATORS):
+        x = start_x + index * (width + gap)
+        fill, stroke = COLORS[family]
+        style = (
+            f"{shape};whiteSpace=wrap;html=1;fillColor={fill};"
+            f"strokeColor={stroke};strokeWidth=1.8;fontSize=15;fontStyle=1;"
+        )
+        cell(root, f"op-{index}", f"<b>{name}</b>", style, x, 43, width, 48)
+        cell(
+            root,
+            f"op-label-{index}",
+            modality,
+            "text;html=1;align=center;verticalAlign=top;fontSize=12;fontColor=#595959;",
+            x,
+            94,
+            width,
+            22,
+        )
+
+
+def draw_stage(root, prefix, title, family, operators, times, x, y, width):
+    fill, stroke = COLORS[family]
+    cell(
+        root,
+        f"{prefix}-box",
+        "",
+        (
+            "rounded=1;arcSize=8;html=1;"
+            f"fillColor={fill};strokeColor={stroke};strokeWidth=2;"
+        ),
+        x,
+        y,
+        width,
+        145,
+    )
+    cell(
+        root,
+        f"{prefix}-title",
+        f"<b>{title}</b>",
+        text_style(14),
+        x + 5,
+        y + 4,
+        width - 10,
+        22,
+    )
+    count = len(operators)
+    inner_gap = 7
+    card_width = (width - 16 - inner_gap * (count - 1)) / count
+    ids = []
+    for index, name in enumerate(operators):
+        card_x = x + 8 + index * (card_width + inner_gap)
+        estimate, measured = times[name]
+        value = (
+            f"<b>{name}</b><br>"
+            f"<font color='#666666'>E {estimate:.2f} · M {measured:.2f}</font>"
+        )
+        identifier = f"{prefix}-op-{index}"
+        cell(
+            root,
+            identifier,
+            value,
+            (
+                "rounded=1;arcSize=7;whiteSpace=wrap;html=1;"
+                "fillColor=#FFFFFF;strokeColor=#A6A6A6;strokeWidth=1.2;"
+                "fontSize=12;verticalAlign=middle;align=center;"
+            ),
+            card_x,
+            y + 34,
+            card_width,
+            94,
+        )
+        ids.append(identifier)
+    for index in range(len(ids) - 1):
+        edge(root, f"{prefix}-inner-edge-{index}", ids[index], ids[index + 1])
+    return f"{prefix}-box"
+
+
+def draw_plan(root, prefix, label, stages, times, y, highlighted=False):
+    label_fill, label_stroke = COLORS["good"] if highlighted else ("#F2F2F2", "#A6A6A6")
+    cell(
+        root,
+        f"{prefix}-label",
+        f"<b>{label}</b>",
+        (
+            "rounded=1;arcSize=8;whiteSpace=wrap;html=1;"
+            f"fillColor={label_fill};strokeColor={label_stroke};"
+            "strokeWidth=2;fontSize=18;verticalAlign=middle;"
+        ),
+        18,
+        y + 35,
+        118,
+        75,
+    )
+
+    widths = [178, 470, 128, 230, 130] if prefix == "cedar" else [178, 485, 545]
+    x = 150
+    stage_ids = []
+    for index, ((title, family, operators), width) in enumerate(zip(stages, widths)):
+        stage_ids.append(
+            draw_stage(
+                root,
+                f"{prefix}-stage-{index}",
+                title,
+                family,
+                operators,
+                times,
+                x,
+                y,
+                width,
+            )
+        )
+        x += width + 12
+    for index in range(len(stage_ids) - 1):
+        edge(
+            root,
+            f"{prefix}-stage-edge-{index}",
+            stage_ids[index],
+            stage_ids[index + 1],
+        )
+
+    estimated = sum(value[0] for value in times.values())
+    measured = sum(value[1] for value in times.values())
+    fill, stroke = COLORS["good"] if highlighted else ("#FFF2CC", "#D6B656")
+    cell(
+        root,
+        f"{prefix}-total",
+        (
+            f"<b>Total</b><br>"
+            f"Cedar est. {estimated:.2f} ms<br>"
+            f"Measured {measured:.2f} ms"
+        ),
+        (
+            "rounded=1;arcSize=8;whiteSpace=wrap;html=1;"
+            f"fillColor={fill};strokeColor={stroke};strokeWidth=2;"
+            "fontSize=14;align=left;spacingLeft=8;verticalAlign=middle;"
+        ),
+        1425,
+        y + 27,
+        155,
+        92,
+    )
+
+
+def build_drawio(output: Path):
+    mxfile = ET.Element(
+        "mxfile",
+        {
+            "host": "Electron",
+            "version": "26.0.16",
+            "modified": "2026-09-09T00:00:00.000Z",
+        },
+    )
+    diagram = ET.SubElement(mxfile, "diagram", {"id": "video-caption-figure1", "name": "Figure 1"})
+    model = ET.SubElement(
+        diagram,
+        "mxGraphModel",
+        {
+            "dx": "1600",
+            "dy": "700",
+            "grid": "1",
+            "gridSize": "10",
+            "guides": "1",
+            "tooltips": "1",
+            "connect": "1",
+            "arrows": "1",
+            "fold": "1",
+            "page": "1",
+            "pageScale": "1",
+            "pageWidth": "1600",
+            "pageHeight": "660",
+            "math": "0",
+            "shadow": "0",
+        },
+    )
+    root = ET.SubElement(model, "root")
+    ET.SubElement(root, "mxCell", {"id": "0"})
+    ET.SubElement(root, "mxCell", {"id": "1", "parent": "0"})
+
+    draw_operator_legend(root)
+    cell(root, "divider", "", "line;strokeWidth=1;strokeColor=#D9D9D9;", 18, 123, 1562, 1)
+    draw_plan(root, "cedar", "Cedar", CEDAR_STAGES, CEDAR_TIMES, 145)
+    draw_plan(root, "pico", "Joint DP", PICO_STAGES, PICO_TIMES, 345, highlighted=True)
+
+    cell(
+        root,
+        "legend",
+        (
+            "<b>E</b>: Cedar estimate &nbsp;&nbsp; "
+            "<b>M</b>: measured operator contribution &nbsp;&nbsp; "
+            "Unit: ms per source record"
+        ),
+        text_style(14),
+        250,
+        510,
+        1100,
+        28,
+    )
+    cell(
+        root,
+        "comparison",
+        (
+            "<b>Cedar:</b> 5 stages, 4 backend transitions, GPU work starts early"
+            "&nbsp;&nbsp;&nbsp;&nbsp; "
+            "<b>Joint DP:</b> 3 stages, 1 backend transition, CPU filters precede one GPU fusion"
+        ),
+        (
+            "rounded=1;arcSize=8;whiteSpace=wrap;html=1;"
+            "fillColor=#E2F0D9;strokeColor=#70AD47;strokeWidth=2;"
+            "fontSize=16;verticalAlign=middle;"
+        ),
+        110,
+        550,
+        1380,
+        48,
+    )
+    cell(
+        root,
+        "disclaimer",
+        "Illustrative values pending the formal profiling run.",
+        "text;html=1;align=right;fontSize=11;fontColor=#7F6000;fontStyle=2;",
+        1100,
+        610,
+        470,
+        18,
+    )
+
+    ET.indent(mxfile, space="  ")
+    output.write_text(ET.tostring(mxfile, encoding="unicode"), encoding="utf-8")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--render", action="store_true")
+    args = parser.parse_args()
+    build_drawio(args.output)
+    if args.render:
+        for suffix in ("pdf", "png"):
+            target = args.output.with_suffix("." + suffix)
+            command = [
+                "xvfb-run",
+                "-a",
+                "drawio",
+                "--no-sandbox",
+                "--export",
+                "--crop",
+                "--format",
+                suffix,
+                "--output",
+                str(target),
+                str(args.output),
+            ]
+            if suffix == "png":
+                command[4:4] = ["--scale", "2"]
+            subprocess.run(command, check=True)
+
+
+if __name__ == "__main__":
+    main()

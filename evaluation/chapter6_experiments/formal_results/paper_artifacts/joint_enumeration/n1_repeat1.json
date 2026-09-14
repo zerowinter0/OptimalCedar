@@ -1,0 +1,1 @@
+{"best_cost": 0.05, "best_order": [0], "config": {"cache_read_cost": 0.05, "max_width": 8, "ray_width_budget": 8, "smp_width_budget": 8}, "elapsed_seconds": 8.918403182178736e-05, "num_operators": 1, "repeat": 1, "seed": 20260905, "visited_plans": 34}
