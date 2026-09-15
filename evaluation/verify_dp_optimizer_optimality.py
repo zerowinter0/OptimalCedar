@@ -257,6 +257,9 @@ def exhaustive_oracle(
             blocks = _partition_order(order, boundary_mask)
             for block_backends in itertools.product(BACKENDS, repeat=len(blocks)):
                 max_width = parallel_stage_limit or 1
+                # The regression cases pin ``CEDAR_DP_WIDTH_LADDER=all`` on the
+                # optimizer side, so the oracle enumerates every integer width
+                # up to the stage limit and both optimize the same space.
                 width_choices = [
                     (1,)
                     if backend == "INPROCESS"
@@ -417,12 +420,16 @@ def run_dp_optimizer(
         # ``DpOptimizer._dp_smp_shares_worker_path``), so the oracle is pinned
         # to the lane semantics it was written for until it is extended.
         "CEDAR_DP_SMP_MODE",
+        # Same for the width candidates: the shipped default now enumerates
+        # the widths the profile actually measured (1,2,4,8).
+        "CEDAR_DP_WIDTH_LADDER",
     )
     old_resource_env = {
         name: os.environ.get(name) for name in resource_env_names
     }
     try:
         os.environ.setdefault("CEDAR_DP_SMP_MODE", "lane")
+        os.environ.setdefault("CEDAR_DP_WIDTH_LADDER", "all")
         if parallel_stage_limit is None:
             for name in resource_env_names:
                 os.environ.pop(name, None)

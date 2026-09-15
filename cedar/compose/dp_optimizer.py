@@ -31,11 +31,14 @@ class _DpSearchDeadlineExceeded(RuntimeError):
 
 _DP_DECLARED_RAY_INFLIGHT = 100
 
-# Parallel-stage widths the DP enumerates.  Dense where the measured width
-# curve and the sub-linear fan-out term both still change the service, sparse
-# past the widest measured point where only the resource accounting differs.
-# ``CEDAR_DP_WIDTH_LADDER=all`` restores the historical every-integer search.
-_DP_WIDTH_LADDER = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128)
+# Parallel-stage widths the DP enumerates.  The profile measures width curves
+# at exactly these widths (``CEDAR_PROFILE_SCALING_WIDTHS=1,2,4,8``), so every
+# candidate is priced from a measured point instead of an interpolation, and
+# the joint search spends its budget on order/fusion/backend instead of on
+# widths that differ only by a resource reservation.
+# ``CEDAR_DP_WIDTH_LADDER`` accepts a comma-separated list to widen it, and
+# ``all`` restores the historical every-integer search.
+_DP_WIDTH_LADDER = (1, 2, 4, 8)
 
 
 def _raise_if_dp_deadline_exceeded(
@@ -4347,6 +4350,17 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         raw = os.environ.get("CEDAR_DP_WIDTH_LADDER")
         if raw == "all":
             return tuple(range(1, limit + 1))
+        ladder = _DP_WIDTH_LADDER
+        if raw:
+            try:
+                ladder = tuple(
+                    int(token) for token in str(raw).split(",") if token.strip()
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    "CEDAR_DP_WIDTH_LADDER must be 'all' or a comma-separated "
+                    "list of positive integers"
+                ) from exc
         # Stage service grows sub-linearly in the number of actors a worker
         # owns (see ``_dp_service_parallelism``) and is capped by the widest
         # *measured* point, so enumerating every integer width spends the
@@ -4354,7 +4368,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         # while making the search quadratic in the CPU budget.  Enumerate a
         # ladder that is dense where the model still changes and coarse past
         # the measured width range instead.
-        widths = [width for width in _DP_WIDTH_LADDER if width <= limit]
+        widths = [width for width in ladder if width <= limit]
         if limit not in widths:
             widths.append(limit)
         return tuple(sorted(set(widths)))
@@ -5607,7 +5621,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         # ladder and let the worker-search time budget cut it short.
         raw = os.environ.get(
             "CEDAR_WORKER_SEARCH_SET",
-            "1,2,3,4,5,6,7,8,10,12,14,16,21,24,28,32,40,48,56,64",
+            "1,2,4,8,16,32,64",
         )
         candidates: List[int] = []
         for token in str(raw).split(","):

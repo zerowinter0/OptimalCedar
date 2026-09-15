@@ -618,7 +618,17 @@ def _calculate_pico_plan_costs(
         if not inner_ops:
             raise RuntimeError(f"Could not recover linear PICO operators for {f_name}.")
         scorer._prepare_dp_metadata(inner_ops)
-        costs[f_name] = scorer.calculate_dp_objective_cost(plan=plan)
+        try:
+            costs[f_name] = scorer.calculate_dp_objective_cost(plan=plan)
+        except Exception as exc:  # noqa: BLE001
+            # Scoring a *baseline's* plan is evidence, not part of the run: a
+            # plan that fuses an operator the joint DP would not fuse (e.g.
+            # COCO's non-fusable mapper) must not abort the measured cell.
+            logger.warning(
+                "PICO could not score the materialized plan for %s: %s",
+                f_name,
+                exc,
+            )
     return costs
 
 
