@@ -149,6 +149,12 @@ simclrv2（8 视图）与 simclrv2_views4（4 视图）都在 1.64–1.66×，�
 
 ## 五、本轮代码与协议改动
 
+**profile 现状**：`simclr`、`simclrv2`、`simclrv2_views4` 的
+`physical_model.worker_contention` 是本轮按负载实测的（三者的最优点都是 W=8）；
+`coco` 已删除竞争块（它的最优是 W=32）；`alpaca_cot`、`blip`、`clip`、`dino`、
+`pile_pubmed_abstracts` 里仍是从 alpaca 复制过来的占位曲线（不影响这几个负载的
+W 选择，因为它们在 W=32 上最好，但仍应在正式实验前逐负载替换）。
+
 | 文件 | 改动 | 原因 |
 |---|---|---|
 | `cedar/compose/plumber_optimizer.py` | CUDA 算子禁止进入 SMP stage | Plumber 把一个 CUDA filter 复制到 17 个 SMP 进程，导致 GPU OOM；DP 早就有同样的约束 |
