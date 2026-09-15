@@ -567,8 +567,19 @@ class _MultiprocessDataSetIter:
 
         self._await_workers_ready()
 
-    def _await_workers_ready(self, timeout_sec: float = 180.0) -> None:
-        """Wait until every worker has constructed and verified its stages."""
+    def _await_workers_ready(self, timeout_sec: Optional[float] = None) -> None:
+        """Wait until every worker has constructed and verified its stages.
+
+        A plan that gives every worker its own actor pool makes the remote node
+        start hundreds of processes at once, which needs longer than the
+        historical 180 s (COCO's 32-worker plan needs more, and the same limit
+        makes the 10k-record text subsets fail).  ``CEDAR_WORKER_READY_TIMEOUT_SEC``
+        raises the bound without changing what is measured.
+        """
+        if timeout_sec is None:
+            timeout_sec = float(
+                os.environ.get("CEDAR_WORKER_READY_TIMEOUT_SEC", "600")
+            )
         reports = {}
         deadline = time.monotonic() + timeout_sec
         while len(reports) < len(self._workers):
