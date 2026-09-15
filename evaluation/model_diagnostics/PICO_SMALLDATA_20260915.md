@@ -43,6 +43,13 @@ converged on the same plan the best baseline produced (identical pipes, or
 only a cosmetic PrefetcherPipe/fused-pipe difference), so the ranking is
 decided by measurement noise.
 
+Repeat of the alpaca row (same plans, second pass) shows how large that noise
+is: PICO 1 204.8, cedar 1 310.6, dj 1 104.4, pecan 1 029.9, simple_dp 991.6,
+raydata 946.1, plumber 585.7 rec/s.  Across the two passes PICO's plan
+(1 142.9 / 1 204.8) and cedar's plan (1 116.7 / 1 310.6) swap places, so the
+two shapes are indistinguishable at this data size; everything else stays
+clearly behind in both passes.
+
 Ceilings worth knowing: on clip and blip the recorded cedar/dj/pecan plans
 declare `submit_batch_size: 1` on their Ray stage and reach 105-109 rec/s
 against 1 200-2 400 rec/s for the local plans; on alpaca every 32-actor plan
