@@ -165,7 +165,24 @@ def _plan_cost(
     block_backends: Sequence[str],
     block_widths: Sequence[int],
 ) -> float:
-    """Independent width-aware resource-family bottleneck objective."""
+    """Independent width-aware resource-family bottleneck objective.
+
+    ``block_compute / width`` is the historical ideal-fan-out service.  The
+    production model divides by ``width ** exponent`` instead
+    (``DpOptimizer._dp_service_parallelism``, measured fan-out on the text
+    pipelines is close to ``sqrt(a)``), so the oracle reads the same exponent
+    and stays the exact optimum of the model the DP is asked to optimize.
+    """
+    try:
+        exponent = float(os.environ.get("CEDAR_DP_FANOUT_EXPONENT", "0.5"))
+    except ValueError:
+        exponent = 0.5
+    if not math.isfinite(exponent) or exponent <= 0.0:
+        exponent = 1.0
+
+    def service_width(width: int) -> float:
+        return float(max(1, width)) ** exponent
+
     item_size = 1.0
     cardinality = 1.0
     volume = 1.0
@@ -204,9 +221,9 @@ def _plan_cost(
         if backend == "INPROCESS":
             local_serial += block_compute
         elif backend == "RAY":
-            ray_serial += block_compute / width + boundary_work
+            ray_serial += block_compute / service_width(width) + boundary_work
         else:
-            smp_serial += block_compute / width + boundary_work
+            smp_serial += block_compute / service_width(width) + boundary_work
     return max(local_serial, ray_serial, smp_serial)
 
 

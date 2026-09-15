@@ -31,6 +31,12 @@ class _DpSearchDeadlineExceeded(RuntimeError):
 
 _DP_DECLARED_RAY_INFLIGHT = 100
 
+# Parallel-stage widths the DP enumerates.  Dense where the measured width
+# curve and the sub-linear fan-out term both still change the service, sparse
+# past the widest measured point where only the resource accounting differs.
+# ``CEDAR_DP_WIDTH_LADDER=all`` restores the historical every-integer search.
+_DP_WIDTH_LADDER = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128)
+
 
 def _raise_if_dp_deadline_exceeded(
     optimizer: "DpOptimizer", force: bool = False
@@ -768,6 +774,10 @@ class BlockCandidateProvider:
             if required:
                 widths = sorted(set(required) | {1})
             else:
+                # Index every width here, including the widths the search no
+                # longer offers (``_dp_candidate_parallelisms`` drops the
+                # degenerate ones): scoring a materialized baseline plan has
+                # to price whatever width that plan declares.
                 widths = range(1, max_parallelism + 1)
             for parallelism in widths:
                 costs = variant_compute_costs[vt]
@@ -4226,15 +4236,23 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             )
         ):
             return (1,)
-        return tuple(
-            range(
-                1,
-                self._dp_max_candidate_parallelism(
-                    variant, execution_resource
-                )
-                + 1,
-            )
+        limit = self._dp_max_candidate_parallelism(
+            variant, execution_resource
         )
+        raw = os.environ.get("CEDAR_DP_WIDTH_LADDER")
+        if raw == "all":
+            return tuple(range(1, limit + 1))
+        # Stage service grows sub-linearly in the number of actors a worker
+        # owns (see ``_dp_service_parallelism``) and is capped by the widest
+        # *measured* point, so enumerating every integer width spends the
+        # planning budget on candidates whose service is indistinguishable
+        # while making the search quadratic in the CPU budget.  Enumerate a
+        # ladder that is dense where the model still changes and coarse past
+        # the measured width range instead.
+        widths = [width for width in _DP_WIDTH_LADDER if width <= limit]
+        if limit not in widths:
+            widths.append(limit)
+        return tuple(sorted(set(widths)))
 
     def _dp_regular_transition_cost(
         self, prev_mask: int, block: BlockCandidate
@@ -4304,7 +4322,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
             ) / (
-                self._dp_effective_parallelism(block)
+                self._dp_service_parallelism(block)
                 * self._dp_stage_concurrency(block.variant)
             ) + boundary_parallel
             if self._dp_concurrency_aware_enabled():
@@ -4356,9 +4374,26 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             stage_cost = (
                 block.cost * self._dp_stage_factor(block.variant)
             ) / (
-                self._dp_effective_parallelism(block)
+                self._dp_service_parallelism(block)
                 * self._dp_stage_concurrency(block.variant)
             ) + boundary_parallel
+            if self._dp_effective_parallelism(block) <= 1:
+                # A single-process/single-thread SMP stage owns no separate
+                # worker: it runs inside the worker's own slot and hands every
+                # record to it through a queue, so its service is on the
+                # record's path instead of overlapping with the worker chain.
+                # Measured on alpaca_cot, moving six filters onto SMP(1) costs
+                # 1048 -> 982 rec/s with everything else unchanged; the same
+                # shape on clip measures 872 rec/s against 1203 rec/s for the
+                # all-in-process plan.  Wider stages keep their own lane.
+                return DpObjectiveCost(
+                    local_serial=(
+                        previous.local_serial + stage_cost + boundary_local
+                    ),
+                    ray_serial=previous.ray_serial,
+                    smp_serial=previous.smp_serial,
+                    gpu_serial=previous.gpu_serial,
+                )
             if self._dp_concurrency_aware_enabled():
                 # An SMP stage owns its processes and pipelines next to the
                 # worker chain; the measured worker-side service of an SMP
@@ -4699,6 +4734,44 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             return width
         return max(1, min(width, cap))
 
+    def _dp_service_parallelism(self, block) -> float:
+        """Width over which a stage's service time may be divided.
+
+        ``stage service / width`` assumes the a-th actor a worker owns adds as
+        much throughput as the first one.  A worker submits to all of them
+        from a single driver loop, and measured plans show the marginal actor
+        delivering far less.  Fusing every operator of alpaca_cot into one Ray
+        stage and running 2k records on 8 workers (same operators, same host,
+        the harness' own submit batch) gives
+
+            actors/worker    1      2      4      7
+            measured rate    395    470    762    1012   [rec/s]
+            ideal rate       404    797    1462   1903   [rec/s]
+
+        so the realized fan-out is close to ``sqrt(a)`` instead of ``a``.  The
+        model divides by ``sqrt(a)``: a stage with one actor per worker -- what
+        every baseline plan uses, and what a plan that maximizes workers
+        produces -- is unchanged, while a plan that buys parallelism by
+        stacking actors behind one worker is priced for what it measures.
+
+        The measured-width cap still applies first, so a plan that declares
+        more actors than the profile ever measured (Plumber asks for 62) is
+        neither credited with ideal fan-out nor with unmeasured width.
+        """
+        width = max(1, int(self._dp_effective_parallelism(block)))
+        if width <= 1:
+            return float(width)
+        raw = os.environ.get("CEDAR_DP_FANOUT_EXPONENT", "0.5")
+        try:
+            exponent = float(raw)
+        except (TypeError, ValueError):
+            exponent = 0.5
+        if not math.isfinite(exponent) or exponent <= 0.0:
+            exponent = 1.0
+        if exponent == 1.0:
+            return float(width)
+        return float(width) ** exponent
+
     def _dp_stage_concurrency(self, variant) -> float:
         """Effective per-actor overlap factor of a parallel stage.
 
@@ -4994,7 +5067,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 stage_compute = (
                     block.cost * self._dp_stage_factor(variant)
                 ) / (
-                    max(1, self._dp_effective_parallelism(block))
+                    max(1.0, self._dp_service_parallelism(block))
                     * self._dp_stage_concurrency(variant)
                 )
                 round_trip = self._dp_cross_host_round_trip_ms(stage_bytes)
@@ -5076,7 +5149,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 smp_cost = (
                     (block.cost * self._dp_stage_factor(variant))
                     / (
-                        max(1, self._dp_effective_parallelism(block))
+                        max(1.0, self._dp_service_parallelism(block))
                         * self._dp_stage_concurrency(variant)
                     )
                     + boundary_parallel
@@ -5098,7 +5171,14 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                         ),
                         flush=True,
                     )
-                smp = max(smp, smp_cost)
+                if self._dp_effective_parallelism(block) <= 1:
+                    # Same rule as the DP transition: a one-process SMP stage
+                    # runs inside the worker's own slot, so its service is
+                    # added to the record's worker-side path instead of
+                    # overlapping with it.
+                    local += smp_cost
+                else:
+                    smp = max(smp, smp_cost)
             else:
                 local += block.cost
             prev_mask |= block.mask
@@ -5481,11 +5561,25 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         return points
 
     def _dp_worker_contention_factor(self, workers: int) -> float:
-        """Interpolated contention factor for one worker count (1.0 if unset)."""
+        """Interpolated contention factor for one worker count (1.0 if unset).
+
+        The calibration is a noisy measurement of a monotone quantity: adding
+        workers to a fixed host can only add contention.  The published points
+        for alpaca_cot (1.202 at W=2, 1.851 at W=4, 1.197 at W=8, 1.814 at
+        W=16) are not monotone, and interpolating them literally made the
+        worker search prefer 8 workers with 7 actors each over 32 workers with
+        one actor each, although the latter measures 1139 rec/s against 1012.
+        Take the running maximum over the measured points instead, which is
+        the monotone envelope of the measurement and never optimistic.
+        """
         points = self._dp_worker_contention_points()
         if not points:
             return 1.0
-        ordered = sorted(points.items())
+        running = 1.0
+        ordered = []
+        for width, factor in sorted(points.items()):
+            running = max(running, factor)
+            ordered.append((width, running))
         for width, factor in ordered:
             if width == workers:
                 return factor
@@ -5541,7 +5635,16 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             self._dp_selected_workers = workers
             self._dp_worker_search_cache = {}
             return workers
-        for workers in candidates:
+        # Share the budget over the worker counts that are still to be tried.
+        # Giving every candidate "whatever is left" let the first one (W=1)
+        # consume the whole budget on a workload whose exact search cannot
+        # finish (dino: 18 operators, >30k structural transitions), so the
+        # worker search never reported a plan and the harness skipped the
+        # workload.  A fair share guarantees a feasible incumbent per worker
+        # count, and the DP already degrades to its greedy incumbent when its
+        # own deadline fires.
+        total_candidates = len(candidates)
+        for index, workers in enumerate(candidates):
             remaining = time_budget - (time.monotonic() - started)
             if remaining <= 1.0:
                 logger.info(
@@ -5551,11 +5654,13 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                     workers,
                 )
                 break
+            fair_share = remaining / max(1, total_candidates - index)
+            per_candidate_budget = min(remaining, max(10.0, fair_share))
             limits = self._dp_limits_for_workers(workers)
             if limits is None:
                 continue
             os.environ["CEDAR_DP_OPTIMIZATION_TIME_LIMIT_SEC"] = str(
-                min(remaining, time_budget)
+                per_candidate_budget
             )
             self._dp_selected_workers = workers
             # Keep every worker-count-dependent model term (GPU multiplier,
