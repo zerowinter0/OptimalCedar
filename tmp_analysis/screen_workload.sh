@@ -59,9 +59,14 @@ fi
 
 PLANNERS=${OPTIMIZERS:-"dj_optimizer pecan_optimizer plumber_optimizer raydata_optimizer optimizer dp_optimizer simple_dp_optimizer"}
 echo "[screen] planning+executing on $WORKLOAD ($SAMPLES): $PLANNERS"
-docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=cedar_remote \
+docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=${PLACEMENT:-cedar_remote} \
   -e CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC=${PICO_PLAN_BUDGET:-180} \
   -e CEDAR_DP_SMP_MODE=${SMP_MODE:-lane} \
+  -e CEDAR_DATA_JUICER_ROOT=${CEDAR_DATA_JUICER_ROOT:-/workspace/OptimalCedar/data-juicer} \
+  -e HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-1} \
+  -e TRANSFORMERS_OFFLINE=${TRANSFORMERS_OFFLINE:-1} \
+  -e CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC=${ACTOR_READY_TIMEOUT:-240} \
+  -e CEDAR_WORKER_READY_TIMEOUT_SEC=${WORKER_READY_TIMEOUT:-600} \
   $DEV bash -lc "cd /workspace/OptimalCedar && source env/bin/activate && \
   python -u outputs/plumber_bench_20260912/entry.py evaluation/compare_optimizer_perf.py \
     --dataset_file $DATASET_FILE --dataset_func ${DATASET_FUNC:-get_dataset} \

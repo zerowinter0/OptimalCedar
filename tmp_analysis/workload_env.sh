@@ -78,6 +78,18 @@ case "$WORKLOAD" in
     DATASET_FILE=evaluation/pipelines/commonvoice/cedar_dataset.py
     DATA=datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en
     ;;
+  coco)
+    DATASET_FILE=evaluation/pipelines/coco/cedar_dataset.py
+    DATA=datasets/coco
+    ;;
+  wikitext103)
+    DATASET_FILE=evaluation/pipelines/wikitext103/cedar_dataset.py
+    DATA=datasets/wikitext103/wikitext-103/wiki.train.tokens
+    ;;
+  simclrv2)
+    DATASET_FILE=evaluation/pipelines/simclrv2/cedar_dataset.py
+    DATA=datasets/imagenette2
+    ;;
   pile_hackernews)
     DATASET_FILE=evaluation/pipelines/pile_hackernews/cedar_dataset.py
     SUBSET=${SUBSET:-2k}
@@ -155,6 +167,15 @@ case "$WORKLOAD" in
     ;;
   commonvoice)
     DATASET_KWARGS="dataset_path=$DATA,max_samples=300"
+    ;;
+  coco)
+    DATASET_KWARGS="split=val2017"
+    ;;
+  wikitext103)
+    DATASET_KWARGS="max_samples=800"
+    ;;
+  simclrv2)
+    DATASET_KWARGS=""
     ;;
   swav)
     DATASET_KWARGS="workload=swav,dataset_path=$DATA"

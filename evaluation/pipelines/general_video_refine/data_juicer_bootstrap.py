@@ -21,11 +21,15 @@ def data_juicer_root() -> Path:
         candidate = Path(override)
         if (candidate / "data_juicer").is_dir():
             return candidate
-    relative = Path(__file__).resolve().parents[3] / "data-juicer"
-    if (relative / "data_juicer").is_dir():
-        return relative
+    # Both benchmark containers mount the repository at this absolute path.
+    # It is preferred over the relative path because a Ray actor runs from the
+    # *uploaded* copy of the working directory, where ``data-juicer`` is only
+    # partially replicated and the operators below are missing.
     absolute = Path("/workspace/OptimalCedar/data-juicer")
-    return absolute
+    if (absolute / "data_juicer").is_dir():
+        return absolute
+    relative = Path(__file__).resolve().parents[3] / "data-juicer"
+    return relative
 
 
 def ensure_data_juicer_path() -> None:
@@ -44,8 +48,9 @@ def ensure_data_juicer_path() -> None:
         "data_juicer.ops.filter": root / "data_juicer/ops/filter",
     }
     for name, path in packages.items():
-        if name in sys.modules:
-            continue
+        # Overwrite any earlier import of these packages: an eager
+        # ``data_juicer.ops`` import pulls 200+ operators and unrelated
+        # optional dependencies, so the stubs must win regardless of order.
         module = types.ModuleType(name)
         module.__path__ = [str(path)]
         module.__package__ = name
