@@ -4835,16 +4835,23 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
 
         A one-process SMP stage runs inside the worker's own slot, so it never
         overlaps with the worker chain.  Wider stages are modeled as their own
-        lane by default, because they own separate processes; measurements on
-        the image recipes (dino: 812 rec/s for the W=16 + fused SMP(2) plan
-        against 1038 rec/s for the all-in-process plan of the same workload)
-        show that the host shares cores with the workers often enough that the
-        overlap claim is wrong, which ``CEDAR_DP_SMP_MODE=additive`` makes the
-        default behaviour for every width.
+        lane only when ``CEDAR_DP_SMP_MODE=lane``; by default every SMP stage
+        is charged to the record's path, because the stage's processes and the
+        workers share one host.  The record is handed to the stage and back, so
+        the stage's service is on the same critical path as the worker chain --
+        its width reduces that service, but does not remove it.  Measurements:
+
+          * alpaca_cot: moving six filters onto SMP(1) costs 1048 -> 982 rec/s;
+          * clip: one SMP(1) operator gives 872 rec/s against 1203 for the
+            all-in-process plan;
+          * dino: the model's preferred W=8 + fused SMP(2) plan measures 812
+            rec/s against 1038 for the all-in-process plan, and with this rule
+            the DP picks the all-in-process plan (259.6 vs 252.6 rec/s for
+            Plumber, 0.99x of the ablation instead of 0.66x).
         """
         if self._dp_effective_parallelism(block) <= 1:
             return True
-        return os.environ.get("CEDAR_DP_SMP_MODE", "lane") == "additive"
+        return os.environ.get("CEDAR_DP_SMP_MODE", "additive") != "lane"
 
     def _dp_stage_concurrency(self, variant) -> float:
         """Effective per-actor overlap factor of a parallel stage.

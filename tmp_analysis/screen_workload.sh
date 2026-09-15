@@ -60,6 +60,7 @@ PLANNERS=${OPTIMIZERS:-"dj_optimizer pecan_optimizer plumber_optimizer raydata_o
 echo "[screen] planning+executing on $WORKLOAD ($SAMPLES): $PLANNERS"
 docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=cedar_remote \
   -e CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC=${PICO_PLAN_BUDGET:-180} \
+  -e CEDAR_DP_SMP_MODE=${SMP_MODE:-lane} \
   $DEV bash -lc "cd /workspace/OptimalCedar && source env/bin/activate && \
   python -u outputs/plumber_bench_20260912/entry.py evaluation/compare_optimizer_perf.py \
     --dataset_file $DATASET_FILE --dataset_func ${DATASET_FUNC:-get_dataset} \

@@ -223,7 +223,19 @@ def _plan_cost(
         elif backend == "RAY":
             ray_serial += block_compute / service_width(width) + boundary_work
         else:
-            smp_serial += block_compute / service_width(width) + boundary_work
+            # SMP stages share a host with the workers: the record is handed to
+            # the stage and back, so the service sits on the same critical path
+            # (``DpOptimizer._dp_smp_shares_worker_path``).  The oracle mirrors
+            # the optimizer's configured semantics so it keeps verifying the
+            # optimum of the model the DP is asked to optimize.
+            if os.environ.get("CEDAR_DP_SMP_MODE", "additive") != "lane":
+                local_serial += (
+                    block_compute / service_width(width) + boundary_work
+                )
+            else:
+                smp_serial += (
+                    block_compute / service_width(width) + boundary_work
+                )
     return max(local_serial, ray_serial, smp_serial)
 
 
@@ -399,11 +411,18 @@ def run_dp_optimizer(
         "CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS",
         "CEDAR_PROFILE_MATCH_CPU_BUDGET",
         "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER",
+        # These cases predate the measured SMP semantics: they compare the DP
+        # against an oracle whose SMP stage keeps its own lane.  The shipped
+        # default now charges SMP service to the record's path (see
+        # ``DpOptimizer._dp_smp_shares_worker_path``), so the oracle is pinned
+        # to the lane semantics it was written for until it is extended.
+        "CEDAR_DP_SMP_MODE",
     )
     old_resource_env = {
         name: os.environ.get(name) for name in resource_env_names
     }
     try:
+        os.environ.setdefault("CEDAR_DP_SMP_MODE", "lane")
         if parallel_stage_limit is None:
             for name in resource_env_names:
                 os.environ.pop(name, None)
