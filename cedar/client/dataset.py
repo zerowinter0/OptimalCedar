@@ -1493,6 +1493,40 @@ class DataSet:
             if layered_profile:
                 set_profile_input_reservoir(None)
         d["baseline"] = baseline_profile
+        # The timing passes are bounded by the adaptive profiler's confidence
+        # rule, so on a slow recipe they see only a few dozen records and every
+        # filter looks non-selective.  Selectivity is what lets the joint DP
+        # know that running a selective filter early removes work from every
+        # later operator, so pay for one extra baseline pass that is bounded by
+        # wall time instead of by the timing rule.
+        if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
+            selectivity_seconds = float(
+                os.environ.get("CEDAR_PROFILE_SELECTIVITY_SEC", "90")
+            )
+            previous_profile_time = PROFILE_TIME_SEC
+            try:
+                globals()["PROFILE_TIME_SEC"] = selectivity_seconds
+                selectivity_counts = self._profile_feature(
+                    f_name, feature_to_profile, None, None
+                )
+            finally:
+                globals()["PROFILE_TIME_SEC"] = previous_profile_time
+            for key in ("input_counts", "output_counts", "selectivities"):
+                counts = selectivity_counts.get(key)
+                if isinstance(counts, dict) and counts:
+                    baseline_profile[key] = counts
+            logger.info(
+                "Selectivity pass for %s: %s records seen per filter",
+                f_name,
+                {
+                    pipe_id: (selectivity_counts.get("input_counts") or {}).get(
+                        pipe_id
+                    )
+                    for pipe_id in (
+                        selectivity_counts.get("input_counts") or {}
+                    )
+                },
+            )
         inferred_scalings = baseline_profile.get(
             "compute_scaling_inference", {}
         )

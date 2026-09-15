@@ -687,7 +687,20 @@ class BlockCandidateProvider:
         }
         candidate_variants: List[PipeVariantType] = [PipeVariantType.INPROCESS]
 
+        forced_variants = os.environ.get("CEDAR_DP_FORCE_VARIANTS")
+        forced = (
+            {
+                PipeVariantType[name.strip()]
+                for name in forced_variants.split(",")
+                if name.strip()
+            }
+            if forced_variants
+            else None
+        )
+
         for vt, backend_stats in opt._iter_candidate_backend_stats():
+            if forced is not None and vt not in forced:
+                continue
             costs_v = [float("inf")] * self.n
             for i, p_id in enumerate(self.inner_ops):
                 pipe: Optional[Pipe] = opt.logical_pipes.get(p_id)
@@ -2040,6 +2053,50 @@ class ExtensibleDpSearch:
 
         restricted_start = time.monotonic()
         restricted_result = self._fixed_order_physical_incumbent()
+        # A second incumbent restricted to in-process execution.  The joint
+        # search burns most of its budget on width/backend alternatives, and
+        # when its deadline fires the returned plan is only as good as the
+        # incumbent: with a short budget the measured plans on the small image
+        # recipes fell behind Plumber's all-local plan (blip 0.90x, dino
+        # 0.61x).  The all-in-process shape is the shape that wins whenever
+        # offloading does not pay, and it costs one extra fixed-order beam over
+        # a single variant.
+        if os.environ.get("CEDAR_DP_INPROCESS_INCUMBENT", "1") == "1":
+            previous_variants = os.environ.get("CEDAR_DP_FORCE_VARIANTS")
+            os.environ["CEDAR_DP_FORCE_VARIANTS"] = "INPROCESS"
+            try:
+                local_provider = BlockCandidateProvider(
+                    self.optimizer, self.inner_ops
+                )
+                local_provider.prepare()
+                local_search = ExtensibleDpSearch(
+                    optimizer=self.optimizer,
+                    inner_ops=self.inner_ops,
+                    block_provider=local_provider,
+                    cache_policy=self.cache_policy,
+                )
+                local_result = local_search._fixed_order_physical_incumbent()
+            except Exception as exc:  # noqa: BLE001 - bound must stay optional
+                logger.info(
+                    "[DpOptimizer] In-process incumbent unavailable: %s", exc
+                )
+                local_result = None
+            finally:
+                if previous_variants is None:
+                    os.environ.pop("CEDAR_DP_FORCE_VARIANTS", None)
+                else:
+                    os.environ["CEDAR_DP_FORCE_VARIANTS"] = previous_variants
+            if local_result is not None and (
+                restricted_result is None
+                or local_result.cost < restricted_result.cost
+            ):
+                logger.info(
+                    "[DpOptimizer] In-process incumbent cost=%s beats "
+                    "mixed-backend incumbent %s",
+                    local_result.cost,
+                    getattr(restricted_result, "cost", None),
+                )
+                restricted_result = local_result
         if os.environ.get("CEDAR_DP_LEGACY_SUBSET_INCUMBENT", "0") == "1":
             legacy_result = self._single_parallel_block_incumbent()
             if (
@@ -4377,7 +4434,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 self._dp_service_parallelism(block)
                 * self._dp_stage_concurrency(block.variant)
             ) + boundary_parallel
-            if self._dp_effective_parallelism(block) <= 1:
+            if self._dp_smp_shares_worker_path(block):
                 # A single-process/single-thread SMP stage owns no separate
                 # worker: it runs inside the worker's own slot and hands every
                 # record to it through a queue, so its service is on the
@@ -4385,7 +4442,8 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 # Measured on alpaca_cot, moving six filters onto SMP(1) costs
                 # 1048 -> 982 rec/s with everything else unchanged; the same
                 # shape on clip measures 872 rec/s against 1203 rec/s for the
-                # all-in-process plan.  Wider stages keep their own lane.
+                # all-in-process plan.  ``CEDAR_DP_SMP_MODE=additive`` extends
+                # the same rule to every SMP width.
                 return DpObjectiveCost(
                     local_serial=(
                         previous.local_serial + stage_cost + boundary_local
@@ -4771,6 +4829,22 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         if exponent == 1.0:
             return float(width)
         return float(width) ** exponent
+
+    def _dp_smp_shares_worker_path(self, block) -> bool:
+        """Whether an SMP stage's service belongs on the record's worker path.
+
+        A one-process SMP stage runs inside the worker's own slot, so it never
+        overlaps with the worker chain.  Wider stages are modeled as their own
+        lane by default, because they own separate processes; measurements on
+        the image recipes (dino: 812 rec/s for the W=16 + fused SMP(2) plan
+        against 1038 rec/s for the all-in-process plan of the same workload)
+        show that the host shares cores with the workers often enough that the
+        overlap claim is wrong, which ``CEDAR_DP_SMP_MODE=additive`` makes the
+        default behaviour for every width.
+        """
+        if self._dp_effective_parallelism(block) <= 1:
+            return True
+        return os.environ.get("CEDAR_DP_SMP_MODE", "lane") == "additive"
 
     def _dp_stage_concurrency(self, variant) -> float:
         """Effective per-actor overlap factor of a parallel stage.
@@ -5171,7 +5245,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                         ),
                         flush=True,
                     )
-                if self._dp_effective_parallelism(block) <= 1:
+                if self._dp_smp_shares_worker_path(block):
                     # Same rule as the DP transition: a one-process SMP stage
                     # runs inside the worker's own slot, so its service is
                     # added to the record's worker-side path instead of
