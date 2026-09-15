@@ -20,6 +20,7 @@
 | simclr | **483.4** | Plumber 250.0 | **1.93×** | 430.9 | 1.12× | ✓ |
 | simclrv2 | **454.9** | Plumber 248.8 | **1.83×** | 410.5 | 1.11× | ✓ |
 | simclrv2_views4 | **468.6** | Plumber 265.8 | **1.76×** | 416.3 | 1.13× | ✓ |
+| simclrv2_cache | 409.5 | Plumber 254.8 | **1.61×** | 451.0 | **0.91×** | ✓ / ✗ |
 | simclr（标定前） | 399.1 | Plumber 241.9 | 1.65× | 394.3 | 1.01× | |
 | simclrv2（标定前） | 403.3 | Plumber 242.2 | 1.66× | 391.8 | 1.03× | |
 | pile_hackernews | 37.3 | Plumber 34.8 | 1.07× | 26.0 | 1.43× | |
@@ -35,6 +36,11 @@
 | dino（2 视图，重测） | 279.9 | Plumber 236.0 | 1.19× | — | 0.99× | |
 | llava_pretrain | 18.0 | DJ-Cedar 44.9 | 0.40× | 43.0 | 0.42× | |
 | swav（8 视图，59 算子） | 无计划 | Plumber 83.4 | — | 无计划 | — | |
+
+**汇总**：目标 1 达成 **5/8**（coco 7.36×、simclr 1.93×、simclrv2 1.83×、
+simclrv2_views4 1.76×、simclrv2_cache 1.61×）；目标 2 达成 **0/3**（最大
+ablation 差距 1.13×）；目标 3 在 4/5 个达标负载上成立（simclrv2_cache 上
+PICO 0.91× 于 simple-DP，见 §2.7）。
 
 **当前（"逐个系统"口径，对 Cedar）**：PICO ≥1.5× Cedar 的负载有
 coco 35×、blip 12×、swav_single 8.3×、dino_single 7.0×、clip 4.8×、
@@ -116,6 +122,13 @@ DJ-Cedar 与 simple-DP 都选了"1 个 Ray stage、8 actors、bs=500"的融合�
 共享 1 块 GPU 的融合 stage 里，CPU 与 GPU 工作在实际运行时是重叠的，而当前
 模型把 GPU 服务需求整条记在记录的关键路径上、并且没有按提交批大小摊销。
 这既是 llava 失败的原因，也是把 GPU 负载纳入 8 个负载集合前必须修的问题。
+
+### 7. 缓存负载上模型反而输给 ablation（新发现）
+`simclrv2_cache`（simclrv2 + object-disk cache）：PICO 409.5 rec/s、Plumber 254.8、
+Cedar 120.7，但 simple-DP 451.0——**PICO 只有它的 0.91×**。说明"缓存边界怎么定价"
+上 Cedar 原模型反而更接近现实（它按 cache 命中后的算子成本直接打折）。这一条
+既是目标 3 的反例，也是下一步最具体的模型修正点：把 cache 写/读边界按实测
+标定（本轮 llava 已经证明 RAY/SMP 边界可以用线性拟合标定到 R²>0.99）。
 
 ### 6. 多视图 recipe 的计划空间确实有 1.6–2.0× 余地
 simclrv2（8 视图）与 simclrv2_views4（4 视图）都在 1.64–1.66×，且两个模型的
