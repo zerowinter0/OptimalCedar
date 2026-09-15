@@ -161,6 +161,12 @@ case "$WORKLOAD" in
     DATASET_FILE=evaluation/pipelines/target_pipeline/simclr/cedar_dataset.py
     DATA=
     ;;
+  simclr_order_probe)
+    # Diagnostic: the SimCLR augmentation chain declared in "shrink first"
+    # order, used to measure the value of operator ordering on its own.
+    DATASET_FILE=evaluation/pipelines/simclr_order_probe/cedar_dataset.py
+    DATA=
+    ;;
   *)
     echo "unknown workload: $WORKLOAD" >&2
     return 1
