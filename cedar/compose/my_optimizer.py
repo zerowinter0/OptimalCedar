@@ -30,6 +30,59 @@ from cedar.pipes import (
 logger = logging.getLogger(__name__)
 
 
+class _LazyProductTable:
+    """Mask-indexed product table that materializes entries on demand.
+
+    The exact subset DP indexes these tables by bitmask, which costs 2^n
+    entries.  Pipelines with 60+ operators cannot afford that, so the
+    chain-partition search only ever visits prefix masks; this table computes
+    exactly those (and caches them) while keeping the same ``table[mask]``
+    interface the rest of the model uses.
+    """
+
+    __slots__ = ("_ratios", "_cache")
+
+    def __init__(self, ratios: Iterable[float]):
+        self._ratios = tuple(float(value) for value in ratios)
+        self._cache = {0: 1.0}
+
+    def __getitem__(self, mask: int) -> float:
+        value = self._cache.get(mask)
+        if value is not None:
+            return value
+        lsb = mask & -mask
+        index = lsb.bit_length() - 1
+        value = self[mask ^ lsb] * self._ratios[index]
+        self._cache[mask] = value
+        return value
+
+    def __len__(self) -> int:
+        # Callers compare table lengths to detect schema mismatches; report the
+        # number of factors so lazy and eager tables stay comparable.
+        return len(self._ratios)
+
+
+class _LazyProductPair:
+    """Item-volume table = per-item size product x surviving cardinality."""
+
+    __slots__ = ("_sizes", "_cardinality", "_cache")
+
+    def __init__(self, sizes, cardinality):
+        self._sizes = sizes
+        self._cardinality = cardinality
+        self._cache = {0: 1.0}
+
+    def __getitem__(self, mask: int) -> float:
+        value = self._cache.get(mask)
+        if value is None:
+            value = self._sizes[mask] * self._cardinality[mask]
+            self._cache[mask] = value
+        return value
+
+    def __len__(self) -> int:
+        return len(self._sizes)
+
+
 class MyOptimizer(Optimizer):
     """
     一个完全独立于原 `Optimizer` 重排/缓存/offload 逻辑的优化器实现。
@@ -1477,19 +1530,24 @@ class MyOptimizer(Optimizer):
         # The exact DP materializes 2^n subset tables. Multi-view workloads
         # (DINO/SwAV expose 60+ operators) would otherwise fail with an
         # out-of-memory or overflow error deep inside the metadata build.
-        if n > 26:
-            raise ValueError(
-                "DP exact subset metadata requires 2^n tables; "
-                f"{n} reorderable operators exceed the supported limit (26). "
-                "Use a staged optimizer or reduce the pipeline."
-            )
-        full_mask = 1 << n
-        r_prod = [1.0] * full_mask
-        for mask in range(1, full_mask):
-            lsb = mask & -mask
-            i = lsb.bit_length() - 1
-            prev = mask ^ lsb
-            r_prod[mask] = r_prod[prev] * ratios[i]
+        # Above the limit the tables are built lazily: only the masks the
+        # search actually visits are materialized, which is what lets the
+        # chain-partition search handle 60+ operator pipelines.
+        subset_limit = int(
+            os.environ.get("CEDAR_DP_SUBSET_OPERATOR_LIMIT", "26")
+        )
+        if n > subset_limit:
+            self._dp_use_lazy_products = True
+            r_prod = _LazyProductTable(ratios)
+        else:
+            self._dp_use_lazy_products = False
+            full_mask = 1 << n
+            r_prod = [1.0] * full_mask
+            for mask in range(1, full_mask):
+                lsb = mask & -mask
+                i = lsb.bit_length() - 1
+                prev = mask ^ lsb
+                r_prod[mask] = r_prod[prev] * ratios[i]
         self._dp_r_prod = r_prod
 
         # Cardinality is distinct from serialized size per surviving item.
@@ -1576,18 +1634,23 @@ class MyOptimizer(Optimizer):
                         ) from exc
             self._dp_compute_scalings.append(scaling)
 
-        cardinality_prod = [1.0] * full_mask
-        volume_prod = [1.0] * full_mask
-        for mask in range(1, full_mask):
-            lsb = mask & -mask
-            i = lsb.bit_length() - 1
-            prev = mask ^ lsb
-            cardinality_prod[mask] = (
-                cardinality_prod[prev] * selectivities[i]
-            )
-            volume_prod[mask] = (
-                r_prod[mask] * cardinality_prod[mask]
-            )
+        if getattr(self, "_dp_use_lazy_products", False):
+            cardinality_prod = _LazyProductTable(selectivities)
+            volume_prod = _LazyProductPair(r_prod, cardinality_prod)
+        else:
+            cardinality_prod = [1.0] * full_mask
+            loop_mask = 1 << n
+            volume_prod = [1.0] * loop_mask
+            for mask in range(1, loop_mask):
+                lsb = mask & -mask
+                i = lsb.bit_length() - 1
+                prev = mask ^ lsb
+                cardinality_prod[mask] = (
+                    cardinality_prod[prev] * selectivities[i]
+                )
+                volume_prod[mask] = (
+                    r_prod[mask] * cardinality_prod[mask]
+                )
         self._dp_cardinality_prod = cardinality_prod
         self._dp_volume_prod = volume_prod
 

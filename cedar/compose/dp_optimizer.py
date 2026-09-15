@@ -3638,6 +3638,54 @@ class ExtensibleDpSearch:
         )
 
 
+class ChainPartitionDpSearch(ExtensibleDpSearch):
+    """Joint stage-partition DP for pipelines above the subset-DP limit.
+
+    The subset DP enumerates every operator subset, which costs 2^n states; the
+    multi-view recipes (SwAV and DINO expose 60+ operators) cannot afford that.
+    This search keeps the *whole* transition machinery -- fusion, backend,
+    stage width, worker count, boundary and transport pricing, resource
+    accounting -- and only fixes the operator order to the profiled order,
+    running an exact partition DP over contiguous segments (O(n^2) transitions
+    per order).  Ordering is exactly the part whose search space is
+    exponential, and it is the part the profile's selectivity and size ratios
+    already rank well; everything else is still decided jointly.
+    """
+
+    def run(self) -> SearchResult:
+        previous_beam = os.environ.get("CEDAR_DP_INCUMBENT_BEAM")
+        os.environ["CEDAR_DP_INCUMBENT_BEAM"] = os.environ.get(
+            "CEDAR_DP_CHAIN_BEAM", "512"
+        )
+        try:
+            result = self._fixed_order_physical_incumbent()
+            if result is None:
+                result = self._single_parallel_block_incumbent()
+        finally:
+            if previous_beam is None:
+                os.environ.pop("CEDAR_DP_INCUMBENT_BEAM", None)
+            else:
+                os.environ["CEDAR_DP_INCUMBENT_BEAM"] = previous_beam
+        if result is None or not math.isfinite(result.cost):
+            raise RuntimeError(
+                "Chain partition search found no feasible plan for this "
+                f"{self.n}-operator pipeline."
+            )
+        stats = dict(getattr(self, "_last_search_stats", {}) or {})
+        stats.update(
+            {
+                "search_mode": "chain_partition",
+                "operator_count": self.n,
+                "chain_beam": int(
+                    os.environ.get("CEDAR_DP_CHAIN_BEAM", "512")
+                ),
+                "returned_feasible_cost": result.cost,
+            }
+        )
+        self._last_search_stats = stats
+        return result
+
+
 class ThresholdFeasibilityDpSearch:
     """Move integer Ray/SMP width choice out of the subset-DP frontier.
 
@@ -6014,6 +6062,44 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             requested_mode = os.environ.get(
                 "CEDAR_DP_SEARCH_MODE", "auto"
             ).strip().lower()
+            subset_limit = int(
+                os.environ.get("CEDAR_DP_SUBSET_OPERATOR_LIMIT", "26")
+            )
+            if len(inner_ops) > subset_limit and requested_mode == "auto":
+                logger.info(
+                    "[DpOptimizer] %s operators exceed the subset-DP limit "
+                    "(%s); using the chain-partition search.",
+                    len(inner_ops),
+                    subset_limit,
+                )
+                requested_mode = "chain"
+            if requested_mode not in ("auto", "general", "threshold", "chain"):
+                raise RuntimeError(
+                    "CEDAR_DP_SEARCH_MODE must be auto, general, chain, or "
+                    "threshold"
+                )
+            if requested_mode == "chain":
+                selected_mode = "chain_partition"
+                search = ChainPartitionDpSearch(
+                    optimizer=self,
+                    inner_ops=inner_ops,
+                    block_provider=block_provider,
+                    cache_policy=cache_policy,
+                )
+                candidate_result = search.run()
+                stats = dict(
+                    getattr(search, "_last_search_stats", {}) or {}
+                )
+                stats.update(
+                    {
+                        "search_mode": selected_mode,
+                        "complexity_prediction": prediction,
+                        "optimization_timed_out": False,
+                        "returned_feasible_cost": candidate_result.cost,
+                    }
+                )
+                self._dp_last_search_stats = stats
+                return (resource_limits, candidate_result, dict(stats))
             legacy_threshold = os.environ.get(
                 "CEDAR_DP_THRESHOLD_FEASIBILITY"
             )

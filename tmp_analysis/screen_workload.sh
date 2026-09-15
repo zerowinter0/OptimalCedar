@@ -22,6 +22,7 @@ SAMPLES=${2:-2000}
 SPEC=${SPEC:-600}
 OUT=${OUT:-/tmp/screen}
 mkdir -p "$OUT"
+export SUBSET=${SUBSET:-${SAMPLES}}
 # The harness writes results *inside* the container, so the shared repo path is
 # the only location both sides can read.
 RESULTS_DIR=outputs/screen

@@ -51,6 +51,19 @@ case "$WORKLOAD" in
     DATASET_FILE=evaluation/pipelines/target_pipeline/swav/cedar_dataset.py
     DATA=datasets/target_pipeline_bench/swav.jsonl
     ;;
+  swav_single)
+    # Single-view SwAV: the multi-crop recipe replicates the whole augmentation
+    # chain once per view (59 operators with the default views=8).  One view
+    # keeps the pipeline semantics and the dataset, and stays inside the joint
+    # DP's subset limit; the multi-view shape is a training-time choice, not a
+    # different data pipeline.
+    DATASET_FILE=evaluation/pipelines/target_pipeline/swav/cedar_dataset.py
+    DATA=datasets/target_pipeline_bench/swav.jsonl
+    ;;
+  dino_single)
+    DATASET_FILE=evaluation/pipelines/target_pipeline/dino/cedar_dataset.py
+    DATA=datasets/target_pipeline_bench/dino.jsonl
+    ;;
   general_video_refine)
     DATASET_FILE=evaluation/pipelines/general_video_refine/cedar_dataset.py
     DATA=$SMALL/general_video_refine_500.jsonl
@@ -67,19 +80,27 @@ case "$WORKLOAD" in
     ;;
   pile_hackernews)
     DATASET_FILE=evaluation/pipelines/pile_hackernews/cedar_dataset.py
-    DATA=$SMALL/pile_hackernews_2k.jsonl
+    SUBSET=${SUBSET:-2k}
+    DATA=$SMALL/pile_hackernews_${SUBSET}.jsonl
+    SOURCE=/workspace/OptimalCedar/datasets/pile_hackernews/pile-hackernews-raw-100000.jsonl
     ;;
   pile_pubmed_abstracts)
     DATASET_FILE=evaluation/pipelines/target_pipeline/hub/pile_pubmed_abstracts/cedar_dataset.py
-    DATA=$SMALL/pile_pubmed_2k.jsonl
+    SUBSET=${SUBSET:-2k}
+    DATA=$SMALL/pile_pubmed_${SUBSET}.jsonl
+    SOURCE=/workspace/OptimalCedar/datasets/pile_pubmed_abstracts/pile-pubmed-abstracts-raw-100000.jsonl
     ;;
   pile_uspto_backgrounds)
     DATASET_FILE=evaluation/pipelines/target_pipeline/hub/pile_uspto_backgrounds/cedar_dataset.py
-    DATA=$SMALL/pile_uspto_2k.jsonl
+    SUBSET=${SUBSET:-2k}
+    DATA=$SMALL/pile_uspto_${SUBSET}.jsonl
+    SOURCE=/workspace/OptimalCedar/datasets/pile_uspto_backgrounds/pile-uspto-backgrounds-raw-100000.jsonl
     ;;
   bloom_oscar)
     DATASET_FILE=evaluation/pipelines/bloom_oscar/cedar_dataset.py
-    DATA=$SMALL/bloom_oscar_2k.jsonl
+    SUBSET=${SUBSET:-2k}
+    DATA=$SMALL/bloom_oscar_${SUBSET}.jsonl
+    SOURCE=/workspace/OptimalCedar/datasets/bloom_oscar/c4_en_50000_for_bloom_oscar.jsonl
     ;;
   blip)
     DATASET_FILE=evaluation/pipelines/target_pipeline/blip/cedar_dataset.py
@@ -137,6 +158,12 @@ case "$WORKLOAD" in
     ;;
   swav)
     DATASET_KWARGS="workload=swav,dataset_path=$DATA"
+    ;;
+  swav_single)
+    DATASET_KWARGS="workload=swav,dataset_path=$DATA,views=1"
+    ;;
+  dino_single)
+    DATASET_KWARGS="workload=dino,dataset_path=$DATA,views=1"
     ;;
   dino)
     DATASET_KWARGS="workload=dino,dataset_path=$DATA,views=2"

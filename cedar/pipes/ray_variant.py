@@ -136,7 +136,9 @@ class RayPipeVariant(_AsyncPipeVariant):
         try:
             ray.get(
                 [actor.__ray_ready__.remote() for actor in actors],
-                timeout=60,
+                timeout=float(
+                    os.environ.get("CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC", "240")
+                ),
             )
         except Exception:
             for actor in actors:

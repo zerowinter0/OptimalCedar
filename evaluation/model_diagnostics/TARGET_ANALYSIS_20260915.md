@@ -202,3 +202,21 @@ stage 内部的宽度折算服务时间**（`CEDAR_DP_SMP_MODE=additive` 已是�
    "PICO 在所有负载上不劣于最好的对比系统，且在模型敏感的负载上比同搜索空间
    但使用 Cedar 代价模型的 ablation 快 1.2–3.8×"——后者（alpaca 3.81×、
    bloom 1.64×）是目前最干净、最可解释的证据。
+
+## 六、本轮新增的 DP / 运行时支持
+
+1. **链式分段 DP（`ChainPartitionDpSearch`）**：当算子数超过
+   `CEDAR_DP_SUBSET_OPERATOR_LIMIT`（默认 26）时，子集 DP 的 2^n 表不可行。
+   新模式固定算子顺序（profile 顺序），对**连续分段**做精确划分 DP，融合、
+   后端、stage 宽度、worker 数仍然联合决策，只放弃"顺序搜索"这一指数项；
+   相应的乘积表改为按需计算（`_LazyProductTable`），只有搜索真正访问到的
+   mask 才会被物化。这样 60 算子级的流水线（SwAV 默认 8 视图、DINO 10 视图）
+   可以在不改变代价语义的前提下求解。
+2. **Ray actor 就绪超时可配置**：`CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC`（默认
+   240 s，原为硬编码 60 s）。32 worker × 多 actor 的计划在启动阶段会把远端
+   节点打满，60 s 会导致整个 cell 直接失败（`Get timed out` / 数据集 worker
+   初始化超时），而这不是计划本身的问题。
+3. **规模上限的实测**：把 text 负载的子集从 2 000 提到 10 000 条后，W=32 的
+   计划在启动阶段仍会失败（`Timed out waiting for multiprocess dataset
+   workers to initialize their execution stages`），因此当前稳定的小数据规模
+   是 2 000 条；要跑更大规模需要先解决 worker/actor 的批量启动问题。
