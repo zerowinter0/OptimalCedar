@@ -2,13 +2,34 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import types
 from pathlib import Path
 
 
+def data_juicer_root() -> Path:
+    """Locate the pinned Data-Juicer checkout.
+
+    Ray stages execute from an uploaded copy of the working directory, so the
+    repository-relative path does not exist inside an actor.  The benchmark
+    containers all mount the repository at ``/workspace/OptimalCedar``, which
+    is why an absolute override wins over the relative default.
+    """
+    override = os.environ.get("CEDAR_DATA_JUICER_ROOT", "").strip()
+    if override:
+        candidate = Path(override)
+        if (candidate / "data_juicer").is_dir():
+            return candidate
+    relative = Path(__file__).resolve().parents[3] / "data-juicer"
+    if (relative / "data_juicer").is_dir():
+        return relative
+    absolute = Path("/workspace/OptimalCedar/data-juicer")
+    return absolute
+
+
 def ensure_data_juicer_path() -> None:
-    root = Path(__file__).resolve().parents[3] / "data-juicer"
+    root = data_juicer_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 

@@ -71,6 +71,18 @@ def get_ray_actor_options(
         env_vars["PYTHONPATH"] = debug_pythonpath
         runtime_env["env_vars"] = env_vars
         options["runtime_env"] = runtime_env
+    # Some workloads resolve pinned in-repository assets (Data-Juicer's video
+    # operators) by absolute path.  Ray stages run from an uploaded copy of the
+    # workdir where that path does not exist, so forward the override.
+    for name in ("CEDAR_DATA_JUICER_ROOT",):
+        value = os.environ.get(name, "").strip()
+        if not value:
+            continue
+        runtime_env = dict(options.get("runtime_env", {}))
+        env_vars = dict(runtime_env.get("env_vars", {}))
+        env_vars.setdefault(name, value)
+        runtime_env["env_vars"] = env_vars
+        options["runtime_env"] = runtime_env
     resource_name = os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip()
     if not resource_name:
         return options
