@@ -1240,6 +1240,95 @@ class MyOptimizer(Optimizer):
             return self._dp_cardinality_prod[mask]
         return self._dp_work_prod(mask)
 
+    def _dp_operator_fixed_fraction(self, p_id: int) -> float:
+        """Size-independent share of an operator's profiled cost.
+
+        ``physical_model.operator_affine`` fits ``cost = k * input_bytes + b``
+        per operator on the smallest and largest legal inputs that reached it.
+        The DP prices an operator by the byte volume reaching it, which assumes
+        the whole cost shrinks with the input; ``b`` is the part that does not.
+        Returning 0 keeps the historical behaviour for old profiles.
+        """
+        raw = os.environ.get("CEDAR_DP_OPERATOR_AFFINE")
+        if raw is not None and raw.strip() not in (
+            "1",
+            "true",
+            "True",
+            "yes",
+        ):
+            return 0.0
+        entry = (
+            self.profiled_stats.get("physical_model", {})
+            .get("operator_affine", {})
+        )
+        if not isinstance(entry, dict):
+            return 0.0
+        operators = entry.get("operators", entry)
+        if not isinstance(operators, dict):
+            return 0.0
+        record = operators.get(p_id, operators.get(str(p_id)))
+        if not isinstance(record, dict):
+            return 0.0
+        try:
+            fraction = float(record["fixed_fraction"])
+        except (KeyError, TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(fraction) or fraction <= 0.0:
+            return 0.0
+        return min(fraction, 0.95)
+
+    def _dp_backend_width_speedup(
+        self, p_id: int, family: str, width: int
+    ) -> float:
+        """Measured per-operator speedup from width 1 to ``width`` actors.
+
+        ``physical_model.scaling`` records an operator's per-record cost at
+        1/2/4/8 actors of the same backend.  For accelerator operators that
+        curve is the only honest answer to "what does a wider stage buy?":
+        co-locating several model replicas on one device overlaps their
+        latency-bound work, so the marginal actor is worth much less than a
+        linear share -- but refusing to credit it at all (the previous
+        single-shared-GPU accounting) rejects plans that measure faster.
+        """
+        if width <= 1:
+            return 1.0
+        scaling = (
+            self.profiled_stats.get("physical_model", {}).get("scaling", {})
+        )
+        if not isinstance(scaling, dict):
+            return 1.0
+        entry = scaling.get(family)
+        if not isinstance(entry, dict):
+            return 1.0
+        record = entry.get(p_id, entry.get(str(p_id)))
+        if not isinstance(record, dict):
+            return 1.0
+        widths = record.get("widths")
+        if not isinstance(widths, dict):
+            return 1.0
+        measured = {}
+        for key, value in widths.items():
+            try:
+                actors = int(key)
+                cost = float(value.get("end_to_end_ms_per_input_sample"))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            if actors >= 1 and math.isfinite(cost) and cost > 0.0:
+                measured[actors] = cost
+        if not measured:
+            return 1.0
+        base = measured.get(1)
+        if base is None or base <= 0.0:
+            base = measured[min(measured)]
+        usable = [actors for actors in measured if actors <= width]
+        if not usable:
+            return 1.0
+        widest = max(usable)
+        cost_at_width = measured[widest]
+        if cost_at_width <= 0.0:
+            return 1.0
+        return max(1.0, base / cost_at_width)
+
     def _dp_compute_cost_denominator(
         self,
         operator_idx: int,

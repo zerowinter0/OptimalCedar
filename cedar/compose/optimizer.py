@@ -2093,6 +2093,12 @@ class Optimizer:
         Returns the fractional data size of the output / input for pipe
         p_id
         """
+        # A profile may carry statistics for pipes that the current logical
+        # feature no longer exposes (e.g. a recipe's source pipe, or a pipe
+        # added by an older revision of the same workload).  Those entries are
+        # never scheduled, so give them the neutral ratio instead of raising.
+        if p_id not in self.logical_pipes:
+            return 1.0
         try:
             ratio = (
                 self.profiled_stats["baseline"]["output_sizes"][p_id]

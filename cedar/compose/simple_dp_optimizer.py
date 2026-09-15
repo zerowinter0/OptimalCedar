@@ -141,6 +141,9 @@ class _CedarCacheTransitionPolicy(CacheTransitionPolicy):
 
 
 class SimpleDpOptimizer(DpOptimizer):
+    # Scores with Cedar's original cost model, so it must not see PICO's
+    # operator input-size affine split.
+    uses_affine_operator_cost = False
     """Joint DP whose objective is exactly Cedar's original scalar cost."""
 
     joint_actor_allocation = False

@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 import pathlib
@@ -2313,6 +2314,386 @@ class DataSet:
         finally:
             variant.shutdown()
 
+    def _time_operator_on_snapshots(
+        self,
+        fn,
+        snapshots: List[bytes],
+        min_calls: int,
+        max_calls: int,
+        repeats: int,
+        target_sec: float,
+        max_batch_bytes: int,
+    ) -> Optional[float]:
+        """Median milliseconds per record for one operator callable."""
+        values = [pickle.loads(snapshot) for snapshot in snapshots]
+        if not values:
+            return None
+        record_bytes = max(
+            1.0, statistics.median(len(snapshot) for snapshot in snapshots)
+        )
+        for value in values[:3]:
+            fn(value)
+        calibration_calls = 3
+        sink = None
+        start = time.perf_counter()
+        for _ in range(calibration_calls):
+            for value in values:
+                sink = fn(value)
+        elapsed = time.perf_counter() - start
+        per_call_sec = max(elapsed / (calibration_calls * len(values)), 1e-9)
+        calls = int(min(max_calls, max(min_calls, target_sec / per_call_sec)))
+        calls = max(1, min(calls, int(max(1.0, max_batch_bytes / record_bytes))))
+        rates: List[float] = []
+        for _ in range(max(1, repeats)):
+            was_enabled = gc.isenabled()
+            gc.disable()
+            sink = None
+            start = time.perf_counter()
+            for _ in range(calls):
+                for value in values:
+                    sink = fn(value)
+            duration = time.perf_counter() - start
+            if was_enabled:
+                gc.enable()
+            if sink is NotImplemented:
+                raise RuntimeError("Unexpected operator result")
+            rates.append(calls * len(values) / max(duration, 1e-9))
+        return 1000.0 / statistics.median(rates)
+
+    def _time_operator_value(
+        self,
+        fn,
+        value,
+        min_calls: int,
+        max_calls: int,
+        repeats: int,
+        target_sec: float,
+        max_batch_bytes: int,
+        payload_bytes: int = 0,
+    ) -> Optional[float]:
+        """Median milliseconds per record for one operator on one payload."""
+        fn(value)
+        calibration_calls = 3
+        sink = None
+        start = time.perf_counter()
+        for _ in range(calibration_calls):
+            sink = fn(value)
+        elapsed = time.perf_counter() - start
+        per_call_sec = max(elapsed / calibration_calls, 1e-9)
+        calls = int(min(max_calls, max(min_calls, target_sec / per_call_sec)))
+        if payload_bytes > 0:
+            calls = max(
+                1,
+                min(calls, int(max(1.0, max_batch_bytes / payload_bytes))),
+            )
+        rates: List[float] = []
+        for _ in range(max(1, repeats)):
+            was_enabled = gc.isenabled()
+            gc.disable()
+            sink = None
+            start = time.perf_counter()
+            for _ in range(calls):
+                sink = fn(value)
+            duration = time.perf_counter() - start
+            if was_enabled:
+                gc.enable()
+            if sink is NotImplemented:
+                raise RuntimeError("Unexpected operator result")
+            rates.append(calls / max(duration, 1e-9))
+        return 1000.0 / statistics.median(rates)
+
+    @staticmethod
+    def _affine_rescale_payload(value, factor: float, depth: int = 0):
+        """Return ``value`` with its data-carrying fields scaled by ``factor``.
+
+        The affine calibration asks one question per operator: how much of this
+        operator's cost is size-independent?  Image pipelines answer it only if
+        the same operator is also fed a differently sized payload, because every
+        record that reaches an operator after a resize has the same shape.  This
+        helper builds such payloads from the operator's own legal input, keeping
+        the container structure so the operator sees a real record: images are
+        resampled, text is truncated or repeated, and anything unsupported makes
+        the caller fall back to its own snapshots.
+        """
+        if depth > 3 or factor <= 0.0:
+            return None
+        if isinstance(value, dict):
+            scaled = {}
+            changed = False
+            for key, item in value.items():
+                replacement = Dataset._affine_rescale_payload(
+                    item, factor, depth + 1
+                )
+                if replacement is None:
+                    scaled[key] = item
+                else:
+                    scaled[key] = replacement
+                    changed = True
+            return scaled if changed else None
+        if isinstance(value, (list, tuple)):
+            items = []
+            changed = False
+            for item in value:
+                replacement = Dataset._affine_rescale_payload(
+                    item, factor, depth + 1
+                )
+                if replacement is None:
+                    items.append(item)
+                else:
+                    items.append(replacement)
+                    changed = True
+            if not changed:
+                return None
+            return type(value)(items) if not isinstance(value, tuple) else tuple(items)
+        if isinstance(value, str):
+            if factor < 1.0:
+                cut = max(1, int(len(value) * factor))
+                return value[:cut] if cut < len(value) else None
+            repeats = max(2, int(round(factor)))
+            return value * repeats
+        if isinstance(value, bytes):
+            if factor < 1.0:
+                cut = max(1, int(len(value) * factor))
+                return value[:cut] if cut < len(value) else None
+            return value * max(2, int(round(factor)))
+        try:
+            from PIL import Image
+        except Exception:  # noqa: BLE001
+            Image = None
+        if Image is not None and isinstance(value, Image.Image):
+            width, height = value.size
+            new_size = (
+                max(1, int(round(width * factor))),
+                max(1, int(round(height * factor))),
+            )
+            if new_size == value.size:
+                return None
+            return value.resize(new_size, Image.BILINEAR)
+        try:
+            import torch
+            import torch.nn.functional as torch_functional
+        except Exception:  # noqa: BLE001
+            return None
+        if isinstance(value, torch.Tensor) and value.dim() >= 2:
+            channel_last = value.dim() == 3 and value.shape[-1] in (1, 3, 4)
+            if channel_last:
+                moved = value.permute(2, 0, 1)
+            else:
+                moved = value
+            height, width = int(moved.shape[-2]), int(moved.shape[-1])
+            new_size = (
+                max(1, int(round(height * factor))),
+                max(1, int(round(width * factor))),
+            )
+            if new_size == (height, width):
+                return None
+            floating = moved.dtype.is_floating_point
+            resized = torch_functional.interpolate(
+                moved.unsqueeze(0).float(),
+                size=new_size,
+                mode="bilinear" if floating else "nearest",
+                align_corners=False if floating else None,
+            ).squeeze(0)
+            if not floating:
+                resized = resized.round().to(moved.dtype)
+            if channel_last:
+                resized = resized.permute(1, 2, 0)
+            return resized.contiguous()
+        return None
+
+    def _profile_operator_input_size_affine(
+        self,
+        profile: Dict[str, Any],
+        feature: Feature,
+        reservoir: ProfileInputReservoir,
+    ) -> None:
+        """Fit ``cost(record) = k * input_bytes + b`` for every operator.
+
+        The DP prices an operator's compute by the byte volume that reaches it,
+        which is what lets it prefer orders that shrink the payload before the
+        expensive operators.  A purely per-byte price assumes every operator's
+        cost vanishes as its input shrinks; real operators keep a fixed part
+        (call overhead, kernel launch, per-record bookkeeping).  Each operator
+        is therefore measured on the smallest and the largest legal input it
+        sees, and, when its own inputs carry no size contrast, on rescaled
+        versions of its own legal input.  ``fixed_fraction`` is the share of the
+        profiled cost that does not shrink with the payload.
+        """
+        enabled = os.environ.get("CEDAR_PROFILE_OPERATOR_AFFINE", "1")
+        if enabled.strip() not in ("1", "true", "True", "yes"):
+            return
+        min_calls = int(os.environ.get("CEDAR_PROFILE_AFFINE_MIN_CALLS", "5"))
+        max_calls = int(
+            os.environ.get("CEDAR_PROFILE_AFFINE_MAX_CALLS", "400")
+        )
+        repeats = int(os.environ.get("CEDAR_PROFILE_AFFINE_REPEATS", "5"))
+        target_sec = float(
+            os.environ.get("CEDAR_PROFILE_AFFINE_TARGET_SEC", "0.05")
+        )
+        max_batch_bytes = int(
+            os.environ.get(
+                "CEDAR_PROFILE_AFFINE_MAX_BATCH_BYTES",
+                str(64 * 1024 * 1024),
+            )
+        )
+        max_operators = int(
+            os.environ.get("CEDAR_PROFILE_AFFINE_MAX_OPERATORS", "80")
+        )
+        include_cuda = os.environ.get(
+            "CEDAR_PROFILE_AFFINE_INCLUDE_CUDA", "0"
+        ).strip() in ("1", "true", "True", "yes")
+        min_contrast = float(
+            os.environ.get("CEDAR_PROFILE_AFFINE_MIN_CONTRAST", "1.10")
+        )
+        min_growth = float(
+            os.environ.get("CEDAR_PROFILE_AFFINE_MIN_GROWTH", "1.02")
+        )
+        baseline = profile.get("baseline", {})
+        input_sizes = baseline.get("input_sizes", {}) or {}
+        operators: Dict[str, Dict[str, Any]] = {}
+        for p_id, pipe in feature.logical_pipes.items():
+            if len(operators) >= max_operators:
+                break
+            if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
+                continue
+            if (
+                not include_cuda
+                and pipe.execution_resource
+                == PipeExecutionResource.CUDA
+            ):
+                continue
+            fn = getattr(pipe, "fn", None)
+            if fn is None:
+                continue
+            predecessor_id = pipe.input_pipes[0].id
+            snapshots = reservoir.values_for(predecessor_id)
+            if not snapshots:
+                continue
+            ordered = sorted(snapshots, key=len)
+            stratum = max(1, len(ordered) // 4)
+            low = ordered[:stratum]
+            high = ordered[-stratum:]
+            x_low = float(statistics.median(len(s) for s in low))
+            x_high = float(statistics.median(len(s) for s in high))
+            points: List[Tuple[float, float]] = []
+            try:
+                if x_low > 0.0 and x_high >= x_low * min_contrast:
+                    cost_low = self._time_operator_on_snapshots(
+                        fn, low, min_calls, max_calls, repeats,
+                        target_sec, max_batch_bytes,
+                    )
+                    cost_high = self._time_operator_on_snapshots(
+                        fn, high, min_calls, max_calls, repeats,
+                        target_sec, max_batch_bytes,
+                    )
+                    if cost_low is not None and cost_high is not None:
+                        points = [(x_low, cost_low), (x_high, cost_high)]
+                if not points:
+                    reference = pickle.loads(ordered[len(ordered) // 2])
+                    factor_low = float(
+                        os.environ.get("CEDAR_PROFILE_AFFINE_DOWNSCALE", "0.5")
+                    )
+                    factor_high = float(
+                        os.environ.get("CEDAR_PROFILE_AFFINE_UPSCALE", "2.0")
+                    )
+                    scaled_pairs = []
+                    for factor in (factor_low, factor_high):
+                        scaled = self._affine_rescale_payload(
+                            reference, factor
+                        )
+                        if scaled is None:
+                            continue
+                        scaled_pairs.append(
+                            (
+                                len(
+                                    pickle.dumps(
+                                        scaled,
+                                        protocol=pickle.HIGHEST_PROTOCOL,
+                                    )
+                                ),
+                                scaled,
+                            )
+                        )
+                    if len(scaled_pairs) >= 2:
+                        scaled_pairs.sort(key=lambda item: item[0])
+                        for size_bytes, payload in scaled_pairs:
+                            cost = self._time_operator_value(
+                                fn, payload, min_calls, max_calls, repeats,
+                                target_sec, max_batch_bytes, size_bytes,
+                            )
+                            if cost is not None:
+                                points.append((float(size_bytes), cost))
+            except Exception as exc:  # noqa: BLE001
+                logger.info(
+                    "Input-size affine fit skipped for pipe %s: %s", p_id, exc
+                )
+                continue
+            if len(points) < 2:
+                continue
+            points.sort()
+            (x_low_pt, cost_low_pt), (x_high_pt, cost_high_pt) = (
+                points[0],
+                points[-1],
+            )
+            if x_high_pt <= x_low_pt:
+                continue
+            # A cost that does not grow with the payload is not evidence of a
+            # per-byte term: leave the operator to the historical pricing.
+            if cost_high_pt <= cost_low_pt * min_growth:
+                continue
+            slope = (cost_high_pt - cost_low_pt) / (x_high_pt - x_low_pt)
+            intercept = max(0.0, cost_low_pt - slope * x_low_pt)
+            reference_bytes = float(
+                input_sizes.get(p_id, input_sizes.get(str(p_id), 0.0)) or 0.0
+            )
+            if reference_bytes <= 0.0:
+                reference_bytes = float(
+                    statistics.median(len(s) for s in ordered)
+                )
+            reference_cost = slope * reference_bytes + intercept
+            if not math.isfinite(reference_cost) or reference_cost <= 0.0:
+                continue
+            fixed_fraction = min(
+                0.95, max(0.0, intercept / reference_cost)
+            )
+            operators[str(p_id)] = {
+                "fixed_fraction": round(fixed_fraction, 6),
+                "k_ms_per_byte": slope,
+                "b_ms": intercept,
+                "x_reference_bytes": reference_bytes,
+                "points_ms_per_byte": [
+                    [x_low_pt, cost_low_pt], [x_high_pt, cost_high_pt]
+                ],
+                "source": (
+                    "legal_inputs"
+                    if len(points) == 2
+                    and x_low == x_low_pt
+                    and x_high == x_high_pt
+                    else "rescaled_legal_input"
+                ),
+            }
+        profile.setdefault(
+            "physical_model", {"schema_version": 1, "boundary": {}}
+        )["operator_affine"] = {
+            "schema_version": 1,
+            "method": "two_stratum_operator_affine_fit",
+            "note": (
+                "cost(record) = k * input_bytes + b, fitted on the smallest and "
+                "largest legal inputs that reached the operator, or on rescaled "
+                "versions of its own legal input when those inputs have no size "
+                "contrast; fixed_fraction = b / (k * x_reference + b) is what "
+                "the joint DP uses to split an operator's profiled cost into "
+                "its size-dependent and size-independent parts"
+            ),
+            "min_contrast": min_contrast,
+            "operators": operators,
+        }
+        logger.info(
+            "Input-size affine calibration: %s/%s operators fitted",
+            len(operators),
+            len(feature.logical_pipes),
+        )
+
     def _profile_layered_backends(
         self,
         profile: Dict[str, Any],
@@ -2320,6 +2701,7 @@ class DataSet:
         reservoir: ProfileInputReservoir,
     ) -> None:
         """Collect isolated adaptive costs and targeted width calibration."""
+        self._profile_operator_input_size_affine(profile, feature, reservoir)
         min_duration = float(
             os.environ.get("CEDAR_ADAPTIVE_PROFILE_MIN_SEC", "3")
         )

@@ -256,6 +256,10 @@ class _BlockCostIndex:
             "output_sizes"
         ][optimizer._get_source_p_id()]
         self.per_byte = [float("inf")] * self.n
+        # Size-independent part of each operator's profiled cost, expressed in
+        # the same normalized unit as ``per_byte`` (the block cost is multiplied
+        # by ``source_size`` before it is compared with a measurement).
+        self.fixed = [0.0] * self.n
         self.successor_masks = [0] * self.n
         for successor, predecessors in enumerate(
             optimizer._dp_pred_indices
@@ -271,7 +275,27 @@ class _BlockCostIndex:
                     i, baseline_input, self.source_size
                 )
                 if denominator > 0:
-                    self.per_byte[i] = costs[i] / denominator
+                    fixed_fraction = 0.0
+                    if getattr(
+                        optimizer, "uses_affine_operator_cost", False
+                    ) and hasattr(
+                        optimizer, "_dp_operator_fixed_fraction"
+                    ):
+                        fixed_fraction = optimizer._dp_operator_fixed_fraction(
+                            p_id
+                        )
+                    if fixed_fraction > 0.0 and costs[i] > 0.0:
+                        # cost(prefix) = (1 - f) * c * w/w_ref + f * c: the
+                        # profiled cost is reproduced at the profiled position
+                        # while the operator keeps a floor as its input shrinks.
+                        self.fixed[i] = (
+                            fixed_fraction * costs[i] / self.source_size
+                        )
+                        self.per_byte[i] = (
+                            (1.0 - fixed_fraction) * costs[i] / denominator
+                        )
+                    else:
+                        self.per_byte[i] = costs[i] / denominator
         self._costs: Dict[Tuple[int, int], float] = {}
         self._orders: Dict[Tuple[int, int], Tuple[int, ...]] = {}
         self._endpoint_costs: Dict[
@@ -357,6 +381,7 @@ class _BlockCostIndex:
             operator_cost = (
                 _work_prod(self.optimizer, prefix_mask | prev, last)
                 * self.per_byte[last]
+                + self.fixed[last]
             )
             if prev == 0:
                 predecessors = [(last, 0.0, tuple())]
@@ -414,6 +439,7 @@ class _BlockCostIndex:
             operator_cost = (
                 _work_prod(self.optimizer, prefix_mask | prev, i)
                 * self.per_byte[i]
+                + self.fixed[i]
             )
             if prev == 0:
                 predecessors = [(i, 0.0, tuple())]
@@ -4180,6 +4206,11 @@ class ThresholdFeasibilityDpSearch:
 
 
 class DpOptimizer(AffineDpCostMixin, MyOptimizer):
+    # The operator input-size affine split (``physical_model.operator_affine``)
+    # is part of PICO's objective.  Ablations and baselines that score plans
+    # with an external cost model must not inherit it, otherwise their search
+    # and their reported cost disagree.
+    uses_affine_operator_cost = True
     """
     Extensible DP optimizer.
 
@@ -4424,6 +4455,29 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             self._dp_stage_boundary_components(prev_mask, block)
         )
         if block.execution_resource == PipeExecutionResource.CUDA:
+            # The accelerator is shared, so the block's service is not divided
+            # by the stage width the way a CPU stage's is.  It is still not
+            # free to ignore: several model replicas on one device overlap
+            # their latency-bound work, which the profile measures directly as
+            # the operator's cost at 1/2/4/8 actors.  Credit exactly that
+            # measured speedup and nothing more.
+            gpu_speedup = 1.0
+            if block.variant in (
+                PipeVariantType.RAY,
+                PipeVariantType.TF_RAY,
+            ):
+                family = "RAY"
+                for idx in getattr(block, "order", ()) or ():
+                    if idx < 0 or idx >= len(self._dp_inner_ops):
+                        continue
+                    p_id = self._dp_inner_ops[idx]
+                    gpu_speedup = min(
+                        gpu_speedup,
+                        self._dp_backend_width_speedup(
+                            p_id, family, int(block.parallelism or 1)
+                        ),
+                    )
+            gpu_speedup = max(1.0, gpu_speedup)
             return DpObjectiveCost(
                 local_serial=previous.local_serial + boundary_local,
                 ray_serial=previous.ray_serial,
@@ -4431,7 +4485,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 gpu_serial=(
                     previous.gpu_serial
                     + self._dp_gpu_worker_multiplier()
-                    * (block.cost + boundary_parallel)
+                    * (block.cost / gpu_speedup + boundary_parallel)
                 ),
             )
         if block.variant in (

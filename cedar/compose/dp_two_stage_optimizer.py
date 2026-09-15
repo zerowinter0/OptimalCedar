@@ -29,6 +29,8 @@ class _FixedBackPointer:
 
 
 class DpTwoStageOptimizer(DpOptimizer):
+    # Staged baseline; keep it on the unmodified objective.
+    uses_affine_operator_cost = False
     """
     Two-stage DP optimizer.
 

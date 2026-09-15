@@ -51,6 +51,18 @@ case "$WORKLOAD" in
     DATASET_FILE=evaluation/pipelines/target_pipeline/swav/cedar_dataset.py
     DATA=datasets/target_pipeline_bench/swav.jsonl
     ;;
+  swav_views4)
+    # SwAV multi-crop with four views instead of the default eight: same
+    # recipe and dataset, half the replicated augmentation chains (31 operators
+    # instead of 59), which is the shape the chain-partition DP can plan.
+    DATASET_FILE=evaluation/pipelines/target_pipeline/swav/cedar_dataset.py
+    DATA=datasets/target_pipeline_bench/swav.jsonl
+    ;;
+  dino_views4)
+    # DINO multi-crop with four crops instead of the default ten.
+    DATASET_FILE=evaluation/pipelines/target_pipeline/dino/cedar_dataset.py
+    DATA=datasets/target_pipeline_bench/dino.jsonl
+    ;;
   swav_single)
     # Single-view SwAV: the multi-crop recipe replicates the whole augmentation
     # chain once per view (59 operators with the default views=8).  One view
@@ -231,6 +243,12 @@ case "$WORKLOAD" in
     ;;
   swav_single)
     DATASET_KWARGS="workload=swav,dataset_path=$DATA,views=1"
+    ;;
+  swav_views4)
+    DATASET_KWARGS="workload=swav,dataset_path=$DATA,views=4"
+    ;;
+  dino_views4)
+    DATASET_KWARGS="workload=dino,dataset_path=$DATA,views=4"
     ;;
   dino_single)
     DATASET_KWARGS="workload=dino,dataset_path=$DATA,views=1"
