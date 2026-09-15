@@ -82,12 +82,43 @@ case "$WORKLOAD" in
     DATASET_FILE=evaluation/pipelines/coco/cedar_dataset.py
     DATA=datasets/coco
     ;;
+  llava_pretrain)
+    # Data-Juicer Hub image/llava-pretrain-refine.yaml: nine cheap text
+    # filters, three image filters, then the CLIP/BLIP image-text filters on
+    # the accelerator.  The recipe is the selective-filter counterpart of the
+    # augmentation workloads above.
+    DATASET_FILE=evaluation/pipelines/llava_pretrain/cedar_dataset.py
+    SUBSET=${SUBSET:-2k}
+    DATA=$SMALL/llava_${SUBSET}.jsonl
+    SOURCE=/workspace/OptimalCedar/evaluation/datasets/llava_pretrain/blip_laion_cc_sbu_20000_dj_fmt_only_caption.jsonl
+    ;;
+  multimodal_running_example)
+    # Data-Juicer's multimodal running example over COCO image/caption pairs
+    # (CLIP + BLIP + perplexity + sharpness + aesthetics predicates).  The
+    # manifest is built by the workload's own fixture builder from the
+    # original COCO annotations.
+    DATASET_FILE=evaluation/pipelines/multimodal_running_example/cedar_dataset.py
+    DATA=/tmp/small/multimodal_fixture.jsonl/calibration.jsonl
+    ;;
   wikitext103)
     DATASET_FILE=evaluation/pipelines/wikitext103/cedar_dataset.py
     DATA=datasets/wikitext103/wikitext-103/wiki.train.tokens
     ;;
   simclrv2)
     DATASET_FILE=evaluation/pipelines/simclrv2/cedar_dataset.py
+    DATA=datasets/imagenette2
+    ;;
+  simclrv2_views4)
+    # Same recipe, four views instead of the default eight: the augmentation
+    # chain is replicated per view, so this is the multi-view shape the
+    # chain-partition DP is meant to handle.
+    DATASET_FILE=evaluation/pipelines/simclrv2/cedar_dataset.py
+    DATA=datasets/imagenette2
+    ;;
+  simclrv2_cache)
+    # The same recipe with Cedar's object-disk cache enabled: a second stage
+    # boundary (cache write/read) that the joint DP can price.
+    DATASET_FILE=evaluation/pipelines/simclrv2/cedar_cache_dataset.py
     DATA=datasets/imagenette2
     ;;
   pile_hackernews)
@@ -171,10 +202,22 @@ case "$WORKLOAD" in
   coco)
     DATASET_KWARGS="split=val2017"
     ;;
+  llava_pretrain)
+    DATASET_KWARGS="dataset_path=$DATA,image_root=/workspace/OptimalCedar/evaluation/datasets/llava_pretrain"
+    ;;
+  multimodal_running_example)
+    DATASET_KWARGS="dataset_path=$DATA,threshold_path=/workspace/OptimalCedar/.multimodal_smoke_threshold.json,image_root=/workspace/OptimalCedar/datasets/coco/train2017"
+    ;;
   wikitext103)
     DATASET_KWARGS="max_samples=800"
     ;;
   simclrv2)
+    DATASET_KWARGS=""
+    ;;
+  simclrv2_views4)
+    DATASET_KWARGS="views=4"
+    ;;
+  simclrv2_cache)
     DATASET_KWARGS=""
     ;;
   swav)

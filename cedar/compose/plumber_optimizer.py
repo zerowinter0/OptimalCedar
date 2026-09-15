@@ -28,7 +28,7 @@ from .optimizer import (
     PipeVariantType,
 )
 from .utils import get_fixed_pipes
-from cedar.pipes import PipeVariantContextFactory
+from cedar.pipes import PipeExecutionResource, PipeVariantContextFactory
 
 
 logger = logging.getLogger(__name__)
@@ -256,6 +256,19 @@ class PlumberOptimizer(Optimizer):
 
         for p_id, desc in self.physical_plan.pipe_descs.items():
             width = int(allocation.get(p_id, 0))
+            # An accelerator-backed operator owns a model instance.  An SMP
+            # stage runs its operator in `width` separate processes, so
+            # assigning one to a CUDA pipe multiplies the model footprint by
+            # the stage width and exhausts the device; the joint DP forbids
+            # the same placement, so keep the operator in the worker process
+            # and let the width model decide everything else.
+            logical_pipe = self.logical_pipes.get(p_id)
+            if (
+                logical_pipe is not None
+                and logical_pipe.execution_resource
+                == PipeExecutionResource.CUDA
+            ):
+                width = 0
             if width >= 1:
                 desc.variant_type = PipeVariantType.SMP
                 desc.variant_ctx = PipeVariantContextFactory.create_context(

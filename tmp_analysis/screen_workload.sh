@@ -24,9 +24,20 @@ OUT=${OUT:-/tmp/screen}
 mkdir -p "$OUT"
 export SUBSET=${SUBSET:-${SAMPLES}}
 # The harness writes results *inside* the container, so the shared repo path is
-# the only location both sides can read.
-RESULTS_DIR=outputs/screen
+# the only location both sides can read.  ``RESULTS_DIR`` can be overridden so
+# diagnostic probes do not overwrite the recorded screening cells.
+RESULTS_DIR=${RESULTS_DIR:-outputs/screen}
 docker exec $DEV bash -lc "mkdir -p /workspace/OptimalCedar/$RESULTS_DIR"
+# The harness ships ``outputs/plumber_bench_20260912/modules`` to the Ray
+# actors as ``py_modules``; that snapshot is what the actors execute, so it
+# must be refreshed from the live tree, otherwise actor-side code changes
+# silently do not take effect.  Copy only code: the evaluation tree also
+# carries the experiment outputs (hundreds of GB) and copying those hangs.
+docker exec $DEV bash -lc "cd /workspace/OptimalCedar && \
+  mkdir -p outputs/plumber_bench_20260912/modules/cedar outputs/plumber_bench_20260912/modules/evaluation && \
+  cp -a cedar/. outputs/plumber_bench_20260912/modules/cedar/ && \
+  cp -a evaluation/pipelines/. outputs/plumber_bench_20260912/modules/evaluation/pipelines/ && \
+  cp -a evaluation/*.py outputs/plumber_bench_20260912/modules/evaluation/ 2>/dev/null; true"
 
 # shellcheck disable=SC1091
 source tmp_analysis/workload_env.sh "$WORKLOAD" || exit 1
@@ -40,7 +51,7 @@ if ! docker exec $DEV bash -lc "[ -f $PROFILE_ABS ]"; then
   echo "[screen] profiling $WORKLOAD -> $PROFILE"
   docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=cedar_remote \
     -e CEDAR_REUSE_BOUNDARY_MODEL=0 -e CEDAR_LAYERED_ADAPTIVE_PROFILE=1 \
-    -e CEDAR_PROFILE_FILTER_SELECTIVITY=1 \
+    -e CEDAR_PROFILE_FILTER_SELECTIVITY=${SELECTIVITY_PASS:-1} \
     -e CEDAR_PROFILE_SELECTIVITY_SEC=${SELECTIVITY_SEC:-90} \
     -e CEDAR_PROFILE_TIME_SEC=10 -e CEDAR_CM_SWEEP_TIME_SEC=10 \
     -e CEDAR_PROFILE_SCALING_WIDTHS=1,2,4,8 -e CEDAR_PROFILE_SCALING_TOP_K=5 \
@@ -62,6 +73,8 @@ echo "[screen] planning+executing on $WORKLOAD ($SAMPLES): $PLANNERS"
 docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=${PLACEMENT:-cedar_remote} \
   -e CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC=${PICO_PLAN_BUDGET:-180} \
   -e CEDAR_DP_SMP_MODE=${SMP_MODE:-lane} \
+  ${CEDAR_WORKER_SEARCH_SET:+-e CEDAR_WORKER_SEARCH_SET=$CEDAR_WORKER_SEARCH_SET} \
+  ${CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER:+-e CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER=$CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER} \
   -e CEDAR_DATA_JUICER_ROOT=${CEDAR_DATA_JUICER_ROOT:-/workspace/OptimalCedar/data-juicer} \
   -e HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-1} \
   -e TRANSFORMERS_OFFLINE=${TRANSFORMERS_OFFLINE:-1} \
