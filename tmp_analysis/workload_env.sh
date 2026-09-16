@@ -88,7 +88,9 @@ case "$WORKLOAD" in
     ;;
   commonvoice)
     DATASET_FILE=evaluation/pipelines/commonvoice/cedar_dataset.py
-    DATA=datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en
+    # Absolute path: the audio clips are opened by Ray actors whose working
+    # directory is not the repository root, so a relative path fails there.
+    DATA=/workspace/OptimalCedar/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en
     ;;
   coco)
     DATASET_FILE=evaluation/pipelines/coco/cedar_dataset.py

@@ -6350,6 +6350,32 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                     time.monotonic() - search_started,
                     candidate_result.cost,
                 )
+            except RuntimeError as exc:
+                # The exact search can prove its own resource slice infeasible
+                # (audio and video recipes whose fixed-position operators leave
+                # no legal block cover).  A fully materializable plan was
+                # already constructed as a branch-and-bound incumbent, so
+                # return that instead of failing the whole workload: a weaker
+                # feasible plan is a legitimate answer, and the alternative is
+                # "the optimizer produced nothing".
+                if not _is_infeasible_conditioned_search_error(exc):
+                    raise
+                candidate_result = getattr(
+                    search, "_best_feasible_result", None
+                )
+                if candidate_result is None:
+                    candidate_result = getattr(
+                        search, "_greedy_full_block_result", None
+                    )
+                if candidate_result is None:
+                    raise
+                logger.warning(
+                    "[DpOptimizer] Exact search reported an infeasible slice "
+                    "(%s); returning the best feasible plan found "
+                    "(cost %.9f).",
+                    exc,
+                    candidate_result.cost,
+                )
         finally:
             self._dp_search_deadline = None
 
