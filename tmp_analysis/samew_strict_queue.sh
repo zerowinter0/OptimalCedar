@@ -24,6 +24,14 @@ cd /home/xieruiyang/OptimalCedar
 
 run() {
   local w=$1 n=$2
+  # ``SKIP`` lets a resumed batch re-use the cells that already finished
+  # instead of re-measuring them (the harness writes one JSON per workload).
+  for done in ${SKIP:-}; do
+    if [ "$done" = "$w" ]; then
+      echo "########## $w skipped (already recorded)"
+      return 0
+    fi
+  done
   echo "########## $w samples=$n strict-same-W=32 $(date +%H:%M:%S)"
   FIXED_W=32 CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER=0 \
     CEDAR_WORKER_SEARCH_SET=32 CEDAR_DP_WORKER_LADDER=0 \
