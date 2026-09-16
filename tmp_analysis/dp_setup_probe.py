@@ -3,7 +3,9 @@
     python tmp_analysis/dp_setup_probe.py <dataset_file> <dataset_kwargs> <profile> [optimizer]
 """
 
+import faulthandler
 import importlib
+import os
 import json
 import logging
 import sys
@@ -13,7 +15,7 @@ sys.path.insert(0, "/workspace/OptimalCedar")
 
 from evaluation.cedar_utils import CedarEvalSpec  # noqa: E402
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 
 def main() -> int:
@@ -26,7 +28,9 @@ def main() -> int:
             continue
         key, _, value = token.partition("=")
         kwargs[key.strip()] = value.strip()
+    faulthandler.dump_traceback_later(120, exit=True)
     spec = CedarEvalSpec(1, None, 1, profiled_stats=profile)
+    spec.use_my_optimizer = int(os.environ.get("PROBE_OPTIMIZER_SELECTOR", "2"))
     spec.kwargs = kwargs
     spec.run_profiling = False
     spec.generate_plan = False

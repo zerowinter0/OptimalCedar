@@ -455,7 +455,9 @@ class Optimizer:
             "[Baseline] Calculated baseline cost: {}".format(baseline_cost)
         )
 
-        if self.options.enable_reorder:
+        if self.options.enable_reorder and not getattr(
+            self, "skip_legacy_reordering", False
+        ):
             logger.info("*Reordering Pass*")
             self.physical_plan.graph = self._pass_reordering()
 

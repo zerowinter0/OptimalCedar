@@ -1394,21 +1394,56 @@ class CacheTransitionPolicy:
             replaces_prefix_cost=True,
         )
 
-    def _calculate_all_non_random(self) -> List[bool]:
+    def _calculate_all_non_random(self) -> "_LazyMaskFlagTable":
+        """Deterministic-subset flags, computed per queried mask.
+
+        The cache policy asks whether every operator of one appended block is
+        deterministic.  Materializing the answer for all ``2**n`` masks is
+        quadratic-free for short pipelines but impossible for the 30+ operator
+        multi-view recipes (a 31-operator pipeline allocated a 2**31-entry list
+        and spent minutes building it).  The table is therefore memoized on
+        demand: only the masks the search actually visits are evaluated.
+        """
         opt = self.optimizer
         if opt.logical_pipes is None:
             raise RuntimeError("logical_pipes is not initialized.")
+        return _LazyMaskFlagTable(opt, self.inner_ops, self.n)
 
-        all_non_random = [False] * self.full_mask
-        all_non_random[0] = True
-        for mask in range(1, self.full_mask):
-            lsb = mask & -mask
-            idx = lsb.bit_length() - 1
-            prev = mask ^ lsb
-            pipe = opt.logical_pipes.get(self.inner_ops[idx])
-            is_random = bool(pipe is not None and pipe.is_random())
-            all_non_random[mask] = all_non_random[prev] and not is_random
-        return all_non_random
+
+class _LazyMaskFlagTable:
+    """Memoized ``mask -> bool`` table for a predicate on the mask's operators.
+
+    Used for "every operator in this subset is deterministic".  Evaluation
+    recurses on the lowest set bit, so one lookup costs O(popcount(mask)) and
+    only masks the search visits are ever built.
+    """
+
+    __slots__ = ("optimizer", "inner_ops", "size", "_cache")
+
+    def __init__(self, optimizer, inner_ops, n: int) -> None:
+        self.optimizer = optimizer
+        self.inner_ops = inner_ops
+        self.size = 1 << n
+        self._cache: Dict[int, bool] = {0: True}
+
+    def _is_random(self, idx: int) -> bool:
+        pipe = self.optimizer.logical_pipes.get(self.inner_ops[idx])
+        return bool(pipe is not None and pipe.is_random())
+
+    def __getitem__(self, mask: int) -> bool:
+        cached = self._cache.get(mask)
+        if cached is not None:
+            return cached
+        if mask < 0 or mask >= self.size:
+            raise IndexError(mask)
+        lsb = mask & -mask
+        idx = lsb.bit_length() - 1
+        value = self[mask ^ lsb] and not self._is_random(idx)
+        self._cache[mask] = value
+        return value
+
+    def __len__(self) -> int:
+        return self.size
 
 
 class ExtensibleDpSearch:
@@ -2344,6 +2379,24 @@ class ExtensibleDpSearch:
             raise ValueError("CEDAR_DP_INCUMBENT_BEAM must be an integer") from exc
         if beam_width < 1:
             raise ValueError("CEDAR_DP_INCUMBENT_BEAM must be positive")
+        # A fused segment's cost is evaluated exactly for every (start, end)
+        # pair, and the number of pairs is quadratic in the pipeline length
+        # while the per-segment work grows with the segment's payload.  Fusing
+        # more than a handful of operators is also never the measured optimum:
+        # every plan the search has produced keeps blocks short and pipelines
+        # them.  Bounding the segment length is therefore a search-shape
+        # decision, not a quality trade-off, and it is what makes the 30+
+        # operator multi-view recipes plan inside a usable budget.
+        try:
+            max_segment = int(
+                os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "8")
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "CEDAR_DP_CHAIN_MAX_SEGMENT must be an integer"
+            ) from exc
+        if max_segment < 1:
+            raise ValueError("CEDAR_DP_CHAIN_MAX_SEGMENT must be positive")
 
         best_result: Optional[SearchResult] = None
         initial_state = self.cache_policy.initial_state()
@@ -2374,7 +2427,8 @@ class ExtensibleDpSearch:
                     continue
                 beams[start] = retain(beams[start])
                 prev_mask = prefix_masks[start]
-                for end in range(start + 1, self.n + 1):
+                segment_end = min(self.n, start + max_segment)
+                for end in range(start + 1, segment_end + 1):
                     cache_key = (start, end)
                     blocks = block_cache.get(cache_key)
                     if blocks is None:
@@ -3708,6 +3762,9 @@ class ChainPartitionDpSearch(ExtensibleDpSearch):
                 "chain_beam": int(
                     os.environ.get("CEDAR_DP_CHAIN_BEAM", "512")
                 ),
+                "chain_max_segment": int(
+                    os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "8")
+                ),
                 "returned_feasible_cost": result.cost,
             }
         )
@@ -4211,6 +4268,14 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
     # with an external cost model must not inherit it, otherwise their search
     # and their reported cost disagree.
     uses_affine_operator_cost = True
+
+    # The joint DP searches operator order, fusion, backend and stage width in
+    # one objective.  Cedar's legacy reordering pass enumerates *every* legal
+    # reordering of the dependency graph before the optimizer runs; that is
+    # combinatorial in the number of reorderable operators (a four-view SwAV
+    # recipe has ~10^30 of them) and costs minutes of planning for an order the
+    # DP re-derives anyway.
+    skip_legacy_reordering = True
     """
     Extensible DP optimizer.
 
@@ -4230,6 +4295,18 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
     # R and S are additive and future transitions can affect either lane, so
     # they must remain separate Pareto coordinates.
     collapse_external_service_coordinates = False
+
+    def _dp_ray_lane_enabled(self) -> bool:
+        """Whether Ray service forms its own lane instead of the worker path.
+
+        ``CEDAR_DP_RAY_MODE=lane`` prices a Ray stage as service on a separate
+        resource family, so the remote machine adds capacity.  The default
+        (``additive``) keeps the historical accounting in which every offload
+        stage's service, marshalling and round trip are all paid by the record
+        on the worker's critical path.
+        """
+        raw = os.environ.get("CEDAR_DP_RAY_MODE", "additive").strip().lower()
+        return raw in ("lane", "parallel", "max")
 
     def configure_lane_exposure(self) -> Dict[str, float]:
         """Load the calibrated inter-lane exposure vector.
@@ -4528,10 +4605,32 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 )
                 if scaled_floor is not None:
                     transport_floor = scaled_floor
+                lane_service = max(offload_path, transport_floor)
+                if self._dp_ray_lane_enabled():
+                    # Lane semantics: the remote machine is its own resource.
+                    # The record pays only the driver-side marshalling and the
+                    # cross-host round trip, while the stage's service is
+                    # bounded by the transport floor on the Ray lane.  This is
+                    # what lets a plan use the idle second machine at all; the
+                    # additive mode makes every offload stage part of the
+                    # worker's own critical path, so a Ray stage can only ever
+                    # slow a record down.
+                    driver_cost = (
+                        boundary_local
+                        + self._dp_cross_host_round_trip_ms(
+                            self._dp_stage_transport_bytes(prev_mask, block)
+                        )
+                    )
+                    return DpObjectiveCost(
+                        local_serial=previous.local_serial + driver_cost,
+                        ray_serial=previous.ray_serial + lane_service,
+                        smp_serial=previous.smp_serial,
+                        gpu_serial=previous.gpu_serial,
+                    )
                 return DpObjectiveCost(
                     local_serial=(
                         previous.local_serial
-                        + max(offload_path, transport_floor)
+                        + lane_service
                     ),
                     ray_serial=previous.ray_serial + offload_path,
                     smp_serial=previous.smp_serial,
