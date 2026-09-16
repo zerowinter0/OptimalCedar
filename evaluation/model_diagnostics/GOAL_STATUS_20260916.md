@@ -75,6 +75,13 @@ PICO 的计划随之改变（Ray 段全部消失），吞吐 230.9 → 258.4 rec
 "DP 比执行器更严"的问题（我上一轮的说法需要更正）。ablation 那条 8 段流水线
 按预算应在 W=6 附近执行（6×9=54 核）。
 
+**工具已就绪但计划复用路径还没打通**：`tmp_analysis/same_plan_worker_sweep.sh`
+（用 `--master_feature_config` 冻结一条计划 + `CEDAR_PROFILE_MATCH_FIXED_LOCAL_WORKERS`
+扫 W）已写好，但把录制下来的计划 YAML 交给 `_load_config` 时多进程 worker 启动即退出
+（`Multiprocess dataset worker exited during startup`），需要再修一处 loader 兼容性；
+`--fixed_local_workers_ablation` 则会让 DP 重新选计划（曲线被污染：W=4/8/16/21/32
+实测 100/112/275/114/203 是四条不同计划）。
+
 **下一步（唯一还缺的一步）**：用**计划复用**做同计划 worker 曲线
 （`--fixed_local_workers_ablation` 会让 DP 重新选计划，曲线被污染：W=4/8/16/21/32
 实测 100/112/275/114/203 是不同计划；仓库里 `run_scaled_reuse_plan_matrix.sh`
