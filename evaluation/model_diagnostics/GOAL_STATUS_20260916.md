@@ -4,38 +4,21 @@
 > 数据全部来自小数据量（1000–20000 条）在线实验，协议与正式矩阵一致：
 > 同一份 profile、W 由各 optimizer 自选、local 64 + Ray 64 CPU、`--match_profile_resources`。
 
-## 一、目标与达成情况
+## 一、目标与达成情况（2026-09-16 13:35，协议统一为 additive SMP）
 
-三条目标：
-
-1. ≥8 个负载上 PICO ≥1.5× 最优对比系统（对比集合不含 simple-DP）；
-2. 其中 ≥3 个负载 PICO ≥1.3× simple-DP；
-3. 这 8 个负载上 PICO 不差于 simple-DP。
-
-**当前（"最优外部系统"口径）**
-
-| 负载 | PICO | 最优外部 | 比值 | simple-DP | PICO/abl | 达标 |
+| 负载 | PICO | 最优外部 | 比值 | simple-DP | 对 ablation | 备注 |
 |---|---|---|---|---|---|---|
-| coco | 263.6 | Plumber 35.8 | **7.36×** | 241.9 | 1.09× | ✓ |
-| simclr（affine profile） | **490.2** | Plumber 258.0 | **1.90×** | 418.0 | 1.17× | ✓ |
-| simclrv2（affine profile） | **492.6** | Plumber 250.9 | **1.96×** | 455.2 | 1.08× | ✓ |
-| simclrv2_views4（affine profile） | **489.8** | Plumber 272.8 | **1.80×** | 456.0 | 1.07× | ✓ |
-| simclrv2_cache | 409.5 | Plumber 254.8 | **1.61×** | 451.0 | **0.91×** | ✓ / ✗ |
-| simclr（标定前） | 399.1 | Plumber 241.9 | 1.65× | 394.3 | 1.01× | |
-| simclrv2（标定前） | 403.3 | Plumber 242.2 | 1.66× | 391.8 | 1.03× | |
-| pile_hackernews | 37.3 | Plumber 34.8 | 1.07× | 26.0 | 1.43× | |
-| pile_uspto_backgrounds | 67.1 | Plumber 57.8 | 1.16× | 56.5 | 1.19× | |
-| clip | 238.7 | Plumber 231.1 | 1.03× | 225.7 | 1.06× | |
-| dino | 259.6 | Plumber 252.6 | 1.03× | 261.1 | 0.99× | |
-| wikitext103 | 651.5 | Cedar 626.1 | 1.04× | 652.8 | 1.00× | |
-| bloom_oscar | 125.6 | Cedar 125.2 | 1.00× | 76.5 | 1.64× | |
-| alpaca_cot | 3796.2 | Cedar 3843.3 | 0.99× | 997.2 | 3.81× | |
-| blip | 496.3 | Plumber 504.2 | 0.98× | 470.6 | 1.05× | |
-| swav_single | 423.5 | Plumber 438.7 | 0.97× | 432.5 | 0.98× | |
-| dino_single | 372.2 | Plumber 425.3 | 0.88× | 364.6 | 1.02× | |
-| dino（2 视图，重测） | 279.9 | Plumber 236.0 | 1.19× | — | 0.99× | |
-| llava_pretrain | 18.0 | DJ-Cedar 44.9 | 0.40× | 43.0 | 0.42× | |
-| swav（8 视图，59 算子） | 无计划 | Plumber 83.4 | — | 无计划 | — | |
+| coco | 265.8 | Plumber 34.4 | **7.72×** | 243.2 | 1.09× | |
+| simclrv2 | 492.6 | Plumber 250.9 | **1.96×** | 455.2 | 1.08× | affine + W 标定 |
+| simclr | 490.2 | Plumber 258.0 | **1.90×** | 418.0 | 1.17× | affine + W 标定 |
+| simclrv2_views4 | 464.2 | Plumber 266.9 | **1.74×** | 393.6 | 1.18× | affine + W 标定 |
+| simclrv2_cache | 423.1 | Plumber 262.0 | **1.61×** | 398.9 | 1.06× | additive SMP 修复 |
+| dino_views4 | 150.5 | Plumber 138.5 | 1.09× | 超时 | — | 3 MB/记录，机器饱和 |
+| swav_views4 | 129.8 | Plumber 122.4 | 1.06× | 超时 | — | 7.8 MB/记录，机器饱和 |
+| dino | 212.2 | Plumber 244.0 | 0.87× | 262.4 | 0.81× | affine 后 W 取舍仍错 |
+| blip / clip / dino_single / swav_single | 见旧表 | Plumber | 0.88–1.06× | — | — | Plumber 已到机器上限 |
+| bloom_oscar / alpaca_cot | 125.6 / 3796 | Cedar 125.2 / 3843 | 1.00 / 0.99× | 76.5 / 997 | 1.64 / 3.81× | 对 ablation 大赢、对 Cedar 打平 |
+| llava_pretrain | 15.7 | DJ-Cedar 45.0 | 0.35× | 42.5 | 0.37× | GPU 批大小建模未完成 |
 
 **汇总**：目标 1 达成 **5/8**（coco 7.36×、simclr 1.93×、simclrv2 1.83×、
 simclrv2_views4 1.76×、simclrv2_cache 1.61×）；目标 2 达成 **0/3**（最大
