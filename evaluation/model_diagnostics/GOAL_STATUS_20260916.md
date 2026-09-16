@@ -5,7 +5,45 @@
 > 同一份 profile、W 由各 optimizer 自选、local 64 + Ray 64 CPU、`--match_profile_resources`。
 
 
-## commonvoice 诊断结论（2026-09-16 14:45）
+## commonvoice 诊断结论（2026-09-16 15:15 更新）
+
+### 本轮修复后的最终测量
+
+| optimizer | rec/s | 计划 |
+|---|---|---|
+| **simple-DP（ablation）** | **385.4** | 8×SMP(1) 流水线 + 融合块，W=21 |
+| PICO | **244.1**（此前 172–178） | `_read`/`_resample` RAY + 融合，W=32 |
+| Plumber | 230.9 | 全本地 W=32 |
+| Cedar | 200.7 | 全融合 Ray |
+
+→ 对最优外部 **1.06×**、对 ablation **0.63×**：**仍不达标，但 PICO 自身提升了 41%**。
+
+### 本轮修复（都已提交）
+
+1. **I/O 型算子不给 offload 加速比 credit**：输入是"文件路径"、输出远大于输入（≥10×）
+   且输入 ≤64KB 的算子（音频解码就属此类），在 Ray/SMP 上的代价不低于本地代价。
+   依据：隔离基准回放固定 snapshot（热页缓存）测出 8.57 ms，而数据通路的冷读是
+   24.87 ms；我直接测同一段音频 warm decode 只需 5.3 ms。
+2. **worker 阶梯补上 Cedar 规则的计数**：64→32/21/16/12/10/9/8/6/7。此前只有 2 的幂，
+   **搜不到实测最优计划所在的 W=21**（ablation 正是在 W=21 跑到 385–466）。
+3. 修掉 DP 直接让负载失败的问题（回退到可行 incumbent）。
+
+### 仍然存在的关键问题（下一步）
+
+PICO 返回的计划，**在我们自己的打分函数下就比备选计划差**：
+PICO 的 Ray 计划 `pico_plan_cost=1155.1`，而 ablation 的流水线计划只有 `591.4`
+（同一模型、同一 profile）。原因定位到：
+
+- 该计划是**回退 incumbent**，它没有经过与精确搜索相同的**每 worker Ray/SMP 预算校验**：
+  计划声明每个 worker 有 3 个 Ray stage，而 W=32 时预算只允许 1 个 slot/worker；
+- harness 的资源匹配随后在**执行时改写了计划**（执行签名显示 `ray_stages=1`、
+  `global_ray_actors=32`），也就是说"被打分的计划"和"真正执行的计划"并不一致。
+
+**修的下一步**：让回退 incumbent 也过同一套资源校验（或对所有候选计划先重打分再返回）。
+按 ablation 的实测（W=21 流水线 385.4 rec/s）推断，修好后 commonvoice 有望达到
+**1.67× 于最优外部系统**（385.4 / 230.9），成为一个类别完全不同（音频）的达标负载。
+
+## commonvoice 早期诊断结论（2026-09-16 14:45，保留背景）
 
 修掉三个阻塞点后 commonvoice 可以完整测量了，结果是 **PICO 178–278 rec/s**，
 而 ablation 的 simple-DP **425–466 rec/s**、Plumber 241–284 rec/s。逐层定位：
