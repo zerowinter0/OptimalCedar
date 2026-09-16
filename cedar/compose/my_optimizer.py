@@ -387,11 +387,49 @@ class MyOptimizer(Optimizer):
             floor = float(raw)
         except ValueError:
             floor = 0.9
+        if os.environ.get("CEDAR_DP_IO_OPERATOR_NO_SPEEDUP", "1").strip() in (
+            "1",
+            "true",
+            "True",
+            "yes",
+        ) and self._dp_operator_reads_storage(p_id):
+            # The isolated backend benchmarks replay a fixed snapshot set, so
+            # the operator's files stay in the page cache, while the in-process
+            # baseline comes from the single data pass that reads every file
+            # once.  For an operator that *materializes* its input from storage
+            # (tiny input, much larger output: "path -> decoded waveform") that
+            # asymmetry is a pure measurement artifact, and crediting it made
+            # the DP offload the audio decoder onto Ray for an illusory 2.9x
+            # speedup (8.57 ms warm vs 24.87 ms cold) and lose 2.4x end to end.
+            floor = max(floor, 1.0)
         if not math.isfinite(floor) or floor <= 0.0:
             return cost
         if floor >= 1.0 or not math.isfinite(inprocess_cost) or inprocess_cost <= 0.0:
             return cost
         return max(cost, floor * inprocess_cost)
+
+    def _dp_operator_reads_storage(self, p_id: int) -> bool:
+        """Whether an operator materializes its input from storage.
+
+        True when the profiled input is at least an order of magnitude smaller
+        than the profiled output and the input is small in absolute terms,
+        which is the signature of "open a file and decode it".
+        """
+        baseline = self.profiled_stats.get("baseline", {})
+        sizes_in = baseline.get("input_sizes", {}) or {}
+        sizes_out = baseline.get("output_sizes", {}) or {}
+        try:
+            input_bytes = float(
+                sizes_in.get(p_id, sizes_in.get(str(p_id), 0.0)) or 0.0
+            )
+            output_bytes = float(
+                sizes_out.get(p_id, sizes_out.get(str(p_id), 0.0)) or 0.0
+            )
+        except (TypeError, ValueError):
+            return False
+        if output_bytes <= 0.0 or input_bytes <= 0.0:
+            return False
+        return input_bytes * 10.0 <= output_bytes and input_bytes <= 64 * 1024
 
     def _dp_profiled_width_compute_cost(
         self,

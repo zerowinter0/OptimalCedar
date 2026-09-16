@@ -5820,6 +5820,26 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             if limits.ray_cpus < 1 and limits.smp_cpus < 1:
                 continue
             candidates.append(workers)
+        # The budget-derived counts are the ones Cedar's own rule lands on:
+        # ``budget // (1 + reserve + slots)`` for one parallel slot per worker
+        # (64 -> 32, 21, 16, 12, 10, 9, 8).  They are exactly the counts at
+        # which a one-process-per-stage pipeline fits next to its workers, and
+        # the pure power-of-two ladder cannot represent them: on the audio
+        # recipe the measured best plan runs at 21 workers (411-466 rec/s)
+        # while every power of two is worse.  Add them after the classic
+        # ladder so a tight budget still finds a plan quickly.
+        budget = self._dp_worker_budget()
+        if budget is not None:
+            local_budget, _ray_budget, local_reserve, _ray_reserve = budget
+            for slots in range(1, 9):
+                # Cedar's historical reserve: one runtime CPU per worker on top
+                # of the worker's own core.
+                seats = 1 + max(0, local_reserve) + slots
+                if seats <= 0:
+                    continue
+                workers = local_budget // seats
+                if workers >= 2:
+                    candidates.append(workers)
         if not candidates:
             # A profile without matched-resource budgets has no per-worker
             # SMP/Ray capacity to search over (unit tests, uncalibrated
