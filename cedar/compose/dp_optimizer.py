@@ -1275,10 +1275,18 @@ class BlockCandidateProvider:
                 ]
                 if missing_internal:
                     raise ValueError("The fused block order violates dependencies.")
+            # Exactly the recurrence ``_BlockCostIndex`` uses, including the
+            # operator's size-independent floor.  Omitting the floor here made
+            # the fixed-order incumbent cheaper than every plan the exact
+            # search can build, and using that price as the branch-and-bound
+            # bound pruned the whole frontier (the audio recipe reported "no
+            # feasible final state" for a seven-operator pipeline).
             normalized_cost += (
                 _work_prod(self.optimizer, prefix_mask | local_mask, idx)
                 * index.per_byte[idx]
             )
+            if idx < len(getattr(index, "fixed", ())):
+                normalized_cost += index.fixed[idx]
             local_mask |= 1 << idx
 
         return BlockCandidate(
@@ -1887,10 +1895,38 @@ class ExtensibleDpSearch:
                 ),
                 default=0.0,
             )
+            # The objective never pays an operator's raw per-byte cost: a block
+            # is served over its measured width curve, so the realized service
+            # is ``cost / _dp_service_parallelism(block)``.  Charging the raw
+            # sum here made the suffix bound an *upper* bound, and on the audio
+            # recipe it exceeded the incumbent for every prefix, which pruned
+            # the whole frontier and made a seven-operator pipeline report "no
+            # feasible final state".  Discount by the widest candidate the
+            # provider offers so the term stays a true lower bound.
+            max_discount = 1.0
+            for (variant, width), index in indexes.items():
+                if variant not in candidate_variants:
+                    continue
+                if not math.isfinite(index.per_byte[idx]):
+                    continue
+                probe = BlockCandidate(
+                    mask=bit,
+                    order=(idx,),
+                    variant=variant,
+                    cost=index.per_byte[idx] * local_index.source_size,
+                    materializes_fusion=False,
+                    execution_resource=execution_resource,
+                    parallelism=max(1, int(width)),
+                )
+                max_discount = max(
+                    max_discount,
+                    self.optimizer._dp_service_parallelism(probe),
+                )
             mandatory_cost[idx] = (
                 local_index.per_byte[idx]
                 * local_index.source_size
                 * minimum_work
+                / max_discount
             )
 
         full_mask = self.full_mask - 1
@@ -2273,6 +2309,29 @@ class ExtensibleDpSearch:
                 and resource_cost != self.required_final_parallel_stage_cpus
             ):
                 continue
+            # The bound is only sound if the search itself can build this
+            # plan: a greedy estimate that the transition rules cannot realize
+            # (a fused block the provider never offers, or one that
+            # ``_block_can_follow`` rejects) would prune every label and make a
+            # seven-operator pipeline report "no feasible final state".
+            offered = any(
+                candidate.order == block.order
+                and candidate.variant == block.variant
+                and candidate.parallelism == block.parallelism
+                for candidate in self.block_provider.candidates_for_prefix(
+                    0, block.mask
+                )
+            )
+            if not offered:
+                logger.info(
+                    "[DpOptimizer] Greedy full-block estimate order=%s "
+                    "variant=%s width=%s is not offered by the provider; "
+                    "keeping it out of the pruning bound.",
+                    block.order,
+                    block.variant.name,
+                    block.parallelism,
+                )
+                continue
             regular_cost = self.optimizer._dp_regular_transition_cost(0, block)
             for choice in self.cache_policy.transitions(
                 0,
@@ -2457,17 +2516,21 @@ class ExtensibleDpSearch:
                                 )
                             ):
                                 continue
-                            for width in self.optimizer._dp_candidate_parallelisms(
-                                variant, execution_resource
-                            ):
-                                try:
-                                    block = candidate_for_order(
-                                        block_order,
-                                        variant,
-                                        prefix_mask=prev_mask,
-                                        parallelism=width,
-                                    )
-                                except ValueError:
+                            # Price the incumbent through the *same* candidate
+                            # list the exact search uses.  Building it with
+                            # ``candidate_for_order`` produced blocks whose
+                            # objective the search cannot realize, and using
+                            # such a cost as the branch-and-bound incumbent
+                            # pruned the entire frontier (the audio recipe's
+                            # seven-operator pipeline reported "no feasible
+                            # final state" while a legal cover existed).
+                            offered = provider.candidates_for_prefix(
+                                prev_mask, block_mask
+                            )
+                            for block in offered:
+                                if block.variant != variant:
+                                    continue
+                                if tuple(block.order) != tuple(block_order):
                                     continue
                                 if self._block_can_follow(prev_mask, block):
                                     blocks.append(block)
@@ -2741,8 +2804,26 @@ class ExtensibleDpSearch:
             else self.block_provider.candidates_for(block_mask)
         )
         blocks = self._prune_dominated_blocks(prev_mask, blocks)
+        debug_final = (
+            os.environ.get("CEDAR_DP_DEBUG_FINAL") == "1"
+            and next_mask == self.full_mask - 1
+        )
+        if debug_final:
+            logger.warning(
+                "[DpOptimizer] final-mask transitions from %s: blocks=%s "
+                "incumbent_bound=%.4f",
+                bin(prev_mask),
+                len(blocks),
+                incumbent_score,
+            )
         for block in blocks:
             if not self._block_can_follow(prev_mask, block):
+                if debug_final:
+                    logger.warning(
+                        "  block %s variant=%s rejected by can_follow",
+                        block.order,
+                        block.variant.name,
+                    )
                 continue
 
             regular_cost = self.optimizer._dp_regular_transition_cost(
@@ -2766,6 +2847,16 @@ class ExtensibleDpSearch:
                 # exceeds a feasible complete-plan bound cannot extend any
                 # retained prefix, so reject it before the label cross product.
                 self._upper_bound_pruned += 1
+                if debug_final:
+                    logger.warning(
+                        "  block %s variant=%s width=%s pruned: delta=%.4f > "
+                        "bound=%.4f",
+                        block.order,
+                        block.variant.name,
+                        block.parallelism,
+                        objective_delta.score,
+                        incumbent_score,
+                    )
                 continue
             for prev_state, prev_objectives in dp[prev_mask].items():
                 if self.parallel_stage_cpu_limit is None:
@@ -3268,8 +3359,26 @@ class ExtensibleDpSearch:
                 else self.block_provider.candidates_for(block_mask)
             )
             blocks = self._prune_dominated_blocks(prev_mask, blocks)
+            debug_final = (
+                os.environ.get("CEDAR_DP_DEBUG_FINAL") == "1"
+                and next_mask <= int(os.environ.get("CEDAR_DP_DEBUG_MASK", "15"))
+            )
+            if debug_final:
+                logger.warning(
+                    "[DpOptimizer] final mask %s from %s: blocks=%s bound=%.4f",
+                    bin(next_mask),
+                    bin(prev_mask),
+                    len(blocks),
+                    incumbent_score,
+                )
             for block in blocks:
                 if not self._block_can_follow(prev_mask, block):
+                    if debug_final:
+                        logger.warning(
+                            "  block %s variant=%s rejected by can_follow",
+                            block.order,
+                            block.variant.name,
+                        )
                     continue
                 regular_cost = self.optimizer._dp_regular_transition_cost(
                     prev_mask, block
@@ -3283,7 +3392,25 @@ class ExtensibleDpSearch:
                 )
                 if delta.score > incumbent_score + 1e-12:
                     self._upper_bound_pruned += 1
+                    if debug_final:
+                        logger.warning(
+                            "  block %s variant=%s width=%s pruned: "
+                            "delta=%.4f > bound=%.4f",
+                            block.order,
+                            block.variant.name,
+                            block.parallelism,
+                            delta.score,
+                            incumbent_score,
+                        )
                     continue
+                if debug_final:
+                    logger.warning(
+                        "  block %s variant=%s width=%s accepted: delta=%.4f",
+                        block.order,
+                        block.variant.name,
+                        block.parallelism,
+                        delta.score,
+                    )
                 block_cpus = self.optimizer._dp_parallel_stage_cpu_cost(block)
                 for prev_state, prev_objectives in dp[prev_mask].items():
                     if self.parallel_stage_cpu_limit is None:
