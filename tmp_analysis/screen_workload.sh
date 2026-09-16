@@ -27,6 +27,12 @@ export SUBSET=${SUBSET:-${SAMPLES}}
 # the only location both sides can read.  ``RESULTS_DIR`` can be overridden so
 # diagnostic probes do not overwrite the recorded screening cells.
 RESULTS_DIR=${RESULTS_DIR:-outputs/screen}
+# ``NO_LOCAL_PARALLELISM=1`` plans without SMP stages (used for strict same-W
+# comparisons: at a fixed W the residual per-worker SMP budget can be zero).
+LOCAL_PARALLELISM_FLAG=--enable_local_parallelism
+if [ -n "${NO_LOCAL_PARALLELISM:-}" ]; then
+  LOCAL_PARALLELISM_FLAG=
+fi
 docker exec $DEV bash -lc "mkdir -p /workspace/OptimalCedar/$RESULTS_DIR"
 # The harness ships ``outputs/plumber_bench_20260912/modules`` to the Ray
 # actors as ``py_modules``; that snapshot is what the actors execute, so it
@@ -74,7 +80,10 @@ docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=${PLACEMENT:-cedar_remote} \
   -e CEDAR_DP_WORKER_SEARCH_TIME_LIMIT_SEC=${PICO_PLAN_BUDGET:-180} \
   -e CEDAR_DP_SMP_MODE=${SMP_MODE:-additive} \
   ${CEDAR_WORKER_SEARCH_SET:+-e CEDAR_WORKER_SEARCH_SET=$CEDAR_WORKER_SEARCH_SET} \
+  ${CEDAR_DP_WORKER_LADDER:+-e CEDAR_DP_WORKER_LADDER=$CEDAR_DP_WORKER_LADDER} \
   ${CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER:+-e CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER=$CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER} \
+  ${CEDAR_LOCAL_WORKERS_MAX:+-e CEDAR_LOCAL_WORKERS_MAX=$CEDAR_LOCAL_WORKERS_MAX} \
+  ${CEDAR_DP_FORCE_VARIANTS:+-e CEDAR_DP_FORCE_VARIANTS=$CEDAR_DP_FORCE_VARIANTS} \
   ${CEDAR_DP_CHAIN_BEAM:+-e CEDAR_DP_CHAIN_BEAM=$CEDAR_DP_CHAIN_BEAM} \
   ${CEDAR_DP_RAY_MODE:+-e CEDAR_DP_RAY_MODE=$CEDAR_DP_RAY_MODE} \
   ${CEDAR_DP_SEARCH_MODE:+-e CEDAR_DP_SEARCH_MODE=$CEDAR_DP_SEARCH_MODE} \
@@ -88,10 +97,11 @@ docker exec -e CEDAR_RAY_PLACEMENT_RESOURCE=${PLACEMENT:-cedar_remote} \
     --dataset_file $DATASET_FILE --dataset_func ${DATASET_FUNC:-get_dataset} \
     --dataset_kwargs '$DATASET_KWARGS' --batch_size 4 --num_total_samples 0 \
     --profiled_stats $PROFILE --use_ray --ray_ip $RAY \
-    --enable_local_parallelism --disable_caching --match_profile_resources \
+    ${LOCAL_PARALLELISM_FLAG} --disable_caching --match_profile_resources \
     --cpu_budget 64 --ray_cpu_budget 64 \
     --optimizers $PLANNERS \
     --optimizer_time_limit_sec $SPEC --cedar_reorder_timeout_sec $SPEC \
+    ${FIXED_W:+--fixed_local_workers_ablation $FIXED_W} \
     --disable_cedar_runtime_timeout --num_repeats 1 \
     --results_path /workspace/OptimalCedar/$RESULTS_DIR/$WORKLOAD.json" \
   > "$OUT/$WORKLOAD.run.log" 2>&1

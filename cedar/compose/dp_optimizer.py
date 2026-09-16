@@ -730,6 +730,21 @@ class BlockCandidateProvider:
         for vt, backend_stats in opt._iter_candidate_backend_stats():
             if forced is not None and vt not in forced:
                 continue
+            # ``--disable_parallelism`` is a hard protocol constraint, not a
+            # hint: the greedy planners already refuse SMP stages when it is
+            # set, so the DP must refuse them too.  Without this gate one
+            # planner could answer the same fixed-W protocol with per-operator
+            # SMP processes while the others cannot, which would silently make
+            # the comparison about the flag instead of the plans.
+            if (
+                vt == PipeVariantType.SMP
+                and not getattr(
+                    getattr(opt, "options", None),
+                    "enable_local_parallelism",
+                    True,
+                )
+            ):
+                continue
             costs_v = [float("inf")] * self.n
             for i, p_id in enumerate(self.inner_ops):
                 pipe: Optional[Pipe] = opt.logical_pipes.get(p_id)
@@ -5955,8 +5970,17 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         # recipe the measured best plan runs at 21 workers (411-466 rec/s)
         # while every power of two is worse.  Add them after the classic
         # ladder so a tight budget still finds a plan quickly.
+        # ``CEDAR_DP_WORKER_LADDER=0`` keeps the candidate set exactly as
+        # configured.  The fixed-worker control experiment needs that: with the
+        # ladder appended the DP can still answer a configured ``W=32`` set
+        # with a budget-derived count such as 8 or 21, which would leave the
+        # worker count free and defeat the "every planner gets Cedar's W"
+        # protocol.
+        ladder_enabled = os.environ.get(
+            "CEDAR_DP_WORKER_LADDER", "1"
+        ).strip() not in ("0", "false", "False", "no")
         budget = self._dp_worker_budget()
-        if budget is not None:
+        if budget is not None and ladder_enabled:
             local_budget, _ray_budget, local_reserve, _ray_reserve = budget
             for slots in range(1, 9):
                 # Cedar's historical reserve: one runtime CPU per worker on top
