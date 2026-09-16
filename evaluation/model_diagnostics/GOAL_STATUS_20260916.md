@@ -50,6 +50,38 @@
 **结果**：commonvoice 现在**完全不再回退**（运行日志里 `infeasible slice` 出现 0 次），
 标准测试无新增回归（仍是那 4 个已知失败）。
 
+### 按框架推进的第二步结论（17:35）
+
+**已完成**：机器级共享容量标定已并入 profile（`tmp_analysis/merge_host_calibration.py`），
+PICO 的计划随之改变（Ray 段全部消失），吞吐 230.9 → 258.4 rec/s。
+
+**已定位剩余阻塞**——DP 自己的 worker 搜索日志（commonvoice，lane + 流水线规则）：
+
+| W | 每 worker 预算 smp_cpus | 模型 per-record | 模型 aggregate | 实测（同 W 的计划） |
+|---|---|---|---|---|
+| 6 | 8 | 19.28 ms | 3.21 ms | （W≈21 的流水线 395–454 rec/s） |
+| 16 | 2 | 26.89 ms | 1.68 ms | 275 rec/s |
+| 21 | 1 | 43.66 ms | 2.08 ms | 114–422 rec/s（计划不同） |
+| 32 | 0 | 50.78 ms | **1.59 ms（被选中）** | **203–323 rec/s** |
+
+模型选 W=32（1.59 最小），因为它把 32 个 worker 当成**线性加速**——`worker_contention`
+在这个 profile 里是空的，系数恒为 1.0。而实测在 W=32 上明显更慢（203–323），
+在 W≈21 的流水线计划上更快（395–454）。也就是说：**缺的不是新的算子 profile，
+而是本负载的 worker 竞争曲线（框架第一项的非线性）**。
+
+**顺带澄清执行器语义**：`apply_profile_matched_resources` 实现的是
+`W × (1 + Σ SMP 宽度) ≤ cpu_budget`，并且是**下调 W**；我们的 DP 是按
+`Σ 宽度 ≤ budget//W - 1 - reserve` 约束的——两者的约束集合相同，并不存在
+"DP 比执行器更严"的问题（我上一轮的说法需要更正）。ablation 那条 8 段流水线
+按预算应在 W=6 附近执行（6×9=54 核）。
+
+**下一步（唯一还缺的一步）**：用**计划复用**做同计划 worker 曲线
+（`--fixed_local_workers_ablation` 会让 DP 重新选计划，曲线被污染：W=4/8/16/21/32
+实测 100/112/275/114/203 是不同计划；仓库里 `run_scaled_reuse_plan_matrix.sh`
+已有计划复用路径），把 `worker_contention` 写进 commonvoice profile 后重测；
+按上面数据预期 DP 会移到 W≈16–21 并选中流水线计划（395–454 rec/s ≈ 1.6–1.8× 于
+Plumber 250）。
+
 ### 与"理想吞吐量公式"的对照（17:05）
 
 用户给出的框架：`T = 1 / max( D_drv/W, max_s c̃_s/(W p_s η_s), max_r D_r/K_r, max_s q_s L_s/(W I_s) )`
