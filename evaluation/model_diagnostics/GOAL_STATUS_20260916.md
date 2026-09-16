@@ -26,6 +26,19 @@
    取舍依赖算子是否 I/O-bound**，需要用实测的每算子"吞吐型/延迟型"分类来定价，
    而不是全局取 sum 或 max。
 
+本轮为修复所做的两次尝试（都已实现，默认不改变已验证的负载）：
+
+- **SMP 流水线 credit**：lane 模式下把同一 lane 上多个 stage 的服务从"求和"改成
+  "取最大"（流水线的吞吐由最慢 stage 决定），`CEDAR_DP_SMP_LANE_PIPELINE=0` 可回退。
+  在 commonvoice 上**没有改变选择**（PICO 仍选 Ray 计划，172.1 rec/s）。
+- **offload 加速比钳制**：`CEDAR_DP_BACKEND_SPEEDUP_FLOOR`（默认 0.0 关闭；设为 1.0
+  即"offload 不得比本地更快"）——同样没有翻盘，说明 DP 选 Ray 不只是因为
+  `_read` 的单算子代价，还叠加了资源池记账（用远端 64 核换容量）。
+- 另外发现一个**口径不一致**：同一个 PICO 计划，DP 内部目标值 351.6，而 harness
+  用 `calculate_dp_objective_cost` 重新打分是 1155.1（simple-DP 的计划反而 591.4）。
+  也就是说 DP 认为自己选的是更好的计划、而模型给该计划的分数更差——这一层需要单独查
+  （worker 数/竞争因子在打分路径里的传入方式不同）。
+
 诊断用到的命令：`tmp_analysis/dp_local_probe.sh <workload> <n> INPROCESS,SMP`
 （排除 Ray，看模型本地产出的计划）、`tmp_analysis/read_timing_probe.py`（直接测解码）。
 

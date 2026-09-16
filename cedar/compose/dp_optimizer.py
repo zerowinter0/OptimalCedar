@@ -4680,12 +4680,31 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
                 # worker chain; the measured worker-side service of an SMP
                 # stage already contains its marshalling, so the boundary stays
                 # on the stage's own lane instead of the worker's.
+                #
+                # Stages on the same lane run *concurrently*: with one process
+                # per stage every stage holds a different record, so the lane
+                # sustains the rate of its slowest stage rather than the sum of
+                # all of them.  Summing (the historical behaviour) prices a
+                # pipeline exactly like a chain of operators fused into one
+                # process, which is what made the DP indifferent between them
+                # on the audio recipe even though the pipelined plan measures
+                # 2x faster (425.8 vs 213.6 rec/s).  ``max`` is the throughput
+                # model of a lane; ``CEDAR_DP_SMP_LANE_PIPELINE=0`` restores the
+                # additive latency model.
+                lane_cost = stage_cost + boundary_local
+                if os.environ.get(
+                    "CEDAR_DP_SMP_LANE_PIPELINE", "1"
+                ).strip() in ("1", "true", "True", "yes"):
+                    return DpObjectiveCost(
+                        local_serial=previous.local_serial,
+                        ray_serial=previous.ray_serial,
+                        smp_serial=max(previous.smp_serial, lane_cost),
+                        gpu_serial=previous.gpu_serial,
+                    )
                 return DpObjectiveCost(
                     local_serial=previous.local_serial,
                     ray_serial=previous.ray_serial,
-                    smp_serial=(
-                        previous.smp_serial + stage_cost + boundary_local
-                    ),
+                    smp_serial=previous.smp_serial + lane_cost,
                     gpu_serial=previous.gpu_serial,
                 )
             return DpObjectiveCost(
