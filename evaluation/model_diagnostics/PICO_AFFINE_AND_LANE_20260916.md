@@ -114,6 +114,43 @@ simclrv2_views4 从 489.8 掉到 169.5 rec/s——**实测最优计划里那条�
 个算子**，被上限切掉了。现在默认不设上限（`CEDAR_DP_CHAIN_MAX_SEGMENT=0`），
 速度靠惰性表 + 可调 beam 来保证。
 
+## 4.6 SMP 记账方式（`CEDAR_DP_SMP_MODE`）——实测差异很大
+
+代码里 SMP 有两种语义：`lane`（每个 SMP stage 自成一条并行通道，harness 目前
+默认）与 `additive`（SMP 服务落在 worker 的关键路径上，代码默认）。在
+simclrv2_cache 上同一 profile、同一预算：
+
+| 模式 | PICO | Plumber | 比值 | simple-DP | 对 ablation |
+|---|---|---|---|---|---|
+| lane | 302.5 | 262.9 | 1.15× | 442.3 | **0.68×** |
+| additive | **423.1** | 262.0 | **1.61×** | 398.9 | **1.06×** |
+
+四个主负载上的两种模式对照（同 profile、同预算）：
+
+| 负载 | additive PICO / ablation | lane PICO / ablation |
+|---|---|---|
+| simclr | **490.2** / 1.17× | 475.9 / 1.09× |
+| simclrv2 | **492.6** / 1.08× | 480.0 / 1.12× |
+| simclrv2_views4 | 464.2 / 1.18× | **472.7** / 1.10× |
+| simclrv2_cache | **423.1** / **1.06×** | 302.5 / **0.68×** |
+
+additive 在 3/4 个负载上更好（cache 上高 40%，并把它从"PICO 比 ablation 慢 32%"
+变成"快 6%"），所以筛查协议默认值已改为 `additive`（也是代码默认）。
+
+也就是说：把 SMP 记成"免费并行通道"会让 DP 选出一个实测慢 28% 的计划。这正是
+用户最初质疑 `max(ray+local, smp)` 的同一个问题在 SMP 侧的体现。四个主负载上
+两种模式的对照实验正在跑（`/tmp/screen_smpmode2`），结果会决定协议默认值。
+
+## 4.7 仍然存在的问题（诚实记录）
+
+- **dino（2 视图）退化**：affine profile + 无竞争曲线时 PICO 选了 W=16（212.2
+  rec/s），比之前 W=32 的 279.9 慢，也低于 Plumber 244.0。说明"worker 数 vs 每
+  worker 宽度"的取舍在这条 recipe 上仍未被模型算对。
+- **blip/clip/alpaca/pile_pubmed 的 profile 里带着从 alpaca 复制的占位竞争曲线**
+  （已在本轮删除，避免占位数据驱动决策）。
+- dino_views4 1.09×、swav_views4 1.06×：两条 4 视图 recipe 都是 3–8 MB/记录，
+  机器带宽/算力饱和，Plumber 的朴素全本地计划已到极限。
+
 ## 5. 实验结果（本轮）
 
 | 负载 | PICO | 最优外部 | 比值 | simple-DP | 对 ablation | 备注 |
