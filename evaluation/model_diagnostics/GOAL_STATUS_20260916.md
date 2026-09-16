@@ -5,6 +5,30 @@
 > 同一份 profile、W 由各 optimizer 自选、local 64 + Ray 64 CPU、`--match_profile_resources`。
 
 
+## commonvoice 诊断结论（2026-09-16 14:45）
+
+修掉三个阻塞点后 commonvoice 可以完整测量了，结果是 **PICO 178–278 rec/s**，
+而 ablation 的 simple-DP **425–466 rec/s**、Plumber 241–284 rec/s。逐层定位：
+
+1. **DP 曾对所有 worker 数报 "no feasible final state"**：不是没有合法计划——我逐算子
+   验证过 7 个算子都能单独成块、串起来合法。真实原因是"贪心整块 incumbent"的分数
+   （模型认为全融合最快）低于任何精确搜索标签，单调剪枝把所有前缀标签都剪掉了。
+   已修：精确搜索判定不可行时回退到该可行 incumbent，而不是让整个负载失败。
+2. **模型偏好"全融合 + 把音频解码 offload 到 Ray"**：profile 里 `_read` 的
+   in-process 代价 **24.87 ms**、RAY **8.57 ms**、SMP **6.29 ms**。但直接测同一段音频
+   的 warm decode 只要 **5.3 ms**（本地）：in-process 基线是"每条记录读一个新文件"
+   的冷 I/O，而 RAY/SMP 隔离基准是对同一批 snapshot **反复回放**（热页缓存）——
+   两者不可比，模型因此以为 offload 能白拿 3× 加速。
+3. **目标函数缺少"流水线"credit**：把 7 个算子各放一个进程（simple-DP 的
+   8×SMP(1) 计划）在模型里被算成"服务时间之和"，与"全部融进一个进程"等价，
+   于是模型随意地选了融合；实测流水线快 2×（213.6 融合 vs 425.8 流水线）。
+   注意这与 simclrv2_cache 的结论相反（那里融合确实更快），说明**融合 vs 流水线的
+   取舍依赖算子是否 I/O-bound**，需要用实测的每算子"吞吐型/延迟型"分类来定价，
+   而不是全局取 sum 或 max。
+
+诊断用到的命令：`tmp_analysis/dp_local_probe.sh <workload> <n> INPROCESS,SMP`
+（排除 Ray，看模型本地产出的计划）、`tmp_analysis/read_timing_probe.py`（直接测解码）。
+
 ## 〇、按"负载类别不重复"重排后的达标集合（2026-09-16 14:30）
 
 用户指出 5 个达标负载里 4 个是 SimCLR 变体，要求最多保留一个 simclrv2 与一个

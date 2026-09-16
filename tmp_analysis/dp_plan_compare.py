@@ -23,6 +23,7 @@ def plan_once(dataset_file, kwargs_raw, profile, affine):
             key, _, value = token.partition("=")
             fields[key.strip()] = value.strip()
     spec = CedarEvalSpec(1, None, 1, kwargs=fields, profiled_stats=profile)
+    spec.use_my_optimizer = int(os.environ.get("PROBE_OPTIMIZER_SELECTOR", "2"))
     spec.disable_controller = True
     spec.disable_caching = True
     dataset = module.get_dataset(spec)
