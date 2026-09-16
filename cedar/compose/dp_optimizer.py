@@ -2387,16 +2387,20 @@ class ExtensibleDpSearch:
         # them.  Bounding the segment length is therefore a search-shape
         # decision, not a quality trade-off, and it is what makes the 30+
         # operator multi-view recipes plan inside a usable budget.
+        # ``0`` (the default) keeps every contiguous segment in the search.
+        # A positive cap trades plan quality for planning time on very long
+        # pipelines; the measured plans on the four-view recipes fuse seven
+        # operators, so the default must not be tighter than that.
         try:
             max_segment = int(
-                os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "8")
+                os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "0")
             )
         except ValueError as exc:
             raise ValueError(
                 "CEDAR_DP_CHAIN_MAX_SEGMENT must be an integer"
             ) from exc
-        if max_segment < 1:
-            raise ValueError("CEDAR_DP_CHAIN_MAX_SEGMENT must be positive")
+        if max_segment < 0:
+            raise ValueError("CEDAR_DP_CHAIN_MAX_SEGMENT must be >= 0")
 
         best_result: Optional[SearchResult] = None
         initial_state = self.cache_policy.initial_state()
@@ -2427,7 +2431,11 @@ class ExtensibleDpSearch:
                     continue
                 beams[start] = retain(beams[start])
                 prev_mask = prefix_masks[start]
-                segment_end = min(self.n, start + max_segment)
+                segment_end = (
+                    self.n
+                    if max_segment <= 0
+                    else min(self.n, start + max_segment)
+                )
                 for end in range(start + 1, segment_end + 1):
                     cache_key = (start, end)
                     blocks = block_cache.get(cache_key)
@@ -3763,7 +3771,7 @@ class ChainPartitionDpSearch(ExtensibleDpSearch):
                     os.environ.get("CEDAR_DP_CHAIN_BEAM", "512")
                 ),
                 "chain_max_segment": int(
-                    os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "8")
+                    os.environ.get("CEDAR_DP_CHAIN_MAX_SEGMENT", "0")
                 ),
                 "returned_feasible_cost": result.cost,
             }

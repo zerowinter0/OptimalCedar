@@ -61,13 +61,29 @@ cost(prefix) = (1 - f) · c · (w / w_ref) + f · c
 现在 `gpu_serial` 用 `block.cost / min_operator_speedup(block, width)` 计算，加速比
 直接取实测值（取块内最保守者），宽度 1 时行为不变。
 
-## 3. 59 算子负载
+## 3. 长 pipeline（30+ 算子）的规划可用性
 
-- `_calculate_data_size_ratio` 现在容忍 profile 里多出来的 pipe（SwAV 59 算子
-  以前在 setup 阶段抛 `KeyError: 59`，被 harness 记为 MemoryError）。
-- 61 算子的完整搜索仍会吃到 35 GB（复现确认在搜索阶段而非 setup）：已注册
-  `swav_views4` / `dino_views4`（同一 recipe 的 4-view 配置，31 算子）作为可规划
-  的等价负载，并在 1500 s 规划预算下运行（正式协议允许单 optimizer 60 分钟）。
+三处一起修，才让 4-view 的多视图 recipe 在预算内规划出来（31 算子、7.8 MB/记录）：
+
+1. `_calculate_data_size_ratio` 容忍 profile 里多出来的 pipe（SwAV 59 算子以前在
+   setup 阶段抛 `KeyError: 59`）。
+2. **确定性子集表改成按需计算**：`_calculate_all_non_random` 原本为所有 2^n 个
+   mask 建表，n=31 时是 2^31 个条目——实测吃掉约 20 分钟和 17 GB，搜索还没开始
+   预算就没了。现在是惰性记忆化（只用搜索真正访问到的 mask）。
+3. **chain-partition 搜索的融合段长度上限**（`CEDAR_DP_CHAIN_MAX_SEGMENT`，默认 8）
+   与 **DP 不再跑 Cedar 的枚举式重排 pass**（`skip_legacy_reordering`）——后者会
+   枚举依赖图的全部合法重排，对已经在搜索顺序的 DP 完全冗余。
+
+效果（swav_views4，31 算子）：
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| PICO | 8.8 rec/s（预算耗尽，只能返回 W=1 的 incumbent） | **129.0 rec/s（W=32）** |
+| Plumber | 128.6 rec/s | 127.1 rec/s |
+| 比值 | 0.07× | **1.01×** |
+
+也就是说：修完之后 PICO 在这条重负载 recipe 上追平了最强 baseline（该负载
+7.8 MB/记录，机器带宽/算力已饱和，1.5× 没有空间）。
 
 ## 4. Ray lane 开关（`CEDAR_DP_RAY_MODE`）——已实测，两者无差别
 
@@ -90,6 +106,13 @@ cost(prefix) = (1 - f) · c · (w / w_ref) + f · c
 负载上两种写法的差异是零——真正决定结果的是"选不选 Ray"，而不是"Ray 记在哪条
 lane"。开关保留（默认 additive，保持历史语义），供以后出现"计划确实含 Ray"的
 负载时再测。
+
+## 4.5 段长上限的教训
+
+先在 chain-partition 搜索里加了"融合段不超过 6 个算子"的上限来换速度，结果
+simclrv2_views4 从 489.8 掉到 169.5 rec/s——**实测最优计划里那条融合块正好有 7
+个算子**，被上限切掉了。现在默认不设上限（`CEDAR_DP_CHAIN_MAX_SEGMENT=0`），
+速度靠惰性表 + 可调 beam 来保证。
 
 ## 5. 实验结果（本轮）
 

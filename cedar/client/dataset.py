@@ -2402,8 +2402,7 @@ class DataSet:
             rates.append(calls / max(duration, 1e-9))
         return 1000.0 / statistics.median(rates)
 
-    @staticmethod
-    def _affine_rescale_payload(value, factor: float, depth: int = 0):
+    def _affine_rescale_payload(self, value, factor: float, depth: int = 0):
         """Return ``value`` with its data-carrying fields scaled by ``factor``.
 
         The affine calibration asks one question per operator: how much of this
@@ -2421,7 +2420,7 @@ class DataSet:
             scaled = {}
             changed = False
             for key, item in value.items():
-                replacement = Dataset._affine_rescale_payload(
+                replacement = self._affine_rescale_payload(
                     item, factor, depth + 1
                 )
                 if replacement is None:
@@ -2434,7 +2433,7 @@ class DataSet:
             items = []
             changed = False
             for item in value:
-                replacement = Dataset._affine_rescale_payload(
+                replacement = self._affine_rescale_payload(
                     item, factor, depth + 1
                 )
                 if replacement is None:
