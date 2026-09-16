@@ -4,6 +4,45 @@
 > 数据全部来自小数据量（1000–20000 条）在线实验，协议与正式矩阵一致：
 > 同一份 profile、W 由各 optimizer 自选、local 64 + Ray 64 CPU、`--match_profile_resources`。
 
+
+## 〇、按"负载类别不重复"重排后的达标集合（2026-09-16 14:30）
+
+用户指出 5 个达标负载里 4 个是 SimCLR 变体，要求最多保留一个 simclrv2 与一个
+simclrv2_cache。按此收缩后：
+
+| 类别 | 负载 | PICO | 最优外部 | 比值 | simple-DP | 对 ablation |
+|---|---|---|---|---|---|---|
+| 图像检测增强（原始 Cedar） | **coco** | 265.8 | Plumber 34.4 | **7.72×** | 243.2 | 1.09× |
+| 多视图增强 | **simclrv2** | 492.6 | Plumber 250.9 | **1.96×** | 455.2 | 1.08× |
+| 多视图增强 + 磁盘 cache | **simclrv2_cache** | 423.1 | Plumber 262.0 | **1.61×** | 398.9 | 1.06× |
+| （已按要求剔除） | simclr / simclrv2_views4 | 490.2 / 464.2 | 258.0 / 266.9 | 1.90× / 1.74× | — | — |
+
+即：**类别不重复的达标负载目前是 3 个**（目标 8 个）。下面记录为补足类别而做的
+尝试与其结果。
+
+### 用户点名的两个"原始 Cedar"负载
+
+| 负载 | 结果 | 结论 |
+|---|---|---|
+| wikitext103 | PICO 651.5 (W=16)、Cedar 626.1、Plumber 457.9、simple-DP 652.8 | 对最优外部 1.04×、对 ablation 1.00× —— 没有优势（该负载上计划形态是唯一的） |
+| commonvoice（音频） | PICO 178.8 (W=32)、Plumber 241.7、Cedar 165.4、simple-DP **466.6** | 对最优外部 0.74× —— **PICO 的精确搜索在这条 pipeline 上返回 "no feasible final state"**，只能退回较弱的 incumbent；而 ablation 的 simple-DP 能到 466.6，说明修好这个可行性 bug 后该负载有 ~1.9× 的空间 |
+
+commonvoice 的三个阻塞点本轮已修掉两个半：① Ray actor 用相对路径读不到音频
+（改成绝对路径）；② 精确搜索不可行时不再让整个负载失败（回退到可行 incumbent）；
+③ 仍待修：为什么"存在合法单算子块覆盖"（我逐算子验证过 7 个算子都能单独成块）
+但 Pareto 子集 DP 仍然报 `no feasible final state`。
+
+### 其他类别的尝试
+
+| 类别 | 负载 | 结果 |
+|---|---|---|
+| 图文 refine（Data-Juicer Hub） | llava_pretrain | PICO 15.7 vs DJ 45.0 = 0.35×（GPU 批大小建模未完成） |
+| 图文匹配/相似度 | blip / clip | 0.98× / 1.03×（Plumber 已到机器上限） |
+| 单视图增强 | dino_single / swav_single | 0.88× / 0.97× |
+| 4 视图增强（大 payload） | dino_views4 / swav_views4 | 1.09× / 1.06×（3–8 MB/记录，机器饱和） |
+| 视频（Data-Juicer） | video_self_evolution | profile 阶段失败：Ray actor 离线拉不到 HF 模型 + 远端视频路径不匹配（需先补基础设施） |
+| 文本 LLM 数据 | alpaca_cot / bloom_oscar / pile_* | 对 ablation 大赢（1.4–3.8×）、对 Cedar 打平（0.99–1.05×） |
+
 ## 一、目标与达成情况（2026-09-16 13:35，协议统一为 additive SMP）
 
 | 负载 | PICO | 最优外部 | 比值 | simple-DP | 对 ablation | 备注 |
