@@ -50,6 +50,52 @@
 **结果**：commonvoice 现在**完全不再回退**（运行日志里 `infeasible slice` 出现 0 次），
 标准测试无新增回归（仍是那 4 个已知失败）。
 
+### 与"理想吞吐量公式"的对照（17:05）
+
+用户给出的框架：`T = 1 / max( D_drv/W, max_s c̃_s/(W p_s η_s), max_r D_r/K_r, max_s q_s L_s/(W I_s) )`
+—— 分别约束"驱动能力 / stage 处理能力 / 共享资源容量 / 在途窗口"。
+
+映射到现有实现：
+
+| 框架项 | 我们的实现 | 现状 |
+|---|---|---|
+| 驱动能力 `D_drv/W` | `local_serial`（in-process 服务 + 序列化 + 往返） | 有；但冷/热测量不一致（已用 IO 规则部分修正） |
+| stage 处理能力 `max_s c̃_s/(W p_s η_s)` | 各 lane（`ray_serial`/`smp_serial`） + `_dp_service_parallelism`（宽度曲线作 η） | 有；但 lane 内是**求和**，只有 `CEDAR_DP_SMP_LANE_PIPELINE=1` 且 lane 模式下才是取 max |
+| 共享资源容量 `max_r D_r/K_r` | `physical_model.transport`（`cross_host_link_bytes_per_sec` 等） | **22 个 profile 里 18 个缺这个块**（只有 alpaca/blip/clip/pubmed 有，来自早先的 ten-workload 合并） |
+| 在途窗口 `q_s L_s/(W I_s)` | `_dp_inflight_inflation` 读 `calibration.inflight_per_width` | **所有 profile 都没有** → 恒为 1.0（不惩罚） |
+
+**关键实测证据（已有的标定文件）**：
+
+`outputs/transport_microbench_20260912/ray_transport.json`（echo sweep，1→56 actor）：
+
+| payload | actors | 聚合 rec/s | ms/record |
+|---|---|---|---|
+| 238 KB | 1 / 8 / 32 / 56 | 315 / 327 / 322 / 375 | ~3.1 |
+| 714 KB | 1 / 8 / 32 / 56 | 309 / 333 / 331 / 373 | ~3.0 |
+
+**跨主机往返是"共享容量"型瓶颈：聚合 ~330–375 rec/s，且与 actor 数、payload 大小几乎无关**
+（说明瓶颈在驱动/对象存储的串行路径，不在带宽）。这正是框架里的第三/四项，
+而我们的 profile 里根本没带这段数据。
+
+**本轮做的实验**：
+
+1. 新增 `tmp_analysis/merge_host_calibration.py`（把机器级标定并入任意 profile；
+   数值来自 `cross_host_inplan_20260913/cross_host.json` + echo sweep），并并入 commonvoice。
+2. 重测 commonvoice（additive）：**PICO 的计划真的变了——Ray 段全部消失**，全本地 W=32，
+   吞吐 230.9 → **258.4 rec/s**（Plumber 250.0）。说明"共享容量"项确实在起作用。
+3. 再开 lane + 流水线取 max：PICO 251.4，仍是全本地计划；ablation 454.1。
+   即：**共享容量项修好了，但"stage 容量取 max"这一项还没改变计划**。
+
+**剩下的具体阻塞**：ablation 用的"7 个 SMP(1) stage 流水线"在 DP 里**不可行**——
+W=21 时每 worker 的 SMP 预算只有 1 个 slot（`64//21-1-1`），而计划要 7 个；
+但执行侧 `apply_profile_matched_resources` 会**把宽度按预算裁剪**后照常执行
+（执行签名里 `smp_width_used_per_worker=1`）。也就是说：
+
+> **DP 的可行性判据比执行器的裁剪语义更严**，于是 DP 永远看不到这类计划。
+
+对齐这两者（DP 允许"声明宽度超过预算、由执行器按预算裁剪"，并按裁剪后的形态定价）
+就是让 PICO 拿到 ablation 那条 454 rec/s 计划的关键一步。
+
 ### 回退修好之后的复盘（16:30）
 
 回退消失后，把「模型估计」和「实测」对齐看，commonvoice 上剩下的**不是搜索问题、而是定价问题**：

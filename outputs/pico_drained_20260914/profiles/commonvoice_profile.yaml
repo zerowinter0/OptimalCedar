@@ -1,0 +1,3486 @@
+baseline:
+  input_counts: {}
+  input_sizes:
+    0: 435117.4492753623
+    1: 435117.4492753623
+    2: 435117.4492753623
+    3: 348134.49275362317
+    4: 230185.15942028986
+    5: 781335.6521739131
+    6: 168.0
+    7: 0.0
+  latencies:
+    0: 4206638.898550725
+    1: 116634.11594202899
+    2: 156665.4927536232
+    3: 19276399.36231884
+    4: 1879507.6811594204
+    5: 1560261.8985507246
+    6: 30068752.579710145
+    7: 42702.42028985507
+  output_counts: {}
+  output_sizes:
+    0: 1108267.3623188406
+    1: 435117.4492753623
+    2: 435117.4492753623
+    3: 435117.4492753623
+    4: 348134.49275362317
+    5: 230185.15942028986
+    6: 781335.6521739131
+    7: 168.0
+  selectivities: {}
+  selectivity_observation_sources: {}
+  throughput: 33.129741593418174
+  wall_latencies:
+    0: 4079660.4492753623
+    1: 76202.36231884058
+    2: 88667.95652173914
+    3: 19151870.260869566
+    4: 1821214.5942028984
+    5: 1456737.9130434783
+    6: 30455882.420289855
+    7: 1017389.2463768116
+disk_info:
+  read_latency: 5.488573151524179e-10
+  write_latency: 3.4974164009327067e-09
+layered_profile:
+  compatibility_throughput: component_substitution
+  component_layers:
+    contention_and_fusion: deferred_to_selected_plan_validation
+    object_marshalling: physical_model.object_boundary
+    operator_compute: isolated_replay
+    parallel_scaling: physical_model.scaling
+    stage_boundary: physical_model.boundary
+  input_pool:
+    bytes_per_pipe:
+      0: 34621120
+      1: 27184836
+      2: 27184836
+      3: 27184836
+      4: 21752207
+      5: 10812346
+      6: 29786276
+      7: 8256
+    max_bytes_per_pipe: 67108864
+    max_bytes_total: 536870912
+    max_samples_per_pipe: 64
+    samples_per_pipe:
+      0: 64
+      1: 64
+      2: 64
+      3: 64
+      4: 64
+      5: 64
+      6: 64
+      7: 64
+    serialization_errors: {}
+    snapshot_format: pickle
+    total_bytes: 178534713
+  isolated_operator_costs:
+    RAY:0: &id001
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 4.756402594968677
+        epoch_records: 20
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.04284808787993176
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 1.6280022761784494
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 15.854675316562256
+      mean_ms_per_sample: 5.513909226666668
+      measured_input_records: 300
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 1.2940518728076202
+      stderr_ms_per_sample: 0.23626046710617993
+    RAY:1: &id002
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.170442300150171
+        epoch_records: 44
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.0415561761110005
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.22591368295252323
+        width: 1
+      count: 35
+      end_to_end_ms_per_input_sample: 10.293643831656398
+      mean_ms_per_sample: 0.1455637071428571
+      measured_input_records: 308
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.03578678694188066
+      stderr_ms_per_sample: 0.006049071049398671
+    RAY:2: &id003
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.0081680729053915
+        epoch_records: 36
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.035793895303454296
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.2741538821719587
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 10.445028030921499
+      mean_ms_per_sample: 0.14531223020833334
+      measured_input_records: 288
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.029422943706808192
+      stderr_ms_per_sample: 0.005201290754388532
+    RAY:3: &id004
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 7.478656195104122
+        epoch_records: 20
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.01634101768412737
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 2.264636990148574
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 24.92885398368041
+      mean_ms_per_sample: 17.77507083
+      measured_input_records: 300
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 1.5909299852064624
+      stderr_ms_per_sample: 0.29046274676964656
+    RAY:4: &id005
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.004354174947366
+        epoch_records: 20
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.03176653643477391
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 1.4141317470930517
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 9.38860679671052
+      mean_ms_per_sample: 3.9641382062499995
+      measured_input_records: 320
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.7123503499712478
+      stderr_ms_per_sample: 0.1259269407613199
+    RAY:5: &id006
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.186919393017888
+        epoch_records: 20
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.029506202350454834
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 1.419731511035934
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 9.9591231031809
+      mean_ms_per_sample: 3.1766863187500003
+      measured_input_records: 320
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.5302279758520987
+      stderr_ms_per_sample: 0.09373194932495897
+    RAY:6: &id007
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.049607709981501
+        epoch_records: 20
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.008456043318859097
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 1.554156858008355
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 9.530024093692191
+      mean_ms_per_sample: 5.630857024999999
+      measured_input_records: 320
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.2693498192496639
+      stderr_ms_per_sample: 0.04761477092570206
+    SMP:0: &id008
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.022662705043331
+        epoch_records: 19
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.002162612661436866
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.10233126603998244
+        width: 1
+      count: 665
+      end_to_end_ms_per_input_sample: 4.545357451192979
+      mean_ms_per_sample: 3.4657751578947367
+      measured_input_records: 665
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.19328134914493078
+      stderr_ms_per_sample: 0.0074951292381565116
+    SMP:1: &id009
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.016112719895318
+        epoch_records: 30
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.005755342064491019
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.0653910560067743
+        width: 1
+      count: 2580
+      end_to_end_ms_per_input_sample: 1.1690359379439217
+      mean_ms_per_sample: 0.103531107751938
+      measured_input_records: 2580
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.03026577886066485
+      stderr_ms_per_sample: 0.000595856939428081
+    SMP:2: &id010
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.012847646139562
+        epoch_records: 32
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.005164466415066877
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.06165939383208752
+        width: 1
+      count: 2592
+      end_to_end_ms_per_input_sample: 1.1623640610106336
+      mean_ms_per_sample: 0.10992553510802469
+      measured_input_records: 2592
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.028902908267626377
+      stderr_ms_per_sample: 0.0005677067342236484
+    SMP:3: &id011
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.0962981160264462
+        epoch_records: 10
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.01021197739511397
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.19596736202947795
+        width: 1
+      count: 170
+      end_to_end_ms_per_input_sample: 18.213518329567332
+      mean_ms_per_sample: 17.17419709411765
+      measured_input_records: 170
+      method: worker_wall_clock
+      stddev_ms_per_sample: 2.286708194697834
+      stderr_ms_per_sample: 0.17538251250436146
+    SMP:4: &id012
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.0334150919225067
+        epoch_records: 23
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.004280177609933972
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.08414557809010148
+        width: 1
+      count: 1380
+      end_to_end_ms_per_input_sample: 2.198126878204715
+      mean_ms_per_sample: 1.6403420268115942
+      measured_input_records: 1380
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.2608169104107132
+      stderr_ms_per_sample: 0.007020955215792697
+    SMP:5: &id013
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.0547754680737853
+        epoch_records: 24
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.004153375669887906
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.0827033978421241
+        width: 1
+      count: 1296
+      end_to_end_ms_per_input_sample: 2.3570798364766863
+      mean_ms_per_sample: 1.459603726080247
+      measured_input_records: 1296
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.21824217372885948
+      stderr_ms_per_sample: 0.006062282603579431
+    SMP:6: &id014
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.0190411920193583
+        epoch_records: 18
+        max_duration_sec: 20.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.0054105249851255114
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.11004843795672059
+        width: 1
+      count: 486
+      end_to_end_ms_per_input_sample: 6.212018913620079
+      mean_ms_per_sample: 5.862142267489712
+      measured_input_records: 486
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.6992200861813244
+      stderr_ms_per_sample: 0.0317172672046134
+  method: fixed_legal_input_adaptive_microbenchmark
+  schema_version: 1
+offloads:
+  RAY:
+    0:
+      backend_compute: *id001
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 31.62694639327334
+      throughput_provenance:
+        measured_backend_ms_per_sample: 5.513909226666668
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 4079660.4492753623
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    1:
+      backend_compute: *id002
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.05378652289743
+      throughput_provenance:
+        measured_backend_ms_per_sample: 0.1455637071428571
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 76202.36231884058
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    2:
+      backend_compute: *id003
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.06768643741324
+      throughput_provenance:
+        measured_backend_ms_per_sample: 0.14531223020833334
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 88667.95652173914
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    3:
+      backend_compute: *id004
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 34.713111053171744
+      throughput_provenance:
+        measured_backend_ms_per_sample: 17.77507083
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 19151870.260869566
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    4:
+      backend_compute: *id005
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 30.93362423674115
+      throughput_provenance:
+        measured_backend_ms_per_sample: 3.9641382062499995
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 1821214.5942028984
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    5:
+      backend_compute: *id006
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 31.34373049917306
+      throughput_provenance:
+        measured_backend_ms_per_sample: 3.1766863187500003
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 1456737.9130434783
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    6:
+      backend_compute: *id007
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 186.59037702559348
+      throughput_provenance:
+        measured_backend_ms_per_sample: 5.630857024999999
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 30455882.420289855
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+  SMP:
+    0:
+      backend_compute: *id008
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.81751756748671
+      throughput_provenance:
+        measured_backend_ms_per_sample: 3.4657751578947367
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 4079660.4492753623
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    1:
+      backend_compute: *id009
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.09977324823955
+      throughput_provenance:
+        measured_backend_ms_per_sample: 0.103531107751938
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 76202.36231884058
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    2:
+      backend_compute: *id010
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.106426125138675
+      throughput_provenance:
+        measured_backend_ms_per_sample: 0.10992553510802469
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 88667.95652173914
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    3:
+      backend_compute: *id011
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 35.452588110302386
+      throughput_provenance:
+        measured_backend_ms_per_sample: 17.17419709411765
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 19151870.260869566
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    4:
+      backend_compute: *id012
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.32946043328906
+      throughput_provenance:
+        measured_backend_ms_per_sample: 1.6403420268115942
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 1821214.5942028984
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    5:
+      backend_compute: *id013
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 33.12659643359429
+      throughput_provenance:
+        measured_backend_ms_per_sample: 1.459603726080247
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 1456737.9130434783
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+    6:
+      backend_compute: *id014
+      input_counts: {}
+      input_sizes:
+        0: 435117.4492753623
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 348134.49275362317
+        4: 230185.15942028986
+        5: 781335.6521739131
+        6: 168.0
+        7: 0.0
+      latencies:
+        0: 4206638.898550725
+        1: 116634.11594202899
+        2: 156665.4927536232
+        3: 19276399.36231884
+        4: 1879507.6811594204
+        5: 1560261.8985507246
+        6: 30068752.579710145
+        7: 42702.42028985507
+      output_counts: {}
+      output_sizes:
+        0: 1108267.3623188406
+        1: 435117.4492753623
+        2: 435117.4492753623
+        3: 435117.4492753623
+        4: 348134.49275362317
+        5: 230185.15942028986
+        6: 781335.6521739131
+        7: 168.0
+      selectivities: {}
+      throughput: 178.87108780212364
+      throughput_provenance:
+        measured_backend_ms_per_sample: 5.862142267489712
+        measured_baseline_throughput: 33.129741593418174
+        method: component_substitution
+        replaced_local_wall_ns_per_sample: 30455882.420289855
+      wall_latencies:
+        0: 4079660.4492753623
+        1: 76202.36231884058
+        2: 88667.95652173914
+        3: 19151870.260869566
+        4: 1821214.5942028984
+        5: 1456737.9130434783
+        6: 30455882.420289855
+        7: 1017389.2463768116
+  TF_RAY: {}
+operator_compute_scaling:
+  0:
+    mode: default
+    scaling: per_data
+  1:
+    mode: default
+    scaling: per_data
+  2:
+    mode: default
+    scaling: per_data
+  3:
+    mode: default
+    scaling: per_data
+  4:
+    mode: default
+    scaling: per_data
+  5:
+    mode: default
+    scaling: per_data
+  6:
+    mode: default
+    scaling: per_data
+  7:
+    mode: default
+    scaling: per_data
+physical_model:
+  boundary:
+    RAY:
+      calibration_source: measured
+      fixed_latency_ms: 0.659913567896164
+      measurements:
+      - boundary_sec_per_sample: 0.0005966621160951036
+        payload_bytes: 512.0
+      - boundary_sec_per_sample: 0.0006100066193539533
+        payload_bytes: 4096.0
+      - boundary_sec_per_sample: 0.0008685006446285115
+        payload_bytes: 65536.0
+      - boundary_sec_per_sample: 0.011262431987233867
+        payload_bytes: 1048576.0
+      - boundary_sec_per_sample: 0.03991658969243872
+        payload_bytes: 4194304.0
+      method: synchronous_round_trip_linear_fit
+      payload_bytes:
+      - 512
+      - 4096
+      - 65536
+      - 1048576
+      - 4194304
+      r_squared: 0.999338593418677
+      repetitions: 2
+      runs:
+      - boundary_sec_per_sample: 0.0006079543732084858
+        payload_bytes: 512
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.0005853698589817213
+        payload_bytes: 512
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0006131096465651353
+        payload_bytes: 4096
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.0006069035921427712
+        payload_bytes: 4096
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.000858573148434516
+        payload_bytes: 65536
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.000878428140822507
+        payload_bytes: 65536
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0112627901162341
+        payload_bytes: 1048576
+        repeat: 1
+        samples: 128
+      - boundary_sec_per_sample: 0.011262073858233634
+        payload_bytes: 1048576
+        repeat: 2
+        samples: 128
+      - boundary_sec_per_sample: 0.039577593037392944
+        payload_bytes: 4194304
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.040255586347484495
+        payload_bytes: 4194304
+        repeat: 2
+        samples: 32
+      stage_width: 8
+      throughput_bytes_per_sec: 212714005.53149262
+      variant: RAY
+      warmup_samples: 20
+    SMP:
+      calibration_source: measured
+      fixed_latency_ms: 0.0938635548185609
+      measurements:
+      - boundary_sec_per_sample: 6.135095031822857e-05
+        payload_bytes: 512.0
+      - boundary_sec_per_sample: 7.498729974031448e-05
+        payload_bytes: 4096.0
+      - boundary_sec_per_sample: 0.00019362945795364794
+        payload_bytes: 65536.0
+      - boundary_sec_per_sample: 0.0025283449031121563
+        payload_bytes: 1048576.0
+      - boundary_sec_per_sample: 0.009240638279152336
+        payload_bytes: 4194304.0
+      method: synchronous_round_trip_linear_fit
+      payload_bytes:
+      - 512
+      - 4096
+      - 65536
+      - 1048576
+      - 4194304
+      r_squared: 0.9996103765881267
+      repetitions: 2
+      runs:
+      - boundary_sec_per_sample: 5.738480103900656e-05
+        payload_bytes: 512
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 6.531709959745058e-05
+        payload_bytes: 512
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 7.416559355988284e-05
+        payload_bytes: 4096
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 7.580900592074613e-05
+        payload_bytes: 4096
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.00019099852352155722
+        payload_bytes: 65536
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.00019626039238573867
+        payload_bytes: 65536
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0025046164300874807
+        payload_bytes: 1048576
+        repeat: 1
+        samples: 128
+      - boundary_sec_per_sample: 0.002552073376136832
+        payload_bytes: 1048576
+        repeat: 2
+        samples: 128
+      - boundary_sec_per_sample: 0.009357843402540311
+        payload_bytes: 4194304
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.00912343315576436
+        payload_bytes: 4194304
+        repeat: 2
+        samples: 32
+      stage_width: 8
+      throughput_bytes_per_sec: 913704490.4032885
+      variant: SMP
+      warmup_samples: 20
+  object_boundary:
+    RAY:
+      method: cedar_identity_stage_real_legal_objects
+      operators:
+        0:
+          input_identity_stage: &id015
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.7197929020039737
+              epoch_records: 31
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.06034161352129009
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.06295533198863268
+              width: 1
+            backend_compute_ms_per_sample: 0.00484903125
+            input_records: 62
+            mean_ms_per_sample: 11.609562935547963
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 2
+          input_pipe_id: 1
+          input_serialize_ms_per_sample: 0.1630119513720274
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.09369396138936281
+          output_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.8598123260308057
+              epoch_records: 27
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.016898148041583662
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.0358380270190537
+              width: 1
+            backend_compute_ms_per_sample: 0.007264037037037038
+            input_records: 54
+            mean_ms_per_sample: 15.922450482051957
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          output_serialized_bytes_per_sample: 592523.0
+        1:
+          input_identity_stage: &id016
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.7879428840242326
+              epoch_records: 35
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.08574417854554177
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.056979205925017595
+              width: 1
+            backend_compute_ms_per_sample: 0.004712416666666667
+            input_records: 70
+            mean_ms_per_sample: 11.256326914631895
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 2
+          input_pipe_id: 2
+          input_serialize_ms_per_sample: 0.14566851314157248
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.07909699343144894
+          output_identity_stage: *id015
+          output_serialized_bytes_per_sample: 465252.0
+        2:
+          input_identity_stage: &id017
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.7879058569669724
+              epoch_records: 35
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.07060974224979662
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.056819133926182985
+              width: 1
+            backend_compute_ms_per_sample: 0.004517611111111111
+            input_records: 70
+            mean_ms_per_sample: 11.255797956671033
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 2
+          input_pipe_id: 3
+          input_serialize_ms_per_sample: 0.14683802146464586
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.08193787652999163
+          output_identity_stage: *id016
+          output_serialized_bytes_per_sample: 465252.0
+        3:
+          input_identity_stage: &id018
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.677196130855009
+              epoch_records: 34
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.06256014714252324
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.058773834025487304
+              width: 1
+            backend_compute_ms_per_sample: 0.004207426470588235
+            input_records: 68
+            mean_ms_per_sample: 9.95876663022072
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 2
+          input_pipe_id: 4
+          input_serialize_ms_per_sample: 0.12363353744149208
+          input_serialized_bytes_per_sample: 372390.0
+          output_deserialize_ms_per_sample: 0.08238747250288725
+          output_identity_stage: *id017
+          output_serialized_bytes_per_sample: 465252.0
+        4:
+          input_identity_stage: &id019
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.7600044189020991
+              epoch_records: 86
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 12
+              observed_rse: 0.09266586775995492
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 12
+              warmup_sec: 0.06905475398525596
+              width: 1
+            backend_compute_ms_per_sample: 0.002012377777777778
+            input_records: 172
+            mean_ms_per_sample: 4.4186303424540645
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 6
+          input_pipe_id: 5
+          input_serialize_ms_per_sample: 0.1990661257877946
+          input_serialized_bytes_per_sample: 185036.0
+          output_deserialize_ms_per_sample: 0.062066479586064816
+          output_identity_stage: *id018
+          output_serialized_bytes_per_sample: 372390.0
+        5:
+          input_identity_stage: &id020
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.8088789461180568
+              epoch_records: 33
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.0735043662458865
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.060179949970915914
+              width: 1
+            backend_compute_ms_per_sample: 0.00354975
+            input_records: 66
+            mean_ms_per_sample: 12.255741607849345
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 2
+          input_pipe_id: 6
+          input_serialize_ms_per_sample: 0.1564765116199851
+          input_serialized_bytes_per_sample: 509765.0
+          output_deserialize_ms_per_sample: 0.038720085285604
+          output_identity_stage: *id019
+          output_serialized_bytes_per_sample: 185036.0
+        6:
+          input_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5464465110562742
+              epoch_records: 4096
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 1000
+              observed_rse: 0.06601325138825469
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 1000
+              warmup_sec: 0.026016298914328218
+              width: 1
+            backend_compute_ms_per_sample: 0.00037060972685185186
+            input_records: 16384
+            mean_ms_per_sample: 0.03335244818458705
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 500
+          input_pipe_id: 7
+          input_serialize_ms_per_sample: 0.006588408723473549
+          input_serialized_bytes_per_sample: 129.0
+          output_deserialize_ms_per_sample: 0.08186185732483864
+          output_identity_stage: *id020
+          output_serialized_bytes_per_sample: 509765.0
+      schema_version: 2
+    SMP:
+      method: cedar_identity_stage_real_legal_objects
+      operators:
+        0:
+          input_identity_stage: &id021
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5114385378547013
+              epoch_records: 27
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.016674977572086882
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.07184433401562274
+              width: 1
+            backend_compute_ms_per_sample: 0.0016350388007054673
+            input_records: 567
+            mean_ms_per_sample: 0.9020080032710781
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 1
+          input_serialize_ms_per_sample: 0.09420153219252825
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.0941939651966095
+          output_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5179459219798446
+              epoch_records: 24
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.013141529209224555
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.08089505205862224
+              width: 1
+            backend_compute_ms_per_sample: 0.0016564444444444443
+            input_records: 432
+            mean_ms_per_sample: 1.1989488934718624
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          output_serialized_bytes_per_sample: 592523.0
+        1:
+          input_identity_stage: &id022
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5075913730543107
+              epoch_records: 30
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.01596451744821671
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.06526546087116003
+              width: 1
+            backend_compute_ms_per_sample: 0.0017171312499999999
+            input_records: 480
+            mean_ms_per_sample: 1.0574820271964807
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 2
+          input_serialize_ms_per_sample: 0.10258285328745842
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.07463258225470781
+          output_identity_stage: *id021
+          output_serialized_bytes_per_sample: 465252.0
+        2:
+          input_identity_stage: &id023
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5162304218392819
+              epoch_records: 28
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.014034438527720235
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.0696949188131839
+              width: 1
+            backend_compute_ms_per_sample: 0.00161590873015873
+            input_records: 504
+            mean_ms_per_sample: 1.0242667099985752
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 3
+          input_serialize_ms_per_sample: 0.048667541705071926
+          input_serialized_bytes_per_sample: 465252.0
+          output_deserialize_ms_per_sample: 0.07381092291325331
+          output_identity_stage: *id022
+          output_serialized_bytes_per_sample: 465252.0
+        3:
+          input_identity_stage: &id024
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5286251918878406
+              epoch_records: 39
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.012919993742544383
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.05117564904503524
+              width: 1
+            backend_compute_ms_per_sample: 0.0014523212669683258
+            input_records: 663
+            mean_ms_per_sample: 0.7973230646875424
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 4
+          input_serialize_ms_per_sample: 0.047683948650956154
+          input_serialized_bytes_per_sample: 372390.0
+          output_deserialize_ms_per_sample: 0.037084915675222874
+          output_identity_stage: *id023
+          output_serialized_bytes_per_sample: 465252.0
+        4:
+          input_identity_stage: &id025
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5074145989492536
+              epoch_records: 41
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.015449842709689219
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.04804830811917782
+              width: 1
+            backend_compute_ms_per_sample: 0.0012612977642276423
+            input_records: 984
+            mean_ms_per_sample: 0.5156652428346072
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 5
+          input_serialize_ms_per_sample: 0.051375944167375565
+          input_serialized_bytes_per_sample: 185036.0
+          output_deserialize_ms_per_sample: 0.029325601644814014
+          output_identity_stage: *id024
+          output_serialized_bytes_per_sample: 372390.0
+        5:
+          input_identity_stage: &id026
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5293033251073211
+              epoch_records: 27
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.015696302521306344
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.07165233395062387
+              width: 1
+            backend_compute_ms_per_sample: 0.0017319782135076253
+            input_records: 459
+            mean_ms_per_sample: 1.1531662856368652
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 6
+          input_serialize_ms_per_sample: 0.054105534218251705
+          input_serialized_bytes_per_sample: 509765.0
+          output_deserialize_ms_per_sample: 0.03861146979033947
+          output_identity_stage: *id025
+          output_serialized_bytes_per_sample: 185036.0
+        6:
+          input_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5011117139365524
+              epoch_records: 67
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.00842929645956527
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.029759783064946532
+              width: 1
+            backend_compute_ms_per_sample: 0.0006418488147497805
+            input_records: 5695
+            mean_ms_per_sample: 0.08799152132336302
+            method: cedar_identity_stage_real_objects
+            submit_batch_size: 1
+          input_pipe_id: 7
+          input_serialize_ms_per_sample: 0.0015575205907225609
+          input_serialized_bytes_per_sample: 129.0
+          output_deserialize_ms_per_sample: 0.03890553489327431
+          output_identity_stage: *id026
+          output_serialized_bytes_per_sample: 509765.0
+      schema_version: 2
+  operator_affine:
+    method: two_stratum_operator_affine_fit
+    min_contrast: 1.1
+    note: cost(record) = k * input_bytes + b, fitted on the smallest and largest legal
+      inputs that reached the operator, or on rescaled versions of its own legal input
+      when those inputs have no size contrast; fixed_fraction = b / (k * x_reference
+      + b) is what the joint DP uses to split an operator's profiled cost into its
+      size-dependent and size-independent parts
+    operators:
+      '0':
+        b_ms: 2.3700839748788978
+        fixed_fraction: 0.750996
+        k_ms_per_byte: 1.8060372086532704e-06
+        points_ms_per_byte:
+        - - 332190.0
+          - 2.9700314752214276
+        - - 514296.0
+          - 3.29892168714044
+        source: legal_inputs
+        x_reference_bytes: 435117.4492753623
+      '1':
+        b_ms: 0.0
+        fixed_fraction: 0.0
+        k_ms_per_byte: 1.0430122572515392e-07
+        points_ms_per_byte:
+        - - 332190.0
+          - 0.030095005562957744
+        - - 514296.0
+          - 0.04908888457486262
+        source: legal_inputs
+        x_reference_bytes: 435117.4492753623
+      '2':
+        b_ms: 0.0
+        fixed_fraction: 0.0
+        k_ms_per_byte: 9.58707796224248e-08
+        points_ms_per_byte:
+        - - 332190.0
+          - 0.03073739049562004
+        - - 514296.0
+          - 0.04819603468954133
+        source: legal_inputs
+        x_reference_bytes: 435117.4492753623
+      '3':
+        b_ms: 0.0
+        fixed_fraction: 0.0
+        k_ms_per_byte: 4.82073107576619e-05
+        points_ms_per_byte:
+        - - 265860.0
+          - 12.18603391025681
+        - - 411384.0
+          - 19.2013546009548
+        source: legal_inputs
+        x_reference_bytes: 348134.49275362317
+      '4':
+        b_ms: 0.4079488242867034
+        fixed_fraction: 0.21136
+        k_ms_per_byte: 6.612797291960827e-06
+        points_ms_per_byte:
+        - - 132042.0
+          - 1.281115804311795
+        - - 204620.0
+          - 1.7610594061677278
+        source: legal_inputs
+        x_reference_bytes: 230185.15942028986
+      '5':
+        b_ms: 0.07066587126820367
+        fixed_fraction: 0.032462
+        k_ms_per_byte: 2.6956526292095105e-06
+        points_ms_per_byte:
+        - - 363705.0
+          - 1.0510882107748487
+        - - 563743.0
+          - 1.5903211714166607
+        source: legal_inputs
+        x_reference_bytes: 781335.6521739131
+    schema_version: 1
+  scaling:
+    RAY:
+      0:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id001
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0616564699448645
+              epoch_records: 8
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.01997251147577521
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 1.42612323211506
+              width: 2
+            count: 80
+            end_to_end_ms_per_input_sample: 13.270705874310806
+            mean_ms_per_sample: 6.7899186625
+            measured_input_records: 80
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 1.2129481730514544
+            stderr_ms_per_sample: 0.13561172840636151
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0519831341225654
+              epoch_records: 16
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.014190858579238658
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 1.4849486330058426
+              width: 4
+            count: 96
+            end_to_end_ms_per_input_sample: 10.958157647110056
+            mean_ms_per_sample: 7.29583565625
+            measured_input_records: 96
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 1.0144235695152302
+            stderr_ms_per_sample: 0.10353417201521062
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.3026021861005574
+              epoch_records: 32
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.01969814843764359
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 1.6011707910802215
+              width: 8
+            count: 128
+            end_to_end_ms_per_input_sample: 10.176579578910605
+            mean_ms_per_sample: 7.0438400078125
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 1.5697839108495082
+            stderr_ms_per_sample: 0.13875060604490322
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.15897983382456
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.014768670657262315
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 1.8228574050590396
+              width: 16
+            count: 128
+            end_to_end_ms_per_input_sample: 9.054529951754375
+            mean_ms_per_sample: 7.1907917265625
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 1.2014981340879112
+            stderr_ms_per_sample: 0.10619843477456821
+          32:
+            adaptive_profile:
+              converged: false
+              elapsed_sec: 8.21822396107018
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.1668974515874462
+              stop_reason: max_duration
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 2.333926244871691
+              width: 32
+            count: 896
+            end_to_end_ms_per_input_sample: 9.17212495655154
+            mean_ms_per_sample: 9.065207099330356
+            measured_input_records: 896
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 45.287822571337905
+            stderr_ms_per_sample: 1.5129599629906618
+      1:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id002
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1511691049672663
+              epoch_records: 42
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.02266039538837038
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.09436249802820385
+              width: 2
+            count: 126
+            end_to_end_ms_per_input_sample: 9.136262737835446
+            mean_ms_per_sample: 0.2153642857142857
+            measured_input_records: 126
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.054780556640743605
+            stderr_ms_per_sample: 0.004880239866819681
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1974908700212836
+              epoch_records: 46
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.026470032467244893
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.1710506840609014
+              width: 4
+            count: 138
+            end_to_end_ms_per_input_sample: 8.677470072617997
+            mean_ms_per_sample: 0.2481243043478261
+            measured_input_records: 138
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.07715486642017766
+            stderr_ms_per_sample: 0.0065678583919995094
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.3712303380016237
+              epoch_records: 54
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.029255153368981015
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.29226006590761244
+              width: 8
+            count: 162
+            end_to_end_ms_per_input_sample: 8.46438480247916
+            mean_ms_per_sample: 0.26250245061728394
+            measured_input_records: 162
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.09774470689829806
+            stderr_ms_per_sample: 0.007679549452542007
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.009773172903806
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.03716539878742392
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.5175309258047491
+              width: 16
+            count: 128
+            end_to_end_ms_per_input_sample: 7.888852913310984
+            mean_ms_per_sample: 0.2836677734375
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.11927619650604335
+            stderr_ms_per_sample: 0.010542625922945305
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0076488798949867
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.03702613984742341
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 1.0199328330345452
+              width: 32
+            count: 128
+            end_to_end_ms_per_input_sample: 7.872256874179584
+            mean_ms_per_sample: 0.305467171875
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.12796110036633146
+            stderr_ms_per_sample: 0.011310270224640673
+      2:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id003
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0352539189625531
+              epoch_records: 41
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.0326133465085773
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.09731928096152842
+              width: 2
+            count: 123
+            end_to_end_ms_per_input_sample: 8.416698528150839
+            mean_ms_per_sample: 0.21663321138211383
+            measured_input_records: 123
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.0783561264173726
+            stderr_ms_per_sample: 0.00706513398807075
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2372575460467488
+              epoch_records: 47
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.02734260671012174
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.16702306107617915
+              width: 4
+            count: 141
+            end_to_end_ms_per_input_sample: 8.774876213097508
+            mean_ms_per_sample: 0.24156939007092199
+            measured_input_records: 141
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.07843165420258524
+            stderr_ms_per_sample: 0.006605136825913208
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.351475145900622
+              epoch_records: 54
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.026704708982528115
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.2920565770473331
+              width: 8
+            count: 162
+            end_to_end_ms_per_input_sample: 8.342439172226062
+            mean_ms_per_sample: 0.26131215432098764
+            measured_input_records: 162
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.08881881348566241
+            stderr_ms_per_sample: 0.006978265034739452
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4756977988872677
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.02390120105865253
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.5435507730580866
+              width: 16
+            count: 192
+            end_to_end_ms_per_input_sample: 7.685926035871186
+            mean_ms_per_sample: 0.2851601354166667
+            measured_input_records: 192
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.09444069008676997
+            stderr_ms_per_sample: 0.006815669730506333
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 2.033732932060957
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.022779732785772798
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 1.0182783959899098
+              width: 32
+            count: 256
+            end_to_end_ms_per_input_sample: 7.944269265863113
+            mean_ms_per_sample: 0.29121415234375
+            measured_input_records: 256
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.1061404891812153
+            stderr_ms_per_sample: 0.006633780573825956
+      3:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id004
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0320128509774804
+              epoch_records: 8
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.03265960195608639
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 2.044581125024706
+              width: 2
+            count: 56
+            end_to_end_ms_per_input_sample: 18.42880091031215
+            mean_ms_per_sample: 23.78201723214286
+            measured_input_records: 56
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 5.812374521323854
+            stderr_ms_per_sample: 0.7767112165145731
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0918276379816234
+              epoch_records: 16
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.03743924313050871
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 2.0470481410156935
+              width: 4
+            count: 80
+            end_to_end_ms_per_input_sample: 13.647845474770293
+            mean_ms_per_sample: 26.427341375
+            measured_input_records: 80
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 8.849638463477085
+            stderr_ms_per_sample: 0.9894196590315775
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0435531178954989
+              epoch_records: 32
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.03181908687302813
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 2.193608368979767
+              width: 8
+            count: 128
+            end_to_end_ms_per_input_sample: 8.152758733558585
+            mean_ms_per_sample: 28.3156175390625
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 10.193392209612256
+            stderr_ms_per_sample: 0.9009770943388689
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4074742938391864
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.023876224372423763
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 2.3710512241814286
+              width: 16
+            count: 192
+            end_to_end_ms_per_input_sample: 7.330595280412429
+            mean_ms_per_sample: 31.961147229166667
+            measured_input_records: 192
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 10.573983429709163
+            stderr_ms_per_sample: 0.7631115224436534
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.8302550271619111
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.021389137426403353
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 3.2837235389743
+              width: 32
+            count: 256
+            end_to_end_ms_per_input_sample: 7.149433699851215
+            mean_ms_per_sample: 33.74303815234375
+            measured_input_records: 256
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 11.547751683597632
+            stderr_ms_per_sample: 0.721734480224852
+      4:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id005
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0082386289723217
+              epoch_records: 8
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.013318469244545356
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 1.3696879888884723
+              width: 2
+            count: 120
+            end_to_end_ms_per_input_sample: 8.401988574769348
+            mean_ms_per_sample: 4.37573125
+            measured_input_records: 120
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.6384039650399609
+            stderr_ms_per_sample: 0.05827804207552101
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1124570569954813
+              epoch_records: 16
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.014094853537872085
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 1.4155054290313274
+              width: 4
+            count: 176
+            end_to_end_ms_per_input_sample: 6.320778732928871
+            mean_ms_per_sample: 4.555454528409091
+            measured_input_records: 176
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.8518215388051789
+            stderr_ms_per_sample: 0.06420846437636228
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0750068998895586
+              epoch_records: 32
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.018426441633391303
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 1.4882708131335676
+              width: 8
+            count: 192
+            end_to_end_ms_per_input_sample: 5.5989942702581175
+            mean_ms_per_sample: 4.920489151041667
+            measured_input_records: 192
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 1.256320275408072
+            stderr_ms_per_sample: 0.0906671061494044
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2769475530367345
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.012772352796962988
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 1.6534335119649768
+              width: 16
+            count: 256
+            end_to_end_ms_per_input_sample: 4.988076379049744
+            mean_ms_per_sample: 4.85888277734375
+            measured_input_records: 256
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.9929498405011478
+            stderr_ms_per_sample: 0.062059365031321735
+          32:
+            adaptive_profile:
+              converged: false
+              elapsed_sec: 8.324924498796463
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.12335784693834548
+              stop_reason: max_duration
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 2.0034078559838235
+              width: 32
+            count: 1920
+            end_to_end_ms_per_input_sample: 4.3358981764564914
+            mean_ms_per_sample: 5.459133513020833
+            measured_input_records: 1920
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 29.508090784471204
+            stderr_ms_per_sample: 0.6734269563152162
+      5:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id006
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.004106483189389
+              epoch_records: 8
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.01697121525766305
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 1.3442818420007825
+              width: 2
+            count: 104
+            end_to_end_ms_per_input_sample: 9.654870030667203
+            mean_ms_per_sample: 3.4597609134615386
+            measured_input_records: 104
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.5987916003039014
+            stderr_ms_per_sample: 0.05871634720240471
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.045715139945969
+              epoch_records: 16
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.013450683025963427
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 1.3742088230792433
+              width: 4
+            count: 128
+            end_to_end_ms_per_input_sample: 8.169649530827883
+            mean_ms_per_sample: 3.467118984375
+            measured_input_records: 128
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.5276161362092798
+            stderr_ms_per_sample: 0.04663511847212837
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1002388319466263
+              epoch_records: 32
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.019064701115901334
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 1.7943328279070556
+              width: 8
+            count: 160
+            end_to_end_ms_per_input_sample: 6.876492699666414
+            mean_ms_per_sample: 3.5488398250000004
+            measured_input_records: 160
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.855808095842287
+            stderr_ms_per_sample: 0.0676575705718326
+          16:
+            adaptive_profile:
+              converged: false
+              elapsed_sec: 8.101534573128447
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.2243251509955406
+              stop_reason: max_duration
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 1.5826921118423343
+              width: 16
+            count: 1152
+            end_to_end_ms_per_input_sample: 7.0325820947295545
+            mean_ms_per_sample: 4.998348177083333
+            measured_input_records: 1152
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 38.05666378153529
+            stderr_ms_per_sample: 1.1212552095525037
+          32:
+            adaptive_profile:
+              converged: false
+              elapsed_sec: 8.074826937168837
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.21751786170279566
+              stop_reason: max_duration
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 2.027431864058599
+              width: 32
+            count: 1280
+            end_to_end_ms_per_input_sample: 6.308458544663154
+            mean_ms_per_sample: 4.60909311484375
+            measured_input_records: 1280
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 35.86867980108122
+            stderr_ms_per_sample: 1.0025600787298905
+      6:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id007
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0298105939291418
+              epoch_records: 8
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.024055985669864794
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 1.4307625989895314
+              width: 2
+            count: 104
+            end_to_end_ms_per_input_sample: 9.902024941626363
+            mean_ms_per_sample: 10.149794903846153
+            measured_input_records: 104
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 2.489987074107406
+            stderr_ms_per_sample: 0.24416332075898978
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.02702727005817
+              epoch_records: 16
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.023598957045070586
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 1.443903804058209
+              width: 4
+            count: 144
+            end_to_end_ms_per_input_sample: 7.132133819848402
+            mean_ms_per_sample: 11.263155875
+            measured_input_records: 144
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 3.1895847802327135
+            stderr_ms_per_sample: 0.26579873168605944
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1452755148056895
+              epoch_records: 32
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.02582410416545168
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 1.543953720945865
+              width: 8
+            count: 192
+            end_to_end_ms_per_input_sample: 5.964976639612966
+            mean_ms_per_sample: 12.515022635416667
+            measured_input_records: 192
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 4.478241586323215
+            stderr_ms_per_sample: 0.3231892481699856
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0023194779641926
+              epoch_records: 64
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.02894169038753069
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 1.7069010119885206
+              width: 16
+            count: 192
+            end_to_end_ms_per_input_sample: 5.22041394773017
+            mean_ms_per_sample: 10.992475020833334
+            measured_input_records: 192
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 4.40828835628214
+            stderr_ms_per_sample: 0.31814080864562333
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2371068650390953
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.02307061099745096
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 2.255215076962486
+              width: 32
+            count: 256
+            end_to_end_ms_per_input_sample: 4.832448691558966
+            mean_ms_per_sample: 9.96389978125
+            measured_input_records: 256
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 3.6779720939328873
+            stderr_ms_per_sample: 0.22987325587080545
+    SMP:
+      0:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id008
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.001024500001222
+              epoch_records: 42
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.003026632085974698
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.09347344283014536
+              width: 2
+            count: 462
+            end_to_end_ms_per_input_sample: 2.1667196969723417
+            mean_ms_per_sample: 3.0931560346320346
+            measured_input_records: 462
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.2012252372844556
+            stderr_ms_per_sample: 0.00936184530134358
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0023468709550798
+              epoch_records: 91
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.00854595283442085
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.0876665199175477
+              width: 4
+            count: 546
+            end_to_end_ms_per_input_sample: 1.8358001299543587
+            mean_ms_per_sample: 4.242474576923077
+            measured_input_records: 546
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.8471807157453826
+            stderr_ms_per_sample: 0.03625598763561416
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1010340889915824
+              epoch_records: 136
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.009996748273761874
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.1169917790684849
+              width: 8
+            count: 680
+            end_to_end_ms_per_input_sample: 1.6191677779287976
+            mean_ms_per_sample: 6.2508157014705885
+            measured_input_records: 680
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.6294832745152883
+            stderr_ms_per_sample: 0.06248783107327972
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.14800486410968
+              epoch_records: 185
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.010163589993412686
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.17231314606033266
+              width: 16
+            count: 740
+            end_to_end_ms_per_input_sample: 1.5513579244725406
+            mean_ms_per_sample: 7.963519598648649
+            measured_input_records: 740
+            method: worker_wall_clock
+            stddev_ms_per_sample: 2.2017502283800923
+            stderr_ms_per_sample: 0.08093794810517121
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1551369638182223
+              epoch_records: 281
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.007767156801377397
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.22702915593981743
+              width: 32
+            count: 843
+            end_to_end_ms_per_input_sample: 1.3702692334735733
+            mean_ms_per_sample: 8.213545117437722
+            measured_input_records: 843
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.8522794438909915
+            stderr_ms_per_sample: 0.0637958928223265
+      1:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id009
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0363154660444707
+              epoch_records: 54
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.015336156387923334
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.07349386205896735
+              width: 2
+            count: 972
+            end_to_end_ms_per_input_sample: 1.066168174942871
+            mean_ms_per_sample: 0.13508313580246914
+            measured_input_records: 972
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.06458784505464919
+            stderr_ms_per_sample: 0.0020716560960377522
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.031861025141552
+              epoch_records: 97
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.013673949693687624
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.08220376702956855
+              width: 4
+            count: 873
+            end_to_end_ms_per_input_sample: 1.1819713919147217
+            mean_ms_per_sample: 0.1369473883161512
+            measured_input_records: 873
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.05532925901002013
+            stderr_ms_per_sample: 0.0018726116985169558
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0648116550873965
+              epoch_records: 128
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.01146700008122355
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.12498029717244208
+              width: 8
+            count: 1024
+            end_to_end_ms_per_input_sample: 1.0398551319212856
+            mean_ms_per_sample: 0.1276927734375
+            measured_input_records: 1024
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.04685609738814313
+            stderr_ms_per_sample: 0.0014642530433794728
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0946759518701583
+              epoch_records: 245
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.01466091416982966
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.1304913628846407
+              width: 16
+            count: 980
+            end_to_end_ms_per_input_sample: 1.1170162774185288
+            mean_ms_per_sample: 0.1537685306122449
+            measured_input_records: 980
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.07057348329335447
+            stderr_ms_per_sample: 0.0022543872293269472
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0127032389864326
+              epoch_records: 293
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.016203660126114933
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.2179029220715165
+              width: 32
+            count: 879
+            end_to_end_ms_per_input_sample: 1.1521083492450883
+            mean_ms_per_sample: 0.15926063253697384
+            measured_input_records: 879
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.07650961191115363
+            stderr_ms_per_sample: 0.0025806051610992053
+      2:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id010
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0539453912060708
+              epoch_records: 50
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.011724119475794171
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.07934971898794174
+              width: 2
+            count: 1000
+            end_to_end_ms_per_input_sample: 1.0539453912060708
+            mean_ms_per_sample: 0.115840649
+            measured_input_records: 1000
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.042947829222473186
+            stderr_ms_per_sample: 0.0013581296090295367
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0677341369446367
+              epoch_records: 95
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.01622441780595566
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.08358066412620246
+              width: 4
+            count: 950
+            end_to_end_ms_per_input_sample: 1.1239306704680387
+            mean_ms_per_sample: 0.11343619894736842
+            measured_input_records: 950
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.05672605606623568
+            stderr_ms_per_sample: 0.0018404362860416131
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0291159239131957
+              epoch_records: 179
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.012013852451604003
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.0893684159964323
+              width: 8
+            count: 895
+            end_to_end_ms_per_input_sample: 1.1498501943164199
+            mean_ms_per_sample: 0.1426113497206704
+            measured_input_records: 895
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.05125637657520444
+            stderr_ms_per_sample: 0.0017133117134682319
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.224211080931127
+              epoch_records: 220
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.013444719591128255
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.14485363801941276
+              width: 16
+            count: 1100
+            end_to_end_ms_per_input_sample: 1.112919164482843
+            mean_ms_per_sample: 0.15941730545454544
+            measured_input_records: 1100
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.07108591462159111
+            stderr_ms_per_sample: 0.0021433209698096044
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2076369090937078
+              epoch_records: 273
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.015453501030750202
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.23392565688118339
+              width: 32
+            count: 1092
+            end_to_end_ms_per_input_sample: 1.1058946053971683
+            mean_ms_per_sample: 0.1474037554945055
+            measured_input_records: 1092
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.07527430477018052
+            stderr_ms_per_sample: 0.0022779040874707913
+      3:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id011
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1400562289636582
+              epoch_records: 18
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.014532279871853493
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.21682847291231155
+              width: 2
+            count: 108
+            end_to_end_ms_per_input_sample: 10.556076194107947
+            mean_ms_per_sample: 18.77135225
+            measured_input_records: 108
+            method: worker_wall_clock
+            stddev_ms_per_sample: 2.834922497080029
+            stderr_ms_per_sample: 0.2727905444701468
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2043293209280819
+              epoch_records: 45
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.01285966117402813
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.17748541897162795
+              width: 4
+            count: 225
+            end_to_end_ms_per_input_sample: 5.352574759680364
+            mean_ms_per_sample: 18.773463786666664
+            measured_input_records: 225
+            method: worker_wall_clock
+            stddev_ms_per_sample: 3.6213057503913064
+            stderr_ms_per_sample: 0.24142038335942043
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1644634399563074
+              epoch_records: 88
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.01388873259220705
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.18062349106185138
+              width: 8
+            count: 352
+            end_to_end_ms_per_input_sample: 3.3081347726031463
+            mean_ms_per_sample: 21.85049142613636
+            measured_input_records: 352
+            method: worker_wall_clock
+            stddev_ms_per_sample: 5.693707556211685
+            stderr_ms_per_sample: 0.3034756324259208
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2186267531942576
+              epoch_records: 146
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.012368342342339142
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.21804521791636944
+              width: 16
+            count: 584
+            end_to_end_ms_per_input_sample: 2.086689645880578
+            mean_ms_per_sample: 27.064472118150686
+            measured_input_records: 584
+            method: worker_wall_clock
+            stddev_ms_per_sample: 8.089421814948224
+            stderr_ms_per_sample: 0.33474265647198026
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2959138660226017
+              epoch_records: 211
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.010573497654601872
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.30286740185692906
+              width: 32
+            count: 844
+            end_to_end_ms_per_input_sample: 1.535442969221092
+            mean_ms_per_sample: 36.74588171208531
+            measured_input_records: 844
+            method: worker_wall_clock
+            stddev_ms_per_sample: 11.28752094710588
+            stderr_ms_per_sample: 0.3885324940990118
+      4:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id012
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0064129009842873
+              epoch_records: 44
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.006762053702139165
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.08896033093333244
+              width: 2
+            count: 792
+            end_to_end_ms_per_input_sample: 1.2707233598286456
+            mean_ms_per_sample: 1.7581998497474747
+            measured_input_records: 792
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.3345872942543489
+            stderr_ms_per_sample: 0.011889041803085434
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0126662109978497
+              epoch_records: 116
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.004376732359081863
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.06889664893969893
+              width: 4
+            count: 1392
+            end_to_end_ms_per_input_sample: 0.7274900941076506
+            mean_ms_per_sample: 1.9002767765804596
+            measured_input_records: 1392
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.31030335301619405
+            stderr_ms_per_sample: 0.008317002859271472
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0171159929595888
+              epoch_records: 160
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.006151010338316692
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.0999469580128789
+              width: 8
+            count: 1600
+            end_to_end_ms_per_input_sample: 0.635697495599743
+            mean_ms_per_sample: 2.9610657306249997
+            measured_input_records: 1600
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.7285418368603858
+            stderr_ms_per_sample: 0.01821354592150964
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1817915609572083
+              epoch_records: 349
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.007515839267398553
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.09153668815270066
+              width: 16
+            count: 1396
+            end_to_end_ms_per_input_sample: 0.8465555594249343
+            mean_ms_per_sample: 4.875736061604584
+            measured_input_records: 1396
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.3691794771938577
+            stderr_ms_per_sample: 0.036645248549278905
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1263853469863534
+              epoch_records: 353
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.007941122555030157
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.18121066689491272
+              width: 32
+            count: 1412
+            end_to_end_ms_per_input_sample: 0.7977233335597403
+            mean_ms_per_sample: 4.808141528328611
+            measured_input_records: 1412
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.4347508462715206
+            stderr_ms_per_sample: 0.03818204113838751
+      5:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id013
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0429149291012436
+              epoch_records: 44
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.0096919608315605
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.08932817704044282
+              width: 2
+            count: 572
+            end_to_end_ms_per_input_sample: 1.8232778480790972
+            mean_ms_per_sample: 1.9049025367132868
+            measured_input_records: 572
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.4415525781492099
+            stderr_ms_per_sample: 0.018462240773765414
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0091884159483016
+              epoch_records: 99
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.010759441826165514
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.0806725318543613
+              width: 4
+            count: 693
+            end_to_end_ms_per_input_sample: 1.4562603404737395
+            mean_ms_per_sample: 2.736199186147186
+            measured_input_records: 693
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.7750042220586432
+            stderr_ms_per_sample: 0.029439975968152076
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0713873200584203
+              epoch_records: 127
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.009428768555829366
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.1252185609191656
+              width: 8
+            count: 889
+            end_to_end_ms_per_input_sample: 1.2051600900544661
+            mean_ms_per_sample: 3.5862727784026998
+            measured_input_records: 889
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.0082057630735162
+            stderr_ms_per_sample: 0.03381413600563019
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1916854311712086
+              epoch_records: 186
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.010021791079886044
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.17154594813473523
+              width: 16
+            count: 930
+            end_to_end_ms_per_input_sample: 1.281382184055063
+            mean_ms_per_sample: 3.4911865376344084
+            measured_input_records: 930
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.066988831242347
+            stderr_ms_per_sample: 0.03498794210108276
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0861690000165254
+              epoch_records: 206
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.008348921465622985
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.3097457338590175
+              width: 32
+            count: 824
+            end_to_end_ms_per_input_sample: 1.3181662621559773
+            mean_ms_per_sample: 4.111251377427185
+            measured_input_records: 824
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.98529893579027
+            stderr_ms_per_sample: 0.03432451487557389
+      6:
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id014
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.071755290031433
+              epoch_records: 37
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.009836267554301328
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.10682079498656094
+              width: 2
+            count: 333
+            end_to_end_ms_per_input_sample: 3.2184843544487483
+            mean_ms_per_sample: 5.9610381531531536
+            measured_input_records: 333
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.0699767766860557
+            stderr_ms_per_sample: 0.05863436617581267
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0057905949652195
+              epoch_records: 97
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.008191208772680696
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.08196563320234418
+              width: 4
+            count: 582
+            end_to_end_ms_per_input_sample: 1.7281625343045008
+            mean_ms_per_sample: 6.407298099656358
+            measured_input_records: 582
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.266147837152982
+            stderr_ms_per_sample: 0.0524835164030855
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.087809898890555
+              epoch_records: 158
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.005960486698477447
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.10072864405810833
+              width: 8
+            count: 1264
+            end_to_end_ms_per_input_sample: 0.8606090972235403
+            mean_ms_per_sample: 6.157185268196203
+            measured_input_records: 1264
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.3047805726446198
+            stderr_ms_per_sample: 0.03669982089114476
+          16:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1093805651180446
+              epoch_records: 391
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 64
+              observed_rse: 0.006183177826964787
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 64
+              warmup_sec: 0.08172545512206852
+              width: 16
+            count: 1955
+            end_to_end_ms_per_input_sample: 0.5674580895744473
+            mean_ms_per_sample: 7.3294301964194375
+            measured_input_records: 1955
+            method: worker_wall_clock
+            stddev_ms_per_sample: 2.003804422852306
+            stderr_ms_per_sample: 0.04531917027478683
+          32:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1846334519796073
+              epoch_records: 484
+              max_duration_sec: 8.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 128
+              observed_rse: 0.007113932342506492
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 128
+              warmup_sec: 0.13217699993401766
+              width: 32
+            count: 1936
+            end_to_end_ms_per_input_sample: 0.6118974442043427
+            mean_ms_per_sample: 10.489846834194214
+            measured_input_records: 1936
+            method: worker_wall_clock
+            stddev_ms_per_sample: 3.2834586691153964
+            stderr_ms_per_sample: 0.07462406066171355
+  schema_version: 1
+  transport:
+    cross_host_bytes_per_worker_per_sec: 13816224.7
+    cross_host_link_bytes_per_sec: 355000000.0
+    cross_host_prefetch_budget_bytes: 300000000.0
+    cross_host_oversized_window_penalty: 2.4863
+    cross_host_calibration_source: outputs/cross_host_inplan_20260913/cross_host.json
+profile_metadata:
+  stage_duration_sec: 8.0
+resource_config:
+  actors_per_stage: 8
+  profile_local_workers: 1
+  profile_scope: single_local_worker
+  ray_actors_per_stage: 8
+  schema_version: 1
+  smp_procs_per_stage: 8
