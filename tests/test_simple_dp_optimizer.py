@@ -211,3 +211,24 @@ def test_dataset_selector_uses_simple_dp_and_legacy_profile_mode():
     )
     assert isinstance(feature.optimizer, SimpleDpOptimizer)
     assert dataset._legacy_cedar_profile is True
+
+
+def test_simple_dp_ignores_affine_ratio_rewriting():
+    def profile(feature):
+        data = copy.deepcopy(_ray_profile_for(feature))
+        data["cm_model"] = {"schema_version": 1, "operators": {
+            pid: {"input_mean_bytes": 1, "output_mean_bytes": 1000000}
+            for pid in feature.logical_pipes}}
+        return data
+    base, _, _ = _run(_ray_profile_for, offload=True, fusion=True, caching=False)
+    changed, _, _ = _run(profile, offload=True, fusion=True, caching=False)
+    assert changed._data_size_ratio_map == base._data_size_ratio_map
+    assert changed._last_dp_search_result == base._last_dp_search_result
+
+
+def test_simple_dp_ignores_pico_stage_curve_switch(monkeypatch):
+    monkeypatch.setenv("CEDAR_DP_STAGE_CURVE_COST", "1")
+    def forbidden(*args, **kwargs):
+        raise AssertionError("PICO stage curve reached the Cedar baseline")
+    monkeypatch.setattr(SimpleDpOptimizer, "_dp_stage_curve_cost", forbidden)
+    _run(_ray_profile_for, offload=True, fusion=True, caching=False)

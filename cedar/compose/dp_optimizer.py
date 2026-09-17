@@ -783,7 +783,10 @@ class BlockCandidateProvider:
                 candidate_variants.append(vt)
 
         self._candidate_variants = candidate_variants
-        use_stage_curve = os.environ.get("CEDAR_DP_STAGE_CURVE_COST") == "1"
+        use_stage_curve = (
+            getattr(opt, "uses_stage_curve_cost", True)
+            and os.environ.get("CEDAR_DP_STAGE_CURVE_COST") == "1"
+        )
         logger.info(
             "[DpOptimizer] Candidate backends=%s resource_limits=%s "
             "stage_curve=%s",

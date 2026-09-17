@@ -112,37 +112,6 @@ class PlumberOptimizer(Optimizer):
         )
         return allocation, per_worker_rate
 
-    def _worker_search_candidates(self) -> List[int]:
-        raw = os.environ.get(
-            "CEDAR_WORKER_SEARCH_SET", "1,2,4,8,16,32"
-        )
-        budget_raw = os.environ.get("CEDAR_PROFILE_MATCH_CPU_BUDGET")
-        budget = (
-            int(budget_raw)
-            if budget_raw is not None
-            else int(getattr(self.options, "available_local_cpus", 0) or 0)
-        )
-        candidates: List[int] = []
-        for token in str(raw).split(","):
-            token = token.strip()
-            if not token:
-                continue
-            try:
-                workers = int(token)
-            except ValueError:
-                continue
-            if workers < 1:
-                continue
-            cores_per_worker, parallel = self._core_budget_for(workers)
-            if budget > 0 and cores_per_worker < 1:
-                continue
-            if budget > 0 and parallel < 0:
-                continue
-            candidates.append(workers)
-        if not candidates:
-            candidates = [1]
-        return sorted(set(candidates))
-
     def _stage_rates(self) -> Dict[int, float]:
         """Return the measured per-core rate (records/second) of each stage."""
         baseline = self.profiled_stats.get("baseline", {})
@@ -164,15 +133,10 @@ class PlumberOptimizer(Optimizer):
     def _sequential_pipes(self) -> Set[int]:
         """Pipes Plumber would cap at one core.
 
-        Sources, sinks and fixed-position operators cannot be replicated: their
-        semantics or position depend on a single stream. Everything else is
-        treated as a parallelizable Dataset.
+        Sources and operators without SMP support remain sequential. A fixed
+        graph position constrains reordering, not execution parallelism.
         """
         sequential: Set[int] = set()
-        try:
-            sequential |= get_fixed_pipes(self.logical_pipes)
-        except Exception:  # noqa: BLE001 - optional helper
-            pass
         for p_id, pipe in self.logical_pipes.items():
             if pipe.is_source() or pipe.pipe_spec is None:
                 sequential.add(p_id)
@@ -220,39 +184,13 @@ class PlumberOptimizer(Optimizer):
 
     # ------------------------------------------------------------- optimizer
     def _physical_opt(self) -> None:
-        worker_search = self._worker_search_enabled()
-        if worker_search:
-            chosen, allocation, cores_per_worker = self._select_worker_count()
-            self.physical_plan.set_local_workers(chosen)
-            logger.info(
-                "[Plumber] Worker search picked W=%s (cores/worker=%s, "
-                "budget=%s, allocation=%s)",
-                chosen,
-                cores_per_worker,
-                max(0, cores_per_worker - 1 - 1),
-                {p_id: width for p_id, width in sorted(allocation.items())},
-            )
-        elif self.options.enable_local_parallelism:
-            workers = self._calculate_local_parallelism(
-                self.physical_plan.graph, self.options
-            )
-            logger.info("[Parallelism] Using {} local workers".format(workers))
-            self.physical_plan.set_local_workers(workers)
-            cores_per_worker, parallel_budget = self._core_budget()
-            rates = self._stage_rates()
-            sequential = self._sequential_pipes()
-            allocation = self._allocate_widths(
-                parallel_budget,
-                rates,
-                sequential,
-                max_width=parallel_budget,
-            )
-            logger.info(
-                "[Plumber] cores/worker=%s, stage budget=%s, allocation=%s",
-                cores_per_worker,
-                parallel_budget,
-                {p_id: width for p_id, width in sorted(allocation.items())},
-            )
+        # Plumber allocates one host's stage pool, without replicated drivers.
+        self.physical_plan.set_local_workers(1)
+        _, parallel_budget = self._core_budget()
+        allocation = self._allocate_widths(
+            parallel_budget, self._stage_rates(), self._sequential_pipes(),
+            max_width=max(1, parallel_budget),
+        )
 
         for p_id, desc in self.physical_plan.pipe_descs.items():
             width = int(allocation.get(p_id, 0))
@@ -297,63 +235,3 @@ class PlumberOptimizer(Optimizer):
                 for p_id, desc in sorted(self.physical_plan.pipe_descs.items())
             },
         )
-
-    def _select_worker_count(self) -> Tuple[int, Dict[int, int], int]:
-        """Pick the local worker count with Plumber's own rate model.
-
-        Plumber's paper has no worker-count dimension: it assumes a machine
-        with a fixed number of cores and allocates them across stages.  We
-        extend its objective with the worker count so the baseline is allowed
-        to trade workers for stage width exactly like the DP does: pick the
-        ``W`` that maximizes ``W * min_i theta_i * R_i`` subject to the shared
-        CPU budget, and keep the width allocation of that ``W``.
-        """
-        rates = self._stage_rates()
-        sequential = self._sequential_pipes()
-        best: Optional[Tuple[float, int, Dict[int, int], int]] = None
-        report: List[Tuple[int, int, float, float]] = []
-        for workers in self._worker_search_candidates():
-            cores_per_worker, parallel_budget = self._core_budget_for(workers)
-            allocation, per_worker_rate = self._stage_effective_rates(
-                parallel_budget, rates, sequential
-            )
-            if not math.isfinite(per_worker_rate) or per_worker_rate <= 0.0:
-                continue
-            aggregate = per_worker_rate * workers
-            report.append(
-                (workers, parallel_budget, per_worker_rate, aggregate)
-            )
-            if best is None or aggregate > best[0]:
-                best = (aggregate, workers, allocation, cores_per_worker)
-        for workers, budget, per_worker_rate, aggregate in report:
-            logger.info(
-                "[Plumber] worker search W=%s budget=%s rate/worker=%.1f "
-                "aggregate=%.1f rec/s",
-                workers,
-                budget,
-                per_worker_rate,
-                aggregate,
-            )
-        if best is None:
-            fallback = max(1, int(self.physical_plan.n_local_workers or 1))
-            cores_per_worker, parallel_budget = self._core_budget_for(fallback)
-            allocation = self._allocate_widths(
-                parallel_budget, rates, sequential, max_width=max(1, parallel_budget)
-            )
-            return fallback, allocation, cores_per_worker
-        _, workers, allocation, cores_per_worker = best
-        return workers, allocation, cores_per_worker
-
-    @staticmethod
-    def _worker_search_enabled() -> bool:
-        """Whether the baseline picks its own worker count (default on).
-
-        The comparison is only meaningful if every planner may configure the
-        resources it optimises, so the Plumber-style baseline gets the same
-        worker-count freedom as the DP.  ``CEDAR_PLUMBER_WORKER_SEARCH=0``
-        restores the fixed-worker protocol used for ablations.
-        """
-        raw = os.environ.get("CEDAR_PLUMBER_WORKER_SEARCH")
-        if raw is None:
-            return True
-        return raw.strip() in ("1", "true", "True", "yes")

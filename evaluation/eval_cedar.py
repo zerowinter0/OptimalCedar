@@ -24,11 +24,28 @@ logger = logging.getLogger(__name__)
 
 def import_module_from_path(module_path: str):
     module_path_obj = Path(module_path).resolve()
-    try:
-        rel_path = module_path_obj.relative_to(Path.cwd().resolve())
-        module_name = ".".join(rel_path.with_suffix("").parts)
-    except ValueError:
-        module_name = os.path.basename(module_path).removesuffix(".py")
+    # Derive the import name from the most specific sys.path root. Experiment
+    # snapshots live below the repository cwd but put their ``modules``
+    # directory first on sys.path. Naming such a module
+    # ``outputs.<run>.modules.evaluation...`` makes cloudpickle ask workers to
+    # import a package that does not exist in the shipped runtime environment.
+    candidates = []
+    for entry in sys.path:
+        if not entry:
+            entry = os.getcwd()
+        try:
+            root = Path(entry).resolve()
+            relative = module_path_obj.relative_to(root)
+        except (OSError, ValueError):
+            continue
+        parts = relative.with_suffix("").parts
+        if parts and all(part.isidentifier() for part in parts):
+            candidates.append((len(root.parts), ".".join(parts)))
+    module_name = (
+        max(candidates, key=lambda item: item[0])[1]
+        if candidates
+        else os.path.basename(module_path).removesuffix(".py")
+    )
     spec = importlib.util.spec_from_file_location(module_name, str(module_path_obj))
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module

@@ -79,7 +79,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
     train_filepath = pathlib.Path(data_dir) / pathlib.Path("imagenette2/train")
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
-    source = LocalFSSource(str(train_filepath), recursive=True)
+    source = LocalFSSource(str((spec.kwargs or {}).get("dataset_path", train_filepath)), recursive=True)
     feature = SimCLRV2Feature(batch_size=spec.batch_size)
     feature.apply(source)
 

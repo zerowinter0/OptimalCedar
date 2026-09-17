@@ -9,11 +9,10 @@ backpressure between stages instead of reordering the user's graph.
 Translated into Cedar's plan space, that policy is:
 
   * keep the declared operator order (Ray Data does not reorder or cache);
-  * fuse each maximal run of mappable operators into one stage, which is what
-    Ray Data's map fusion produces;
+  * fuse each maximal run of mappable operators into one stage, when compatible with Cedar mutation and fusion constraints;
   * give every stage an *equal* share of the per-worker Ray CPU budget --
-    Ray Data sizes its actor pool from the available cluster CPUs and hands the
-    same budget to each stage rather than solving for the bottleneck;
+    this static Cedar adapter approximates Ray Data's dynamic scheduling and
+    backpressure with a shared, bounded actor allocation;
   * run those stages on the Ray pool (RAY variant), leaving sources and sinks
     in the worker process.
 
@@ -35,7 +34,7 @@ from .optimizer import (
     PipeVariantType,
 )
 from .utils import find_all_paths, get_fixed_pipes
-from cedar.pipes import PipeVariantContextFactory
+from cedar.pipes import PipeExecutionResource, PipeVariantContextFactory
 
 
 logger = logging.getLogger(__name__)
@@ -88,11 +87,6 @@ class RayDataOptimizer(Optimizer):
 
     def _stage_groups(self) -> List[List[int]]:
         """Maximal runs of consecutive parallelizable operators (map fusion)."""
-        fixed = set()
-        try:
-            fixed |= get_fixed_pipes(self.logical_pipes)
-        except Exception:  # noqa: BLE001 - optional helper
-            pass
         # Fusion must follow the physical chain order: ``_fuse_pipe`` rewires
         # the graph from the first to the last member.
         source_p_id = self._get_source_p_id()
@@ -109,8 +103,14 @@ class RayDataOptimizer(Optimizer):
                     groups.append(current)
                     current = []
                 continue
-            if self._parallelizable(p_id) and p_id not in fixed:
-                current.append(p_id)
+            if self._parallelizable(p_id):
+                if self.logical_pipes[p_id].is_fusable(PipeVariantType.RAY):
+                    current.append(p_id)
+                else:
+                    if current:
+                        groups.append(current)
+                        current = []
+                    groups.append([p_id])
                 continue
             if current:
                 groups.append(current)
@@ -121,29 +121,8 @@ class RayDataOptimizer(Optimizer):
 
     # ------------------------------------------------------------- optimizer
     def _physical_opt(self) -> None:
-        if self.options.enable_local_parallelism:
-            # Ray Data runs a loader per local core and an actor pool on the
-            # cluster.  In Cedar's per-worker accounting the actor share of a
-            # stage is ``ray_budget // W - reserve``, so asking for every local
-            # core (W = 64 here) would leave a single actor per worker and idle
-            # most of the remote node.  We therefore size the local worker pool
-            # so the cluster's actors are used, which is what Ray Data's
-            # autoscaler converges to when the pipeline is throughput-bound;
-            # CEDAR_RAYDATA_WORKERS overrides it for experiments.
-            raw = os.environ.get("CEDAR_RAYDATA_WORKERS")
-            cpu_total = int(getattr(self.options, "available_local_cpus", 0) or 0)
-            try:
-                workers = int(raw) if raw is not None else 8
-            except ValueError:
-                workers = 8
-            if cpu_total > 0:
-                workers = max(1, min(workers, cpu_total))
-            self.physical_plan.set_local_workers(workers)
-            logger.info(
-                "[RayData] Using %s local workers so the cluster actor pool "
-                "keeps a stage-wide share per worker.",
-                workers,
-            )
+        # A single streaming executor owns the distributed stage pool.
+        self.physical_plan.set_local_workers(1)
 
         cores_per_worker, ray_per_worker = self._core_budget()
         groups = self._stage_groups()
@@ -160,19 +139,28 @@ class RayDataOptimizer(Optimizer):
             share,
         )
 
-        context = PipeVariantContextFactory.create_context(
-            variant_type=PipeVariantType.RAY,
-            spec={
-                "n_actors": share,
-                "max_inflight": 100,
-                "max_prefetch": 100,
-                "use_threads": True,
-                "submit_batch_size": 30,
-            },
-        )
         staged: Set[int] = set()
         fused_ids: Set[int] = set()
         for group in groups:
+            # One CUDA actor owns one model replica and one profiled GPU.
+            # Giving the CPU equal-share width to a CUDA group invents dozens
+            # of GPU replicas and is rejected by resource matching.
+            cuda_group = any(
+                self.logical_pipes[p_id].execution_resource
+                == PipeExecutionResource.CUDA
+                for p_id in group
+            )
+            stage_width = 1 if cuda_group else share
+            context = PipeVariantContextFactory.create_context(
+                variant_type=PipeVariantType.RAY,
+                spec={
+                    "n_actors": stage_width,
+                    "max_inflight": 100,
+                    "max_prefetch": 100,
+                    "use_threads": True,
+                    "submit_batch_size": 30,
+                },
+            )
             if len(group) == 1:
                 desc = self.physical_plan.pipe_descs[group[0]]
                 desc.variant_type = PipeVariantType.RAY

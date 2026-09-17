@@ -16,6 +16,8 @@ from yaml import safe_load
 from cedar.pipes import PipeVariantType
 
 from .dp_optimizer import (
+    BackPointer,
+    DpResourceUsage,
     BlockCandidate,
     BlockCandidateProvider,
     CacheTransitionPolicy,
@@ -55,7 +57,7 @@ class _CedarCostBlockCandidateProvider(BlockCandidateProvider):
         if mask.bit_count() > 1:
             adjusted = []
             for candidate in candidates:
-                ratio = self.optimizer._cedar_fusion_io_ratio(
+                ratio = self.optimizer._fusion_cost_ratio(
                     candidate.order
                 )
                 adjusted.append(
@@ -88,7 +90,7 @@ class _CedarCostBlockCandidateProvider(BlockCandidateProvider):
         )
         if candidate.mask.bit_count() <= 1:
             return candidate
-        ratio = self.optimizer._cedar_fusion_io_ratio(candidate.order)
+        ratio = self.optimizer._fusion_cost_ratio(candidate.order)
         return BlockCandidate(
             mask=candidate.mask,
             order=candidate.order,
@@ -140,18 +142,87 @@ class _CedarCacheTransitionPolicy(CacheTransitionPolicy):
         )
 
 
+class _CedarDpSearch(ExtensibleDpSearch):
+    """Exact generic transitions without PICO-specific bounds or fast paths.
+
+    PICO's batch skyline and block pruning hard-code its resource-family
+    objective. They are not valid for Cedar's scalar I/O-discounted costs.
+    """
+    def _initial_incumbent_score(self):
+        return float("inf")
+
+    def _prepare_mandatory_suffix_lower_bounds(self, legal_masks):
+        self._mandatory_local_suffix_cost = {}
+
+    def _can_use_exact_batch_frontier(self):
+        return False
+
+    def _try_extend(self, dp, back, prev_mask, next_mask, block_mask,
+                    incumbent_score=float("inf")):
+        for block in self.block_provider.candidates_for_prefix(prev_mask, block_mask):
+            if not self._block_can_follow(prev_mask, block):
+                continue
+            regular = self.optimizer._dp_regular_transition_cost(prev_mask, block)
+            for state, objectives in dp[prev_mask].items():
+                resource = DpResourceUsage()
+                if self.parallel_stage_cpu_limit is not None:
+                    resource = state.parallel_stage_cpus + self.optimizer._dp_parallel_stage_cpu_cost(block)
+                    if resource > self.parallel_stage_cpu_limit:
+                        continue
+                for choice in self.cache_policy.transitions(
+                        prev_mask, next_mask, state, regular, block, resource):
+                    for previous in objectives:
+                        candidate = self._accumulate_objective(
+                            previous, choice.extra_cost, block,
+                            choice.replaces_prefix_cost, prev_mask)
+                        frontier = dp[next_mask].setdefault(choice.state, [])
+                        if any(self._dominates(old, candidate) for old in frontier):
+                            continue
+                        removed = [old for old in frontier if self._dominates(candidate, old)]
+                        for old in removed:
+                            frontier.remove(old)
+                            back[next_mask].pop((choice.state, old), None)
+                        frontier.append(candidate)
+                        back[next_mask][(choice.state, candidate)] = BackPointer(
+                            prev_mask=prev_mask, prev_state=state,
+                            prev_objective=previous, block=block,
+                            cache_after_idx=choice.cache_after_idx)
+
+
 class SimpleDpOptimizer(DpOptimizer):
     # Scores with Cedar's original cost model, so it must not see PICO's
     # operator input-size affine split.
     uses_affine_operator_cost = False
+    uses_stage_curve_cost = False
     """Joint DP whose objective is exactly Cedar's original scalar cost."""
 
+    cedar_objective = True
     joint_actor_allocation = False
     # DpOptimizer preserves widths selected jointly inside its DP state.
     # Simple-DP delegates parallelism to Cedar/MyOptimizer after plan search,
     # so its provisional widths must be normalized by the shared resource
     # allocator just like Cedar's staged optimizer widths.
     preserve_optimizer_widths = False
+
+    def _init_stats(self):
+        # AffineDpCostMixin._init_stats also rewrites size ratios when cm_model
+        # is present. Bypass it as well as the per-operator affine cost hook.
+        Optimizer._init_stats(self)
+        self._dp_affine_enabled = False
+        self._dp_affine_models = {}
+        self._dp_co_run_factors = {}
+
+    def _dp_finite_workload_ray_batch_cap(self, ray_stage_count):
+        # Keep Cedar's native batch rule; PICO's extra finite-workload cap is
+        # not part of the simple baseline or any of these one-factor tests.
+        return 500
+
+    def _dp_worker_search_enabled(self) -> bool:
+        """Cedar chooses W after planning; the baseline never searches W."""
+        return False
+
+    def _fusion_cost_ratio(self, order: Iterable[int]) -> float:
+        return self._cedar_fusion_io_ratio(order)
 
     def _allocate_final_remote_stage_resources(self) -> None:
         MyOptimizer._allocate_final_remote_stage_resources(self)
@@ -186,8 +257,10 @@ class SimpleDpOptimizer(DpOptimizer):
         if self.options.enable_prefetch:
             self._insert_prefetch()
 
-        cedar_cost = self._calculate_materialized_cedar_cost(
-            self.physical_plan
+        cedar_cost = (
+            self._calculate_materialized_cedar_cost(self.physical_plan)
+            if self.cedar_objective else self.calculate_dp_objective_cost(
+                plan=self.physical_plan)
         )
         search_cost = getattr(self, "_last_dp_state_cost", None)
         if search_cost is not None and not math.isclose(
@@ -322,7 +395,7 @@ class SimpleDpOptimizer(DpOptimizer):
         provider = _CedarCostBlockCandidateProvider(self, inner_ops)
         provider.prepare()
         cache_policy = _CedarCacheTransitionPolicy(self, inner_ops)
-        search = ExtensibleDpSearch(
+        search = _CedarDpSearch(
             optimizer=self,
             inner_ops=inner_ops,
             block_provider=provider,
@@ -335,6 +408,12 @@ class SimpleDpOptimizer(DpOptimizer):
         self._last_dp_state_cost = result.cost
         self._last_dp_search_result = result
 
+        if self.joint_actor_allocation:
+            self._dp_selected_stage_parallelism = {
+                tuple(inner_ops[idx] for idx in block):
+                    result.parallelism_by_idx.get(block[0], 1)
+                for block in result.blocks
+            }
         self._store_pending_fusions_from_blocks(
             blocks_in_idx_order=result.blocks,
             inner_ops=inner_ops,
@@ -420,7 +499,14 @@ class SimpleDpOptimizer(DpOptimizer):
         if (plan is None) == (search_result is None):
             raise ValueError("Supply exactly one of plan or search_result.")
         if plan is not None:
-            return self._calculate_materialized_cedar_cost(plan)
+            if self.cedar_objective:
+                return self._calculate_materialized_cedar_cost(plan)
+            ops = list(inner_ops if inner_ops is not None else self._dp_inner_ops)
+            specs = self._dp_blocks_from_physical_plan(plan, ops)
+            if not self.joint_actor_allocation:
+                specs = [(order, variant, cache, 1)
+                         for order, variant, cache, width in specs]
+            return self._replay_dp_objective(specs, ops).score
         return float(search_result.cost)
 
     def _calculate_materialized_cedar_cost(

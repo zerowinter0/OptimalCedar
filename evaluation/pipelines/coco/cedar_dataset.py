@@ -79,7 +79,7 @@ def get_dataset(spec: CedarEvalSpec) -> DataSet:
     # Keep the split explicit in experiment metadata while allowing the
     # reduced validation protocol to reuse the already materialized val set.
     split = (spec.kwargs or {}).get("split", "val2017")
-    source = COCOSource(str(data_dir), split=split)
+    source = COCOSource(str((spec.kwargs or {}).get("dataset_path", data_dir)), split=split)
     feature = COCOFeature(batch_size=spec.batch_size)
     feature.apply(source)
 

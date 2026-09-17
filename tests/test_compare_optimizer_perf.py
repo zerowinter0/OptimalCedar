@@ -1,12 +1,30 @@
 import math
 import json
+import importlib
 import threading
 import time
 
+from evaluation.eval_cedar import import_module_from_path
 from evaluation.compare_optimizer_perf import (
     _average_repeat_results,
     _wait_for_object_disk_cache_complete,
 )
+
+
+def test_import_module_from_path_prefers_snapshot_sys_path(
+    tmp_path, monkeypatch
+):
+    modules = tmp_path / "snapshot" / "modules"
+    dataset = modules / "evaluation" / "pipelines" / "demo" / "cedar_dataset.py"
+    dataset.parent.mkdir(parents=True)
+    dataset.write_text("VALUE = 7\n")
+    monkeypatch.syspath_prepend(str(modules))
+    monkeypatch.chdir(tmp_path)
+
+    loaded = import_module_from_path(str(dataset))
+
+    assert loaded.__name__ == "evaluation.pipelines.demo.cedar_dataset"
+    assert importlib.import_module(loaded.__name__) is loaded
 
 
 def test_average_repeat_results_preserves_repeated_timeout():

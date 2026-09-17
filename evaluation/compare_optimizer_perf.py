@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 
 
 OPTIMIZERS = {
+    "simple_dp_workers": 20,
+    "simple_dp_boundary": 21,
+    "simple_dp_variant": 22,
+    "simple_dp_width": 23,
+    "unopti": 24,
     "dj_optimizer": 3,
     "optimizer": 0,
     "cm_optimizer": 16,
@@ -93,7 +98,7 @@ def _configure_object_disk_cache(
         f"{_cache_component(workload_name)}__"
         f"{_cache_component(optimizer_name)}"
     )
-    cache_root = experiment_dir / "cache"
+    cache_root = Path(args.cache_root) if getattr(args, "cache_root", None) else experiment_dir / "cache"
     cache_dir = cache_root / namespace
     os.environ["CEDAR_CACHE_ROOT"] = str(cache_root)
     os.environ["CEDAR_CACHE_NAMESPACE"] = namespace
@@ -532,6 +537,18 @@ def _calculate_plan_costs(
                 )
             optimizer.profiled_stats = loaded_profile
             optimizer._init_stats()
+        if getattr(optimizer, "cedar_objective", True) is False:
+            # Multiprocess planning happens in children; the parent's
+            # optimizer has no options or DP metadata. Rebuild only a scorer.
+            scorer = type(optimizer)()
+            scorer.init(feature.logical_pipes, feature.logical_adj_list)
+            scorer.profiled_stats = optimizer.profiled_stats
+            scorer.options = dataset.optimizer_options
+            scorer._init_stats()
+            scorer._prepare_dp_metadata(scorer._get_linear_inner_ops())
+            scorer._dp_selected_workers = plan.n_local_workers
+            costs[f_name] = scorer.calculate_dp_objective_cost(plan=plan)
+            continue
         caching_on = optimizer._get_cache_pid(plan) is not None
         fused_blocks = [
             list(desc.fused_pipes)
@@ -633,11 +650,11 @@ def _calculate_pico_plan_costs(
 
 
 def _collect_plan_evidence(
-    dataset: Any, profiled_stats: Optional[str]
+    dataset: Any, profiled_stats: Optional[str], skip_pico: bool = False
 ) -> Dict[str, Any]:
     own_costs = _calculate_plan_costs(dataset, profiled_stats)
     cedar_costs = _calculate_cedar_plan_costs(dataset, profiled_stats)
-    pico_costs = _calculate_pico_plan_costs(dataset, profiled_stats)
+    pico_costs = {} if skip_pico else _calculate_pico_plan_costs(dataset, profiled_stats)
     return {
         "plan_cost": sum(own_costs.values()),
         "plan_costs_by_feature": own_costs,
@@ -914,7 +931,7 @@ def _run_one(
                     )
                     dataset_getter = getattr(module, args.dataset_func)
                     dataset = dataset_getter(spec)
-                    plan_evidence = _collect_plan_evidence(dataset, args.profiled_stats)
+                    plan_evidence = _collect_plan_evidence(dataset, args.profiled_stats, args.skip_pico_plan_cost)
                     plan_costs_by_feature = plan_evidence["plan_costs_by_feature"]
                     plan_cost = plan_evidence["plan_cost"]
                     logger.info(
@@ -938,7 +955,7 @@ def _run_one(
                         args.dataset_file, args.dataset_func, spec
                     )
                     plan_evidence = _collect_plan_evidence(
-                        workload_runner.dataset, args.profiled_stats
+                        workload_runner.dataset, args.profiled_stats, args.skip_pico_plan_cost
                     )
         except _OptimizerResourceExceeded as e:
             setup_time_sec = time.perf_counter() - setup_start
@@ -1250,6 +1267,8 @@ def main() -> None:
         action="store_true",
         help="Disable optimizer cache insertion when constructing plans.",
     )
+    parser.add_argument("--cache_root", type=str, default=None,
+                        help="Explicit per-workload cache directory.")
     parser.add_argument(
         "--warmup_runs", type=int, default=0,
         help="Full unmeasured warmup passes before cache-off measurement.",
@@ -1321,6 +1340,8 @@ def main() -> None:
             "executes the workload to measure runtime performance."
         ),
     )
+    parser.add_argument("--skip_pico_plan_cost", action="store_true",
+                        help="Skip auxiliary PICO rescoring of baseline plans.")
     parser.add_argument(
         "--calculate_plan_cost",
         action="store_true",
