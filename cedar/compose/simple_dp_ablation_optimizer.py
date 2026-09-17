@@ -102,8 +102,11 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
         local_budget, ray_budget, local_reserve, ray_reserve = budget
         # One local runtime worker and its reserve must both fit. Ray stages
         # are optional, so a zero-sized Ray slice is still a legal candidate.
+        # Respect the workload's own replica cap as well. GPU-backed workloads
+        # such as LLaVA deliberately set available_local_cpus=1 because every
+        # complete Feature replica owns model state on the accelerator.
         max_workers = min(
-            self._cap_local_workers(local_budget),
+            self._cap_local_workers(self.options.available_local_cpus),
             local_budget // (1 + local_reserve),
             ray_budget,
         )

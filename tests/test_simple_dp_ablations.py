@@ -96,3 +96,13 @@ def test_worker_boundary_conditions_dp_on_each_resource_slice(monkeypatch):
             assert desc.variant_ctx.n_actors == 1
         elif desc.variant_type == PipeVariantType.SMP:
             assert desc.variant_ctx.n_procs == 1
+
+
+def test_worker_boundary_respects_workload_worker_cap(monkeypatch):
+    monkeypatch.setenv('CEDAR_MATCH_PROFILE_RESOURCES', '1')
+    monkeypatch.setenv('CEDAR_PROFILE_MATCH_CPU_BUDGET', '64')
+    monkeypatch.setenv('CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET', '64')
+    opt = SimpleDpWorkersBoundaryOptimizer()
+    opt.options = SimpleNamespace(available_local_cpus=1)
+    groups = opt._worker_resource_groups()
+    assert [workers for workers, _ in groups] == [1]
