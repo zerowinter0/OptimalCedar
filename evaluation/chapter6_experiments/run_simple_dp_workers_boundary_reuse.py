@@ -23,15 +23,19 @@ PROFILE_SOURCES = {
     "stackexchange": REPO / "outputs/simple_dp_ablation_remaining_one_round_20260917/stackexchange/profiles/shared.yaml",
 }
 SOURCE_INPUT_ROOT = REPO / "outputs/simple_dp_ablation_remaining_one_round_20260917/inputs"
-LABEL = "simple-dp+W+boundary"
-INTERNAL = "simple_dp_workers_boundary"
+DEFAULT_LABEL = "simple-dp+W+boundary"
+DEFAULT_INTERNAL = "simple_dp_workers_boundary"
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workloads", nargs="+", choices=WORKLOADS, default=WORKLOADS)
+    parser.add_argument("--label", default=DEFAULT_LABEL)
+    parser.add_argument("--optimizer-internal", default=DEFAULT_INTERNAL)
     args = parser.parse_args()
+    label = args.label
+    internal = args.optimizer_internal
     root = args.output.resolve()
     modules, entry = prepare(root)
 
@@ -64,7 +68,7 @@ def main():
     }
     metadata = {
         "workloads": args.workloads,
-        "methods": {LABEL: INTERNAL},
+        "methods": {label: internal},
         "repeats": 1,
         "input_records": {
             "simclrv2": 9469, "simclrv2_cache": 9469,
@@ -121,13 +125,13 @@ def main():
             "--use_ray", "--ray_ip", metadata["ray_address"],
             "--profiled_stats", str(profile),
         ]
-        result = work / f"results/round1__{INTERNAL}.json"
+        result = work / f"results/round1__{internal}.json"
         cmd = [sys.executable, "-u", str(entry),
                str(modules / "evaluation/compare_optimizer_perf.py")]
         cmd += common + [
             "--full_data_run", "--enable_local_parallelism",
             "--match_profile_resources", "--cpu_budget", "64",
-            "--ray_cpu_budget", "64", "--optimizers", INTERNAL,
+            "--ray_cpu_budget", "64", "--optimizers", internal,
             "--optimizer_time_limit_sec", "3600",
             "--cedar_reorder_timeout_sec", "3600",
             "--disable_cedar_runtime_timeout", "--num_repeats", "1",
@@ -137,16 +141,16 @@ def main():
         if not workload.endswith("_cache"):
             cmd.append("--disable_caching")
         state[workload]["active_cell"] = {
-            "method": LABEL, "round": 1, "started_unix": time.time()
+            "method": label, "round": 1, "started_unix": time.time()
         }
         write_json(root / "status.json", state)
-        print(f"RUN {workload} {LABEL}", flush=True)
+        print(f"RUN {workload} {label}", flush=True)
         record = run(
-            cmd, work / f"logs/round1__{INTERNAL}.log",
+            cmd, work / f"logs/round1__{internal}.log",
             dict(env, EXPERIMENT_SEED="20260917"), 3600,
         )
         state[workload].pop("active_cell", None)
-        record.update(method=LABEL, round=1, profile_sha256=sha(profile))
+        record.update(method=label, round=1, profile_sha256=sha(profile))
         if result.exists():
             try:
                 payload = json.loads(result.read_text())
@@ -161,11 +165,11 @@ def main():
                 elif measured.get("workload_skipped"):
                     record["status"] = "failed"
                 plans = measured.get("physical_plans_by_feature", {})
-                (work / f"plans/round1__{INTERNAL}.yaml").write_text(
+                (work / f"plans/round1__{internal}.yaml").write_text(
                     yaml.safe_dump(plans)
                 )
                 write_json(
-                    work / f"warmup_results/round1__{INTERNAL}.json",
+                    work / f"warmup_results/round1__{internal}.json",
                     {k: v for k, v in measured.items()
                      if k.startswith("cache_warmup")},
                 )

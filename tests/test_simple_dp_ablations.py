@@ -7,6 +7,7 @@ from cedar.compose.simple_dp_ablation_optimizer import (
     SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
     SimpleDpVariantOptimizer, SimpleDpWidthOptimizer, UnoptimizedOptimizer,
     SimpleDpWorkersBoundaryOptimizer,
+    SimpleDpMaxWorkersBoundaryOptimizer,
 )
 from cedar.compose.plumber_optimizer import PlumberOptimizer
 from cedar.compose.raydata_optimizer import RayDataOptimizer
@@ -38,7 +39,7 @@ def make(cls, monkeypatch):
 @pytest.mark.parametrize('cls', [SimpleDpOptimizer, SimpleDpWorkersOptimizer,
     SimpleDpBoundaryOptimizer, SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
     SimpleDpWorkersBoundaryOptimizer, PlumberOptimizer, RayDataOptimizer,
-    UnoptimizedOptimizer])
+    SimpleDpMaxWorkersBoundaryOptimizer, UnoptimizedOptimizer])
 def test_valid_plans(cls, monkeypatch):
     opt, plan = make(cls, monkeypatch)
     assert plan.validate()
@@ -106,3 +107,12 @@ def test_worker_boundary_respects_workload_worker_cap(monkeypatch):
     opt.options = SimpleNamespace(available_local_cpus=1)
     groups = opt._worker_resource_groups()
     assert [workers for workers, _ in groups] == [1]
+
+
+def test_max_worker_boundary_uses_largest_feasible_w(monkeypatch):
+    opt, plan = make(SimpleDpMaxWorkersBoundaryOptimizer, monkeypatch)
+    assert plan.n_local_workers == 4
+    selected = [row for row in opt._worker_search_evidence
+                if row['status'] == 'selected_largest_feasible_workers']
+    assert len(selected) == 1
+    assert selected[0]['workers'] == 4

@@ -936,21 +936,23 @@ class DataSet:
             from cedar.compose.raydata_optimizer import RayDataOptimizer
             for feature in self.features.values():
                 feature.set_optimizer(RayDataOptimizer())
-        elif 20 <= optimizer_selector <= 25:
+        elif 20 <= optimizer_selector <= 26:
             from cedar.compose.simple_dp_ablation_optimizer import (
                 SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
                 SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
                 UnoptimizedOptimizer, SimpleDpWorkersBoundaryOptimizer,
+                SimpleDpMaxWorkersBoundaryOptimizer,
             )
             cls = (SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
                    SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
                    UnoptimizedOptimizer,
-                   SimpleDpWorkersBoundaryOptimizer)[optimizer_selector - 20]
+                   SimpleDpWorkersBoundaryOptimizer,
+                   SimpleDpMaxWorkersBoundaryOptimizer)[optimizer_selector - 20]
             for feature in self.features.values():
                 feature.set_optimizer(cls())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 25."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 26."
             )
 
         if len(self.features) == 0:

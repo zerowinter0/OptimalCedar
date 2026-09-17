@@ -220,6 +220,77 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
         return self._apply_cedar_dp_search_result(result, inner_ops)
 
 
+class SimpleDpMaxWorkersBoundaryOptimizer(SimpleDpWorkersBoundaryOptimizer):
+    """Use the largest feasible W, then optimize the boundary-aware plan.
+
+    Unlike ``SimpleDpWorkersBoundaryOptimizer``, this policy does not trade
+    worker count against modeled plan cost. It fixes the largest W admitted
+    by the workload and the two CPU budgets, and only falls back to a smaller
+    resource group when the DP has no legal plan at that W.
+    """
+
+    def _dp_reorder_offload_cache_fusion(self, inner_ops):
+        if not inner_ops:
+            return [], None
+        groups = self._worker_resource_groups()
+        if not groups:
+            logger.info(
+                "[SimpleDpMaxWorkersBoundaryOptimizer] Resource matching is "
+                "disabled; falling back to one boundary-aware DP search."
+            )
+            return SimpleDpBoundaryOptimizer._dp_reorder_offload_cache_fusion(
+                self, inner_ops
+            )
+
+        started = time.monotonic()
+        evidence = []
+        for workers, limit in groups:
+            try:
+                result = self._run_cedar_dp_search(
+                    inner_ops, resource_limit=limit
+                )
+            except RuntimeError as exc:
+                if (
+                    "no feasible final state" not in str(exc)
+                    and "required parallel CPU total" not in str(exc)
+                ):
+                    raise
+                evidence.append({
+                    "workers": workers,
+                    "limits": limit.as_dict(),
+                    "status": "infeasible_resource_slice",
+                })
+                continue
+
+            evidence.append({
+                "workers": workers,
+                "limits": limit.as_dict(),
+                "plan_resource_usage": self._result_resource_usage(
+                    result
+                ).as_dict(),
+                "plan_cost": result.cost,
+                "status": "selected_largest_feasible_workers",
+            })
+            self._worker_search_evidence = evidence
+            self._dp_selected_workers = workers
+            self.physical_plan.set_local_workers(workers)
+            logger.info(
+                "[SimpleDpMaxWorkersBoundaryOptimizer] selected largest "
+                "feasible W=%s, limits=%s, plan_cost=%s, elapsed=%.3fs, "
+                "evidence=%s",
+                workers,
+                limit.as_dict(),
+                result.cost,
+                time.monotonic() - started,
+                evidence,
+            )
+            return self._apply_cedar_dp_search_result(result, inner_ops)
+
+        raise RuntimeError(
+            "No feasible plan for any W in max-worker boundary search"
+        )
+
+
 @dataclass(frozen=True)
 class _VariantObjective(DpObjectiveCost):
     @property
