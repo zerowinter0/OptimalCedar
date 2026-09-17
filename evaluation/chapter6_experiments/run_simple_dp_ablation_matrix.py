@@ -157,6 +157,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--prepared', action='store_true')
+    parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--skip-cedar-workloads', nargs='*', choices=WORKLOADS, default=[])
     parser.add_argument('--commonvoice-max-samples', type=int, default=300)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--workloads', nargs='+', choices=WORKLOADS, default=WORKLOADS)
@@ -166,9 +168,13 @@ def main():
     if args.repeats < 1:
         parser.error('--repeats must be positive')
     root = args.output.resolve()
-    if args.prepared:
+    if args.resume:
+        if not (root/'status.json').exists():
+            raise RuntimeError('Cannot resume without status.json')
+        modules, entry = root / 'modules', root / 'entry.py'
+    elif args.prepared:
         if (root/'status.json').exists():
-            raise RuntimeError('This prepared run has already started; use a new output directory')
+            raise RuntimeError('This prepared run has already started; use --resume')
         modules, entry = root / 'modules', root / 'entry.py'
     else:
         modules, entry = prepare(root)
@@ -188,24 +194,34 @@ def main():
         (REPO/'evaluation/datasets/imagenette2/imagenette2/train').rglob('*') if p.is_file()),
         commonvoice=args.commonvoice_max_samples, coco=5000, llava_pretrain=1000, stackexchange=2000)
     input_records['simclrv2_cache'] = input_records['simclrv2']
-    metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=args.repeats,
-        cpu_budget=64, ray_cpu_budget=64, ray_address='172.23.166.105:6379',
-        fixed_W=None, cell_timeout_sec=3600, profile_timeout_sec=10800,
-        timeout_includes_import_setup_warmup_measurement_cleanup=True,
-        full_input_pass=True, round_robin=True, independent_ablations=True,
-        first_round_timeout_excludes_later_rounds=True,
-        profile_seconds_per_stage=10, profile_actors_processes_per_stage=1,
-        input_sha256={p.name: sha(p) for p in (root/'inputs').glob('*.jsonl')},
-        commonvoice_max_samples=args.commonvoice_max_samples,
-        command_by_workload={w: config(root, w, args.commonvoice_max_samples)
-                             for w in args.workloads},
-        environment={k:v for k,v in env.items() if k.startswith(('CEDAR_', 'OMP_', 'MKL_', 'OPENBLAS_', 'NUMEXPR_'))})
+    if args.resume:
+        metadata = json.loads((root/'metadata.json').read_text())
+        args.commonvoice_max_samples = metadata['commonvoice_max_samples']
+        args.repeats = metadata['repeats']
+        skipped = set(metadata.get('skip_cedar_workloads', []))
+        skipped.update(args.skip_cedar_workloads)
+        metadata['skip_cedar_workloads'] = sorted(skipped)
+    else:
+        metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=args.repeats,
+            cpu_budget=64, ray_cpu_budget=64, ray_address='172.23.166.105:6379',
+            fixed_W=None, cell_timeout_sec=3600, profile_timeout_sec=10800,
+            timeout_includes_import_setup_warmup_measurement_cleanup=True,
+            full_input_pass=True, round_robin=True, independent_ablations=True,
+            first_round_timeout_excludes_later_rounds=True,
+            profile_seconds_per_stage=10, profile_actors_processes_per_stage=1,
+            input_sha256={p.name: sha(p) for p in (root/'inputs').glob('*.jsonl')},
+            commonvoice_max_samples=args.commonvoice_max_samples,
+            skip_cedar_workloads=sorted(args.skip_cedar_workloads),
+            command_by_workload={w: config(root, w, args.commonvoice_max_samples)
+                                 for w in args.workloads},
+            environment={k:v for k,v in env.items() if k.startswith(('CEDAR_', 'OMP_', 'MKL_', 'OPENBLAS_', 'NUMEXPR_'))})
     write_json(root / 'metadata.json', metadata)
     if args.prepare_only:
         return
     (root/'runner.pid').write_text(str(os.getpid()))
     shutil.copy2(Path(__file__), root/'runner_source.py')
-    state = {}
+    state = (json.loads((root/'status.json').read_text())
+             if args.resume else {})
     for workload in args.workloads:
         work = root/workload
         for name in ('profiles','plans','results','logs','warmup_results','cache'):
@@ -217,11 +233,19 @@ def main():
         cmd += common+['--run_profiling','--disable_controller','--disable_optimizer','--disable_prefetch']
         if not workload.endswith('_cache'):
             cmd += ['--disable_caching']
-        print(f'PROFILE {workload}', flush=True)
-        state[workload] = {'profile': {'status':'running', 'started_unix':time.time()}, 'cells': []}
-        write_json(root/'status.json',state)
-        state[workload]['profile'] = run(cmd, work/'logs/profile.log', env, 10800)
-        write_json(root/'status.json',state)
+        reuse_profile = (
+            workload in state
+            and state[workload].get('profile', {}).get('status') == 'completed'
+            and profile.exists()
+        )
+        if reuse_profile:
+            print(f'REUSE PROFILE {workload}', flush=True)
+        else:
+            print(f'PROFILE {workload}', flush=True)
+            state[workload] = {'profile': {'status':'running', 'started_unix':time.time()}, 'cells': []}
+            write_json(root/'status.json',state)
+            state[workload]['profile'] = run(cmd, work/'logs/profile.log', env, 10800)
+            write_json(root/'status.json',state)
         if state[workload]['profile']['status'] != 'completed' or not profile.exists():
             state[workload]['blocked'] = 'profile failed or missing'
             write_json(root/'status.json',state)
@@ -235,13 +259,26 @@ def main():
             write_json(root/'status.json',state)
             continue
         state[workload]['profile']['sha256'] = sha(profile)
-        excluded = set()
+        excluded = {c['method'] for c in state[workload].get('cells', [])
+                    if c.get('round') == 1 and c.get('status') == 'timeout'}
         methods = list(METHODS)
         for repeat in range(args.repeats):
             order = methods[repeat:]+methods[:repeat]
             for label in order:
                 internal = METHODS[label]
                 cell = f'round{repeat+1}__{internal}'
+                previous = [c for c in state[workload].get('cells', [])
+                            if c.get('method') == label and c.get('round') == repeat+1]
+                if previous:
+                    print(f'REUSE {workload} {cell} status={previous[-1].get("status")}', flush=True)
+                    continue
+                if label == 'cedar-opt' and workload in metadata.get('skip_cedar_workloads', []):
+                    state[workload]['cells'].append(dict(
+                        method=label, round=repeat+1, status='skipped_user_requested',
+                        reason='Known Cedar optimization timeout for this workload'))
+                    write_json(root/'status.json', state)
+                    print(f'SKIP {workload} {cell} (user requested)', flush=True)
+                    continue
                 if label in excluded:
                     state[workload]['cells'].append(dict(method=label, round=repeat+1,
                         status='skipped_first_round_timeout'))
