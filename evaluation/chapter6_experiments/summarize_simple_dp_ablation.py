@@ -47,14 +47,14 @@ def summarize(root):
         writer=csv.DictWriter(out, fieldnames=list(rows[0]) if rows else ['workload'])
         writer.writeheader();writer.writerows(rows)
     text=['# Simple-DP 独立消融实验', '',
-          '吞吐量按完整输入条数 / 正式遍历 wall time 计算，包含启动和排空，排除优化及 cache 预热。未完成三轮的结果不作为完整三轮均值。', '',
+          f'吞吐量按完整输入条数 / 正式遍历 wall time 计算，包含启动和排空，排除优化及 cache 预热。未完成配置的 {metadata["repeats"]} 轮时不作为完整均值。', '',
           '| 负载 | 方法 | 成功轮数 | 输入条/秒（均值 ± 标准差） | 优化/构建秒 | 状态 |',
           '|---|---|---:|---:|---:|---|']
     for row in rows:
         mean=row['mean_input_records_per_sec'];sd=row['stdev_input_records_per_sec']
         rate='—' if mean is None else f'{mean:.2f} ± {sd:.2f}' if sd is not None else f'{mean:.2f}'
         setup=row['mean_setup_sec'];setup='—' if setup is None else f'{setup:.2f}'
-        text.append(f"| {row['workload']} | {row['method']} | {row['completed']}/3 | {rate} | {setup} | {row['statuses']} |")
+        text.append(f"| {row['workload']} | {row['method']} | {row['completed']}/{metadata['repeats']} | {rate} | {setup} | {row['statuses']} |")
     (root/'RESULTS.md').write_text('\n'.join(text)+'\n')
 
 

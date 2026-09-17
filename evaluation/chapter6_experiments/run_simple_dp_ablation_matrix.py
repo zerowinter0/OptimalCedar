@@ -158,10 +158,13 @@ def main():
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--prepared', action='store_true')
     parser.add_argument('--commonvoice-max-samples', type=int, default=300)
+    parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--workloads', nargs='+', choices=WORKLOADS, default=WORKLOADS)
     args = parser.parse_args()
     if args.commonvoice_max_samples < 1:
         parser.error('--commonvoice-max-samples must be positive')
+    if args.repeats < 1:
+        parser.error('--repeats must be positive')
     root = args.output.resolve()
     if args.prepared:
         if (root/'status.json').exists():
@@ -185,7 +188,7 @@ def main():
         (REPO/'evaluation/datasets/imagenette2/imagenette2/train').rglob('*') if p.is_file()),
         commonvoice=args.commonvoice_max_samples, coco=5000, llava_pretrain=1000, stackexchange=2000)
     input_records['simclrv2_cache'] = input_records['simclrv2']
-    metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=3,
+    metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=args.repeats,
         cpu_budget=64, ray_cpu_budget=64, ray_address='172.23.166.105:6379',
         fixed_W=None, cell_timeout_sec=3600, profile_timeout_sec=10800,
         timeout_includes_import_setup_warmup_measurement_cleanup=True,
@@ -234,7 +237,7 @@ def main():
         state[workload]['profile']['sha256'] = sha(profile)
         excluded = set()
         methods = list(METHODS)
-        for repeat in range(3):
+        for repeat in range(args.repeats):
             order = methods[repeat:]+methods[:repeat]
             for label in order:
                 internal = METHODS[label]
