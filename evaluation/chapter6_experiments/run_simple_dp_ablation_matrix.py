@@ -133,14 +133,16 @@ runpy.run_path(script, run_name="__main__")
     return modules, entry
 
 
-def config(root, workload):
+def config(root, workload, commonvoice_max_samples=300):
     batch = 4 if workload.startswith('simclrv2') else 1
     filename = 'cedar_cache_dataset.py' if workload == 'simclrv2_cache' else 'cedar_dataset.py'
     folder = 'simclrv2' if workload.startswith('simclrv2') else workload
     kwargs = {
         'simclrv2': f'dataset_path={REPO}/evaluation/datasets/imagenette2/imagenette2/train',
         'simclrv2_cache': f'dataset_path={REPO}/evaluation/datasets/imagenette2/imagenette2/train',
-        'commonvoice': f'dataset_path={REPO}/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips,max_samples=300',
+        'commonvoice': (f'dataset_path={REPO}/datasets/commonvoice/'
+            'cv-corpus-15.0-delta-2023-09-08/en/clips,'
+            f'max_samples={commonvoice_max_samples}'),
         'coco': f'dataset_path={REPO}/evaluation/datasets/coco,split=val2017',
         'llava_pretrain': f'dataset_path={root}/inputs/llava_pretrain.jsonl,image_root={REPO}/evaluation/datasets/llava_pretrain',
         'stackexchange': f'dataset_path={root}/inputs/stackexchange.jsonl',
@@ -155,8 +157,11 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--prepared', action='store_true')
+    parser.add_argument('--commonvoice-max-samples', type=int, default=300)
     parser.add_argument('--workloads', nargs='+', choices=WORKLOADS, default=WORKLOADS)
     args = parser.parse_args()
+    if args.commonvoice_max_samples < 1:
+        parser.error('--commonvoice-max-samples must be positive')
     root = args.output.resolve()
     if args.prepared:
         if (root/'status.json').exists():
@@ -178,7 +183,7 @@ def main():
         env.pop(key, None)
     input_records = dict(simclrv2=sum(1 for p in
         (REPO/'evaluation/datasets/imagenette2/imagenette2/train').rglob('*') if p.is_file()),
-        commonvoice=300, coco=5000, llava_pretrain=1000, stackexchange=2000)
+        commonvoice=args.commonvoice_max_samples, coco=5000, llava_pretrain=1000, stackexchange=2000)
     input_records['simclrv2_cache'] = input_records['simclrv2']
     metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=3,
         cpu_budget=64, ray_cpu_budget=64, ray_address='172.23.166.105:6379',
@@ -188,7 +193,9 @@ def main():
         first_round_timeout_excludes_later_rounds=True,
         profile_seconds_per_stage=10, profile_actors_processes_per_stage=1,
         input_sha256={p.name: sha(p) for p in (root/'inputs').glob('*.jsonl')},
-        command_by_workload={w: config(root,w) for w in args.workloads},
+        commonvoice_max_samples=args.commonvoice_max_samples,
+        command_by_workload={w: config(root, w, args.commonvoice_max_samples)
+                             for w in args.workloads},
         environment={k:v for k,v in env.items() if k.startswith(('CEDAR_', 'OMP_', 'MKL_', 'OPENBLAS_', 'NUMEXPR_'))})
     write_json(root / 'metadata.json', metadata)
     if args.prepare_only:
@@ -201,7 +208,7 @@ def main():
         for name in ('profiles','plans','results','logs','warmup_results','cache'):
             (work/name).mkdir(parents=True, exist_ok=True)
         profile = work/'profiles/shared.yaml'
-        common = config(root, workload)+['--use_ray','--ray_ip',metadata['ray_address'],
+        common = config(root, workload, args.commonvoice_max_samples)+['--use_ray','--ray_ip',metadata['ray_address'],
                                         '--profiled_stats',str(profile)]
         cmd = [sys.executable, '-u', str(entry), str(modules/'evaluation/eval_cedar.py')]
         cmd += common+['--run_profiling','--disable_controller','--disable_optimizer','--disable_prefetch']
