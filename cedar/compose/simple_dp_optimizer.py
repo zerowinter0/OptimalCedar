@@ -392,6 +392,20 @@ class SimpleDpOptimizer(DpOptimizer):
     ) -> Tuple[List[int], Optional[int]]:
         if not inner_ops:
             return [], None
+        result = self._run_cedar_dp_search(inner_ops)
+        return self._apply_cedar_dp_search_result(result, inner_ops)
+
+    def _run_cedar_dp_search(
+        self,
+        inner_ops: List[int],
+        resource_limit: Optional[DpResourceUsage] = None,
+    ) -> SearchResult:
+        """Run one exact Cedar-cost search under an optional resource slice.
+
+        Keeping search and materialization separate lets worker-conditioned
+        optimizers compare plans for several values of W without mutating the
+        physical plan after each candidate.
+        """
         provider = _CedarCostBlockCandidateProvider(self, inner_ops)
         provider.prepare()
         cache_policy = _CedarCacheTransitionPolicy(self, inner_ops)
@@ -400,11 +414,17 @@ class SimpleDpOptimizer(DpOptimizer):
             inner_ops=inner_ops,
             block_provider=provider,
             cache_policy=cache_policy,
+            parallel_stage_cpu_limit=resource_limit,
         )
         # The scalar Cedar objective has one exact label per search state.
         search.pareto_global_epsilon = 0.0
         search.pareto_step_epsilon = 0.0
-        result = search.run()
+        return search.run()
+
+    def _apply_cedar_dp_search_result(
+        self, result: SearchResult, inner_ops: List[int]
+    ) -> Tuple[List[int], Optional[int]]:
+        """Materialize the one selected result into optimizer state."""
         self._last_dp_state_cost = result.cost
         self._last_dp_search_result = result
 

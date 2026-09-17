@@ -44,6 +44,7 @@ OPTIMIZERS = {
     "simple_dp_variant": 22,
     "simple_dp_width": 23,
     "unopti": 24,
+    "simple_dp_workers_boundary": 25,
     "dj_optimizer": 3,
     "optimizer": 0,
     "cm_optimizer": 16,

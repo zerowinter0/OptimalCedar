@@ -6,6 +6,7 @@ from cedar.compose.simple_dp_optimizer import SimpleDpOptimizer
 from cedar.compose.simple_dp_ablation_optimizer import (
     SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
     SimpleDpVariantOptimizer, SimpleDpWidthOptimizer, UnoptimizedOptimizer,
+    SimpleDpWorkersBoundaryOptimizer,
 )
 from cedar.compose.plumber_optimizer import PlumberOptimizer
 from cedar.compose.raydata_optimizer import RayDataOptimizer
@@ -36,7 +37,8 @@ def make(cls, monkeypatch):
 
 @pytest.mark.parametrize('cls', [SimpleDpOptimizer, SimpleDpWorkersOptimizer,
     SimpleDpBoundaryOptimizer, SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
-    PlumberOptimizer, RayDataOptimizer, UnoptimizedOptimizer])
+    SimpleDpWorkersBoundaryOptimizer, PlumberOptimizer, RayDataOptimizer,
+    UnoptimizedOptimizer])
 def test_valid_plans(cls, monkeypatch):
     opt, plan = make(cls, monkeypatch)
     assert plan.validate()
@@ -73,3 +75,24 @@ def test_widths_preserve_baseline_worker_choice(monkeypatch):
     width, width_plan = make(SimpleDpWidthOptimizer, monkeypatch)
     assert width_plan.n_local_workers == base_plan.n_local_workers
     assert width.preserve_optimizer_widths
+
+
+def test_worker_boundary_conditions_dp_on_each_resource_slice(monkeypatch):
+    opt, plan = make(SimpleDpWorkersBoundaryOptimizer, monkeypatch)
+    assert plan.n_local_workers == opt._dp_selected_workers
+    assert 1 <= plan.n_local_workers <= 4
+    assert opt.preserve_optimizer_widths
+    evaluated = [row for row in opt._worker_search_evidence
+                 if row['status'] == 'evaluated']
+    assert evaluated
+    winner = min(evaluated,
+                 key=lambda row: (row['score'], row['plan_cost'],
+                                  row['workers']))
+    assert winner['workers'] == plan.n_local_workers
+    assert winner['plan_resource_usage']['ray_cpus'] <= winner['limits']['ray_cpus']
+    assert winner['plan_resource_usage']['smp_cpus'] <= winner['limits']['smp_cpus']
+    for desc in plan.pipe_descs.values():
+        if desc.variant_type in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+            assert desc.variant_ctx.n_actors == 1
+        elif desc.variant_type == PipeVariantType.SMP:
+            assert desc.variant_ctx.n_procs == 1
