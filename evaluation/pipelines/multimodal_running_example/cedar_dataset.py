@@ -17,7 +17,6 @@ from cedar.pipes import (
     FilterPipe,
     MapperPipe,
     Pipe,
-    PipeComputeScaling,
     PipeExecutionResource,
     PipeVariantType,
 )
@@ -95,7 +94,6 @@ def parse_json_record(line: Any) -> dict[str, Any]:
 
 
 def _per_record(pipe: Pipe, *, cuda: bool = False) -> Pipe:
-    pipe.set_compute_scaling(PipeComputeScaling.PER_RECORD)
     if cuda:
         pipe.set_execution_resource(PipeExecutionResource.CUDA)
     if os.environ.get("PICO_MULTIMODAL_DISABLE_SMP") == "1":

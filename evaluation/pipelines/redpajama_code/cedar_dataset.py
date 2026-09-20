@@ -17,7 +17,6 @@ from cedar.pipes import (
     FilterPipe,
     MapperPipe,
     Pipe,
-    PipeComputeScaling,
 )
 from cedar.sources import LocalLineSource
 
@@ -36,25 +35,18 @@ class RedPajamaCodeFeature(Feature):
     def _compose(self, source_pipes: List[Pipe]):
         fp = source_pipes[0]
         fp = MapperPipe(fp, ops.parse_json_line, tag="parse").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, ops.CleanEmailMapper(), tag="clean_email").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, ops.CleanLinksMapper(), tag="clean_links").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, ops.FixUnicodeMapper(), tag="fix_unicode").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, ops.PunctuationNormalizationMapper(), tag="normalize_punct"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, ops.WhitespaceNormalizationMapper(), tag="normalize_space"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, ops.CleanCopyrightMapper(), tag="clean_copyright"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         fp = FilterPipe(
             fp,
@@ -63,7 +55,6 @@ class RedPajamaCodeFeature(Feature):
             ),
             tag="alphanumeric_chars",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.AlphanumericFilter(
@@ -71,13 +62,11 @@ class RedPajamaCodeFeature(Feature):
             ),
             tag="alphanumeric_tokens",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.AverageLineLengthFilter(min_len=15, max_len=100),
             tag="avg_line_len",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.CharacterRepetitionFilter(
@@ -85,19 +74,16 @@ class RedPajamaCodeFeature(Feature):
             ),
             tag="char_repeat",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.MaximumLineLengthFilter(min_len=50, max_len=500),
             tag="max_line_len",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.TextLengthFilter(min_len=300),
             tag="text_length",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         fp = FilterPipe(
             fp,
             ops.WordsNumFilter(
@@ -108,7 +94,6 @@ class RedPajamaCodeFeature(Feature):
             ),
             tag="words_num",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = FilterPipe(
             fp,
             ops.WordRepetitionFilter(
@@ -119,14 +104,11 @@ class RedPajamaCodeFeature(Feature):
             ),
             tag="word_repeat",
         )
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         fp = MapperPipe(fp, ops.sync_text_key, tag="sync_text").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         fp = MapperPipe(
             fp, ops.extract_output_text, tag="extract_text"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         return fp
 
 

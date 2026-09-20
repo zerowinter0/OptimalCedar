@@ -98,3 +98,116 @@ def test_boundary_calibration_reuses_exact_signature(tmp_path, monkeypatch):
     assert first["calibration_source"] == "measured"
     assert second["calibration_source"] == "cache"
     assert second["calibration_key"] == first["calibration_key"]
+
+def test_ray_calibration_includes_large_payloads():
+    assert max(DEFAULT_PAYLOAD_BYTES) >= 16 * 1024 * 1024
+
+
+def test_boundary_ray_pool_uses_actor_placement_options(monkeypatch):
+    options = []
+    class FakeActor:
+        def location(self):
+            pass
+    class Method:
+        def remote(self):
+            return "location_ref"
+    handle = FakeActor()
+    handle.location = Method()
+    class Factory:
+        def options(self, **kwargs):
+            options.append(kwargs)
+            return self
+        def remote(self):
+            return handle
+    monkeypatch.setattr(boundary_profiler, "_BoundaryRayActor", Factory())
+    monkeypatch.setattr(boundary_profiler, "get_ray_actor_options",
+                        lambda: {"num_cpus": 1, "resources": {"cedar_remote": 0.001}})
+    monkeypatch.setattr(boundary_profiler.ray, "get",
+                        lambda refs, **kwargs: [{"ip": "remote"}])
+    monkeypatch.setattr(boundary_profiler.ray, "kill", lambda actor: None)
+    pool = boundary_profiler._RoundTripPool(PipeVariantType.RAY, 1)
+    assert options == [{"num_cpus": 1, "resources": {"cedar_remote": 0.001}}]
+    assert pool.actor_locations == [{"ip": "remote"}]
+    pool.shutdown()
+
+
+def test_remote_boundary_validator_rejects_legacy_or_failed_profiles():
+    with pytest.raises(RuntimeError, match="remote.*boundary"):
+        boundary_profiler.validate_remote_ray_boundary({
+            "physical_model": {"calibration_errors": {"RAY": "noisy"}}})
+    with pytest.raises(RuntimeError, match="remote.*boundary"):
+        boundary_profiler.validate_remote_ray_boundary({
+            "physical_model": {"boundary": {"RAY": {
+                "throughput_bytes_per_sec": 1e10, "fixed_latency_ms": 0}}}})
+
+
+def test_remote_boundary_validator_accepts_proven_remote_measurement():
+    profile = {"physical_model": {"boundary": {"RAY": {
+        "throughput_bytes_per_sec": 110e6, "fixed_latency_ms": 0.5,
+        "r_squared": 0.99,
+        "calibration_schema_version": boundary_profiler.CALIBRATION_SCHEMA_VERSION,
+        "placement_resource": "cedar_remote", "driver_ip": "local",
+        "actor_locations": [{"ip": "remote"}]}}}}
+    boundary_profiler.validate_remote_ray_boundary(profile)
+    profile["physical_model"]["boundary"]["RAY"]["actor_locations"] = [{"ip": "local"}]
+    with pytest.raises(RuntimeError, match="remote.*boundary"):
+        boundary_profiler.validate_remote_ray_boundary(profile)
+
+
+def test_ray_calibration_failure_preserves_raw_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("CEDAR_BOUNDARY_DIAGNOSTICS_DIR", str(tmp_path))
+    monkeypatch.setattr(boundary_profiler, "_validate_variant_ready", lambda *a: None)
+    class Pool:
+        actor_locations = [{"ip": "remote"}]
+        def __init__(self, **kwargs): pass
+        def shutdown(self): pass
+    monkeypatch.setattr(boundary_profiler, "_RoundTripPool", Pool)
+    monkeypatch.setattr(boundary_profiler, "_measure_round_trip", lambda **kw: 0.01)
+    with pytest.raises(RuntimeError):
+        boundary_profiler.profile_stage_boundary(
+            object(), PipeVariantType.RAY, 1, payload_bytes=[512, 4096])
+    reports = list(tmp_path.glob("*.json"))
+    assert reports
+    import json
+    result = json.loads(reports[0].read_text())
+    assert len(result["runs"]) == 4
+    assert result["actor_locations"] == [{"ip": "remote"}]
+
+def test_ray_boundary_failure_aborts_dataset_profiling(monkeypatch):
+    from cedar.client.dataset import DataSet
+    import cedar.client.dataset as dataset_module
+    dataset = object.__new__(DataSet)
+    dataset.ctx = object()
+    def fail(**kwargs):
+        raise RuntimeError("noisy measurement")
+    monkeypatch.setattr(dataset_module, "profile_stage_boundary_cached", fail)
+    profile = {}
+    with pytest.raises(RuntimeError, match="refusing unmeasured"):
+        dataset._profile_boundary_model(profile, PipeVariantType.RAY, 1)
+    assert "RAY" in profile["physical_model"]["calibration_errors"]
+
+
+def test_optimizer_cannot_use_constant_in_remote_experiment(monkeypatch):
+    from cedar.compose.my_optimizer import MyOptimizer
+    monkeypatch.setenv("CEDAR_RAY_REQUIRE_REMOTE", "1")
+    opt = MyOptimizer()
+    opt.profiled_stats = {}
+    with pytest.raises(RuntimeError, match="remote.*boundary"):
+        opt._dp_boundary_throughput(PipeVariantType.RAY)
+
+
+def test_ray_cache_signature_tracks_placement_nodes(monkeypatch):
+    monkeypatch.setenv("CEDAR_RAY_PLACEMENT_RESOURCE", "cedar_remote")
+    monkeypatch.setattr(boundary_profiler.ray, "is_initialized", lambda: True)
+    monkeypatch.setattr(boundary_profiler.ray.util, "get_node_ip_address", lambda: "local")
+    monkeypatch.setattr(boundary_profiler.ray, "cluster_resources",
+                        lambda: {"CPU": 128, "cedar_remote": 1})
+    nodes = [{"NodeID": "node1", "NodeManagerAddress": "remote1",
+              "Alive": True, "Resources": {"cedar_remote": 1}}]
+    monkeypatch.setattr(boundary_profiler.ray, "nodes", lambda: nodes)
+    first = boundary_profiler.boundary_calibration_signature(PipeVariantType.RAY, 1)
+    import json
+    assert json.loads(json.dumps(first)) == first
+    nodes[0]["NodeManagerAddress"] = "remote2"
+    second = boundary_profiler.boundary_calibration_signature(PipeVariantType.RAY, 1)
+    assert first != second

@@ -40,6 +40,13 @@ class RayActor:
     def exit(self):
         ray.actor.exit_actor()
 
+    def get_runtime_location(self):
+        """Identify the physical node/GPU used by a profiling actor."""
+        return {
+            "node_ip": ray.util.get_node_ip_address(),
+            "gpu_ids": sorted(str(gpu_id) for gpu_id in ray.get_gpu_ids()),
+        }
+
     def process_profiled(self, data: Any) -> Any:
         """Execute one actor batch and return worker-side compute time."""
         started = time.perf_counter_ns()

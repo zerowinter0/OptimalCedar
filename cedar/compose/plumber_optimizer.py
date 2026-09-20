@@ -75,16 +75,8 @@ class PlumberOptimizer(Optimizer):
         if budget <= 0:
             return 1, 1
         cores_per_worker = max(1, budget // workers)
-        # Mirror Cedar's profile-matched accounting exactly: one core for the
-        # worker process and one runtime reserve, so the baseline is charged the
-        # same per-worker CPU budget as every other optimizer.
-        reserve_raw = os.environ.get(
-            "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1"
-        )
-        try:
-            reserve = int(reserve_raw)
-        except ValueError:
-            reserve = 1
+        # One CPU for the worker; remaining CPUs serve parallel stages.
+        reserve = 0
         parallel = max(0, cores_per_worker - 1 - max(0, reserve))
         return cores_per_worker, parallel
 

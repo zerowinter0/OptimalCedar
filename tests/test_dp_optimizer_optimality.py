@@ -2,6 +2,8 @@ import math
 import itertools
 import random
 
+import pytest
+
 from evaluation.verify_dp_optimizer_optimality import (
     BACKENDS,
     unconstrained_plan_count,
@@ -24,7 +26,7 @@ from cedar.compose.dp_optimizer import (
 from cedar.compose import constants
 from cedar.compose.my_optimizer import MyOptimizer
 from cedar.compose.optimizer import OptimizerOptions, PipeDesc
-from cedar.pipes import PipeComputeScaling, PipeVariantType
+from cedar.pipes import PipeVariantType
 from cedar.sources import IterSource
 
 
@@ -167,6 +169,7 @@ def test_external_service_coordinates_are_losslessly_collapsed():
 
 def test_selectivity_aware_block_cost_moves_cheap_rejector_first():
     optimizer = DpOptimizer()
+    optimizer.uses_affine_operator_cost = False
     optimizer._dp_pred_indices = [[], []]
     optimizer._dp_r_prod = [1.0, 1.0, 1.0, 1.0]
     optimizer._dp_volume_prod = [1.0, 0.1, 1.0, 0.1]
@@ -191,8 +194,8 @@ def test_selectivity_aware_block_cost_moves_cheap_rejector_first():
 
 def test_block_index_retains_exact_minimum_for_each_endpoint_pair():
     optimizer = DpOptimizer()
+    optimizer.uses_affine_operator_cost = False
     optimizer._dp_pred_indices = [[], [], []]
-    optimizer._dp_compute_scalings = [PipeComputeScaling.PER_BYTE] * 3
     ratios = [0.25, 0.5, 0.8]
     optimizer._dp_r_prod = [1.0] * 8
     optimizer._dp_volume_prod = [1.0] * 8
@@ -245,63 +248,111 @@ def test_old_profile_keeps_exact_size_only_work_product():
     ] == optimizer._dp_r_prod
 
 
-def test_per_record_compute_keeps_boundaries_byte_scaled():
-    optimizer = DpOptimizer()
-    optimizer._dp_compute_scaling = PipeComputeScaling.PER_RECORD
-    optimizer._dp_r_prod = [1.0, 4.0]
-    optimizer._dp_volume_prod = [1.0, 2.0]
-    optimizer._dp_cardinality_prod = [1.0, 0.5]
-
-    assert optimizer._dp_compute_work_prod(1) == 0.5
-    assert optimizer._dp_work_prod(1) == 2.0
-
-
-def test_per_record_cost_is_anchored_at_its_profiled_position():
+def affine_index_optimizer():
+    """Two-operator fixture: op 0 expands bytes, op 1 halves the records."""
     optimizer = DpOptimizer()
     optimizer._dp_pred_indices = [[], []]
-    optimizer._dp_compute_scalings = [
-        PipeComputeScaling.PER_BYTE,
-        PipeComputeScaling.PER_RECORD,
-    ]
+    optimizer._dp_inner_ops = [0, 1]
     optimizer._dp_r_prod = [1.0, 4.0, 1.0, 4.0]
-    optimizer._dp_volume_prod = [1.0, 2.0, 1.0, 2.0]
-    optimizer._dp_cardinality_prod = [1.0, 0.5, 1.0, 0.5]
+    optimizer._dp_volume_prod = [1.0, 4.0, 1.0, 4.0]
+    optimizer._dp_cardinality_prod = [1.0, 1.0, 0.5, 0.5]
+    optimizer._dp_profiled_input_cardinality = {0: 1.0, 1: 0.5}
+    optimizer._get_source_p_id = lambda: 99
     optimizer.profiled_stats = {
         "baseline": {
             "input_sizes": {0: 100.0, 1: 400.0},
             "output_sizes": {99: 100.0},
-        }
+        },
+        "physical_model": {
+            "operator_affine": {
+                "operators": {
+                    "0": {
+                        "k_ms_per_byte": 0.001,
+                        "b_ms": 0.0,
+                        "x_reference_bytes": 100.0,
+                    },
+                    "1": {
+                        "k_ms_per_byte": 0.001,
+                        "b_ms": 0.2,
+                        "x_reference_bytes": 400.0,
+                    },
+                }
+            }
+        },
+    }
+    return optimizer
+
+
+def test_affine_compute_keeps_boundaries_byte_scaled():
+    optimizer = DpOptimizer()
+    optimizer._dp_inner_ops = [0]
+    optimizer.profiled_stats = {
+        "baseline": {"input_sizes": {0: 10.0}, "output_sizes": {99: 10.0}},
+        "physical_model": {
+            "operator_affine": {
+                "operators": {
+                    "0": {"k_ms_per_byte": 0.1, "b_ms": 1.0},
+                }
+            }
+        },
     }
     optimizer._get_source_p_id = lambda: 99
+    optimizer._dp_r_prod = [1.0, 4.0]
+    optimizer._dp_volume_prod = [1.0, 2.0]
+    optimizer._dp_cardinality_prod = [1.0, 0.5]
 
+    # Half a record survives, each reading 40 bytes: 0.5 * (0.1 * 40 + 1).
+    assert optimizer._dp_compute_work_prod(1, 0) == pytest.approx(2.5)
+    # Stage boundaries keep Cedar's byte-volume product.
+    assert optimizer._dp_work_prod(1) == 2.0
+
+
+def test_affine_cost_is_anchored_at_its_profiled_position():
+    optimizer = affine_index_optimizer()
     index = _BlockCostIndex(
         optimizer,
         inner_ops=[0, 1],
-        costs=[0.1, 10.0],
+        costs=[0.1, 0.6],
     )
     cost, order = index.get(0b11)
 
-    assert order == (0, 1)
-    assert math.isclose(cost, 10.1)
+    # Running the record-reducing filter first never pays the expensive
+    # operator's per-record intercept for the records it removes.
+    assert order == (1, 0)
+    assert math.isclose(cost, 0.35)
 
 
-def test_per_record_normalization_survives_two_stage_reorder():
+def test_affine_normalization_survives_two_stage_reorder():
     optimizer = DpOptimizer()
     optimizer._dp_inner_ops = [20, 10]
-    optimizer._dp_compute_scalings = [
-        PipeComputeScaling.PER_RECORD,
-        PipeComputeScaling.PER_RECORD,
-    ]
     optimizer._dp_profiled_input_cardinality = {10: 1.0, 20: 0.25}
-    optimizer._dp_cardinality_prod = [1.0, 1.0, 0.25, 0.25]
+    optimizer.profiled_stats = {
+        "baseline": {"input_sizes": {10: 400.0, 20: 100.0}},
+        "physical_model": {
+            "operator_affine": {
+                "operators": {
+                    "10": {
+                        "k_ms_per_byte": 0.001,
+                        "b_ms": 0.2,
+                        "x_reference_bytes": 400.0,
+                    },
+                    "20": {
+                        "k_ms_per_byte": 0.001,
+                        "b_ms": 0.0,
+                        "x_reference_bytes": 100.0,
+                    },
+                }
+            }
+        },
+    }
 
+    # source_size * (k * input_bytes + b) at the profiled position; the
+    # surviving-record weighting lives in the operator work product.
     assert math.isclose(
-        optimizer._dp_compute_cost_denominator(0, 999.0, 100.0),
-        25.0,
+        optimizer._dp_compute_cost_denominator(0, 100.0, 100.0), 10.0
     )
     assert math.isclose(
-        optimizer._dp_compute_cost_denominator(1, 999.0, 100.0),
-        100.0,
+        optimizer._dp_compute_cost_denominator(1, 400.0, 100.0), 60.0
     )
 
 

@@ -63,3 +63,29 @@ def test_ray_actor_options_distribute_checkout_modules(monkeypatch):
             "gcs://evaluation.zip",
         ]
     }
+
+def test_remote_experiment_config_pins_actors_by_default(monkeypatch):
+    from cedar.pipes.ray_variant import configure_remote_ray_experiment
+    monkeypatch.setenv(RAY_PLACEMENT_RESOURCE_ENV, "")
+    monkeypatch.setenv("CEDAR_RAY_REQUIRE_REMOTE", "0")
+    monkeypatch.delenv(RAY_PY_MODULE_ROOT_ENV, raising=False)
+    monkeypatch.setattr("cedar.pipes.ray_variant.ray.is_initialized", lambda: False)
+    monkeypatch.setenv("CEDAR_PROFILE_BOUNDARY_MODEL", "0")
+    configure_remote_ray_experiment()
+    assert get_ray_actor_options()["resources"] == {"cedar_remote": 0.001}
+
+
+def test_remote_experiment_rejects_resource_on_driver_node(monkeypatch):
+    from cedar.pipes.ray_variant import configure_remote_ray_experiment
+    monkeypatch.setenv("CEDAR_RAY_REQUIRE_REMOTE", "0")
+    monkeypatch.setenv(RAY_PLACEMENT_RESOURCE_ENV, "")
+    monkeypatch.delenv(RAY_PY_MODULE_ROOT_ENV, raising=False)
+    monkeypatch.setattr("cedar.pipes.ray_variant.ray.is_initialized", lambda: True)
+    monkeypatch.setattr("cedar.pipes.ray_variant.ray.util.get_node_ip_address", lambda: "local")
+    monkeypatch.setattr("cedar.pipes.ray_variant.ray.nodes",
+        lambda: [{"Alive": True, "NodeManagerAddress": "local",
+                  "Resources": {"cedar_remote": 1}}])
+    monkeypatch.setenv("CEDAR_PROFILE_BOUNDARY_MODEL", "0")
+    configure_remote_ray_experiment()
+    with pytest.raises(RuntimeError, match="remote"):
+        get_ray_actor_options()

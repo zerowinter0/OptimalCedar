@@ -15,7 +15,6 @@ from cedar.pipes import (
     FilterPipe,
     MapperPipe,
     Pipe,
-    PipeComputeScaling,
     PipeExecutionResource,
     PipeVariantType,
 )
@@ -56,7 +55,6 @@ def _configure(
     fusable: bool | None = None,
     cuda: bool = False,
 ) -> Pipe:
-    pipe.set_compute_scaling(PipeComputeScaling.PER_RECORD)
     if cuda:
         pipe.set_execution_resource(PipeExecutionResource.CUDA)
     if variants is not None or fusable is not None:

@@ -13,18 +13,21 @@ import time
 
 REPO = Path(__file__).resolve().parents[2]
 METHODS = {
+    'simple_dp': 'simple_dp',
+    'simple-dp-opt': 'simple_dp',
+    'simple_dp_boundary': 'simple_dp_boundary',
+    'simple_dp_workers_boundary': 'simple_dp_workers_boundary',
+    'simple_dp_workers_width_boundary': 'simple_dp_workers_width_boundary',
+    'old_dp_boundary': 'old_dp_boundary',
+    'old-dp-opt': 'old_dp_legacy_optimizer',
+    'plumber-opt': 'plumber_optimizer',
     'dj-cedar-opt': 'dj_optimizer',
     'pecan-cedar-opt': 'pecan_optimizer',
-    'plumber-opt': 'plumber_optimizer',
     'cedar-opt': 'optimizer',
     'ray-opt': 'raydata_optimizer',
     'unopti': 'unopti',
-    'simple-dp-opt': 'simple_dp_optimizer',
-    'simple-dp+W': 'simple_dp_workers',
-    'simple-dp+boundary': 'simple_dp_boundary',
-    'simple-dp+variant-max': 'simple_dp_variant',
-    'simple-dp+width': 'simple_dp_width',
 }
+
 WORKLOADS = ['simclrv2', 'simclrv2_cache', 'commonvoice', 'coco',
              'llava_pretrain', 'stackexchange']
 
@@ -67,7 +70,8 @@ def run(cmd, log, env, timeout):
                 command=cmd, log=str(log))
 
 
-def prepare(root):
+def prepare(root, llava_samples=1000, stackexchange_samples=2000,
+            llava_source=None, stackexchange_source=None):
     if root.exists():
         raise RuntimeError(f'Refusing to overwrite an existing run: {root}')
     root.mkdir(parents=True)
@@ -87,8 +91,8 @@ def prepare(root):
     subsets = root / 'inputs'
     subsets.mkdir()
     for workload, source, count in (
-        ('llava_pretrain', REPO / 'evaluation/datasets/llava_pretrain/blip_laion_cc_sbu_20000_dj_fmt_only_caption.jsonl', 1000),
-        ('stackexchange', REPO / 'datasets/stackexchange/redpajama-stackexchange-10000.jsonl', 2000),
+        ('llava_pretrain', llava_source or (REPO / 'evaluation/datasets/llava_pretrain/blip_laion_cc_sbu_20000_dj_fmt_only_caption.jsonl'), llava_samples),
+        ('stackexchange', stackexchange_source or (REPO / 'datasets/stackexchange/redpajama-stackexchange-10000.jsonl'), stackexchange_samples),
     ):
         target = subsets / (workload + '.jsonl')
         with source.open() as src, target.open('w') as dst:
@@ -133,26 +137,62 @@ runpy.run_path(script, run_name="__main__")
     return modules, entry
 
 
-def config(root, workload, commonvoice_max_samples=300):
+SIMCLRV2_DATASET = 'evaluation/datasets/imagenette2/imagenette2/train'
+# 9,469 local images replayed this many times give the 189,380 records the
+# scaled campaign asks for; no external download is involved.
+SIMCLRV2_EPOCHS = 20
+
+
+def config(root, workload, commonvoice_max_samples=300,
+           commonvoice_dataset_path=None, coco_split='val2017',
+           simclrv2_dataset=None):
     batch = 4 if workload.startswith('simclrv2') else 1
     filename = 'cedar_cache_dataset.py' if workload == 'simclrv2_cache' else 'cedar_dataset.py'
     folder = 'simclrv2' if workload.startswith('simclrv2') else workload
+    simclrv2_path = simclrv2_dataset or (REPO / SIMCLRV2_DATASET)
     kwargs = {
-        'simclrv2': f'dataset_path={REPO}/evaluation/datasets/imagenette2/imagenette2/train',
-        'simclrv2_cache': f'dataset_path={REPO}/evaluation/datasets/imagenette2/imagenette2/train',
-        'commonvoice': (f'dataset_path={REPO}/datasets/commonvoice/'
-            'cv-corpus-15.0-delta-2023-09-08/en/clips,'
+        'simclrv2': f'dataset_path={simclrv2_path}',
+        'simclrv2_cache': f'dataset_path={simclrv2_path}',
+        'commonvoice': (f'dataset_path={commonvoice_dataset_path or (REPO / "datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips")},'
             f'max_samples={commonvoice_max_samples}'),
-        'coco': f'dataset_path={REPO}/evaluation/datasets/coco,split=val2017',
+        'coco': f'dataset_path={REPO}/evaluation/datasets/coco,split={coco_split}',
         'llava_pretrain': f'dataset_path={root}/inputs/llava_pretrain.jsonl,image_root={REPO}/evaluation/datasets/llava_pretrain',
         'stackexchange': f'dataset_path={root}/inputs/stackexchange.jsonl',
     }[workload]
+    epochs = 1
+    if workload.startswith('simclrv2'):
+        epochs = SIMCLRV2_EPOCHS
     return ['--dataset_file', str(root / 'modules/evaluation/pipelines' / folder / filename),
             '--dataset_kwargs', kwargs, '--batch_size', str(batch),
-            '--num_total_samples', '0']
+            '--num_epochs', str(epochs),
+            '--num_total_samples', str(record_counts().get(workload, 0))]
+
+
+LLAVA_INPUT = 'evaluation/datasets/llava_pretrain/blip_laion_cc_sbu_558k.jsonl'
+STACKEXCHANGE_INPUT = 'datasets/stackexchange/redpajama-stackexchange-400000.jsonl'
+
+
+def record_counts() -> dict:
+    """Records each workload must process, from the experiment configuration."""
+    return dict(RECORD_COUNTS)
+
+
+# Scaled data volumes for the final campaign. simclrv2 and simclrv2_cache run
+# on ImageNet-1k (189,380 = 20x the 9,469 imagenette2 training images), coco
+# uses train2017, llava_pretrain and stackexchange take larger subsets of the
+# official corpora, and commonvoice uses all 300,000 local clips.
+RECORD_COUNTS = {
+    'simclrv2': 189380,
+    'simclrv2_cache': 189380,
+    'commonvoice': 300000,
+    'coco': 50000,
+    'llava_pretrain': 50000,
+    'stackexchange': 20000,
+}
 
 
 def main():
+    global METHODS
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--prepare-only', action='store_true')
@@ -162,7 +202,58 @@ def main():
     parser.add_argument('--commonvoice-max-samples', type=int, default=300)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--workloads', nargs='+', choices=WORKLOADS, default=WORKLOADS)
+    parser.add_argument('--methods', nargs='+', choices=list(METHODS),
+                        help='run only the selected methods')
+    parser.add_argument('--smp-aggregate-profile', action='store_true', default=True,
+                        help='measure a real-object SMP aggregate IPC curve per workload')
+    parser.add_argument('--layered-profile', action='store_true', default=True,
+        help='profile each operator x backend with the adaptive layered protocol')
+    parser.add_argument('--skip-cell', action='append', default=[],
+        metavar='LABEL@WORKLOAD',
+        help='mark a previously timed-out cell as skipped without running it')
+    parser.add_argument('--cell-timeout-sec', type=int, default=3600)
+    parser.add_argument('--commonvoice-dataset-path', type=Path)
+    parser.add_argument('--simclrv2-dataset', type=Path,
+        help='image directory for the simclrv2 workloads (default: ImageNet-1k train)')
+    parser.add_argument('--simclrv2-epochs', type=int, default=1,
+        help='repetitions of the simclrv2 image list; the scaled campaign '
+             'replays the local full dataset instead of downloading ImageNet')
+    parser.add_argument('--coco-split', default='train2017',
+        choices=('val2017', 'train2017'))
+    parser.add_argument('--llava-samples', type=int, default=RECORD_COUNTS['llava_pretrain'])
+    parser.add_argument('--stackexchange-samples', type=int,
+        default=RECORD_COUNTS['stackexchange'])
+    parser.add_argument('--llava-source', type=Path, default=REPO / LLAVA_INPUT)
+    parser.add_argument('--stackexchange-source', type=Path,
+        default=REPO / STACKEXCHANGE_INPUT)
+    parser.add_argument('--profile-from', nargs='+', type=Path, default=[],
+        help=('reuse a validated shared profile from an earlier run directory '
+              'instead of profiling again; the source directory is recorded '
+              'in status.json for provenance'))
     args = parser.parse_args()
+    if args.methods:
+        METHODS = {name: METHODS[name] for name in args.methods}
+    global SIMCLRV2_EPOCHS
+    if args.simclrv2_epochs < 1:
+        parser.error('--simclrv2-epochs must be positive')
+    SIMCLRV2_EPOCHS = args.simclrv2_epochs
+    if args.smp_aggregate_profile and not args.layered_profile:
+        parser.error('--smp-aggregate-profile requires --layered-profile')
+    if args.cell_timeout_sec < 1:
+        parser.error('--cell-timeout-sec must be positive')
+    if args.commonvoice_dataset_path:
+        args.commonvoice_dataset_path = args.commonvoice_dataset_path.resolve()
+        files = sorted(args.commonvoice_dataset_path.rglob('*.mp3'))
+        if len(files) < args.commonvoice_max_samples:
+            parser.error('CommonVoice dataset contains fewer real clips than requested')
+    skip_cells = set()
+    for raw in args.skip_cell:
+        if '@' not in raw:
+            parser.error('--skip-cell must be LABEL@WORKLOAD: ' + raw)
+        label, workload = raw.split('@', 1)
+        if label not in METHODS or workload not in WORKLOADS:
+            parser.error('unknown --skip-cell target: ' + raw)
+        skip_cells.add((label, workload))
     if args.commonvoice_max_samples < 1:
         parser.error('--commonvoice-max-samples must be positive')
     if args.repeats < 1:
@@ -177,42 +268,79 @@ def main():
             raise RuntimeError('This prepared run has already started; use --resume')
         modules, entry = root / 'modules', root / 'entry.py'
     else:
-        modules, entry = prepare(root)
+        modules, entry = prepare(
+            root,
+            llava_samples=args.llava_samples,
+            stackexchange_samples=args.stackexchange_samples,
+            llava_source=args.llava_source,
+            stackexchange_source=args.stackexchange_source,
+        )
     env = {k: v for k, v in os.environ.items() if not k.startswith('CEDAR_')}
     env.update(PYTHONPATH=str(modules), OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
         OPENBLAS_NUM_THREADS='1', NUMEXPR_NUM_THREADS='1',
-        CEDAR_RAY_PLACEMENT_RESOURCE='cedar_remote',
+        CEDAR_RAY_PLACEMENT_RESOURCE='cedar_remote', CEDAR_RAY_REQUIRE_REMOTE='1',
+        CEDAR_BOUNDARY_DIAGNOSTICS_DIR=str(root / 'boundary_diagnostics'),
         CEDAR_DATA_JUICER_ROOT=str(REPO / 'data-juicer'),
         HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1',
         CEDAR_PROFILE_RAY_ACTORS='1', CEDAR_PROFILE_SMP_PROCS='1',
         CEDAR_PROFILE_TIME_SEC='10', CEDAR_PROFILE_BOUNDARY_MODEL='1',
         CEDAR_REUSE_BOUNDARY_MODEL='0', CEDAR_PROFILE_INFER_COMPUTE_SCALING='1',
         CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC='240', CEDAR_WORKER_READY_TIMEOUT_SEC='600')
+    if args.smp_aggregate_profile:
+        env["CEDAR_PROFILE_SMP_AGGREGATE_TRANSPORT"] = "1"
+    if args.layered_profile:
+        env.update(
+            CEDAR_LAYERED_ADAPTIVE_PROFILE='1',
+            CEDAR_ADAPTIVE_PROFILE_MIN_SEC='3',
+            CEDAR_ADAPTIVE_PROFILE_MAX_SEC='30',
+            CEDAR_ADAPTIVE_PROFILE_TARGET_RSE='0.10',
+            CEDAR_ADAPTIVE_PROFILE_MIN_OBS='30',
+            CEDAR_PROFILE_POOL_SAMPLES='64',
+            CEDAR_PROFILE_POOL_BYTES_PER_PIPE=str(64 * 1024 * 1024),
+            CEDAR_PROFILE_POOL_BYTES_TOTAL=str(512 * 1024 * 1024),
+            CEDAR_PROFILE_SCALING_WIDTHS='1,2,4,8',
+            CEDAR_PROFILE_SCALING_TOP_K='5',
+            CEDAR_PROFILE_SCALING_MAX_SEC='10')
     for key in ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy'):
         env.pop(key, None)
-    input_records = dict(simclrv2=sum(1 for p in
-        (REPO/'evaluation/datasets/imagenette2/imagenette2/train').rglob('*') if p.is_file()),
-        commonvoice=args.commonvoice_max_samples, coco=5000, llava_pretrain=1000, stackexchange=2000)
-    input_records['simclrv2_cache'] = input_records['simclrv2']
+    input_records = record_counts()
+    input_records['commonvoice'] = args.commonvoice_max_samples
+    input_records['llava_pretrain'] = args.llava_samples
+    input_records['stackexchange'] = args.stackexchange_samples
     if args.resume:
         metadata = json.loads((root/'metadata.json').read_text())
         args.commonvoice_max_samples = metadata['commonvoice_max_samples']
         args.repeats = metadata['repeats']
+        args.cell_timeout_sec = metadata.get('cell_timeout_sec', args.cell_timeout_sec)
+        saved_path = metadata.get('commonvoice_dataset_path')
+        if saved_path:
+            args.commonvoice_dataset_path = Path(saved_path)
         skipped = set(metadata.get('skip_cedar_workloads', []))
         skipped.update(args.skip_cedar_workloads)
         metadata['skip_cedar_workloads'] = sorted(skipped)
+        for raw in metadata.get('skip_cells', []):
+            label, workload = raw.split('@', 1)
+            skip_cells.add((label, workload))
     else:
         metadata = dict(input_records=input_records, workloads=args.workloads, methods=METHODS, repeats=args.repeats,
             cpu_budget=64, ray_cpu_budget=64, ray_address='172.23.166.105:6379',
-            fixed_W=None, cell_timeout_sec=3600, profile_timeout_sec=10800,
+            local_runtime_cpu_reserve_per_worker=0, ray_runtime_cpu_reserve_per_worker=0,
+            fixed_W=None, cell_timeout_sec=args.cell_timeout_sec, profile_timeout_sec=10800,
             timeout_includes_import_setup_warmup_measurement_cleanup=True,
             full_input_pass=True, round_robin=True, independent_ablations=True,
             first_round_timeout_excludes_later_rounds=True,
             profile_seconds_per_stage=10, profile_actors_processes_per_stage=1,
             input_sha256={p.name: sha(p) for p in (root/'inputs').glob('*.jsonl')},
             commonvoice_max_samples=args.commonvoice_max_samples,
+            commonvoice_dataset_path=str(args.commonvoice_dataset_path) if args.commonvoice_dataset_path else None,
             skip_cedar_workloads=sorted(args.skip_cedar_workloads),
-            command_by_workload={w: config(root, w, args.commonvoice_max_samples)
+            layered_profile=args.layered_profile,
+            smp_aggregate_profile=args.smp_aggregate_profile,
+            skip_cells=sorted(raw for raw in args.skip_cell),
+            profile_protocol=('dual_legacy_whole_pipeline_plus_adaptive_layered'
+                              if args.layered_profile
+                              else 'standard_single_operator_offload'),
+            command_by_workload={w: config(root, w, args.commonvoice_max_samples, args.commonvoice_dataset_path, args.coco_split, args.simclrv2_dataset)
                                  for w in args.workloads},
             environment={k:v for k,v in env.items() if k.startswith(('CEDAR_', 'OMP_', 'MKL_', 'OPENBLAS_', 'NUMEXPR_'))})
     write_json(root / 'metadata.json', metadata)
@@ -227,7 +355,7 @@ def main():
         for name in ('profiles','plans','results','logs','warmup_results','cache'):
             (work/name).mkdir(parents=True, exist_ok=True)
         profile = work/'profiles/shared.yaml'
-        common = config(root, workload, args.commonvoice_max_samples)+['--use_ray','--ray_ip',metadata['ray_address'],
+        common = config(root, workload, args.commonvoice_max_samples, args.commonvoice_dataset_path, args.coco_split, args.simclrv2_dataset)+['--use_ray','--ray_ip',metadata['ray_address'],
                                         '--profiled_stats',str(profile)]
         cmd = [sys.executable, '-u', str(entry), str(modules/'evaluation/eval_cedar.py')]
         cmd += common+['--run_profiling','--disable_controller','--disable_optimizer','--disable_prefetch']
@@ -238,6 +366,23 @@ def main():
             and state[workload].get('profile', {}).get('status') == 'completed'
             and profile.exists()
         )
+        if not reuse_profile and args.profile_from:
+            for source in args.profile_from:
+                candidate = source / workload / 'profiles' / 'shared.yaml'
+                if candidate.exists():
+                    shutil.copy2(candidate, profile)
+                    state[workload] = {
+                        'profile': {
+                            'status': 'completed',
+                            'source': str(candidate),
+                            'source_sha256': sha(candidate),
+                        },
+                        'cells': [],
+                    }
+                    write_json(root / 'status.json', state)
+                    print(f'REUSE PROFILE {workload} <- {candidate}', flush=True)
+                    reuse_profile = True
+                    break
         if reuse_profile:
             print(f'REUSE PROFILE {workload}', flush=True)
         else:
@@ -252,6 +397,25 @@ def main():
             continue
         import yaml
         profile_data = yaml.safe_load(profile.read_text())
+        from cedar.client.boundary_profiler import validate_remote_ray_boundary
+        validate_remote_ray_boundary(profile_data)
+        physical = profile_data.get('physical_model', {})
+        if (not profile_data.get('layered_profile')
+                or physical.get('operator_affine', {}).get('schema_version') != 1):
+            state[workload]['blocked'] = (
+                'Shared optimizer profile must contain legacy and layered entries; '
+                'regenerate the profile instead of reusing a legacy-only profile')
+            write_json(root/'status.json', state)
+            continue
+        if any(not isinstance(entry, dict) or 'throughput' not in entry
+               or 'backend_compute' not in entry
+               for backend in profile_data.get('offloads', {}).values()
+               if isinstance(backend, dict)
+               for entry in backend.values()):
+            state[workload]['blocked'] = (
+                'Shared optimizer profile lost legacy throughput or isolated backend_compute')
+            write_json(root/'status.json', state)
+            continue
         signature = profile_data.get('resource_config', {})
         if any(signature.get(k) != 1 for k in
                ('profile_local_workers','ray_actors_per_stage','smp_procs_per_stage')):
@@ -272,6 +436,14 @@ def main():
                 if previous:
                     print(f'REUSE {workload} {cell} status={previous[-1].get("status")}', flush=True)
                     continue
+                if (label, workload) in skip_cells:
+                    state[workload]['cells'].append(dict(
+                        method=label, round=repeat+1,
+                        status='skipped_previous_timeout',
+                        reason='Known timeout from the previous profile campaign'))
+                    write_json(root/'status.json', state)
+                    print(f'SKIP {workload} {cell} (previous timeout)', flush=True)
+                    continue
                 if label == 'cedar-opt' and workload in metadata.get('skip_cedar_workloads', []):
                     state[workload]['cells'].append(dict(
                         method=label, round=repeat+1, status='skipped_user_requested',
@@ -288,8 +460,8 @@ def main():
                 cmd = [sys.executable, '-u', str(entry), str(modules/'evaluation/compare_optimizer_perf.py')]
                 cmd += common+['--full_data_run','--enable_local_parallelism',
                     '--match_profile_resources','--cpu_budget','64','--ray_cpu_budget','64',
-                    '--optimizers',internal,'--optimizer_time_limit_sec','3600',
-                    '--cedar_reorder_timeout_sec','3600','--disable_cedar_runtime_timeout',
+                    '--optimizers',internal,'--optimizer_time_limit_sec',str(args.cell_timeout_sec),
+                    '--cedar_reorder_timeout_sec',str(args.cell_timeout_sec),'--disable_cedar_runtime_timeout',
                     '--num_repeats','1','--skip_pico_plan_cost',
                     '--cache_root',str(work/'cache'),'--results_path',str(result)]
                 if not workload.endswith('_cache'):
@@ -298,7 +470,7 @@ def main():
                 print(f'RUN {workload} {cell}', flush=True)
                 state[workload]['active_cell'] = dict(method=label, round=repeat+1, started_unix=time.time())
                 write_json(root/'status.json',state)
-                record = run(cmd, work/'logs'/f'{cell}.log', cell_env, 3600)
+                record = run(cmd, work/'logs'/f'{cell}.log', cell_env, args.cell_timeout_sec)
                 state[workload].pop('active_cell', None)
                 record.update(method=label, round=repeat+1, profile_sha256=sha(profile))
                 if result.exists():

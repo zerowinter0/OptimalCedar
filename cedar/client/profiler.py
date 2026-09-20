@@ -1,6 +1,4 @@
 import logging
-import math
-import statistics
 import threading
 import time
 from typing import Dict, Deque, Optional, Tuple
@@ -45,10 +43,10 @@ class FeatureProfiler:
         self.buffer_sizes: Dict[int, Deque[int]] = {}
         # List of data sizes for each async pipe
         self.data_sizes: Dict[int, Deque[Tuple[float, float]]] = {}
-        # Paired legal-input observations used by the optional operator
-        # scaling classifier: (input bytes per record, wall latency per
-        # record). Keeping the pair avoids aligning independent aggregates.
-        self.compute_scaling_observations: Dict[
+        # Paired legal-input observations used by the operator affine fit:
+        # (input bytes per record, wall latency per record). Keeping the pair
+        # avoids aligning independent aggregates.
+        self.natural_observations: Dict[
             int, Deque[Tuple[float, float]]
         ] = {}
         # sorted pipes by ID, in topological order
@@ -118,7 +116,7 @@ class FeatureProfiler:
                         p_id: deque(maxlen=maxlen)
                         for p_id in self.feature.physical_pipes.keys()
                     }
-                    self.compute_scaling_observations = {
+                    self.natural_observations = {
                         p_id: deque(maxlen=maxlen)
                         for p_id in self.feature.physical_pipes.keys()
                     }
@@ -129,7 +127,7 @@ class FeatureProfiler:
             self._update_buffer_sizes(ds)
             if self.profile_mode:
                 self._update_data_sizes(ds)
-                self._update_compute_scaling_observations(ds)
+                self._update_natural_observations(ds)
 
     def _update_latencies(self, ds: DataSample) -> None:
         """
@@ -217,7 +215,7 @@ class FeatureProfiler:
             output_size = curr_data_size / (ds.size_dict.get(p_id, 1) or 1)
             self.data_sizes[p_id].append((input_size, output_size))
 
-    def _update_compute_scaling_observations(self, ds: DataSample) -> None:
+    def _update_natural_observations(self, ds: DataSample) -> None:
         """Collect paired timings over naturally different legal inputs."""
         if (
             len(ds.trace_order) < 2
@@ -242,85 +240,9 @@ class FeatureProfiler:
                 - ds.wall_trace_resume_dict[prev_p_id]
             ) / output_records
             if input_bytes > 0 and latency_ns > 0:
-                self.compute_scaling_observations[p_id].append(
+                self.natural_observations[p_id].append(
                     (float(input_bytes), float(latency_ns))
                 )
-
-    def infer_compute_scaling(self) -> Dict[int, Dict[str, float]]:
-        """Classify operators from low/high input-size timing strata.
-
-        The classifier deliberately abstains when profiling did not observe
-        enough legal records or enough input-size variation. An abstention is
-        represented by ``per_data`` with zero confidence, matching Cedar's
-        documented default rather than inventing a per-record label.
-        """
-        result = {}
-        with self._lock:
-            observations = {
-                p_id: list(values)
-                for p_id, values in self.compute_scaling_observations.items()
-            }
-        for p_id, values in observations.items():
-            values = [
-                pair for pair in values
-                if all(math.isfinite(value) and value > 0 for value in pair)
-            ]
-            values.sort(key=lambda pair: pair[0])
-            n = len(values)
-            if n < 12:
-                result[p_id] = {
-                    "scaling": "per_data",
-                    "confidence": 0.0,
-                    "n_observations": n,
-                    "reason": "insufficient_observations",
-                }
-                continue
-
-            group_size = max(4, n // 3)
-            low = values[:group_size]
-            high = values[-group_size:]
-            low_size = statistics.median(pair[0] for pair in low)
-            high_size = statistics.median(pair[0] for pair in high)
-            low_latency = statistics.median(pair[1] for pair in low)
-            high_latency = statistics.median(pair[1] for pair in high)
-            size_ratio = high_size / low_size
-            latency_ratio = high_latency / low_latency
-            if size_ratio < 1.5:
-                result[p_id] = {
-                    "scaling": "per_data",
-                    "confidence": 0.0,
-                    "n_observations": n,
-                    "size_ratio": size_ratio,
-                    "latency_ratio": latency_ratio,
-                    "reason": "insufficient_size_variation",
-                }
-                continue
-
-            elasticity = math.log(max(latency_ratio, 1e-12)) / math.log(
-                size_ratio
-            )
-            per_data = latency_ratio >= 1.25 and elasticity >= 0.35
-            # Confidence is distance from the decision boundary, capped to a
-            # portable [0, 1] diagnostic rather than a probabilistic claim.
-            if per_data:
-                confidence = min(1.0, max(0.0, (elasticity - 0.35) / 0.65))
-            else:
-                confidence = min(1.0, max(0.0, (0.35 - elasticity) / 0.35))
-            predicted_scaling = "per_data" if per_data else "per_record"
-            confident = confidence >= 0.5
-            result[p_id] = {
-                # Low-confidence observations abstain to the documented
-                # per-data default. Keep the raw prediction for evaluation.
-                "scaling": predicted_scaling if confident else "per_data",
-                "predicted_scaling": predicted_scaling,
-                "confidence": confidence,
-                "n_observations": n,
-                "size_ratio": size_ratio,
-                "latency_ratio": latency_ratio,
-                "elasticity": elasticity,
-                "reason": "classified" if confident else "low_confidence",
-            }
-        return result
 
     def calculate_avg_latency_per_sample(self) -> Dict[int, float]:
         """

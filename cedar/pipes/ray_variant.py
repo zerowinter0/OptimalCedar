@@ -20,6 +20,29 @@ DEFAULT_RAY_PLACEMENT_RESOURCE_FRACTION = 0.001
 RAY_PY_MODULE_ROOT_ENV = "CEDAR_RAY_PY_MODULE_ROOT"
 
 
+def configure_remote_ray_experiment() -> None:
+    """All experimental Ray actors must use a resource on remote nodes only."""
+    os.environ["CEDAR_RAY_REQUIRE_REMOTE"] = "1"
+    os.environ["CEDAR_PROFILE_BOUNDARY_MODEL"] = "1"
+    if not os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip():
+        os.environ[RAY_PLACEMENT_RESOURCE_ENV] = "cedar_remote"
+
+
+def validate_remote_ray_resource(resource_name: str, fraction: float) -> None:
+    if not ray.is_initialized():
+        return
+    driver_ip = ray.util.get_node_ip_address()
+    eligible = [node for node in ray.nodes()
+                if node.get("Alive") and
+                node.get("Resources", {}).get(resource_name, 0) >= fraction]
+    if not eligible or any(node.get("NodeManagerAddress") == driver_ip
+                           for node in eligible):
+        raise RuntimeError(
+            f"remote Ray resource {resource_name!r} must exist exclusively on "
+            f"remote nodes, not driver {driver_ip}; eligible nodes={eligible}"
+        )
+
+
 def get_ray_actor_options(
     num_gpus: float = 0.0, num_cpus: float = 1.0
 ) -> Dict[str, Any]:
@@ -85,6 +108,8 @@ def get_ray_actor_options(
         options["runtime_env"] = runtime_env
     resource_name = os.environ.get(RAY_PLACEMENT_RESOURCE_ENV, "").strip()
     if not resource_name:
+        if os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1":
+            raise RuntimeError("remote Ray experiments require a placement resource")
         return options
 
     raw_fraction = os.environ.get(
@@ -104,6 +129,8 @@ def get_ray_actor_options(
             f"{raw_fraction!r}"
         )
 
+    if os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1":
+        validate_remote_ray_resource(resource_name, fraction)
     options["resources"] = {resource_name: fraction}
     return options
 

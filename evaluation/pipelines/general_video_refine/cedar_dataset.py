@@ -15,7 +15,6 @@ from cedar.pipes import (
     FilterPipe,
     MapperPipe,
     Pipe,
-    PipeComputeScaling,
     PipeExecutionResource,
 )
 from cedar.sources import LocalLineSource
@@ -48,7 +47,6 @@ class GeneralVideoRefineFeature(Feature):
     def _per_record(
         pipe: Pipe, *, cuda: bool = False
     ) -> Pipe:
-        pipe.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         if cuda:
             pipe.set_execution_resource(PipeExecutionResource.CUDA)
         return pipe

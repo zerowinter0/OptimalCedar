@@ -68,11 +68,7 @@ class RayDataOptimizer(Optimizer):
             workers = max(1, int(fixed_workers))
         else:
             workers = max(1, int(self.physical_plan.n_local_workers or 1))
-        reserve_raw = os.environ.get("CEDAR_DP_RAY_CPU_RESERVE_PER_WORKER", "1")
-        try:
-            reserve = max(0, int(reserve_raw))
-        except ValueError:
-            reserve = 1
+        reserve = 0
         cores_per_worker = max(1, budget // workers)
         ray_per_worker = max(0, ray_budget // workers - reserve)
         return cores_per_worker, ray_per_worker

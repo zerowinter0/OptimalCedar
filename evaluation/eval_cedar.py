@@ -17,6 +17,7 @@ from evaluation.cedar_utils import CedarEvalSpec
 
 from evaluation.profiler import Profiler
 from cedar.utils.threading import limit_native_threadpools
+from cedar.pipes.ray_variant import configure_remote_ray_experiment
 
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,13 @@ def import_module_from_path(module_path: str):
 
 
 def _get_profiler(dataset_file: str, dataset_func: str, spec: CedarEvalSpec):
+    if spec.use_ray:
+        configure_remote_ray_experiment()
+        if not spec.run_profiling and spec.profiled_stats and not spec.disable_offload:
+            import yaml
+            from cedar.client.boundary_profiler import validate_remote_ray_boundary
+            with open(spec.profiled_stats) as stream:
+                validate_remote_ray_boundary(yaml.safe_load(stream))
     target_file = str(Path(dataset_file).resolve())
     module = import_module_from_path(target_file)
 
@@ -358,6 +366,8 @@ def main():
 
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level.upper())
+    if args.use_ray:
+        configure_remote_ray_experiment()
 
     mp_start_method = os.environ.get("CEDAR_MP_START_METHOD")
     if mp_start_method:

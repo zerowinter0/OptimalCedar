@@ -40,9 +40,13 @@ def test_affine_dp_index_matches_all_orders_with_size_and_selectivity():
 
 def test_affine_dp_worker_anchor_and_intercept():
     opt, (_, _, _, consumer) = affine_dp()
-    # Eight ms per arriving record at 50 bytes, 1/4 of source records arrive.
-    assert opt._dp_affine_worker_cost(consumer, 8, 100) == pytest.approx(3)
-    assert opt._calculate_pipe_cost(consumer, 100, None) == pytest.approx(7.5)
+    # The worker mean is measured at the profiled 50-byte input; the fitted
+    # kx+b shape (30 / 20) rescales it to 12 ms per processed record at 100 B.
+    assert opt._dp_affine_worker_cost(consumer, 8, 100) == pytest.approx(12)
+    # An operator is priced by its own kx+b value; the DP turns that per-record
+    # price into a per-source-record total through the surviving-record work
+    # product, so no cardinality is folded in here.
+    assert opt._calculate_pipe_cost(consumer, 100, None) == pytest.approx(30)
 
 
 def test_affine_dp_does_not_consult_old_classification():

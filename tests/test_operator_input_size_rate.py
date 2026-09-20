@@ -19,7 +19,7 @@ def test_log_size_reservoir_selects_ordered_real_snapshots():
     assert all(item.snapshot for item in selected)
 
 
-def test_stackexchange_benchmark_uses_real_order_and_both_scalings(tmp_path):
+def test_stackexchange_benchmark_uses_real_operator_order(tmp_path):
     dataset = tmp_path / "input.jsonl"
     dataset.write_text("{}\n")
 
@@ -29,5 +29,4 @@ def test_stackexchange_benchmark_uses_real_order_and_both_scalings(tmp_path):
     assert [stage.position for stage in stages] == list(range(1, 20))
     assert stages[0].tag == "parse"
     assert stages[-1].tag == "extract_text"
-    assert {stage.scaling for stage in stages} == {"per_data", "per_record"}
-    assert sum(stage.scaling == "per_record" for stage in stages) == 3
+    assert {stage.kind for stage in stages} == {"mapper", "filter"}

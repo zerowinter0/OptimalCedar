@@ -20,7 +20,6 @@ from cedar.pipes import (
     FilterPipe,
     MapperPipe,
     Pipe,
-    PipeComputeScaling,
 )
 from cedar.sources import LocalLineSource
 
@@ -364,24 +363,18 @@ class PileRecipeFeature(Feature):
         recipe = RECIPES[self.workload]
         fp = source_pipes[0]
         fp = MapperPipe(fp, ops.parse_json_line, tag="parse").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, ops.CleanEmailMapper(), tag="clean_email").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         if recipe.clean_links:
             fp = MapperPipe(
                 fp, ops.CleanLinksMapper(), tag="clean_links"
             ).fix()
-            fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(fp, ops.FixUnicodeMapper(), tag="fix_unicode").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, ops.PunctuationNormalizationMapper(), tag="normalize_punct"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
         fp = MapperPipe(
             fp, ops.WhitespaceNormalizationMapper(), tag="normalize_space"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_DATA)
 
         for filter_spec in recipe.filters:
             fp = FilterPipe(
@@ -389,18 +382,11 @@ class PileRecipeFeature(Feature):
                 make_filter(filter_spec),
                 tag=filter_spec.tag,
             )
-            fp.set_compute_scaling(
-                PipeComputeScaling.PER_RECORD
-                if filter_spec.operator == "TextLengthFilter"
-                else PipeComputeScaling.PER_DATA
-            )
 
         fp = MapperPipe(fp, ops.sync_text_key, tag="sync_text").fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         fp = MapperPipe(
             fp, ops.extract_output_text, tag="extract_text"
         ).fix()
-        fp.set_compute_scaling(PipeComputeScaling.PER_RECORD)
         return fp
 
 

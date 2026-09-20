@@ -133,17 +133,12 @@ def apply_profile_matched_resources(
         )
         local_worker_policy = "fixed_ablation"
 
-    local_reserve = int(
-        os.environ.get("CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1")
-    )
+    # Charge actual worker/stage CPUs only; no per-worker runtime reserve.
+    local_reserve = 0
     ray_cpu_budget = int(
         os.environ.get("CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET", str(cpu_budget))
     )
-    ray_reserve = int(
-        os.environ.get("CEDAR_DP_RAY_CPU_RESERVE_PER_WORKER", "1")
-    )
-    if local_reserve < 0 or ray_reserve < 0:
-        raise RuntimeError("Local and Ray CPU reserves must be non-negative.")
+    ray_reserve = 0
     if fixed_local_workers is None:
         # The optimizer chose the worker count, but that count may not fit the
         # physical pools once every stage of its own plan is instantiated

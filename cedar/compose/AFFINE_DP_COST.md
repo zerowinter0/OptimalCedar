@@ -1,25 +1,35 @@
 # Joint DP with affine operator costs
 
-Selector 2 (dp_optimizer) now collects the same local-only cm_model profile
-section as selector 16. Worker profiling, width measurements, the joint subset
-search, resource allocation, cache and transport models are retained.
+Every operator is priced by one measured equation, ``cost(record) =
+k * input_bytes + b``. The joint DP and the layered Simple-DP/PICO variants
+read the same fitted layer, ``physical_model.operator_affine``, which the
+default layered profiling protocol produces. Worker profiling, width
+measurements, the joint subset search, resource allocation, cache and
+transport models are retained.
 
 For each candidate prefix, x is bytes per surviving record and q is the
 surviving record fraction. Compute work is q * (k*x + b). Local fitted
 coefficients use milliseconds per byte and milliseconds per record. Remote
-backends retain DP's conservative measured/inferred baseline anchor, scaled by
-the local curve ratio. Width-dependent worker measurements use the same curve.
-Both slope and intercept are weighted by q; only x changes with content size.
+backends keep the isolated worker measurement as the anchor, rescaled to the
+candidate input size by the same curve. Width-dependent worker measurements use
+the same curve. Both slope and intercept are weighted by q; only x changes with
+content size.
 
-PERDATA/PERRECORD annotations are ignored when cm_model is present. Missing or
-unsupported operators in that section use an explicit constant estimate;
-insufficient size variation in profiling produces k=0 rather than an invented
-slope. For compatibility, profiles entirely missing cm_model emit a warning and
-retain the historical model. Regenerate them with selector 2 to upgrade.
+There is no per-data/per-record classification any more: an operator whose cost
+is flat in the payload is simply the k = 0 member of the same family, and
+profiling fits it instead of abstaining. Operators with no measured
+coefficients are listed in ``physical_model.operator_affine.unfitted_operators``;
+an optimizer that is asked to price one raises instead of falling back to
+byte-proportional compute. Cost controls that must reproduce Cedar's historical
+model (``old_dp_optimizer``, ``old_dp_boundary``, ``SimpleDpOptimizer``,
+``DpTwoStageOptimizer``, ``ExpOptimizer``) declare
+``uses_affine_operator_cost = False`` and are the only paths that still price
+compute by serialized byte volume.
 
-The existing outputs/cm_vs_cedar_simclr_20260911/profile.yaml contains cm_model
-and can be reused for DP. Regenerate cm_model to use controlled local image
-sweeps, validation and clamped extrapolation (see ../client/AFFINE_PROFILE.md).
-Sizes cover the whole record, not individual modality fields. Multiplicative
-size ratios and independent selectivities remain approximations. No additional
+Historical profiles may still carry ``cm_model`` (selector 2) and
+``operator_compute_scaling`` entries; both are ignored by the DP. Regenerate the
+layered profile to obtain the kx+b layer, using controlled local image sweeps,
+validation and clamped extrapolation (see ../client/AFFINE_PROFILE.md). Sizes
+cover the whole record, not individual modality fields. Multiplicative size
+ratios and independent selectivities remain approximations. No additional
 SMP/Ray size sweep is performed.

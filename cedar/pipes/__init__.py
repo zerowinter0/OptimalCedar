@@ -4,7 +4,6 @@ from cedar.pipes.common import (
     Partition,
     MutationError,
     CedarPipeSpec,
-    PipeComputeScaling,
     PipeExecutionResource,
     cedar_pipe,
 )
@@ -64,7 +63,6 @@ __all__ = [
     "NoopPipe",
     "Partition",
     "Pipe",
-    "PipeComputeScaling",
     "PipeExecutionResource",
     "PipeVariant",
     "PipeVariantContext",

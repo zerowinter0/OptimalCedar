@@ -23,7 +23,6 @@ from .context import (
 from .common import (
     MutationError,
     CedarPipeSpec,
-    PipeComputeScaling,
     PipeExecutionResource,
 )
 from .variant import (
@@ -85,11 +84,6 @@ class Pipe(abc.ABC):
         self.id = None  # for use by feature
         self.pipe_spec: Optional[CedarPipeSpec] = None
         self.tag = tag
-        # Optimizer-facing cost semantics. An unannotated operator defaults to
-        # data-scaled compute, but remains distinguishable from an explicit
-        # annotation so the optional profiler can infer its scaling mode.
-        self.compute_scaling = PipeComputeScaling.PER_DATA
-        self.compute_scaling_explicit = False
         self.execution_resource = PipeExecutionResource.CPU
 
         self.ok_to_mutate = threading.Event()
@@ -124,13 +118,6 @@ class Pipe(abc.ABC):
                 self._input_tf_spec = input_tf_spec
 
         self._pipes_to_fuse = None
-
-    def set_compute_scaling(
-        self, scaling: PipeComputeScaling
-    ) -> "Pipe":
-        self.compute_scaling = PipeComputeScaling(scaling)
-        self.compute_scaling_explicit = True
-        return self
 
     def set_execution_resource(
         self, resource: PipeExecutionResource

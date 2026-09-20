@@ -33,15 +33,30 @@ def main():
     parser.add_argument("--workloads", nargs="+", choices=WORKLOADS, default=WORKLOADS)
     parser.add_argument("--label", default=DEFAULT_LABEL)
     parser.add_argument("--optimizer-internal", default=DEFAULT_INTERNAL)
+    parser.add_argument("--profile-source-root", type=Path, default=None)
+    parser.add_argument("--input-source-root", type=Path, default=None)
     args = parser.parse_args()
     label = args.label
     internal = args.optimizer_internal
     root = args.output.resolve()
     modules, entry = prepare(root)
 
+    profile_sources = PROFILE_SOURCES
+    if args.profile_source_root is not None:
+        source_root = args.profile_source_root.resolve()
+        profile_sources = {
+            workload: source_root / workload / "profiles/shared.yaml"
+            for workload in WORKLOADS
+        }
+    input_source_root = args.input_source_root
+    if input_source_root is None and args.profile_source_root is not None:
+        input_source_root = args.profile_source_root.resolve() / "inputs"
+    if input_source_root is None:
+        input_source_root = SOURCE_INPUT_ROOT
+
     # Use exactly the finite JSONL subsets from the source experiment.
     for workload in ("llava_pretrain", "stackexchange"):
-        source = SOURCE_INPUT_ROOT / f"{workload}.jsonl"
+        source = input_source_root / f"{workload}.jsonl"
         shutil.copy2(source, root / "inputs" / source.name)
 
     env = {k: v for k, v in os.environ.items() if not k.startswith("CEDAR_")}
@@ -49,6 +64,7 @@ def main():
         PYTHONPATH=str(modules), OMP_NUM_THREADS="1", MKL_NUM_THREADS="1",
         OPENBLAS_NUM_THREADS="1", NUMEXPR_NUM_THREADS="1",
         CEDAR_RAY_PLACEMENT_RESOURCE="cedar_remote",
+        CEDAR_RAY_REQUIRE_REMOTE="1",
         CEDAR_DATA_JUICER_ROOT=str(REPO / "data-juicer"),
         HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
         CEDAR_PROFILE_BOUNDARY_MODEL="1", CEDAR_REUSE_BOUNDARY_MODEL="0",
@@ -61,8 +77,8 @@ def main():
 
     source_profiles = {
         workload: {
-            "path": str(PROFILE_SOURCES[workload]),
-            "sha256": sha(PROFILE_SOURCES[workload]),
+            "path": str(profile_sources[workload]),
+            "sha256": sha(profile_sources[workload]),
         }
         for workload in args.workloads
     }
@@ -81,7 +97,12 @@ def main():
         "fixed_W": None,
         "cell_timeout_sec": 3600,
         "profile_policy": "reuse_exact_frozen_profile_without_reprofiling",
+        "profile_source_root": (
+            str(args.profile_source_root.resolve())
+            if args.profile_source_root is not None else None
+        ),
         "profile_sources": source_profiles,
+        "input_source_root": str(input_source_root),
         "input_sha256": {
             p.name: sha(p) for p in (root / "inputs").glob("*.jsonl")
         },
@@ -104,8 +125,10 @@ def main():
         for name in ("profiles", "plans", "results", "logs", "warmup_results", "cache"):
             (work / name).mkdir(parents=True, exist_ok=True)
         profile = work / "profiles/shared.yaml"
-        shutil.copy2(PROFILE_SOURCES[workload], profile)
+        shutil.copy2(profile_sources[workload], profile)
         profile_data = yaml.safe_load(profile.read_text())
+        from cedar.client.boundary_profiler import validate_remote_ray_boundary
+        validate_remote_ray_boundary(profile_data)
         signature = profile_data.get("resource_config", {})
         if any(signature.get(key) != 1 for key in
                ("profile_local_workers", "ray_actors_per_stage", "smp_procs_per_stage")):
@@ -116,7 +139,7 @@ def main():
         state[workload] = {
             "profile": {
                 "status": "reused", "path": str(profile),
-                "source": str(PROFILE_SOURCES[workload]), "sha256": sha(profile),
+                "source": str(profile_sources[workload]), "sha256": sha(profile),
             },
             "cells": [],
         }

@@ -104,17 +104,6 @@ def capture_profile_input(p_id: Optional[int], value: Any) -> None:
         reservoir.capture(p_id, value)
 
 
-class PipeComputeScaling(str, Enum):
-    """Quantity that determines how an operator's compute cost scales."""
-
-    PER_DATA = "per_data"
-    # Backwards-compatible spelling used by profiles and workloads created
-    # before operator-level scaling was introduced.  Both data-scaled values
-    # have identical optimizer semantics.
-    PER_BYTE = "per_byte"
-    PER_RECORD = "per_record"
-
-
 class PipeExecutionResource(str, Enum):
     """Exclusive execution resource required by an operator."""
 

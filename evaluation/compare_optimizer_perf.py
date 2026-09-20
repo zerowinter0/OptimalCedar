@@ -33,19 +33,24 @@ from evaluation.eval_cedar import _get_profiler as _get_workload_runner
 from evaluation.eval_cedar import import_module_from_path
 from cedar.compose.dp_optimizer import DpOptimizer
 from cedar.compose.optimizer import Optimizer
+from cedar.pipes.ray_variant import configure_remote_ray_experiment
+from cedar.client.boundary_profiler import validate_remote_ray_boundary
 
 
 logger = logging.getLogger(__name__)
 
 
 OPTIMIZERS = {
-    "simple_dp_workers": 20,
+    "simple_dp": 29,
     "simple_dp_boundary": 21,
-    "simple_dp_variant": 22,
-    "simple_dp_width": 23,
     "unopti": 24,
+    # Legacy-profile counterpart of ``simple_dp``: same boundary-free DP, but
+    # priced from the entries Cedar's own optimizer reads (baseline latencies
+    # and whole-pipeline offload throughput) instead of the isolated layers.
+    "old_dp_legacy_optimizer": 11,
     "simple_dp_workers_boundary": 25,
-    "simple_dp_max_workers_boundary": 26,
+    "simple_dp_workers_width_boundary": 27,
+    "old_dp_boundary": 28,
     "dj_optimizer": 3,
     "optimizer": 0,
     "cm_optimizer": 16,
@@ -62,7 +67,6 @@ OPTIMIZERS = {
     "pecan_optimizer": 8,
     "pecan_two_stage_optimizer": 9,
     "dj_two_stage_optimizer": 10,
-    "simple_dp_optimizer": 11,
     "simple_dp_ray_candidate_optimizer": 15,
 }
 
@@ -410,6 +414,11 @@ def _query_ray_resources(
             ray.init(address, ignore_reinit_error=True)
         else:
             ray.init(ignore_reinit_error=True)
+        from cedar.pipes.ray_variant import validate_remote_ray_resource
+        validate_remote_ray_resource(
+            os.environ.get("CEDAR_RAY_PLACEMENT_RESOURCE", "cedar_remote"),
+            float(os.environ.get("CEDAR_RAY_PLACEMENT_RESOURCE_FRACTION", "0.001")),
+        )
         result_queue.put(("ok", dict(ray.cluster_resources())))
     except BaseException as exc:
         result_queue.put(("error", repr(exc)))
@@ -1429,6 +1438,11 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level.upper())
     _normalize_ray_args(args)
+    if args.use_ray:
+        configure_remote_ray_experiment()
+        if not args.disable_offload:
+            with open(args.profiled_stats) as stream:
+                validate_remote_ray_boundary(yaml.safe_load(stream))
     if args.num_repeats < 1:
         raise ValueError("--num_repeats must be >= 1")
     if args.cpu_budget < 1:

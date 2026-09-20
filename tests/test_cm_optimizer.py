@@ -39,6 +39,17 @@ def setup():
         "offloads": {"RAY": {b: {"throughput": 110,
             "backend_compute": {"count": 100, "mean_ms_per_sample": 8}}}},
         "disk_info": {"read_latency": 0, "write_latency": 0},
+        # The joint DP prices every operator with the same kx+b coefficients
+        # the cm model fits, so both consumers of this fixture agree.
+        "physical_model": {"operator_affine": {"schema_version": 1,
+            "operators": {
+                str(a): {"k_ms_per_byte": .1, "b_ms": 2,
+                         "x_reference_bytes": 100.0},
+                str(f): {"k_ms_per_byte": 0.0, "b_ms": 5,
+                         "x_reference_bytes": 50.0},
+                str(b): {"k_ms_per_byte": .2, "b_ms": 10,
+                         "x_reference_bytes": 50.0},
+            }}},
         "cm_model": {"schema_version": 1, "operators": {
             a: {"k": .1, "b": 2}, f: {"k": 0, "b": 5}, b: {"k": .2, "b": 10}}}}
     opt = CmOptimizer()

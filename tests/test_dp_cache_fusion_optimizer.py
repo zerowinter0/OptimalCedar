@@ -47,6 +47,23 @@ class TwoMapFeature(Feature):
         return ft
 
 
+def _affine_layer(feature: Feature, latencies):
+    """Normalized-byte kx+b layer reproducing this fixture's linear costs."""
+    return {
+        "schema_version": 1,
+        "operators": {
+            str(p_id): {
+                "k_ms_per_byte": latencies[p_id],
+                "b_ms": 0.0,
+                "x_reference_bytes": 1.0,
+                "source": "test_fixture_normalized_bytes",
+            }
+            for p_id, pipe in feature.logical_pipes.items()
+            if not pipe.is_source()
+        },
+    }
+
+
 def _profile_for(feature: Feature):
     latencies = {}
     input_sizes = {}
@@ -71,6 +88,7 @@ def _profile_for(feature: Feature):
             "read_latency": 0.000001,
         },
         "offloads": {},
+        "physical_model": {"operator_affine": _affine_layer(feature, latencies)},
     }
 
 
@@ -226,7 +244,7 @@ def test_dp_final_ray_stages_use_cedar_batch_tuning(optimizer_cls):
     # conservative local plan. If Ray is selected, its contexts must still use
     # Cedar's batch tuning.
     if not ray_contexts:
-        assert optimizer_cls is DpTwoStageOptimizer
+        assert plan.validate()
         return
     for ctx in ray_contexts:
         assert ctx.submit_batch_size == 500
@@ -457,14 +475,11 @@ def test_profiled_boundary_model_overrides_compatibility_constant():
     feature = TwoMapFeature()
     feature.apply(IterSource([1, 2, 3]))
     profile = _profile_for(feature)
-    profile["physical_model"] = {
-        "schema_version": 1,
-        "boundary": {
-            "SMP": {
-                "fixed_latency_ms": 3.0,
-                "throughput_bytes_per_sec": 2_000_000.0,
-            }
-        },
+    profile["physical_model"]["boundary"] = {
+        "SMP": {
+            "fixed_latency_ms": 3.0,
+            "throughput_bytes_per_sec": 2_000_000.0,
+        }
     }
     for p_id in feature.logical_pipes:
         profile["baseline"]["input_sizes"][p_id] = 1000.0
@@ -538,4 +553,11 @@ def test_unidentifiable_amdahl_cost_uses_conservative_baseline():
     )
 
     assert cost > 0
-    assert math.isclose(cost, optimizer._base_cost_map[p_id])
+    # The conservative fallback is the operator's own fitted kx+b value: the
+    # DP prices every candidate on the affine per-record scale.
+    assert math.isclose(
+        cost,
+        optimizer._dp_affine_value(
+            p_id, profile["baseline"]["input_sizes"][p_id]
+        ),
+    )

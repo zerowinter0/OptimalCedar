@@ -18,16 +18,82 @@ from .utils import (
     derive_constraint_graph,
     get_fixed_pipes,
     flip_adj_list,
+    topological_sort,
 )
 from cedar.pipes import (
     Pipe,
-    PipeComputeScaling,
     PipeExecutionResource,
     PipeVariantContextFactory,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+def fit_width_curve(measured: Dict[int, float]) -> Optional[Dict[str, Any]]:
+    """Fit ``cost(actors) = c / actors ** p`` on measured actor widths.
+
+    The profile measures a stage only at a few widths, while the joint W and
+    width search must price every width its resource slice allows.  A two
+    parameter curve is the smallest model the measurements identify: the
+    exponent is the per-operator version of the fan-out exponent the DP
+    already applies, and the measured points themselves always win over the
+    fit.  Non-monotone observations are made order preserving first (a wider
+    stage that measures slower is a contended sample, not a real minimum), and
+    the residual is reported so a poor fit is visible in the profile.
+    """
+    points = sorted(
+        (int(width), float(cost))
+        for width, cost in (measured or {}).items()
+        if int(width) >= 1 and math.isfinite(float(cost)) and float(cost) > 0.0
+    )
+    if len(points) < 2 or len({width for width, _ in points}) < 2:
+        return None
+    monotone_adjusted = False
+    order_preserving: List[Tuple[int, float]] = []
+    running_min = math.inf
+    for width, cost in points:
+        if cost > running_min:
+            cost = running_min
+            monotone_adjusted = True
+        running_min = min(running_min, cost)
+        order_preserving.append((width, cost))
+    widths = [width for width, _ in order_preserving]
+    costs = [cost for _, cost in order_preserving]
+    logs_x = [math.log(width) for width in widths]
+    logs_y = [math.log(cost) for cost in costs]
+    n = len(widths)
+    mean_x = sum(logs_x) / n
+    mean_y = sum(logs_y) / n
+    denominator = sum((value - mean_x) ** 2 for value in logs_x)
+    if denominator <= 0.0:
+        return None
+    slope = sum(
+        (x - mean_x) * (y - mean_y) for x, y in zip(logs_x, logs_y)
+    ) / denominator
+    exponent = min(1.5, max(0.0, -slope))
+    intercept = mean_y + exponent * mean_x
+    intercept = min(
+        intercept, min(math.log(cost) + exponent * math.log(width)
+                       for width, cost in order_preserving)
+    )
+    scale = math.exp(intercept)
+    fitted = [
+        scale / (width ** exponent) for width in widths
+    ]
+    residual = sum(
+        (math.log(max(value, 1e-12)) - math.log(max(fit, 1e-12))) ** 2
+        for value, fit in zip(costs, fitted)
+    )
+    total = sum((math.log(cost) - mean_y) ** 2 for cost in costs)
+    return {
+        "scale_ms": scale,
+        "exponent": exponent,
+        "r_squared": 1.0 - residual / total if total > 0.0 else 1.0,
+        "points": [[width, cost] for width, cost in order_preserving],
+        "monotone_adjusted": monotone_adjusted,
+        "method": "log_log_least_squares_non_increasing",
+    }
 
 
 class _LazyProductTable:
@@ -93,6 +159,10 @@ class MyOptimizer(Optimizer):
     - 保持接口与整体生命周期不变（`init` → `run`），以方便在现有测试上 A/B。
     """
 
+    # Every priced operator carries measured ``kx+b`` coefficients, so the DP
+    # never chooses between a per-data and a per-record cost regime.
+    uses_affine_operator_cost = True
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -105,9 +175,9 @@ class MyOptimizer(Optimizer):
         self._dp_selectivities: List[float] = []
         self._dp_cardinality_prod: List[float] = []
         self._dp_volume_prod: List[float] = []
-        self._dp_compute_scalings: List[PipeComputeScaling] = []
         self._dp_profiled_input_cardinality: Dict[int, float] = {}
-        self._dp_compute_scaling = PipeComputeScaling.PER_DATA
+        self._dp_co_run_factors: Dict[int, float] = {}
+        self._dp_width_curve_cache: Dict[Tuple[int, str, str], Any] = {}
         self._pending_fusion_blocks: List[List[int]] = []
         self._pending_fusion_variants: Dict[Tuple[int, ...], PipeVariantType] = {}
         self._invalid_cost_warnings: Set[Tuple[int, PipeVariantType]] = set()
@@ -239,22 +309,29 @@ class MyOptimizer(Optimizer):
     def _calculate_pipe_cost(
         self, p_id: int, input_size: float, desc: Optional[PipeDesc]
     ) -> float:
-        """Conservatively combine worker and end-to-end backend measurements.
+        """Price one operator at ``input_size`` with its fitted ``kx+b``.
 
-        Direct worker timings isolate compute but omit IPC, queueing and
-        serialization.  A valid Amdahl inverse includes those runtime costs,
-        but can become unidentifiable near its singularity.  Use the larger
-        of the direct-compute sample mean and a valid end-to-end inverse;
-        if only one is valid, retain it.  When neither is identifiable, fall
-        back to the measured in-process cost rather than inventing speedup.
+        Every candidate is expressed in the same unit the DP cost index uses:
+        the expected cost one source record pays for this operator.  The
+        fitted per-record cost is therefore multiplied by the number of
+        records that reach the operator in the profiled plan.  Backend
+        measurements are worker-side per-processed-record timings, so they
+        are rescaled by the same affine shape before they are compared with
+        the local affine price.
         """
+        if not self.uses_affine_operator_cost:
+            # Historical cost-model control: Cedar's own per-byte scaling and
+            # whole-pipeline Amdahl inversion.
+            return Optimizer._calculate_pipe_cost(self, p_id, input_size, desc)
+        co_run = self._dp_co_run_factor(p_id)
+        reference = float(
+            self.profiled_stats["baseline"]["input_sizes"][p_id]
+        )
+        local_cost = self._dp_affine_value(p_id, input_size) * co_run
         if desc is None or desc.variant_type in (
             None,
             PipeVariantType.INPROCESS,
         ):
-            baseline_cost = super()._calculate_pipe_cost(
-                p_id, input_size, desc
-            )
             # Formal execution replicates every local INPROCESS operator in
             # W worker processes. Worker-side SMP timing at width W executes
             # the same Python callable in W independent processes and excludes
@@ -264,21 +341,15 @@ class MyOptimizer(Optimizer):
                 p_id, PipeVariantType.SMP, input_size
             )
             if width_cost is not None:
-                return max(baseline_cost, width_cost)
-            return baseline_cost
-        baseline_input = self.profiled_stats["baseline"]["input_sizes"][p_id]
-        baseline_cost = (
-            input_size / baseline_input * self._base_cost_map[p_id]
-            if baseline_input > 0
-            else self._base_cost_map[p_id]
-        )
-        backend_entry = self.profiled_stats.get("offloads", {}).get(
-            desc.variant_type.name, {}
-        ).get(p_id)
-        if backend_entry is None:
-            backend_entry = self.profiled_stats.get("offloads", {}).get(
+                return max(local_cost, width_cost)
+            return local_cost
+
+        backend_entry = self._profile_entry(
+            self.profiled_stats.get("offloads", {}).get(
                 desc.variant_type.name, {}
-            ).get(str(p_id))
+            ),
+            p_id,
+        )
         direct = (
             backend_entry.get("backend_compute")
             if isinstance(backend_entry, dict)
@@ -306,19 +377,10 @@ class MyOptimizer(Optimizer):
                 # accuracy/error-bar reporting; adding a per-operator 95% UCB
                 # here systematically rejects useful offloads when only a few
                 # actor batches were observed.
-                direct_cost = mean
-                scaling = self._dp_compute_scaling_for_pipe(p_id)
-                if scaling == PipeComputeScaling.PER_RECORD:
-                    # Worker timing is per processed record. Convert it to the
-                    # profiled per-source-record total expected by
-                    # _BlockCostIndex; the index then removes this original
-                    # cardinality before applying the reordered cardinality.
-                    direct_cost *= self._dp_profiled_input_cardinality.get(
-                        p_id, 1.0
-                    )
-                elif baseline_input > 0:
-                    direct_cost *= input_size / baseline_input
-                direct_cost = max(direct_cost, 1e-12)
+                direct_cost = max(
+                    self._dp_affine_worker_cost(p_id, mean, input_size),
+                    1e-12,
+                )
 
         width_cost = self._dp_profiled_width_compute_cost(
             p_id, desc.variant_type, input_size
@@ -330,32 +392,49 @@ class MyOptimizer(Optimizer):
                 else max(direct_cost, width_cost)
             )
 
-        inferred_cost = super()._calculate_pipe_cost(p_id, input_size, desc)
+        # Keep the measured whole-pipeline offload anchor as an upper bound.
+        # Cedar expresses that anchor as the pipe's share of the baseline
+        # throughput, so convert it to the affine per-record scale before it is
+        # compared with the isolated worker measurements, then rescale it to
+        # the candidate input size with the fitted kx+b shape.
+        inferred_cost = Optimizer._calculate_pipe_cost(
+            self, p_id, reference, desc
+        )
+        legacy_reference = float(self._base_cost_map[p_id])
+        if inferred_cost > 0.0 and legacy_reference > 0.0:
+            inferred_cost *= (
+                self._dp_affine_value(p_id, reference) / legacy_reference
+            )
+        if inferred_cost > 0 and math.isfinite(inferred_cost):
+            shape = self._dp_affine_value(
+                p_id, input_size
+            ) / self._dp_affine_value(p_id, reference)
+            inferred_cost *= shape * co_run
         inferred_valid = inferred_cost > 0 and math.isfinite(inferred_cost)
         if direct_cost is not None and inferred_valid:
             return self._clamp_backend_speedup(
                 p_id, desc.variant_type, max(direct_cost, inferred_cost),
-                baseline_cost,
+                local_cost,
             )
         if direct_cost is not None:
             return self._clamp_backend_speedup(
-                p_id, desc.variant_type, direct_cost, baseline_cost
+                p_id, desc.variant_type, direct_cost, local_cost
             )
         if inferred_valid:
             return self._clamp_backend_speedup(
-                p_id, desc.variant_type, inferred_cost, baseline_cost
+                p_id, desc.variant_type, inferred_cost, local_cost
             )
         warning_key = (p_id, desc.variant_type)
         if warning_key not in self._invalid_cost_warnings:
             self._invalid_cost_warnings.add(warning_key)
             logger.warning(
                 "[MyOptimizer] Invalid inferred %s cost for pipe %s; "
-                "using conservative INPROCESS cost (first value %s).",
+                "using the fitted affine cost (first value %s).",
                 desc.variant_type.name,
                 p_id,
-                baseline_cost,
+                local_cost,
             )
-        return max(baseline_cost, 1e-12)
+        return max(local_cost, 1e-12)
 
     def _clamp_backend_speedup(
         self,
@@ -465,22 +544,118 @@ class MyOptimizer(Optimizer):
                 )
             ),
         )
-        mean = self._dp_scaling_mean(entry, target_width)
+        mean = self._dp_scaling_cost(
+            entry,
+            p_id,
+            variant_type,
+            target_width,
+            "mean_ms_per_sample",
+        )
         if mean is None:
             return None
 
         baseline_input = float(
             self.profiled_stats["baseline"]["input_sizes"][p_id]
         )
-        cost = mean
-        if getattr(self, "_dp_affine_enabled", False):
-            return self._dp_affine_worker_cost(p_id, mean, input_size)
-        scaling = self._dp_compute_scaling_for_pipe(p_id)
-        if scaling == PipeComputeScaling.PER_RECORD:
-            cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
-        elif baseline_input > 0:
-            cost *= input_size / baseline_input
-        return max(cost, 1e-12)
+        if baseline_input <= 0.0:
+            return max(mean, 1e-12)
+        return max(self._dp_affine_worker_cost(p_id, mean, input_size), 1e-12)
+
+    @staticmethod
+    def _scaling_points(
+        entry: Any, metric: str, require_converged: bool
+    ) -> List[Tuple[int, float]]:
+        """Measured (width, cost) points of one stage curve."""
+        if not isinstance(entry, dict):
+            return []
+        raw_widths = entry.get("widths")
+        timings = raw_widths if isinstance(raw_widths, dict) else None
+        if timings is None:
+            timings = {}
+            adaptive = entry.get("adaptive_profile", {})
+            if isinstance(adaptive, dict) and "width" in adaptive:
+                timings[adaptive["width"]] = entry
+        points: List[Tuple[int, float]] = []
+        for raw_width, timing in timings.items():
+            if not isinstance(timing, dict):
+                continue
+            if require_converged:
+                adaptive = timing.get("adaptive_profile", {})
+                if (
+                    not isinstance(adaptive, dict)
+                    or adaptive.get("converged") is not True
+                ):
+                    continue
+            try:
+                width = int(raw_width)
+                value = float(timing[metric])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if width >= 1 and math.isfinite(value) and value >= 0.0:
+                points.append((width, value))
+        points.sort()
+        return points
+
+    def _dp_width_curve(
+        self,
+        entry: Any,
+        p_id: int,
+        variant_type: PipeVariantType,
+        metric: str,
+        require_converged: bool,
+    ) -> Optional[Dict[str, Any]]:
+        """Fitted width curve of one stage, cached per profile entry."""
+        key = (
+            PipeVariantType.RAY.name
+            if variant_type == PipeVariantType.TF_RAY
+            else variant_type.name
+        )
+        cache_key = (p_id, key, metric)
+        cached = self._dp_width_curve_cache.get(cache_key)
+        if cached is not None:
+            return cached if cached != "missing" else None
+        measured = dict(
+            self._scaling_points(entry, metric, require_converged)
+        )
+        recorded = entry.get("fit") if isinstance(entry, dict) else None
+        fit = recorded if isinstance(recorded, dict) else None
+        if fit is None:
+            fit = fit_width_curve(measured)
+        self._dp_width_curve_cache[cache_key] = (
+            fit if fit is not None else "missing"
+        )
+        return fit
+
+    def _dp_scaling_cost(
+        self,
+        entry: Any,
+        p_id: int,
+        variant_type: PipeVariantType,
+        width: int,
+        metric: str,
+        require_converged: bool = True,
+    ) -> Optional[float]:
+        """Price one stage width: measured points first, fitted curve second.
+
+        A fitted value is used only inside a bounded neighbourhood of the
+        measured range; beyond that the measured anchor is kept, because the
+        marginal actor stops buying throughput once the host's memory
+        bandwidth or the shared device saturates.
+        """
+        points = self._scaling_points(entry, metric, require_converged)
+        for measured_width, value in points:
+            if measured_width == width:
+                return value
+        fit = self._dp_width_curve(
+            entry, p_id, variant_type, metric, require_converged
+        )
+        if fit is not None and points:
+            widest = points[-1][0]
+            if width <= 4 * widest:
+                return float(fit["scale_ms"]) / (width ** float(fit["exponent"]))
+        if metric == "end_to_end_ms_per_input_sample":
+            return self._dp_scaling_end_to_end(entry, width)
+        return self._dp_scaling_mean(entry, width)
 
     @staticmethod
     def _dp_scaling_end_to_end(
@@ -548,7 +723,14 @@ class MyOptimizer(Optimizer):
         if not isinstance(entries, dict):
             return None
         entry = entries.get(p_id, entries.get(str(p_id)))
-        return self._dp_scaling_end_to_end(entry, width)
+        return self._dp_scaling_cost(
+            entry,
+            p_id,
+            variant,
+            width,
+            "end_to_end_ms_per_input_sample",
+            require_converged=False,
+        )
 
     @staticmethod
     def _dp_scaling_mean(
@@ -719,44 +901,21 @@ class MyOptimizer(Optimizer):
                 family_total = int(assumed_total)
             contention_parallelism = max(parallelism, family_total)
         global_concurrency = formal_workers * contention_parallelism
-        mean = self._dp_scaling_mean(entry, global_concurrency)
+        mean = self._dp_scaling_cost(
+            entry,
+            p_id,
+            variant_type,
+            global_concurrency,
+            "mean_ms_per_sample",
+        )
         if mean is None:
             return width_one_cost
         baseline_input = float(
             self.profiled_stats["baseline"]["input_sizes"][p_id]
         )
-        cost = mean
-        if getattr(self, "_dp_affine_enabled", False):
-            return self._dp_affine_worker_cost(p_id, mean, baseline_input)
-        scaling = self._dp_compute_scaling_for_pipe(p_id)
-        if scaling == PipeComputeScaling.PER_RECORD:
-            cost *= self._dp_profiled_input_cardinality.get(p_id, 1.0)
-        elif baseline_input <= 0:
+        if baseline_input <= 0.0:
             return width_one_cost
-        return max(cost, 1e-12)
-
-    def _dp_compute_scaling_for_pipe(
-        self, p_id: int
-    ) -> PipeComputeScaling:
-        if self.logical_pipes is not None and p_id in self.logical_pipes:
-            pipe = self.logical_pipes[p_id]
-            if getattr(pipe, "compute_scaling_explicit", False):
-                return pipe.compute_scaling
-        entry = self.profiled_stats.get("operator_compute_scaling", {}).get(
-            p_id
-        )
-        if entry is None:
-            entry = self.profiled_stats.get(
-                "operator_compute_scaling", {}
-            ).get(str(p_id))
-        if isinstance(entry, dict):
-            entry = entry.get("scaling")
-        if entry is not None:
-            try:
-                return PipeComputeScaling(entry)
-            except ValueError:
-                pass
-        return PipeComputeScaling.PER_DATA
+        return max(self._dp_affine_worker_cost(p_id, mean, baseline_input), 1e-12)
 
     def _dp_observed_selectivities(self) -> Dict[int, float]:
         """Return baseline selectivities with offload-count fallback.
@@ -981,6 +1140,10 @@ class MyOptimizer(Optimizer):
         return model if isinstance(model, dict) else None
 
     def _dp_boundary_throughput(self, variant: PipeVariantType) -> Optional[float]:
+        if (variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY)
+                and os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1"):
+            from cedar.client.boundary_profiler import validate_remote_ray_boundary
+            validate_remote_ray_boundary(self.profiled_stats)
         model = self._dp_boundary_profile(variant)
         if model is not None:
             try:
@@ -1294,69 +1457,125 @@ class MyOptimizer(Optimizer):
             return volume_prod[mask]
         return self._dp_r_prod[mask]
 
-    def _dp_compute_scaling_for_idx(
-        self, operator_idx: Optional[int]
-    ) -> PipeComputeScaling:
+    @staticmethod
+    def _profile_entry(mapping: Any, p_id: int) -> Any:
+        if not isinstance(mapping, dict):
+            return None
+        return mapping.get(p_id, mapping.get(str(p_id)))
+
+    def _dp_operator_affine(self, p_id: int) -> Dict[str, float]:
+        """Return the fitted ``k, b, x_reference`` of one operator.
+
+        The shared layered profile fits every operator as
+        ``cost(record) = k * input_bytes + b``; there is no second cost
+        regime, so an operator without fitted coefficients is a profile
+        error rather than a licence to fall back to byte-proportional cost.
+        """
+        section = self.profiled_stats.get("physical_model", {})
+        section = section.get("operator_affine") if isinstance(section, dict) else None
+        operators = (
+            section.get("operators") if isinstance(section, dict) else None
+        )
+        model = self._profile_entry(operators, p_id)
+        if not isinstance(model, dict):
+            raise RuntimeError(
+                f"Operator {p_id} has no fitted kx+b in "
+                "physical_model.operator_affine; every priced operator must "
+                "be calibrated (regenerate the layered profile)"
+            )
+        try:
+            k = float(model["k_ms_per_byte"])
+            b = float(model["b_ms"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Incomplete affine coefficients for pipe {p_id}: {model!r}"
+            ) from exc
         if (
-            operator_idx is not None
-            and operator_idx < len(self._dp_compute_scalings)
+            not math.isfinite(k)
+            or not math.isfinite(b)
+            or k < 0.0
+            or b < 0.0
         ):
-            return self._dp_compute_scalings[operator_idx]
-        return self._dp_compute_scaling
+            raise RuntimeError(
+                f"Invalid affine coefficients for pipe {p_id}: k={k}, b={b}"
+            )
+        reference = model.get("x_reference_bytes")
+        if reference is None:
+            reference = self.profiled_stats["baseline"]["input_sizes"][p_id]
+        reference = float(reference)
+        if not math.isfinite(reference) or reference <= 0.0:
+            raise RuntimeError(
+                f"Invalid affine reference size for pipe {p_id}: {reference!r}"
+            )
+        return {"k": k, "b": b, "x_reference": reference}
+
+    def _dp_affine_value(self, p_id: int, input_size: float) -> float:
+        """Per-record compute cost ``k * input_bytes + b`` for one operator."""
+        model = self._dp_operator_affine(p_id)
+        return model["k"] * float(input_size) + model["b"]
+
+    def _dp_co_run_factor(self, p_id: int) -> float:
+        """Measured in-plan service divided by the modeled isolated service."""
+        if not self._dp_co_run_factors:
+            calibration = self.profiled_stats.get("calibration", {})
+            factors = (
+                calibration.get("co_run_factors", {})
+                if isinstance(calibration, dict)
+                else {}
+            )
+            self._dp_co_run_factors = factors if isinstance(factors, dict) else {}
+        raw = self._profile_entry(self._dp_co_run_factors, p_id)
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return 1.0
+        if not math.isfinite(value) or value <= 0.0:
+            return 1.0
+        return value
+
+    def _dp_affine_worker_cost(
+        self, p_id: int, mean_ms_per_record: float, input_size: float
+    ) -> float:
+        """Scale a measured per-record worker cost to the DP's cost basis.
+
+        The measured mean is the operator's cost at the profiled input size;
+        the DP needs the cost per source record at the candidate position, so
+        the measured mean is scaled by the fitted ``kx+b`` shape and by the
+        cardinality that reaches the operator in the profiled plan.
+        """
+        reference = float(
+            self.profiled_stats["baseline"]["input_sizes"][p_id]
+        )
+        y0 = self._dp_affine_value(p_id, reference)
+        shape = (
+            self._dp_affine_value(p_id, input_size) / y0
+            if y0 > 0.0
+            else 1.0
+        )
+        return (
+            mean_ms_per_record * shape * self._dp_co_run_factor(p_id)
+        )
 
     def _dp_compute_work_prod(
         self, mask: int, operator_idx: Optional[int] = None
     ) -> float:
-        """Return the multiplier appropriate for operator compute work.
+        """Aggregate compute work of one operator over the records it sees.
 
-        Cedar historically scales compute by serialized byte volume.  An
-        operator annotated as per-record instead scales only by the number of
-        surviving records. Stage boundaries and cache I/O continue to use
+        Every operator is priced by its fitted ``kx+b``: the work product is
+        the number of surviving records times the per-record cost at the item
+        size reaching the operator. Stage boundaries and cache I/O keep using
         :meth:`_dp_work_prod` and therefore remain byte based.
         """
-        if (
-            self._dp_compute_scaling_for_idx(operator_idx)
-            == PipeComputeScaling.PER_RECORD
-        ):
-            return self._dp_cardinality_prod[mask]
-        return self._dp_work_prod(mask)
-
-    def _dp_operator_fixed_fraction(self, p_id: int) -> float:
-        """Size-independent share of an operator's profiled cost.
-
-        ``physical_model.operator_affine`` fits ``cost = k * input_bytes + b``
-        per operator on the smallest and largest legal inputs that reached it.
-        The DP prices an operator by the byte volume reaching it, which assumes
-        the whole cost shrinks with the input; ``b`` is the part that does not.
-        Returning 0 keeps the historical behaviour for old profiles.
-        """
-        raw = os.environ.get("CEDAR_DP_OPERATOR_AFFINE")
-        if raw is not None and raw.strip() not in (
-            "1",
-            "true",
-            "True",
-            "yes",
-        ):
-            return 0.0
-        entry = (
-            self.profiled_stats.get("physical_model", {})
-            .get("operator_affine", {})
+        if operator_idx is None or not self.uses_affine_operator_cost:
+            return self._dp_work_prod(mask)
+        p_id = self._dp_inner_ops[operator_idx]
+        source_size = self.profiled_stats["baseline"]["output_sizes"][
+            self._get_source_p_id()
+        ]
+        item_size = source_size * self._dp_r_prod[mask]
+        return self._dp_cardinality_prod[mask] * self._dp_affine_value(
+            p_id, item_size
         )
-        if not isinstance(entry, dict):
-            return 0.0
-        operators = entry.get("operators", entry)
-        if not isinstance(operators, dict):
-            return 0.0
-        record = operators.get(p_id, operators.get(str(p_id)))
-        if not isinstance(record, dict):
-            return 0.0
-        try:
-            fraction = float(record["fixed_fraction"])
-        except (KeyError, TypeError, ValueError):
-            return 0.0
-        if not math.isfinite(fraction) or fraction <= 0.0:
-            return 0.0
-        return min(fraction, 0.95)
 
     def _dp_backend_width_speedup(
         self, p_id: int, family: str, width: int
@@ -1419,27 +1638,24 @@ class MyOptimizer(Optimizer):
         """Normalize a profiled cost without changing its baseline value.
 
         ``_BlockCostIndex`` stores costs per source byte and multiplies the
-        final sum by ``source_size``. For per-record work, divide by the
-        cardinality at the operator's original position as well as the source
-        size. This makes the estimated cost at that original position exactly
-        equal to its profiled cost while removing unrelated item-size growth.
+        final sum by ``source_size``. Dividing by the source size, the
+        cardinality that reached the operator in the profiled plan and its
+        fitted ``k * input_bytes + b`` makes the estimated cost at that
+        original position exactly equal to the profiled cost, while every
+        reordered position is priced by the same affine coefficients.
         """
-        if (
-            self._dp_compute_scaling_for_idx(operator_idx)
-            == PipeComputeScaling.PER_RECORD
-        ):
-            if operator_idx < len(self._dp_inner_ops):
-                p_id = self._dp_inner_ops[operator_idx]
-                profiled_cardinality = (
-                    self._dp_profiled_input_cardinality.get(p_id)
-                )
-                if profiled_cardinality is not None:
-                    return source_size * profiled_cardinality
-            # Compatibility fallback for isolated unit-test stubs and old
-            # callers that do not prepare pipe-keyed baseline metadata.
-            original_prefix = (1 << operator_idx) - 1
-            return source_size * self._dp_cardinality_prod[original_prefix]
-        return baseline_input_size
+        if not self.uses_affine_operator_cost:
+            return baseline_input_size
+        p_id = self._dp_inner_ops[operator_idx]
+        denominator = (
+            source_size * self._dp_affine_value(p_id, baseline_input_size)
+        )
+        if denominator <= 0.0:
+            raise RuntimeError(
+                f"Operator {p_id} has no positive fitted kx+b at its "
+                "profiled input size"
+            )
+        return denominator
 
     def _dp_smp_supported_for_pipe(self, p_id: int) -> bool:
         """Whether SMP can safely execute this operator's resource class."""
@@ -1778,31 +1994,6 @@ class MyOptimizer(Optimizer):
                 )
             selectivities.append(value)
         self._dp_selectivities = selectivities
-
-        profiled_scalings = self.profiled_stats.get(
-            "operator_compute_scaling", {}
-        )
-        self._dp_compute_scalings = []
-        for p_id in inner_ops:
-            if getattr(self, "_dp_affine_enabled", False):
-                continue  # Affine DP never reads PERDATA/PERRECORD annotations.
-            pipe = self.logical_pipes[p_id]
-            scaling = pipe.compute_scaling
-            if not getattr(pipe, "compute_scaling_explicit", False):
-                entry = profiled_scalings.get(
-                    p_id, profiled_scalings.get(str(p_id))
-                )
-                if isinstance(entry, dict):
-                    entry = entry.get("scaling")
-                if entry is not None:
-                    try:
-                        scaling = PipeComputeScaling(entry)
-                    except ValueError as exc:
-                        raise RuntimeError(
-                            f"Invalid profiled compute scaling for pipe "
-                            f"{p_id}: {entry!r}"
-                        ) from exc
-            self._dp_compute_scalings.append(scaling)
 
         if getattr(self, "_dp_use_lazy_products", False):
             cardinality_prod = _LazyProductTable(selectivities)

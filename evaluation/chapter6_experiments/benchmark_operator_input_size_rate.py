@@ -52,7 +52,6 @@ class OperatorStage:
     tag: str
     name: str
     kind: str
-    scaling: str
     fn: Callable[[Any], Any]
 
 
@@ -153,7 +152,6 @@ def build_stages(dataset_path: pathlib.Path) -> List[OperatorStage]:
                 tag=pipe.tag,
                 name=pipe.name,
                 kind="filter" if isinstance(pipe, FilterPipe) else "mapper",
-                scaling=pipe.compute_scaling.value,
                 fn=pipe.fn,
             )
         )
@@ -251,7 +249,6 @@ def benchmark_input(
         "tag": stage.tag,
         "name": stage.name,
         "kind": stage.kind,
-        "scaling": stage.scaling,
         "source_record_index": captured.source_record_index,
         "input_bytes": captured.input_bytes,
         "snapshot_bytes": len(captured.snapshot),
@@ -447,8 +444,7 @@ def main() -> None:
             "pipe_id": stage.pipe_id,
             "name": stage.name,
             "kind": stage.kind,
-            "scaling": stage.scaling,
-            "collection": counts[stage.tag],
+                "collection": counts[stage.tag],
             "reservoir": reservoirs[stage.tag].metadata(),
             "selected_points": len(selected),
             "min_input_bytes": min(item.input_bytes for item in selected),

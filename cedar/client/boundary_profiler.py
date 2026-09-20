@@ -28,6 +28,7 @@ import ray
 
 from cedar.config import CedarContext
 from cedar.pipes import PipeVariantType
+from cedar.pipes.ray_variant import get_ray_actor_options
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ DEFAULT_PAYLOAD_BYTES: Tuple[int, ...] = (
     64 * 1024,
     1024 * 1024,
     4 * 1024 * 1024,
+    16 * 1024 * 1024,
 )
 DEFAULT_REPETITIONS = 2
 DEFAULT_WARMUP_SAMPLES = 20
@@ -46,8 +48,8 @@ DEFAULT_TARGET_BYTES = 128 * 1024 * 1024
 MIN_MEASURED_SAMPLES = 32
 MAX_MEASURED_SAMPLES = 512
 MIN_ACCEPTED_R_SQUARED = 0.75
-CALIBRATION_SCHEMA_VERSION = 2
-DEFAULT_CACHE_PATH = "/tmp/cedar_boundary_profiles_v2.json"
+CALIBRATION_SCHEMA_VERSION = 3
+DEFAULT_CACHE_PATH = "/tmp/cedar_boundary_profiles_v3.json"
 
 
 def profile_object_marshalling(
@@ -107,6 +109,10 @@ def profile_object_marshalling(
 
 @ray.remote
 class _BoundaryRayActor:
+    def location(self):
+        return {"ip": ray.util.get_node_ip_address(),
+                "node_id": str(ray.get_runtime_context().get_node_id())}
+
     def round_trip(self, value: Any) -> Any:
         return value
 
@@ -128,13 +134,27 @@ class _RoundTripPool:
         self.variant = variant
         self.width = width
         self.ray_actors = []
+        self.actor_locations = []
         self.smp_requests = None
         self.smp_responses = None
         self.smp_workers = []
         if variant == PipeVariantType.RAY:
+            options = get_ray_actor_options()
             self.ray_actors = [
-                _BoundaryRayActor.remote() for _ in range(width)
+                _BoundaryRayActor.options(**options).remote() for _ in range(width)
             ]
+            try:
+                self.actor_locations = ray.get(
+                    [actor.location.remote() for actor in self.ray_actors],
+                    timeout=float(os.environ.get("CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC", "240")),
+                )
+                if os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1":
+                    driver_ip = ray.util.get_node_ip_address()
+                    if any(location["ip"] == driver_ip for location in self.actor_locations):
+                        raise RuntimeError("remote Ray boundary actor landed on driver")
+            except Exception:
+                self.shutdown()
+                raise
         elif variant == PipeVariantType.SMP:
             self.smp_requests = mp.Queue(maxsize=max(2 * width, 16))
             self.smp_responses = mp.Queue(maxsize=max(2 * width, 16))
@@ -325,25 +345,39 @@ def profile_stage_boundary(
     finally:
         pool.shutdown()
 
-    model = fit_boundary_model(measurements)
-    if model["r_squared"] < MIN_ACCEPTED_R_SQUARED:
+    evidence = {
+        "method": "synchronous_round_trip_linear_fit",
+        "variant": variant.name,
+        "calibration_schema_version": CALIBRATION_SCHEMA_VERSION,
+        "stage_width": width,
+        "payload_bytes": list(payloads),
+        "repetitions": repetitions,
+        "warmup_samples": warmup_samples,
+        "measurements": measurements,
+        "runs": raw_runs,
+        "actor_locations": pool.actor_locations,
+    }
+    if variant == PipeVariantType.RAY and ray.is_initialized():
+        evidence["placement_resource"] = os.environ.get("CEDAR_RAY_PLACEMENT_RESOURCE", "")
+        evidence["driver_ip"] = ray.util.get_node_ip_address()
+    try:
+        model = fit_boundary_model(measurements)
+        if model["r_squared"] < MIN_ACCEPTED_R_SQUARED:
+            raise RuntimeError(
+                "Boundary calibration fit is too noisy: "
+                f"r_squared={model['r_squared']:.4f}, required={MIN_ACCEPTED_R_SQUARED:.2f}"
+            )
+    except Exception as exc:
+        evidence["error"] = f"{type(exc).__name__}: {exc}"
+        diagnostics = pathlib.Path(os.environ.get(
+            "CEDAR_BOUNDARY_DIAGNOSTICS_DIR", "/tmp/cedar_boundary_failures"))
+        diagnostics.mkdir(parents=True, exist_ok=True)
+        path = diagnostics / f"{variant.name}_{os.getpid()}_{time.time_ns()}.json"
+        path.write_text(json.dumps(evidence, indent=2))
         raise RuntimeError(
-            "Boundary calibration fit is too noisy: "
-            f"r_squared={model['r_squared']:.4f}, "
-            f"required={MIN_ACCEPTED_R_SQUARED:.2f}"
-        )
-    model.update(
-        {
-            "method": "synchronous_round_trip_linear_fit",
-            "variant": variant.name,
-            "stage_width": width,
-            "payload_bytes": list(payloads),
-            "repetitions": repetitions,
-            "warmup_samples": warmup_samples,
-            "measurements": measurements,
-            "runs": raw_runs,
-        }
-    )
+            f"{variant.name} boundary calibration failed; raw evidence: {path}: {exc}"
+        ) from exc
+    model.update(evidence)
     logger.info("Profiled %s boundary model: %s", variant.name, model)
     return model
 
@@ -373,8 +407,19 @@ def boundary_calibration_signature(
         "target_bytes": target_bytes,
     }
     if variant == PipeVariantType.RAY:
+        signature["placement_resource"] = os.environ.get("CEDAR_RAY_PLACEMENT_RESOURCE", "")
+        signature["placement_resource_fraction"] = os.environ.get(
+            "CEDAR_RAY_PLACEMENT_RESOURCE_FRACTION", "0.001")
+        signature["require_remote"] = os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1"
         signature["ray_version"] = ray.__version__
         if ray.is_initialized():
+            signature["driver_ip"] = ray.util.get_node_ip_address()
+            signature["placement_nodes"] = sorted(
+                [str(node.get("NodeID", "")), node.get("NodeManagerAddress", "")]
+                for node in ray.nodes()
+                if node.get("Alive") and node.get("Resources", {}).get(
+                    signature["placement_resource"], 0) > 0
+            )
             signature["ray_cluster_resources"] = {
                 key: float(value)
                 for key, value in sorted(ray.cluster_resources().items())
@@ -448,6 +493,8 @@ def profile_stage_boundary_cached(
         if not refresh and isinstance(entry, dict):
             if entry.get("signature") == signature:
                 result = copy.deepcopy(entry["model"])
+                if variant == PipeVariantType.RAY and os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1":
+                    validate_remote_ray_boundary({"physical_model": {"boundary": {"RAY": result}}})
                 result["calibration_source"] = "cache"
                 result["calibration_key"] = key
                 return result
@@ -476,3 +523,55 @@ def profile_stage_boundary_cached(
         result["calibration_source"] = "measured"
         result["calibration_key"] = key
         return result
+
+
+def validate_remote_ray_boundary(profile: Dict[str, Any]) -> None:
+    """Reject missing/legacy/local/noisy Ray calibration in remote experiments."""
+    physical = profile.get("physical_model", {}) if isinstance(profile, dict) else {}
+    boundaries = physical.get("boundary", {}) if isinstance(physical, dict) else {}
+    model = boundaries.get("RAY") if isinstance(boundaries, dict) else None
+    expected_resource = os.environ.get("CEDAR_RAY_PLACEMENT_RESOURCE", "cedar_remote")
+    try:
+        valid = (
+            isinstance(model, dict)
+            and model.get("calibration_schema_version") == CALIBRATION_SCHEMA_VERSION
+            and model.get("placement_resource") == expected_resource
+            and bool(model.get("driver_ip"))
+            and bool(model.get("actor_locations"))
+            and all(location.get("ip") and location["ip"] != model["driver_ip"]
+                    for location in model["actor_locations"])
+            and math.isfinite(float(model["throughput_bytes_per_sec"]))
+            and float(model["throughput_bytes_per_sec"]) > 0
+            and math.isfinite(float(model["fixed_latency_ms"]))
+            and float(model["fixed_latency_ms"]) >= 0
+            and math.isfinite(float(model["r_squared"]))
+            and float(model["r_squared"]) >= MIN_ACCEPTED_R_SQUARED
+        )
+    except (KeyError, TypeError, ValueError, AttributeError):
+        valid = False
+    if not valid:
+        raise RuntimeError(
+            "A valid measured remote Ray boundary calibration is required; "
+            "legacy/missing/local/noisy calibration cannot use a bandwidth constant. "
+            "Regenerate the Ray boundary profile."
+        )
+
+
+def smp_aggregate_throughput(curve, workers, max_inflight):
+    """Interpolate measured queue-pair throughput without extrapolation."""
+    if int(curve["max_inflight"]) != int(max_inflight):
+        raise ValueError("SMP transport curve max_inflight does not match runtime")
+    points = sorted((int(p["workers"]), float(p["throughput_bytes_per_sec"]))
+                    for p in curve["points"])
+    if (not points or len({w for w, _ in points}) != len(points)
+            or any(w < 1 or not math.isfinite(b) or b <= 0 for w, b in points)):
+        raise ValueError("Invalid SMP aggregate transport curve")
+    if workers < points[0][0] or workers > points[-1][0]:
+        raise ValueError("SMP transport curve does not cover requested W")
+    for w, bandwidth in points:
+        if workers == w:
+            return bandwidth
+    for (left, lo), (right, hi) in zip(points, points[1:]):
+        if left < workers < right:
+            return lo + (hi - lo) * (workers - left) / (right - left)
+    raise ValueError("Invalid SMP worker count")

@@ -208,9 +208,6 @@ class SimpleDpOptimizer(DpOptimizer):
         # AffineDpCostMixin._init_stats also rewrites size ratios when cm_model
         # is present. Bypass it as well as the per-operator affine cost hook.
         Optimizer._init_stats(self)
-        self._dp_affine_enabled = False
-        self._dp_affine_models = {}
-        self._dp_co_run_factors = {}
 
     def _dp_finite_workload_ray_batch_cap(self, ray_stage_count):
         # Keep Cedar's native batch rule; PICO's extra finite-workload cap is

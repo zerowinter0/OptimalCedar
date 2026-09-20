@@ -377,6 +377,26 @@ def build_profile(
             "output_sizes": output_sizes,
             "selectivities": selectivities,
         },
+        # The oracle enumerates plans under the byte-volume objective
+        # ``volume * operator_cost`` with every operator's profiled input
+        # normalized to one byte. The fitted kx+b layer reproduces exactly that
+        # objective with slope k = cost and zero intercept, so the DP search is
+        # verified against the same cost surface the oracle enumerates.
+        "physical_model": {
+            "operator_affine": {
+                "schema_version": 1,
+                "method": "generated_fixture_normalized_bytes",
+                "operators": {
+                    str(p_id_by_tag[operator.tag]): {
+                        "k_ms_per_byte": operator.costs["INPROCESS"],
+                        "b_ms": 0.0,
+                        "x_reference_bytes": 1.0,
+                        "source": "generated_case",
+                    }
+                    for operator in case.operators
+                },
+            }
+        },
         "disk_info": {"read_latency": 0.0, "write_latency": 0.0},
         "offloads": offloads,
     }

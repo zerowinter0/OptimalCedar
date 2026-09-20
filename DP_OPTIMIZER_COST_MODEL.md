@@ -1,5 +1,20 @@
 # 当前 `dp_optimizer` 代价模型详解
 
+# 当前 `dp_optimizer` 代价模型详解
+
+> **2026-09-19 更新（统一 kx+b，取消 per-data / per-record 二元设计）**
+>
+> 算子计算量不再按 per-data / per-record 标签二选一。每个算子一律使用
+> `physical_model.operator_affine` 中测得的 `cost(record) = k * input_bytes + b`：
+> 某前缀下算子成本为 `surviving_records * (k * bytes_per_record + b)`，字节量与
+> 幸存记录数分别相乘。平坦成本就是 `k = 0` 的同一族成员，不再单列一种计价方式。
+> 若某算子没有测得的 kx+b，DP 会直接报错，而不会退回按字节计价。
+>
+> 本文以下章节描述的 `work_prod` 按字节量递推，现在只适用于显式声明
+> `uses_affine_operator_cost = False` 的历史对照（`old_dp_optimizer`、
+> `old_dp_boundary`、`SimpleDpOptimizer`、`DpTwoStageOptimizer`、`ExpOptimizer`），
+> 以及 boundary / cache / transport 这些仍然按真实字节量计价的环节。
+
 本文档基于当前工作区中的实际实现，主要涉及：
 
 - `cedar/compose/dp_optimizer.py`

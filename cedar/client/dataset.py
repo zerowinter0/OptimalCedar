@@ -11,6 +11,7 @@ import pickle
 import tempfile
 import time
 import yaml
+import ray
 import sys
 from typing import Dict, Optional, Iterable, Any, List, Union, Tuple
 from queue import Queue, Empty
@@ -19,7 +20,9 @@ from cedar.config import CedarContext
 from cedar.compose import Feature, OptimizerOptions, PhysicalPlan
 from cedar.compose import constants as compose_constants
 from cedar.pipes import (
+    BatcherPipe,
     FilterPipe,
+    ImageReaderPipe,
     MapperPipe,
     Pipe,
     PipeVariant,
@@ -936,23 +939,28 @@ class DataSet:
             from cedar.compose.raydata_optimizer import RayDataOptimizer
             for feature in self.features.values():
                 feature.set_optimizer(RayDataOptimizer())
-        elif 20 <= optimizer_selector <= 26:
+        elif optimizer_selector in (20, 21, 22, 23, 24, 25, 26, 27, 28, 29):
             from cedar.compose.simple_dp_ablation_optimizer import (
                 SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
                 SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
                 UnoptimizedOptimizer, SimpleDpWorkersBoundaryOptimizer,
                 SimpleDpMaxWorkersBoundaryOptimizer,
+                SimpleDpWorkersWidthBoundaryOptimizer,
+                OldDpBoundaryOptimizer, LayeredSimpleDpOptimizer,
             )
             cls = (SimpleDpWorkersOptimizer, SimpleDpBoundaryOptimizer,
                    SimpleDpVariantOptimizer, SimpleDpWidthOptimizer,
                    UnoptimizedOptimizer,
                    SimpleDpWorkersBoundaryOptimizer,
-                   SimpleDpMaxWorkersBoundaryOptimizer)[optimizer_selector - 20]
+                   SimpleDpMaxWorkersBoundaryOptimizer,
+                   SimpleDpWorkersWidthBoundaryOptimizer,
+                   OldDpBoundaryOptimizer, LayeredSimpleDpOptimizer,
+                   )[optimizer_selector - 20]
             for feature in self.features.values():
                 feature.set_optimizer(cls())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 26."
+                "OptimizerOptions.use_my_optimizer must be between 0 and 29."
             )
 
         if len(self.features) == 0:
@@ -1431,19 +1439,6 @@ class DataSet:
             "CEDAR_INCREMENTAL_PROFILE_FROM"
         )
         if incremental_from:
-            if (
-                os.environ.get(
-                    "CEDAR_INCREMENTAL_COMPUTE_SCALING"
-                )
-                == "1"
-            ):
-                return self._profile_compute_scaling_incremental(
-                    f_name=f_name,
-                    feature_to_profile=self.features[f_name],
-                    n_samples=n_samples,
-                    output_file=output_file,
-                    existing_profile=incremental_from,
-                )
             if os.environ.get("CEDAR_INCREMENTAL_WALL_BASELINE") == "1":
                 return self._profile_wall_baseline_incremental(
                     f_name=f_name,
@@ -1489,7 +1484,7 @@ class DataSet:
         logger.info("Profile resource signature: %s", d["resource_config"])
 
         layered_profile = (
-            os.environ.get("CEDAR_LAYERED_ADAPTIVE_PROFILE") == "1"
+            os.environ.get("CEDAR_LAYERED_ADAPTIVE_PROFILE", "1") == "1"
         )
         reservoir = None
         if layered_profile:
@@ -1510,14 +1505,9 @@ class DataSet:
                     )
                 ),
             )
-            set_profile_input_reservoir(reservoir)
-        try:
-            baseline_profile = self._profile_feature(
-                f_name, feature_to_profile, n_samples, None
-            )
-        finally:
-            if layered_profile:
-                set_profile_input_reservoir(None)
+        baseline_profile = self._profile_feature(
+            f_name, feature_to_profile, n_samples, None
+        )
         d["baseline"] = baseline_profile
         # The timing passes are bounded by the adaptive profiler's confidence
         # rule, so on a slow recipe they see only a few dozen records and every
@@ -1553,35 +1543,6 @@ class DataSet:
                     )
                 },
             )
-        inferred_scalings = baseline_profile.get(
-            "compute_scaling_inference", {}
-        )
-        d["operator_compute_scaling"] = {}
-        for p_id, pipe in feature_to_profile.logical_pipes.items():
-            explicit = bool(
-                getattr(pipe, "compute_scaling_explicit", False)
-            )
-            inference = inferred_scalings.get(
-                p_id, inferred_scalings.get(str(p_id))
-            )
-            if explicit:
-                scaling = pipe.compute_scaling.value
-                mode = "explicit"
-            elif isinstance(inference, dict):
-                scaling = inference.get("scaling", "per_data")
-                mode = (
-                    "inferred"
-                    if inference.get("reason") == "classified"
-                    else "default"
-                )
-            else:
-                scaling = "per_data"
-                mode = "default"
-            entry = {"scaling": scaling, "mode": mode}
-            if isinstance(inference, dict):
-                entry["inference"] = inference
-            d["operator_compute_scaling"][p_id] = entry
-
         boundary_profile_setting = os.environ.get(
             "CEDAR_PROFILE_BOUNDARY_MODEL"
         )
@@ -1595,6 +1556,20 @@ class DataSet:
                 "boundary": {},
             }
 
+        if layered_profile:
+            # Cedar and old_dp_boundary consume measured whole-pipeline
+            # throughput through Cedar's Amdahl inversion. The three current
+            # Simple-DP variants consume the isolated layers attached below.
+            # Keep both in one profile so every optimizer shares one run.
+            if self.ctx.use_ray():
+                self._profile_ray(d, feature_to_profile, f_name, n_samples,
+                              profile_backend_compute=False)
+            self._profile_smp(d, feature_to_profile, f_name, n_samples,
+                              profile_backend_compute=False)
+            # TF fusion is another legacy whole-pipeline candidate. Measure
+            # it before isolated passes can warm its caches or models.
+            self._profile_tf(d, feature_to_profile, f_name, n_samples)
+
         if layered_profile and profile_boundaries:
             if self.ctx.use_ray():
                 self._profile_boundary_model(
@@ -1607,6 +1582,16 @@ class DataSet:
         if layered_profile:
             if reservoir is None:
                 raise RuntimeError("Layered profile input reservoir is absent")
+            # Preserve the exact legacy measurement order above. Snapshot
+            # collection is a separate discarded pass after baseline,
+            # whole-pipeline offloads and boundaries, so serialization and
+            # any extra cache warming cannot affect those compatibility data.
+            self._collect_profile_input_reservoir(
+                f_name, feature_to_profile, n_samples, reservoir
+            )
+            d["profile_metadata"]["input_reservoir_capture"] = (
+                "post_legacy_separate_discarded_pipeline_pass"
+            )
             self._profile_layered_backends(
                 d, feature_to_profile, reservoir
             )
@@ -1637,8 +1622,6 @@ class DataSet:
         if os.environ.get("CEDAR_PROFILE_FILTER_SELECTIVITY") == "1":
             _consolidate_filter_selectivity(d)
 
-        # TF fusion is a separate whole-pipeline candidate validation. It is
-        # deliberately excluded from the isolated-cost layer.
         if not layered_profile:
             self._profile_tf(d, feature_to_profile, f_name, n_samples)
 
@@ -1654,6 +1637,28 @@ class DataSet:
         with open(output_file, "w") as outfile:
             yaml.dump(d, outfile)
         return d
+
+    def _collect_profile_input_reservoir(
+        self,
+        f_name: str,
+        feature_to_profile: Feature,
+        n_samples: Optional[int],
+        reservoir: ProfileInputReservoir,
+    ) -> None:
+        """Collect layered inputs in a discarded, unmeasured profile pass.
+
+        ``capture_profile_input`` executes before ``x.trace()``. Enabling it
+        during a compatibility measurement would attribute pickle cost to
+        operators. Running this after every legacy measurement also prevents
+        its extra cache warming from changing Cedar's offload observations.
+        """
+        set_profile_input_reservoir(reservoir)
+        try:
+            self._profile_feature(
+                f_name, feature_to_profile, n_samples, None
+            )
+        finally:
+            set_profile_input_reservoir(None)
 
     def _profile_legacy_cedar(
         self,
@@ -1721,101 +1726,6 @@ class DataSet:
                     for key, value in measurement.items()
                     if key in measurement_keys
                 }
-
-        if output_file is None:
-            output_file = f"/tmp/{f_name}_profile.yml"
-        with open(output_file, "w") as outfile:
-            yaml.dump(profile, outfile)
-        return profile
-
-    def _profile_compute_scaling_incremental(
-        self,
-        f_name: str,
-        feature_to_profile: Feature,
-        n_samples: Optional[int],
-        output_file: Optional[str],
-        existing_profile: str,
-    ) -> Dict[str, Any]:
-        """Add operator-level scaling semantics to an existing profile.
-
-        Only a fresh in-process baseline observation is executed. All numeric
-        measurements consumed by Cedar/DJ/Pecan and the existing DP cost
-        coefficients remain untouched, so prior optimizer results remain a
-        valid comparison set.
-        """
-        with open(existing_profile, "r") as stream:
-            profile = yaml.safe_load(stream)
-        if not isinstance(profile, dict):
-            raise RuntimeError(
-                f"Incremental profile is not a mapping: {existing_profile}"
-            )
-        baseline = profile.get("baseline")
-        if not isinstance(baseline, dict):
-            raise RuntimeError("Existing profile has no baseline mapping.")
-
-        old_setting = os.environ.get(
-            "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
-        )
-        os.environ["CEDAR_PROFILE_INFER_COMPUTE_SCALING"] = "1"
-        try:
-            fresh_baseline = self._profile_feature(
-                f_name, feature_to_profile, n_samples, None
-            )
-        finally:
-            if old_setting is None:
-                os.environ.pop(
-                    "CEDAR_PROFILE_INFER_COMPUTE_SCALING", None
-                )
-            else:
-                os.environ[
-                    "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
-                ] = old_setting
-
-        inference = fresh_baseline.get("compute_scaling_inference")
-        if not isinstance(inference, dict):
-            raise RuntimeError(
-                "Incremental operator scaling collected no inference data."
-            )
-        baseline_pipe_ids = set(baseline.get("latencies", {}))
-        unknown_pipe_ids = set(inference) - baseline_pipe_ids
-        if unknown_pipe_ids:
-            raise RuntimeError(
-                "Operator scaling observation contains pipes absent from "
-                f"the existing profile: {sorted(unknown_pipe_ids)}"
-            )
-
-        metadata = {}
-        for p_id, pipe in feature_to_profile.logical_pipes.items():
-            explicit = bool(
-                getattr(pipe, "compute_scaling_explicit", False)
-            )
-            observation = inference.get(
-                p_id, inference.get(str(p_id))
-            )
-            if explicit:
-                scaling = pipe.compute_scaling.value
-                mode = "explicit"
-            elif isinstance(observation, dict):
-                scaling = observation.get("scaling", "per_data")
-                mode = (
-                    "inferred"
-                    if observation.get("reason") == "classified"
-                    else "default"
-                )
-            else:
-                scaling = "per_data"
-                mode = "default"
-            entry = {"scaling": scaling, "mode": mode}
-            if isinstance(observation, dict):
-                entry["inference"] = observation
-            metadata[p_id] = entry
-        profile["operator_compute_scaling"] = metadata
-        profile["incremental_compute_scaling"] = {
-            "schema_version": 1,
-            "source_profile": os.path.abspath(existing_profile),
-            "method": "legal_input_size_latency_stratification",
-            "observed_operators": len(inference),
-        }
 
         if output_file is None:
             output_file = f"/tmp/{f_name}_profile.yml"
@@ -2022,6 +1932,11 @@ class DataSet:
             physical_model.setdefault("calibration_errors", {})[
                 variant.name
             ] = f"{type(exc).__name__}: {exc}"
+            if variant in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+                raise RuntimeError(
+                    "Remote Ray boundary calibration failed; refusing unmeasured "
+                    "bandwidth fallback"
+                ) from exc
             logger.warning(
                 "Failed to profile %s stage boundary; optimizer will use "
                 "its compatibility fallback: %s",
@@ -2173,6 +2088,8 @@ class DataSet:
         min_observations: int,
         ray_submit_batch_size: Optional[int] = None,
         minimum_records_per_worker: Optional[int] = None,
+        record_actor_locations: bool = False,
+        snapshot_sequence: Optional[List[Tuple[str, List[bytes]]]] = None,
     ) -> Dict[str, Any]:
         """Measure one backend with fixed inputs until confidence converges."""
         replay = _ProfileReplayPipeVariant(snapshots, 1)
@@ -2229,6 +2146,14 @@ class DataSet:
                 f"{variant_type.name} variant exposes no profiling service"
             )
         try:
+            actor_locations = None
+            if record_actor_locations:
+                if variant_type not in (PipeVariantType.RAY, PipeVariantType.TF_RAY):
+                    raise ValueError("Actor locations require a Ray backend")
+                actor_locations = ray.get([
+                    actor.get_runtime_location.remote()
+                    for actor in service._actors
+                ])
             if variant_type in (
                 PipeVariantType.RAY,
                 PipeVariantType.TF_RAY,
@@ -2247,84 +2172,96 @@ class DataSet:
                 minimum_records_per_worker,
             )
 
-            # Warm the same per-worker work quantum used by measurement. Ray
-            # dispatches batches randomly, so the historical one-record warmup
-            # reached only one actor; at width 48, half of a two-batch/actor
-            # measurement could then be cold starts. A sustained warmup makes
-            # the confidence test operate on a stationary population.
-            warm_started = time.perf_counter()
-            replay.record_count = minimum_parallel_epoch
-            for _ in variant:
-                pass
-            warm_elapsed = max(time.perf_counter() - warm_started, 1e-6)
-            warm_sec_per_record = warm_elapsed / minimum_parallel_epoch
-            reset_stats = getattr(
-                service, "reset_backend_compute_stats", None
+            trials = (
+                snapshot_sequence
+                if snapshot_sequence is not None
+                else [("single", snapshots)]
             )
-            if reset_stats is None:
-                raise RuntimeError(
-                    f"{variant_type.name} service cannot reset timing stats"
-                )
-            reset_stats()
-
-            # Aim for roughly half-second epochs, but a parallel epoch must
-            # actually exercise every worker. The old upper bound of 256
-            # records could produce e.g. seven records for width=8 with a Ray
-            # submit batch of ten: one tail task ran on one actor and the
-            # resulting measurement was incorrectly labelled width=8.
-            epoch_records = max(
-                minimum_parallel_epoch,
-                min(4096, int(0.5 / warm_sec_per_record)),
-            )
-            started = time.perf_counter()
-            converged = False
-            rse = math.inf
-            stats = None
-            measured_input_records = 0
-            while True:
-                replay.record_count = epoch_records
+            results = []
+            for trial_label, trial_snapshots in trials:
+                replay.snapshots = trial_snapshots
+                # Warm the same per-worker work quantum used by measurement. Ray
+                # dispatches batches randomly, so the historical one-record warmup
+                # reached only one actor; at width 48, half of a two-batch/actor
+                # measurement could then be cold starts. A sustained warmup makes
+                # the confidence test operate on a stationary population.
+                warm_started = time.perf_counter()
+                replay.record_count = minimum_parallel_epoch
                 for _ in variant:
                     pass
-                measured_input_records += epoch_records
-                elapsed = time.perf_counter() - started
-                stats = service.get_backend_compute_stats()
-                if stats is not None:
-                    mean = float(stats["mean_ms_per_sample"])
-                    stderr = float(stats["stderr_ms_per_sample"])
-                    rse = stderr / mean if mean > 0 else math.inf
-                    converged = (
-                        elapsed >= min_duration
-                        and int(stats["count"]) >= min_observations
-                        and rse <= target_rse
-                    )
-                if converged or elapsed >= max_duration:
-                    break
-            if stats is None:
-                raise RuntimeError(
-                    f"No {variant_type.name} worker timing for pipe {pipe.id}"
+                warm_elapsed = max(time.perf_counter() - warm_started, 1e-6)
+                warm_sec_per_record = warm_elapsed / minimum_parallel_epoch
+                reset_stats = getattr(
+                    service, "reset_backend_compute_stats", None
                 )
-            stats = dict(stats)
-            stats["end_to_end_ms_per_input_sample"] = (
-                elapsed * 1000.0 / measured_input_records
-            )
-            stats["measured_input_records"] = measured_input_records
-            stats["adaptive_profile"] = {
-                "width": width,
-                "elapsed_sec": elapsed,
-                "warmup_sec": warm_elapsed,
-                "warmup_records": minimum_parallel_epoch,
-                "epoch_records": epoch_records,
-                "minimum_parallel_epoch_records": minimum_parallel_epoch,
-                "unique_input_records": len(snapshots),
-                "target_rse": target_rse,
-                "observed_rse": rse,
-                "min_duration_sec": min_duration,
-                "max_duration_sec": max_duration,
-                "min_observations": min_observations,
-                "converged": converged,
-                "stop_reason": "confidence" if converged else "max_duration",
-            }
-            return stats
+                if reset_stats is None:
+                    raise RuntimeError(
+                        f"{variant_type.name} service cannot reset timing stats"
+                    )
+                reset_stats()
+
+                # Aim for roughly half-second epochs, but a parallel epoch must
+                # actually exercise every worker. The old upper bound of 256
+                # records could produce e.g. seven records for width=8 with a Ray
+                # submit batch of ten: one tail task ran on one actor and the
+                # resulting measurement was incorrectly labelled width=8.
+                epoch_records = max(
+                    minimum_parallel_epoch,
+                    min(4096, int(0.5 / warm_sec_per_record)),
+                )
+                started = time.perf_counter()
+                converged = False
+                rse = math.inf
+                stats = None
+                measured_input_records = 0
+                while True:
+                    replay.record_count = epoch_records
+                    for _ in variant:
+                        pass
+                    measured_input_records += epoch_records
+                    elapsed = time.perf_counter() - started
+                    stats = service.get_backend_compute_stats()
+                    if stats is not None:
+                        mean = float(stats["mean_ms_per_sample"])
+                        stderr = float(stats["stderr_ms_per_sample"])
+                        rse = stderr / mean if mean > 0 else math.inf
+                        converged = (
+                            elapsed >= min_duration
+                            and int(stats["count"]) >= min_observations
+                            and rse <= target_rse
+                        )
+                    if converged or elapsed >= max_duration:
+                        break
+                if stats is None:
+                    raise RuntimeError(
+                        f"No {variant_type.name} worker timing for pipe {pipe.id}"
+                    )
+                stats = dict(stats)
+                stats["end_to_end_ms_per_input_sample"] = (
+                    elapsed * 1000.0 / measured_input_records
+                )
+                if actor_locations is not None:
+                    stats["actor_locations"] = actor_locations
+                stats["measured_input_records"] = measured_input_records
+                stats["adaptive_profile"] = {
+                    "width": width,
+                    "elapsed_sec": elapsed,
+                    "warmup_sec": warm_elapsed,
+                    "warmup_records": minimum_parallel_epoch,
+                    "epoch_records": epoch_records,
+                    "minimum_parallel_epoch_records": minimum_parallel_epoch,
+                    "unique_input_records": len(trial_snapshots),
+                    "target_rse": target_rse,
+                    "observed_rse": rse,
+                    "min_duration_sec": min_duration,
+                    "max_duration_sec": max_duration,
+                    "min_observations": min_observations,
+                    "converged": converged,
+                    "stop_reason": "confidence" if converged else "max_duration",
+                }
+                stats["trial_label"] = trial_label
+                results.append(stats)
+            return results if snapshot_sequence is not None else results[0]
         finally:
             variant.shutdown()
 
@@ -2337,42 +2274,74 @@ class DataSet:
         repeats: int,
         target_sec: float,
         max_batch_bytes: int,
+        records_per_call: int = 1,
     ) -> Optional[float]:
-        """Median milliseconds per record for one operator callable."""
-        values = [pickle.loads(snapshot) for snapshot in snapshots]
-        if not values:
+        """Median milliseconds per record for one operator callable.
+
+        ``records_per_call`` normalizes callables that process several records
+        per invocation (a batcher assembles a whole batch at once).
+        """
+        if not snapshots:
             return None
+        records_per_call = max(1, int(records_per_call))
         record_bytes = max(
             1.0, statistics.median(len(snapshot) for snapshot in snapshots)
         )
-        for value in values[:3]:
-            fn(value)
+        for snapshot in snapshots[:3]:
+            self._time_operator_fresh_snapshot(fn, snapshot)
         calibration_calls = 3
-        sink = None
-        start = time.perf_counter()
+        calibration_sec = 0.0
         for _ in range(calibration_calls):
-            for value in values:
-                sink = fn(value)
-        elapsed = time.perf_counter() - start
-        per_call_sec = max(elapsed / (calibration_calls * len(values)), 1e-9)
+            for snapshot in snapshots:
+                calibration_sec += self._time_operator_fresh_snapshot(
+                    fn, snapshot
+                )
+        per_call_sec = max(
+            calibration_sec / (calibration_calls * len(snapshots)), 1e-9
+        )
         calls = int(min(max_calls, max(min_calls, target_sec / per_call_sec)))
-        calls = max(1, min(calls, int(max(1.0, max_batch_bytes / record_bytes))))
+        bytes_per_pass = record_bytes * len(snapshots)
+        calls = max(
+            1,
+            min(calls, int(max(1.0, max_batch_bytes / bytes_per_pass))),
+        )
         rates: List[float] = []
         for _ in range(max(1, repeats)):
             was_enabled = gc.isenabled()
             gc.disable()
-            sink = None
-            start = time.perf_counter()
-            for _ in range(calls):
-                for value in values:
-                    sink = fn(value)
-            duration = time.perf_counter() - start
-            if was_enabled:
-                gc.enable()
-            if sink is NotImplemented:
-                raise RuntimeError("Unexpected operator result")
-            rates.append(calls * len(values) / max(duration, 1e-9))
-        return 1000.0 / statistics.median(rates)
+            duration = 0.0
+            try:
+                for _ in range(calls):
+                    for snapshot in snapshots:
+                        duration += self._time_operator_fresh_snapshot(
+                            fn, snapshot
+                        )
+            finally:
+                if was_enabled:
+                    gc.enable()
+                    gc.collect()
+            rates.append(calls * len(snapshots) / max(duration, 1e-9))
+        return 1000.0 / statistics.median(rates) / records_per_call
+
+    @staticmethod
+    def _time_operator_fresh_snapshot(fn, snapshot: bytes) -> float:
+        """Time ``fn`` on a fresh value without charging deserialization.
+
+        Profiling inputs are immutable serialized snapshots because mapper
+        functions are allowed to mutate their argument. Reusing one decoded
+        value makes transforms such as COCO RandomZoomOut repeatedly enlarge
+        their own output and can exhaust host memory. Decode before starting
+        the clock and release the mutated value immediately after the call.
+        """
+        value = pickle.loads(snapshot)
+        start = time.perf_counter()
+        result = fn(value)
+        duration = time.perf_counter() - start
+        if result is NotImplemented:
+            raise RuntimeError("Unexpected operator result")
+        del result
+        del value
+        return duration
 
     def _time_operator_value(
         self,
@@ -2386,14 +2355,13 @@ class DataSet:
         payload_bytes: int = 0,
     ) -> Optional[float]:
         """Median milliseconds per record for one operator on one payload."""
-        fn(value)
+        snapshot = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+        self._time_operator_fresh_snapshot(fn, snapshot)
         calibration_calls = 3
-        sink = None
-        start = time.perf_counter()
+        calibration_sec = 0.0
         for _ in range(calibration_calls):
-            sink = fn(value)
-        elapsed = time.perf_counter() - start
-        per_call_sec = max(elapsed / calibration_calls, 1e-9)
+            calibration_sec += self._time_operator_fresh_snapshot(fn, snapshot)
+        per_call_sec = max(calibration_sec / calibration_calls, 1e-9)
         calls = int(min(max_calls, max(min_calls, target_sec / per_call_sec)))
         if payload_bytes > 0:
             calls = max(
@@ -2404,15 +2372,16 @@ class DataSet:
         for _ in range(max(1, repeats)):
             was_enabled = gc.isenabled()
             gc.disable()
-            sink = None
-            start = time.perf_counter()
-            for _ in range(calls):
-                sink = fn(value)
-            duration = time.perf_counter() - start
-            if was_enabled:
-                gc.enable()
-            if sink is NotImplemented:
-                raise RuntimeError("Unexpected operator result")
+            duration = 0.0
+            try:
+                for _ in range(calls):
+                    duration += self._time_operator_fresh_snapshot(
+                        fn, snapshot
+                    )
+            finally:
+                if was_enabled:
+                    gc.enable()
+                    gc.collect()
             rates.append(calls / max(duration, 1e-9))
         return 1000.0 / statistics.median(rates)
 
@@ -2514,6 +2483,86 @@ class DataSet:
             return resized.contiguous()
         return None
 
+    @staticmethod
+    def _operator_affine_measurement(pipe):
+        """Return ``(callable, tag, records_per_call)`` for one operator.
+
+        A batcher or an image reader has no Python ``fn``, yet its per-record
+        cost is real and measurable: the batcher assembles a batch and the
+        reader decodes the file it is handed. Measuring those callables keeps
+        every priced operator on the same fitted ``kx+b`` layer instead of
+        exempting the operator from the model. Readers are timed on a warm
+        page cache, so their fitted slope describes decode work rather than
+        disk latency.
+        """
+        fn = getattr(pipe, "fn", None)
+        if fn is not None:
+            return fn, "callable", 1
+        if isinstance(pipe, BatcherPipe):
+            from .linear_cost_profile import NativeBatchCall
+
+            # One call assembles a full batch, so its cost covers that many
+            # records and is normalized to a per-record price below.
+            return (
+                NativeBatchCall(pipe.batch_size, pipe.drop_last),
+                "batcher",
+                int(pipe.batch_size),
+            )
+        if isinstance(pipe, ImageReaderPipe):
+            from cedar.pipes.io import read_image
+
+            mode = getattr(pipe, "mode", None)
+            return (
+                lambda value, mode=mode: read_image(value, mode=mode),
+                "image_reader",
+                1,
+            )
+        return None, f"unsupported_pipe_type:{type(pipe).__name__}", 1
+
+    @staticmethod
+    def _readable_affine_snapshots(snapshots: List[bytes]) -> List[bytes]:
+        """Keep captured records that name an existing readable file.
+
+        A file lister hands its reader both directory entries and files. Only
+        the files describe decode work, and timing the reader on a directory
+        raises instead of measuring anything.
+        """
+        kept: List[bytes] = []
+        for raw in snapshots:
+            try:
+                value = pickle.loads(raw)
+            except Exception:  # noqa: BLE001
+                continue
+            path = value
+            if isinstance(path, pathlib.Path):
+                path = str(path)
+            if isinstance(path, (str, bytes)) and os.path.isfile(path):
+                kept.append(raw)
+        return kept
+
+    def _affine_usable_snapshots(
+        self, fn, snapshots: List[bytes]
+    ) -> List[bytes]:
+        """Drop legal records this operator cannot process at all.
+
+        A lister can hand its consumer records the consumer rejects (a
+        directory entry, a zero-length file). One such record must not cost the
+        operator its measured coefficients, so the pool is validated with one
+        call per record and the rejects are counted instead of timed.
+        """
+        usable: List[bytes] = []
+        for raw in snapshots:
+            try:
+                self._time_operator_fresh_snapshot(fn, raw)
+            except Exception as exc:  # noqa: BLE001
+                logger.info(
+                    "Affine measurement ignores an unusable legal record: %s",
+                    exc,
+                )
+                continue
+            usable.append(raw)
+        return usable
+
     def _profile_operator_input_size_affine(
         self,
         profile: Dict[str, Any],
@@ -2558,29 +2607,51 @@ class DataSet:
         min_contrast = float(
             os.environ.get("CEDAR_PROFILE_AFFINE_MIN_CONTRAST", "1.10")
         )
-        min_growth = float(
-            os.environ.get("CEDAR_PROFILE_AFFINE_MIN_GROWTH", "1.02")
-        )
         baseline = profile.get("baseline", {})
         input_sizes = baseline.get("input_sizes", {}) or {}
         operators: Dict[str, Dict[str, Any]] = {}
+        unfitted_reasons: Dict[str, str] = {}
         for p_id, pipe in feature.logical_pipes.items():
             if len(operators) >= max_operators:
+                unfitted_reasons[str(p_id)] = "beyond_max_operators"
                 break
             if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
+                unfitted_reasons[str(p_id)] = "not_a_single_input_stage"
                 continue
             if (
                 not include_cuda
                 and pipe.execution_resource
                 == PipeExecutionResource.CUDA
             ):
+                unfitted_reasons[str(p_id)] = "cuda_operator_excluded"
                 continue
             fn = getattr(pipe, "fn", None)
+            measurement = "callable"
+            records_per_call = 1
             if fn is None:
-                continue
+                fn, measurement, records_per_call = (
+                    self._operator_affine_measurement(pipe)
+                )
+                if fn is None:
+                    # Record why this operator has no measured kx+b instead of
+                    # silently leaving the DP to invent a cost regime.
+                    logger.info(
+                        "Input-size affine fit has no measurement for pipe "
+                        "%s (%s): %s",
+                        p_id,
+                        type(pipe).__name__,
+                        measurement,
+                    )
+                    unfitted_reasons[str(p_id)] = measurement
+                    continue
             predecessor_id = pipe.input_pipes[0].id
             snapshots = reservoir.values_for(predecessor_id)
+            if measurement == "image_reader":
+                # Directories in a lister's output carry no decode work.
+                snapshots = self._readable_affine_snapshots(snapshots)
+            snapshots = self._affine_usable_snapshots(fn, snapshots)
             if not snapshots:
+                unfitted_reasons[str(p_id)] = "no_usable_legal_input"
                 continue
             ordered = sorted(snapshots, key=len)
             stratum = max(1, len(ordered) // 4)
@@ -2593,55 +2664,103 @@ class DataSet:
                 if x_low > 0.0 and x_high >= x_low * min_contrast:
                     cost_low = self._time_operator_on_snapshots(
                         fn, low, min_calls, max_calls, repeats,
-                        target_sec, max_batch_bytes,
+                        target_sec, max_batch_bytes, records_per_call,
                     )
                     cost_high = self._time_operator_on_snapshots(
                         fn, high, min_calls, max_calls, repeats,
-                        target_sec, max_batch_bytes,
+                        target_sec, max_batch_bytes, records_per_call,
                     )
                     if cost_low is not None and cost_high is not None:
                         points = [(x_low, cost_low), (x_high, cost_high)]
-                if not points:
-                    reference = pickle.loads(ordered[len(ordered) // 2])
-                    factor_low = float(
-                        os.environ.get("CEDAR_PROFILE_AFFINE_DOWNSCALE", "0.5")
-                    )
-                    factor_high = float(
-                        os.environ.get("CEDAR_PROFILE_AFFINE_UPSCALE", "2.0")
-                    )
-                    scaled_pairs = []
-                    for factor in (factor_low, factor_high):
-                        scaled = self._affine_rescale_payload(
-                            reference, factor
-                        )
-                        if scaled is None:
-                            continue
-                        scaled_pairs.append(
-                            (
-                                len(
-                                    pickle.dumps(
-                                        scaled,
-                                        protocol=pickle.HIGHEST_PROTOCOL,
-                                    )
-                                ),
-                                scaled,
+                if not points and measurement == "callable":
+                    # Rescaling only makes sense for data-carrying payloads: a
+                    # truncated path string would name a different (or
+                    # non-existent) file, so path-consuming operators keep the
+                    # measured constant fallback below instead.
+                    try:
+                        reference = pickle.loads(ordered[len(ordered) // 2])
+                        factor_low = float(
+                            os.environ.get(
+                                "CEDAR_PROFILE_AFFINE_DOWNSCALE", "0.5"
                             )
                         )
-                    if len(scaled_pairs) >= 2:
-                        scaled_pairs.sort(key=lambda item: item[0])
-                        for size_bytes, payload in scaled_pairs:
-                            cost = self._time_operator_value(
-                                fn, payload, min_calls, max_calls, repeats,
-                                target_sec, max_batch_bytes, size_bytes,
+                        factor_high = float(
+                            os.environ.get(
+                                "CEDAR_PROFILE_AFFINE_UPSCALE", "2.0"
                             )
-                            if cost is not None:
-                                points.append((float(size_bytes), cost))
+                        )
+                        scaled_pairs = []
+                        for factor in (factor_low, factor_high):
+                            scaled = self._affine_rescale_payload(
+                                reference, factor
+                            )
+                            if scaled is None:
+                                continue
+                            scaled_pairs.append(
+                                (
+                                    len(
+                                        pickle.dumps(
+                                            scaled,
+                                            protocol=(
+                                                pickle.HIGHEST_PROTOCOL
+                                            ),
+                                        )
+                                    ),
+                                    scaled,
+                                )
+                            )
+                        if len(scaled_pairs) >= 2:
+                            scaled_pairs.sort(key=lambda item: item[0])
+                            for size_bytes, payload in scaled_pairs:
+                                cost = self._time_operator_value(
+                                    fn, payload, min_calls, max_calls,
+                                    repeats, target_sec, max_batch_bytes,
+                                    size_bytes,
+                                )
+                                if cost is not None:
+                                    points.append((float(size_bytes), cost))
+                    except Exception as exc:  # noqa: BLE001
+                        # A rescaled payload the operator rejects (for example a
+                        # truncated path) is not a legal input; keep the
+                        # measured constant cost of its real inputs instead.
+                        logger.info(
+                            "Rescaled affine counterfactual unusable for pipe "
+                            "%s: %s",
+                            p_id,
+                            exc,
+                        )
+                        points = []
             except Exception as exc:  # noqa: BLE001
                 logger.info(
                     "Input-size affine fit skipped for pipe %s: %s", p_id, exc
                 )
+                unfitted_reasons[str(p_id)] = f"measurement_failed:{exc}"[:200]
                 continue
             if len(points) < 2:
+                # Legal inputs with no usable size contrast still carry a
+                # measured per-record cost. Record it as the k = 0 member of
+                # the same family instead of leaving the operator unpriced.
+                constant = self._time_operator_on_snapshots(
+                    fn, ordered, min_calls, max_calls, repeats,
+                    target_sec, max_batch_bytes, records_per_call,
+                )
+                if constant is None:
+                    unfitted_reasons[str(p_id)] = "constant_measurement_failed"
+                    continue
+                operators[str(p_id)] = {
+                    "fixed_fraction": 1.0,
+                    "k_ms_per_byte": 0.0,
+                    "b_ms": constant,
+                    "x_reference_bytes": float(
+                        input_sizes.get(
+                            p_id, input_sizes.get(str(p_id), 0.0)
+                        )
+                        or statistics.median(len(s) for s in ordered)
+                    ),
+                    "measurement": measurement,
+                    "status": "constant_measured",
+                    "reason": "no_legal_size_contrast",
+                }
                 continue
             points.sort()
             (x_low_pt, cost_low_pt), (x_high_pt, cost_high_pt) = (
@@ -2650,11 +2769,13 @@ class DataSet:
             )
             if x_high_pt <= x_low_pt:
                 continue
-            # A cost that does not grow with the payload is not evidence of a
-            # per-byte term: leave the operator to the historical pricing.
-            if cost_high_pt <= cost_low_pt * min_growth:
-                continue
-            slope = (cost_high_pt - cost_low_pt) / (x_high_pt - x_low_pt)
+            # Every operator gets kx+b, including operators whose cost is flat
+            # in the payload size: a flat cost is the k = 0 member of the same
+            # family, not a separate cost regime.
+            slope = max(
+                0.0,
+                (cost_high_pt - cost_low_pt) / (x_high_pt - x_low_pt),
+            )
             intercept = max(0.0, cost_low_pt - slope * x_low_pt)
             reference_bytes = float(
                 input_sizes.get(p_id, input_sizes.get(str(p_id), 0.0)) or 0.0
@@ -2674,6 +2795,7 @@ class DataSet:
                 "k_ms_per_byte": slope,
                 "b_ms": intercept,
                 "x_reference_bytes": reference_bytes,
+                "measurement": measurement,
                 "points_ms_per_byte": [
                     [x_low_pt, cost_low_pt], [x_high_pt, cost_high_pt]
                 ],
@@ -2685,6 +2807,11 @@ class DataSet:
                     else "rescaled_legal_input"
                 ),
             }
+        unfitted = sorted(
+            p_id
+            for p_id, pipe in feature.logical_pipes.items()
+            if not pipe.is_source() and str(p_id) not in operators
+        )
         profile.setdefault(
             "physical_model", {"schema_version": 1, "boundary": {}}
         )["operator_affine"] = {
@@ -2694,11 +2821,21 @@ class DataSet:
                 "cost(record) = k * input_bytes + b, fitted on the smallest and "
                 "largest legal inputs that reached the operator, or on rescaled "
                 "versions of its own legal input when those inputs have no size "
-                "contrast; fixed_fraction = b / (k * x_reference + b) is what "
-                "the joint DP uses to split an operator's profiled cost into "
-                "its size-dependent and size-independent parts"
+                "contrast. Operators whose cost is flat in the payload keep "
+                "k = 0 and are handled by the same equation. "
+                "fixed_fraction = b / (k * x_reference + b) is the share of the "
+                "operator's reference cost that does not shrink with the payload"
             ),
             "min_contrast": min_contrast,
+            # Operators with no measurable callable (for example pass-through
+            # NoopPipe/BatcherPipe stages) cannot be fitted. They are listed
+            # here so an optimizer that is asked to price them raises instead
+            # of silently falling back to byte-proportional compute.
+            "unfitted_operators": sorted(unfitted),
+            "unfitted_reasons": {
+                key: unfitted_reasons[key]
+                for key in sorted(unfitted_reasons, key=int)
+            },
             "operators": operators,
         }
         logger.info(
@@ -2706,6 +2843,13 @@ class DataSet:
             len(operators),
             len(feature.logical_pipes),
         )
+
+    @staticmethod
+    def _fit_width_curve(measured):
+        """Fit the measured actor-width curve of one stage."""
+        from cedar.compose.my_optimizer import fit_width_curve
+
+        return fit_width_curve(measured)
 
     def _profile_layered_backends(
         self,
@@ -2715,6 +2859,18 @@ class DataSet:
     ) -> None:
         """Collect isolated adaptive costs and targeted width calibration."""
         self._profile_operator_input_size_affine(profile, feature, reservoir)
+        affine_section = profile.get("physical_model", {}).get(
+            "operator_affine"
+        )
+        if (
+            not isinstance(affine_section, dict)
+            or affine_section.get("schema_version") != 1
+        ):
+            raise RuntimeError(
+                "Layered profiling must fit an operator kx+b layer; "
+                "CEDAR_PROFILE_OPERATOR_AFFINE cannot be disabled for the "
+                "shared profile contract"
+            )
         min_duration = float(
             os.environ.get("CEDAR_ADAPTIVE_PROFILE_MIN_SEC", "3")
         )
@@ -2732,7 +2888,7 @@ class DataSet:
         if not (0 < target_rse < 1) or min_observations < 2:
             raise RuntimeError("Invalid adaptive profile confidence settings")
 
-        profile["offloads"] = {
+        modeled_offloads = {
             PipeVariantType.RAY.name: {},
             PipeVariantType.TF_RAY.name: {},
             PipeVariantType.SMP.name: {},
@@ -2790,7 +2946,20 @@ class DataSet:
                     target_rse,
                     min_observations,
                 )
-                profile["offloads"][effective_variant.name][p_id] = (
+                legacy_entry = profile.get("offloads", {}).get(
+                    effective_variant.name, {}
+                ).get(p_id)
+                if legacy_entry is None:
+                    raise RuntimeError(
+                        "Layered profile has no legacy whole-pipeline "
+                        f"measurement for pipe {p_id} backend "
+                        f"{effective_variant.name}"
+                    )
+                # DP/PICO and the three current Simple-DP variants read this
+                # isolated worker timing. Cedar and old_dp_boundary read the
+                # original measured ``throughput`` from the same entry.
+                legacy_entry["backend_compute"] = timing
+                modeled_offloads[effective_variant.name][p_id] = (
                     self._modeled_offload_profile(
                         profile["baseline"], p_id, timing
                     )
@@ -2994,14 +3163,94 @@ class DataSet:
                 scaling[family.name][p_id] = {
                     "schema_version": 2,
                     "method": "legal_input_multiwidth_actor_curve",
+                    # Fitted cost(actors) = scale / actors ** exponent over the
+                    # converged points, so a plan can price the widths its
+                    # resource slice allows without enumerating unmeasured
+                    # integers. Measured points always win over this fit.
+                    "fit": self._fit_width_curve({
+                        int(width): float(timing["mean_ms_per_sample"])
+                        for width, timing in width_timings.items()
+                        if timing.get("adaptive_profile", {}).get(
+                            "converged"
+                        ) is True
+                    }),
                     "widths": width_timings,
                 }
 
+        if os.environ.get("CEDAR_PROFILE_CUDA_WORK", "1") == "1":
+            from cedar.client.cuda_work_profiler import profile_cuda_metadata_invariance
+            cuda_work = profile_cuda_metadata_invariance(self, feature, reservoir)
+            physical["cuda_workload"] = cuda_work
+            operators = physical["operator_affine"]["operators"]
+            for raw_pid, result in cuda_work["operators"].items():
+                coefficients = result.get("affine_coefficients")
+                if not isinstance(coefficients, dict):
+                    continue
+                operators[str(int(raw_pid))] = {
+                    "k_ms_per_byte": float(coefficients["k_ms_per_byte"]),
+                    "b_ms": float(coefficients["b_ms"]),
+                    "x_reference_bytes": float(
+                        coefficients["x_reference_bytes"]
+                    ),
+                    "fixed_fraction": float(coefficients["fixed_fraction"]),
+                    "source": "remote_actor_metadata_counterfactual",
+                    "evidence": "physical_model.cuda_workload",
+                    "metadata_invariance": result.get("reason"),
+                }
+            # The CUDA counterfactual can price operators the local sweep had
+            # to skip, so keep the diagnostic list of unpriced operators in
+            # step with the coefficients the profile actually carries.
+            affine_section = physical["operator_affine"]
+            affine_section["unfitted_operators"] = sorted(
+                p_id
+                for p_id in affine_section.get("unfitted_operators", [])
+                if str(int(p_id)) not in operators
+            )
+
+        if os.environ.get("CEDAR_PROFILE_SMP_AGGREGATE_TRANSPORT", "1") == "1":
+            from cedar.client.smp_transport_profiler import profile_smp_aggregate_transport
+            # Balanced legal object classes from all boundaries that can touch
+            # an SMP stage. Keep actual types/sizes; sample the median capture.
+            boundary_ids = set()
+            for p_id, pipe in feature.logical_pipes.items():
+                if (pipe.pipe_spec is not None
+                        and PipeVariantType.SMP in pipe.pipe_spec.mutable_variants):
+                    boundary_ids.add(p_id)
+                    boundary_ids.update(p.id for p in pipe.input_pipes)
+            transport_snapshots = []
+            for boundary_id in sorted(boundary_ids):
+                captured = sorted(reservoir.values_for(boundary_id), key=len)
+                if captured:
+                    transport_snapshots.append(captured[len(captured) // 2])
+            if boundary_ids and not transport_snapshots:
+                raise RuntimeError("No legal objects captured for SMP aggregate profiling")
+            if transport_snapshots:
+                context = SMPPipeVariantContext()
+                max_pairs = min(32, len(os.sched_getaffinity(0)) // 2)
+                widths = [w for w in (1, 2, 4, 8, 16, 32) if w <= max_pairs]
+                if max_pairs not in widths:
+                    widths.append(max_pairs)
+                curve = profile_smp_aggregate_transport(
+                    transport_snapshots, workers=widths,
+                    max_inflight=context.max_inflight)
+                curve["boundary_pipe_ids"] = sorted(boundary_ids)
+                physical.setdefault("boundary", {}).setdefault("SMP", {})[
+                    "aggregate_transport"] = curve
+
+        profile.setdefault("profile_metadata", {})["profile_protocol"] = (
+            "dual_legacy_whole_pipeline_plus_adaptive_layered")
+        profile["profile_metadata"]["optimizer_profile_consumers"] = {
+            "legacy": "baseline.latencies/throughput, offloads.*.throughput, tf_fuse",
+            "simple_dp_and_pico": (
+                "baseline.wall_latencies, physical_model.operator_affine, "
+                "offloads.*.backend_compute, physical_model.scaling/boundary"),
+        }
         profile["layered_profile"] = {
             "schema_version": 1,
             "method": "fixed_legal_input_adaptive_microbenchmark",
             "input_pool": reservoir.metadata(),
             "isolated_operator_costs": isolated,
+            "modeled_offloads": modeled_offloads,
             "component_layers": {
                 "operator_compute": "isolated_replay",
                 "stage_boundary": "physical_model.boundary",
@@ -3009,7 +3258,7 @@ class DataSet:
                 "parallel_scaling": "physical_model.scaling",
                 "contention_and_fusion": "deferred_to_selected_plan_validation",
             },
-            "compatibility_throughput": "component_substitution",
+            "compatibility_throughput": "legacy_whole_pipeline_measurement",
         }
 
     def _profile_smp(
@@ -3186,11 +3435,6 @@ class DataSet:
                 profiler.calculate_avg_wall_latency_per_sample()
             )
             input_sizes, output_sizes = profiler.calculate_avg_data_size()
-            compute_scaling_inference = None
-            if os.environ.get(
-                "CEDAR_PROFILE_INFER_COMPUTE_SCALING"
-            ) == "1":
-                compute_scaling_inference = profiler.infer_compute_scaling()
 
             # A backend profile mutates exactly one logical operator.  Read
             # worker-side timings before reset tears down its service.
@@ -3231,8 +3475,6 @@ class DataSet:
             "output_sizes": output_sizes,
             "throughput": throughput_samples_per_sec,
         }
-        if compute_scaling_inference is not None:
-            result["compute_scaling_inference"] = compute_scaling_inference
         if backend_compute is not None:
             result["backend_compute"] = backend_compute
         if collect_filter_selectivity:

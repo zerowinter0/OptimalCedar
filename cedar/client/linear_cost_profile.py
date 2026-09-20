@@ -162,7 +162,7 @@ def profile_linear_feature(feature, ctx, duration_sec=10.0, n_samples=None):
                     budget_sec=sweep_budget, field=wrapper.field)
             else:
                 models[pid] = fit_affine(
-                    profiler.compute_scaling_observations.get(pid, []))
+                    profiler.natural_observations.get(pid, []))
                 models[pid]["method"] = "local_trace_wall_clock"
             if isinstance(pipe, ImageReaderPipe) and "mean_ms" in models[pid]:
                 # A pathname's in-memory bytes do not measure decoder work.

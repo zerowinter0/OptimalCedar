@@ -256,10 +256,6 @@ class _BlockCostIndex:
             "output_sizes"
         ][optimizer._get_source_p_id()]
         self.per_byte = [float("inf")] * self.n
-        # Size-independent part of each operator's profiled cost, expressed in
-        # the same normalized unit as ``per_byte`` (the block cost is multiplied
-        # by ``source_size`` before it is compared with a measurement).
-        self.fixed = [0.0] * self.n
         self.successor_masks = [0] * self.n
         for successor, predecessors in enumerate(
             optimizer._dp_pred_indices
@@ -275,27 +271,10 @@ class _BlockCostIndex:
                     i, baseline_input, self.source_size
                 )
                 if denominator > 0:
-                    fixed_fraction = 0.0
-                    if getattr(
-                        optimizer, "uses_affine_operator_cost", False
-                    ) and hasattr(
-                        optimizer, "_dp_operator_fixed_fraction"
-                    ):
-                        fixed_fraction = optimizer._dp_operator_fixed_fraction(
-                            p_id
-                        )
-                    if fixed_fraction > 0.0 and costs[i] > 0.0:
-                        # cost(prefix) = (1 - f) * c * w/w_ref + f * c: the
-                        # profiled cost is reproduced at the profiled position
-                        # while the operator keeps a floor as its input shrinks.
-                        self.fixed[i] = (
-                            fixed_fraction * costs[i] / self.source_size
-                        )
-                        self.per_byte[i] = (
-                            (1.0 - fixed_fraction) * costs[i] / denominator
-                        )
-                    else:
-                        self.per_byte[i] = costs[i] / denominator
+                    # Every optimizer prices an operator through its own work
+                    # product and denominator, so a single per-byte rate
+                    # reproduces the profiled cost at the profiled position.
+                    self.per_byte[i] = costs[i] / denominator
         self._costs: Dict[Tuple[int, int], float] = {}
         self._orders: Dict[Tuple[int, int], Tuple[int, ...]] = {}
         self._endpoint_costs: Dict[
@@ -381,7 +360,6 @@ class _BlockCostIndex:
             operator_cost = (
                 _work_prod(self.optimizer, prefix_mask | prev, last)
                 * self.per_byte[last]
-                + self.fixed[last]
             )
             if prev == 0:
                 predecessors = [(last, 0.0, tuple())]
@@ -439,7 +417,6 @@ class _BlockCostIndex:
             operator_cost = (
                 _work_prod(self.optimizer, prefix_mask | prev, i)
                 * self.per_byte[i]
-                + self.fixed[i]
             )
             if prev == 0:
                 predecessors = [(i, 0.0, tuple())]
@@ -1293,18 +1270,13 @@ class BlockCandidateProvider:
                 ]
                 if missing_internal:
                     raise ValueError("The fused block order violates dependencies.")
-            # Exactly the recurrence ``_BlockCostIndex`` uses, including the
-            # operator's size-independent floor.  Omitting the floor here made
-            # the fixed-order incumbent cheaper than every plan the exact
-            # search can build, and using that price as the branch-and-bound
-            # bound pruned the whole frontier (the audio recipe reported "no
-            # feasible final state" for a seven-operator pipeline).
+            # Exactly the recurrence ``_BlockCostIndex`` uses.  The operator's
+            # size-independent part is already inside the affine work product
+            # of the fitted kx+b, so no separate floor term is added.
             normalized_cost += (
                 _work_prod(self.optimizer, prefix_mask | local_mask, idx)
                 * index.per_byte[idx]
             )
-            if idx < len(getattr(index, "fixed", ())):
-                normalized_cost += index.fixed[idx]
             local_mask |= 1 << idx
 
         return BlockCandidate(
@@ -5865,23 +5837,8 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             raise RuntimeError(
                 "Invalid fixed-worker CPU budget configuration"
             ) from exc
-        local_reserve_raw = os.environ.get(
-            "CEDAR_DP_RUNTIME_CPU_RESERVE_PER_WORKER", "1"
-        )
-        ray_reserve_raw = os.environ.get(
-            "CEDAR_DP_RAY_CPU_RESERVE_PER_WORKER", "1"
-        )
-        try:
-            local_reserve = int(local_reserve_raw)
-            ray_reserve = int(ray_reserve_raw)
-        except ValueError as exc:
-            raise RuntimeError(
-                "DP local/Ray CPU reserves must be integers"
-            ) from exc
-        if local_reserve < 0 or ray_reserve < 0:
-            raise RuntimeError(
-                "DP local/Ray CPU reserves must be non-negative"
-            )
+        local_reserve = 0
+        ray_reserve = 0
         return local_budget, ray_budget, local_reserve, ray_reserve
 
     def _dp_limits_for_workers(

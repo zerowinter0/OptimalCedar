@@ -187,6 +187,10 @@ class ExpBlockCandidateProvider:
 class ExpOptimizer(DpOptimizer):
     """Experimental DP optimizer using a separable physical cost model."""
 
+    # Historical additive-model ablation: it prices compute with Cedar's
+    # byte-volume model and therefore does not read the fitted kx+b layer.
+    uses_affine_operator_cost = False
+
     def __init__(self) -> None:
         super().__init__()
         self._fallback_warnings: Set[Tuple[int, PipeVariantType]] = set()
