@@ -23,8 +23,11 @@ from .utils import (
 )
 
 import functools
+import multiprocessing as mp
 import os
 import pathlib
+import time
+import psutil
 import pytest
 import shutil
 
@@ -103,6 +106,106 @@ def test_mp_dataset_drains_truncated_epoch_before_next_epoch():
     # of its sentinels, rather than letting stale sentinels end this epoch.
     out = list(dataset)
     assert sorted(out) == sorted(list(data) * 2)
+
+
+def _sleep_forever():
+    while True:
+        time.sleep(1)
+
+
+def _stuck_worker_with_child(queue, child_pids):
+    """A local worker that cannot observe done or act on SIGTERM."""
+    import signal
+
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    child = mp.Process(target=_sleep_forever)
+    child.start()
+    child_pids.put(child.pid)
+    while True:
+        queue.put(b"blocked")
+
+
+def _live_processes(pids):
+    live = []
+    for pid in pids:
+        try:
+            process = psutil.Process(pid)
+        except psutil.NoSuchProcess:
+            continue
+        if process.status() != psutil.STATUS_ZOMBIE:
+            live.append(pid)
+    return live
+
+
+def test_mp_iter_shutdown_kills_stuck_worker_process_tree():
+    """A worker stuck in queue.put() must not block dataset shutdown.
+
+    COCO's boundary plans hung for hours in ``DataSet._exit``: the consumer
+    stopped at ``num_total_samples``, the local workers kept producing into a
+    full result queue, and the interpreter then joined them without a timeout
+    at exit.
+    """
+    from cedar.client.dataset import MP_QUEUE_MAX_SIZE, _MultiprocessDataSetIter
+
+    ctx = mp.get_context("spawn")
+    iterator = _MultiprocessDataSetIter.__new__(_MultiprocessDataSetIter)
+    iterator._workers = {}
+    iterator._worker_epoch_start = {}
+    iterator._done = ctx.Event()
+    iterator._result_queue = ctx.Queue(maxsize=MP_QUEUE_MAX_SIZE)
+    iterator._startup_queue = ctx.Queue()
+
+    child_pids = ctx.Queue()
+    worker = ctx.Process(
+        target=_stuck_worker_with_child,
+        args=(iterator._result_queue, child_pids),
+    )
+    worker.start()
+    child_pid = child_pids.get(timeout=60)
+    iterator._workers[0] = worker
+    iterator._worker_epoch_start[0] = ctx.Event()
+
+    started = time.monotonic()
+    iterator._shutdown()
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 20, f"shutdown took {elapsed:.1f}s"
+    assert iterator._workers == {}
+    assert _live_processes([worker.pid, child_pid]) == []
+
+
+def test_mp_dataset_close_is_bounded_after_partial_consumption():
+    class TestFeature(Feature):
+        def _compose(self, source_pipes: List[Pipe]):
+            return NoopPipe(source_pipes[0])
+
+    data = list(range(4000))
+    feats = {}
+    for i in range(2):
+        feature = TestFeature()
+        feature.apply(IterSource(data))
+        feats[str(i)] = feature
+
+    dataset = DataSet(
+        CedarContext(),
+        feats,
+        enable_controller=False,
+        iter_mode="mp",
+        prefetch=False,
+        enable_optimizer=False,
+    )
+    iterator = iter(dataset)
+    for _ in range(10):
+        next(iterator)
+
+    # The workers are now blocked in queue.put() and cannot react to the done
+    # event, which is exactly the situation that used to hang the driver.
+    started = time.monotonic()
+    dataset.close()
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 30, f"close() took {elapsed:.1f}s"
+    assert dataset._mp_iter is None
 
 
 def test_epoch():

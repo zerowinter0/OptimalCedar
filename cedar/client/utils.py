@@ -2,8 +2,9 @@ import torch
 import multiprocessing as mp
 import logging
 import os
+import psutil
 from ray import cloudpickle
-from typing import Any, Optional, Union, Dict
+from typing import Any, List, Optional, Union, Dict
 
 from cedar.config import CedarContext
 from cedar.compose import Feature, PhysicalPlan
@@ -15,6 +16,32 @@ from .logger import DataSetLogger
 from cedar.utils.threading import limit_native_threadpools
 
 logger = logging.getLogger(__name__)
+
+
+def kill_process_tree(pid: int) -> List[int]:
+    """SIGKILL ``pid`` together with every live descendant.
+
+    Local dataset workers start SMP actor processes of their own. A worker
+    that has to be killed cannot clean those actors up, and an orphaned actor
+    keeps holding its core for the rest of the campaign, so the whole subtree
+    is killed.
+    """
+    try:
+        root = psutil.Process(pid)
+    except psutil.NoSuchProcess:
+        return []
+
+    # Enumerate before signalling: killing the parent re-parents its children
+    # to init, which would hide them from a later tree walk.
+    victims = root.children(recursive=True) + [root]
+    killed = []
+    for victim in victims:
+        try:
+            victim.kill()
+        except psutil.NoSuchProcess:
+            continue
+        killed.append(victim.pid)
+    return killed
 
 
 class Sentinel:

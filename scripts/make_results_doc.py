@@ -8,6 +8,7 @@ import yaml
 REPO = pathlib.Path("/workspace/OptimalCedar")
 ULT = REPO / "outputs/ultimate_eight_optimizers_20260920"
 SMALL = REPO / "outputs/six_workload_formal_v3_20260919"
+W_MODEL_FRAGMENT = REPO / "docs/experiment_results_20260920_w_models.inc.md"
 
 ULT_METHODS = [
     ("optimizer", "cedar-opt"), ("plumber_optimizer", "plumber-opt"),
@@ -28,7 +29,20 @@ ULT_DATA = {"simclrv2": "189,380 (9,469 张 × 20 epoch)", "simclrv2_cache": "18
             "commonvoice": "300,000", "coco": "50,000 (train2017)", "llava_pretrain": "50,000", "stackexchange": "20,000"}
 SMALL_DATA = {"simclrv2": "9,469", "simclrv2_cache": "9,469", "commonvoice": "15,000",
               "coco": "5,000 (val2017)", "llava_pretrain": "1,000 / 907 processed", "stackexchange": "2,000"}
-DONE = ["simclrv2", "simclrv2_cache", "commonvoice"]
+DONE = ["simclrv2", "simclrv2_cache", "commonvoice", "coco"]
+# status.json records cells by the runner's method label, while results and
+# plans are named after the internal optimizer module.
+STATUS_LABELS = {
+    "optimizer": "cedar-opt",
+    "plumber_optimizer": "plumber-opt",
+    "raydata_optimizer": "ray-opt",
+    "unopti": "unopti",
+    "old_dp_boundary": "old_dp_boundary",
+    "simple_dp_boundary": "simple_dp_boundary",
+    "simple_dp_workers_width_boundary": "simple_dp_workers_width_boundary",
+    "simple_dp": "simple-dp-opt",
+    "old_dp_legacy_optimizer": "old-dp-opt",
+}
 
 
 def metrics(root, workload, method):
@@ -109,9 +123,10 @@ def metric_table(root, workload, methods, data_note):
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
     rows = []
     baseline = None
+    state_json = json.loads((root / "status.json").read_text())
     for key, label in methods:
         m = metrics(root, workload, key)
-        state = cell_for(json.loads((root / "status.json").read_text()), workload, label)
+        state = cell_for(state_json, workload, STATUS_LABELS.get(key, key))
         if m is None:
             rows.append((label, None, state))
             continue
@@ -186,8 +201,10 @@ out = [
     "## 1. 放大数据集 campaign（`outputs/ultimate_eight_optimizers_20260920`）",
     "",
 ]
+section = 0
 for workload in DONE:
-    out.append(f"### 1.{DONE.index(workload) + 1} {workload}")
+    section += 1
+    out.append(f"### 1.{section} {workload}")
     out.append("")
     out.append(f"- 数据量：{ULT_DATA[workload]}")
     out.append("")
@@ -199,6 +216,12 @@ for workload in DONE:
     out.append("")
     out += plan_table(ULT, workload, ULT_METHODS)
     out.append("")
+    if workload == "commonvoice":
+        # Plumber/PICO W-aware model comparison; the fragment is versioned so
+        # regenerating this document cannot drop it.
+        section += 1
+        out.append(W_MODEL_FRAGMENT.read_text().format(no=section).rstrip())
+        out.append("")
 
 out += [
     "## 2. 小数据集 campaign（`outputs/six_workload_formal_v3_20260919`）",
@@ -222,8 +245,10 @@ state = json.loads((ULT / "status.json").read_text())
 out += [
     "## 3. 未完成与不可用记录",
     "",
-    "- 放大 campaign 仍在进行中：coco / llava_pretrain / stackexchange（当前状态见 `outputs/ultimate_eight_optimizers_20260920/status.json`）；",
+    "- 放大 campaign 已于 2026-09-20 14:30（UTC+8）暂停：llava_pretrain / stackexchange 尚未开始，coco 的 `simple-dp-opt` / `old-dp-opt` 未运行（详见 `docs/experiment_status_20260920_pause.md`）；",
     "- `commonvoice` 的 `unopti` 超过 2 小时上限，记为 `timeout`（unavailable）；",
+    "- `coco` 的 `unopti` 真的慢：2 小时内只处理 47,635/50,000（约 6.6 rec/s），记为 `timeout`；",
+    "- `coco` 的 `dp-boundary` / `dp-boundary-affine` 实际已测完（226.5 / 240.0 rec/s，结果 JSON 已落盘），但进程在 teardown 阶段挂住 2 小时才被 runner 杀掉，因此状态记为 `timeout`；根因是本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 该子进程。该缺陷已在 `cedar/client/dataset.py` 修复（分级 shutdown + 进程树 SIGKILL + 有界 join），修复后需重跑这两个 cell；",
     "- 小数据集 campaign 的 `llava_pretrain`：`cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width` 因 1 小时上限记为 `timeout`（单次 W 的精确 DP 在 16 层中的第 10 层被截断）；",
     "- 小数据集 campaign 的 `stackexchange` 按用户要求提前停止（只完成 plumber-opt / ray-opt），本文件不将其计入对照。",
     "",

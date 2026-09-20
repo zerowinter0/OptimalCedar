@@ -185,6 +185,38 @@
 - **PICO（含 W）**：7 个计划里 5 个落在 0.31–2.02×，与实测的相关性最好；唯一偏乐观的是它自己选中的两份 affine 计划（cost 空间 0.31×，即预测 2364 rec/s vs 实测 743），说明它对"本地融合 + 宽 W"的折扣仍偏松；
 - **Cedar（未做 W 处理）**：作为"单副本"代价与带 W 的模型不可直接比较，但仍可看出方向性错误——它在 cedar-opt/ray-opt/old-dp-opt 上给出极小的单副本代价（0.22–0.38×），在它自己也选中的 W-width 计划上给出 3.5×；Cedar 的模型没有后端 IPC、宽度、W 与 lane 竞争项，无法用于这类比较。
 
+### 1.5 coco
+
+- 数据量：50,000 (train2017)
+
+**结果**
+
+| optimizer | 总数据量 | 稳态时间 | 稳态吞吐 | 相对 cedar-opt | 非稳态 setup(含启动+优化) | 总时长 | 状态 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| cedar-opt | 50,000 | 1873.9 s | 26.7 /s | 1.00× | 17.1 s | 1940.9 s | completed |
+| plumber-opt | 50,000 | 2627.6 s | 19.0 /s | 0.71× | 20.9 s | 2648.8 s | completed |
+| ray-opt | 50,000 | 6598.3 s | 7.6 /s | 0.28× | 27.1 s | 6642.7 s | completed |
+| unopti | 50,000 (train2017) | — | — | — | — | — | timeout |
+| dp-boundary | 50,000 | 220.8 s | 226.5 /s | 8.49× | 8.9 s | 251.2 s | timeout |
+| dp-boundary-affine | 50,000 | 208.4 s | 240.0 /s | 8.99× | 9.3 s | 235.9 s | timeout |
+| dp-boundary-affine-W-width | 50,000 | 169.9 s | 294.3 /s | 11.03× | 21.6 s | 221.1 s | completed |
+| simple-dp-opt (new profile, no boundary) | 50,000 (train2017) | — | — | — | — | — | 未运行 |
+| old-dp-opt (legacy profile, no boundary) | 50,000 (train2017) | — | — | — | — | — | 未运行 |
+
+**各 optimizer 选中的计划**
+
+| optimizer | W | 计划（source → ... → sink，未标注即 INPROCESS） | cache |
+| --- | ---: | --- | --- |
+| cedar-opt | 64 | COCOSourcePipe -> FusedPipe{1,5,4,3,2}[RAY w=1] -> to_tensor -> PrefetcherPipe | 无 |
+| plumber-opt | 1 | COCOSourcePipe -> zoom_out -> crop[SMP w=6] -> SanitizeBoundingBox -> RandomHorizontalFlip[SMP w=2] -> distort[SMP w=48] -> to_tensor[SMP w=7] -> PrefetcherPipe | 无 |
+| ray-opt | 1 | COCOSourcePipe -> FusedPipe{5,4,3,2,1,0}[RAY w=64] -> PrefetcherPipe | 无 |
+| unopti | — | 无计划文件（未运行/超时） | — |
+| dp-boundary | 32 | COCOSourcePipe -> FusedPipe{1,5,4,3,2}[SMP w=1] -> to_tensor -> PrefetcherPipe | 无 |
+| dp-boundary-affine | 32 | COCOSourcePipe -> distort[SMP w=1] -> FusedPipe{5,4,3,2} -> to_tensor -> PrefetcherPipe | 无 |
+| dp-boundary-affine-W-width | 64 | COCOSourcePipe -> FusedPipe{1,5,4,3,2} -> to_tensor -> PrefetcherPipe | 无 |
+| simple-dp-opt (new profile, no boundary) | — | 无计划文件（未运行/超时） | — |
+| old-dp-opt (legacy profile, no boundary) | — | 无计划文件（未运行/超时） | — |
+
 ## 2. 小数据集 campaign（`outputs/six_workload_formal_v3_20260919`）
 
 该轮为放大前的对照实验（同样 1 轮、CPU_BUDGET=64、远端 Ray）。
@@ -296,7 +328,7 @@
 | ray-opt | 907 | 55.8 s | 16.3 /s | — | 5.6 s | 68.9 s | completed |
 | dp-boundary | 907 | 30.8 s | 29.4 /s | — | 52.0 s | 92.0 s | completed |
 | dp-boundary-affine | 907 | 57.2 s | 15.9 /s | — | 65.5 s | 126.0 s | completed |
-| dp-boundary-affine-W-width | 1,000 / 907 processed | — | — | — | — | — | 未运行 |
+| dp-boundary-affine-W-width | 1,000 / 907 processed | — | — | — | — | — | timeout |
 
 **各 optimizer 选中的计划**
 
@@ -311,8 +343,10 @@
 
 ## 3. 未完成与不可用记录
 
-- 放大 campaign 仍在进行中：coco / llava_pretrain / stackexchange（当前状态见 `outputs/ultimate_eight_optimizers_20260920/status.json`）；
+- 放大 campaign 已于 2026-09-20 14:30（UTC+8）暂停：llava_pretrain / stackexchange 尚未开始，coco 的 `simple-dp-opt` / `old-dp-opt` 未运行（详见 `docs/experiment_status_20260920_pause.md`）；
 - `commonvoice` 的 `unopti` 超过 2 小时上限，记为 `timeout`（unavailable）；
+- `coco` 的 `unopti` 真的慢：2 小时内只处理 47,635/50,000（约 6.6 rec/s），记为 `timeout`；
+- `coco` 的 `dp-boundary` / `dp-boundary-affine` 实际已测完（226.5 / 240.0 rec/s，结果 JSON 已落盘），但进程在 teardown 阶段挂住 2 小时才被 runner 杀掉，因此状态记为 `timeout`；根因是本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 该子进程。该缺陷已在 `cedar/client/dataset.py` 修复（分级 shutdown + 进程树 SIGKILL + 有界 join），修复后需重跑这两个 cell；
 - 小数据集 campaign 的 `llava_pretrain`：`cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width` 因 1 小时上限记为 `timeout`（单次 W 的精确 DP 在 16 层中的第 10 层被截断）；
 - 小数据集 campaign 的 `stackexchange` 按用户要求提前停止（只完成 plumber-opt / ray-opt），本文件不将其计入对照。
 

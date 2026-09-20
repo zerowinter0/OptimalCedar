@@ -47,6 +47,7 @@ from .boundary_profiler import (
 from .controller import FeatureController
 from .logger import DataSetLogger
 from .utils import (
+    kill_process_tree,
     multiprocess_worker_loop,
     multiprocess_worker_loop_from_serialized_feature,
     Sentinel,
@@ -67,6 +68,15 @@ logger = logging.getLogger(__name__)
 
 
 MP_QUEUE_MAX_SIZE = 100
+
+# A local worker that is blocked in ``result_queue.put()`` (the consumer
+# stopped at ``num_total_samples``) never observes the done event, and a
+# worker blocked in a threading wait does not act on SIGTERM either. Shutdown
+# therefore escalates on a deadline: the interpreter joins surviving children
+# without a timeout at exit, so an unbounded shutdown hangs the cell.
+MP_WORKER_EXIT_GRACE_SEC = 2.0
+MP_WORKER_TERMINATE_GRACE_SEC = 5.0
+MP_WORKER_KILL_GRACE_SEC = 5.0
 
 
 def _profile_time_sec_from_env() -> float:
@@ -708,26 +718,50 @@ class _MultiprocessDataSetIter:
         if not self._workers:
             return
 
+        workers = dict(self._workers)
         self._done.set()
         for _, event in self._worker_epoch_start.items():
             # Need to signal start for workers to check for done signal
             event.set()
-        # Use one shared grace period. Workers can be blocked in queue.put()
-        # after the consumer stops at num_total_samples.
-        deadline = time.monotonic() + 1.0
-        for _, w in self._workers.items():
-            w.join(max(0.0, deadline - time.monotonic()))
-        for idx, w in self._workers.items():
-            if w.is_alive():
-                logger.info(f"Terminating worker {idx}...")
-                w.terminate()
-        for _, w in self._workers.items():
-            w.join(5)
+
+        # Workers can be blocked in queue.put() after the consumer stops at
+        # num_total_samples. Every escalation step is bounded, and the process
+        # tree of a worker that ignores SIGTERM is killed, so the driver can
+        # never end up waiting for a child at interpreter exit.
+        self._join_workers(workers, MP_WORKER_EXIT_GRACE_SEC)
+        for idx in self._alive_workers(workers):
+            logger.info(f"Terminating worker {idx}...")
+            workers[idx].terminate()
+        self._join_workers(workers, MP_WORKER_TERMINATE_GRACE_SEC)
+        for idx in self._alive_workers(workers):
+            logger.warning(
+                f"Worker {idx} ignored SIGTERM; killing its process tree "
+                f"(pids {kill_process_tree(workers[idx].pid)})"
+            )
+        self._join_workers(workers, MP_WORKER_KILL_GRACE_SEC)
+        survivors = self._alive_workers(workers)
+        if survivors:
+            raise RuntimeError(
+                "Dataset workers survived SIGKILL and would block interpreter "
+                f"exit: {[(idx, workers[idx].pid) for idx in survivors]}"
+            )
+
         self._workers.clear()
         self._worker_epoch_start.clear()
         self._result_queue.cancel_join_thread()
         self._result_queue.close()
         self._startup_queue.close()
+
+    @staticmethod
+    def _alive_workers(workers):
+        return [idx for idx, w in workers.items() if w.is_alive()]
+
+    @staticmethod
+    def _join_workers(workers, timeout_sec):
+        """Join every worker against one shared deadline."""
+        deadline = time.monotonic() + timeout_sec
+        for _, w in workers.items():
+            w.join(max(0.0, deadline - time.monotonic()))
 
     def __del__(self):
         self._shutdown()
