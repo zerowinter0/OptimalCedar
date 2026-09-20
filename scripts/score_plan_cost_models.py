@@ -65,8 +65,17 @@ def build_feature(workload: str):
 def load_plan(path: Path) -> PhysicalPlan:
     payload = yaml.safe_load(path.read_text())
     payload = payload.get("physical_plan", payload)
+    if "feature" in payload:
+        payload = payload["feature"]
     if "feature_r0" in payload:
         payload = payload["feature_r0"]
+    payload["graph"] = {int(k): v for k, v in payload["graph"].items()}
+    payload["pipes"] = {int(k): v for k, v in payload["pipes"].items()}
+    for desc in payload["pipes"].values():
+        # Recorded campaign plans leave the variant out for operators that were
+        # fused away; they are not executed, but must still deserialize.
+        desc.setdefault("variant", "INPROCESS")
+        desc.setdefault("variant_ctx", {"variant_type": desc["variant"]})
     return PhysicalPlan.from_dict(payload)
 
 
@@ -187,7 +196,16 @@ def main() -> int:
         plan = load_plan(Path(path))
         workers = max(1, int(plan.n_local_workers or 1))
         cedar_cost = cedar.calculate_cost(plan.graph, plan=plan)
-        pico_score = pico.calculate_dp_objective_cost(plan=plan)
+        try:
+            pico_score = pico.calculate_dp_objective_cost(plan=plan)
+            pico_info = {
+                "score": round(pico_score, 4),
+                "workers": workers,
+                "cost_ms_per_source_record": round(pico_score / workers, 4),
+            }
+        except Exception as exc:  # noqa: BLE001
+            # e.g. a stage whose variant is outside PICO's search space.
+            pico_info = {"error": f"{type(exc).__name__}: {exc}"}
         plumber = plumber_cost(plan, profile)
         row = {
             "label": label,
@@ -196,11 +214,7 @@ def main() -> int:
             "chain": plan_chain(plan),
             "cedar_cost_ms_per_source_record": round(cedar_cost, 4),
             "plumber": plumber,
-            "pico": {
-                "score": round(pico_score, 4),
-                "workers": workers,
-                "cost_ms_per_source_record": round(pico_score / workers, 4),
-            },
+            "pico": pico_info,
         }
         rows.append(row)
 
@@ -209,13 +223,20 @@ def main() -> int:
     header = f"{'plan':<10}{'W':>4}{'cedar':>10}{'plumber/W':>12}{'pico S':>10}{'pico/W':>10}"
     print(header)
     for row in rows:
+        pico = row["pico"]
+        pico_cells = (
+            f"{pico['score']:>10.4f}{pico['cost_ms_per_source_record']:>10.4f}"
+            if "score" in pico
+            else f"{'n/a':>10}{'n/a':>10}"
+        )
         print(
             f"{row['label']:<10}{row['workers']:>4}"
             f"{row['cedar_cost_ms_per_source_record']:>10.4f}"
             f"{row['plumber']['cost_ms_per_source_record']:>12.4f}"
-            f"{row['pico']['score']:>10.4f}"
-            f"{row['pico']['cost_ms_per_source_record']:>10.4f}"
+            f"{pico_cells}"
         )
+        if "error" in pico:
+            print(f"    pico: {pico['error']}")
     for row in rows:
         print(f"\n{row['label']}: {row['chain']}")
         print("  plumber stages: " + json.dumps(row["plumber"]["stages"]))

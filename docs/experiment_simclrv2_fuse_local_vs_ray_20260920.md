@@ -124,7 +124,55 @@ latency 全部相同，所以 Plumber 给出的 cost **完全一样**（它不�
   （S/W = 0.1287，折算 7,770 rec/s，实测 2,391 rec/s），把 RAY 侧估得过差（1.3902，折算 719 rec/s，
   实测 1,151 rec/s），净效果是 10.8× 对 2.08×。
 
-## 6. 产物
+## 6. 另外四个 simclrv2 计划的三模型预测（unopt / old-dp / plumber / cedar）
+
+口径与 §4 完全一致：**Cedar** = `Optimizer.calculate_cost`（单 worker，模型没有 W）；**Plumber** =
+`1000/(X·W)`，`X` 由计划声明的宽度给出（融合 stage 的单条服务时间 = 成员 latency 之和）；**PICO** = `S/W`。
+计划取 campaign 记录的原样文件 `outputs/ultimate_eight_optimizers_20260920/simclrv2/plans/`
+（`round1__{unopti,old_dp_legacy_optimizer,plumber_optimizer,optimizer}.yaml`），其中 `cedar` 就是 §2 的 ray 臂。
+
+| 计划 | W | 计划形态 | Cedar | **Plumber ÷W** | PICO S | **PICO S/W** |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| unopt | 1 | 全 INPROCESS、无融合、无 prefetch | 22.9795 | 8.4977 | 25.4090 | 25.4090 |
+| old-dp | 32 | `ImageReader → FusedPipe{7,1,2,3,4,6,5}[SMP w=1] → Batcher → Prefetch` | 7.9084 | 0.5975 | 113.5186 | 3.5475 |
+| plumber | 1 | 逐算子 SMP（to_float 2 / crop 7 / jitter 27 / grayscale 2 / blur 25） | 22.9795 | 7.7742 | n/a | n/a |
+| cedar | 64 | `… → FusedPipe{2,5,4}[RAY w=1] → …` | 8.4753 | 0.2543 | 88.9718 | 1.3902 |
+| （§3 参照）fuse-local | 64 | 同上但 `{2,5,4}` 为 local | 9.1662 | 0.2543 | 8.2365 | 0.1287 |
+
+完整计划链（即计划记录本身）：
+
+- **unopt**（W=1）：`LocalFSListerPipe → ImageReaderPipe → to_float → RandomResizedCrop → RandomHorizontalFlip → ColorJitter → Grayscale → GaussianBlur → Normalize → BatcherPipe(4)`（全部 INPROCESS）
+- **old-dp**（W=32）：`LocalFSListerPipe → ImageReaderPipe → FusedPipe{7,1,2,3,4,6,5}[SMP w=1] → BatcherPipe(4) → PrefetcherPipe`
+- **plumber**（W=1）：`LocalFSListerPipe → ImageReaderPipe → to_float[SMP w=2] → RandomResizedCrop[SMP w=7] → RandomHorizontalFlip → ColorJitter[SMP w=27] → Grayscale[SMP w=2] → GaussianBlur[SMP w=25] → Normalize → BatcherPipe(4) → PrefetcherPipe`
+- **cedar**（W=64）：`LocalFSListerPipe → ImageReaderPipe → Grayscale → RandomResizedCrop → FusedPipe{2,5,4}[RAY w=1] → to_float → Normalize → BatcherPipe(4) → PrefetcherPipe`
+
+注：`plumber` 计划的逐算子 SMP 宽度不在 PICO 的搜索空间内（`ValueError: Variant SMP is outside the DP
+search space.`），因此该行 PICO 记 n/a；`old-dp` 的整块 SMP 融合计划可以被 PICO 打分。
+
+与实测对照（cost 空间 = 1000/T）：实测取同一 campaign 的 **189,380 条**运行（与 §3 的 9,469 不同尺度，
+仅作数量级对照；§3 的 fuse-local/fuse-ray 是同尺度 9,469）：
+
+| 计划 | 实测 1000/T | Cedar | Plumber ÷W | PICO S/W | Plumber 实测/预测 | PICO 实测/预测 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| unopt | 21.642（46.2 rec/s） | 22.9795 | 8.4977 | 25.4090 | 2.55×（乐观） | 0.85×（偏悲观 1.17×） |
+| old-dp | 2.833（352.9 rec/s） | 7.9084 | 0.5975 | 3.5475 | 4.74×（乐观） | 0.80×（偏悲观 1.25×） |
+| plumber | 9.353（106.9 rec/s） | 22.9795 | 7.7742 | n/a | 1.20×（乐观） | n/a |
+| cedar | 0.842（1187.7 rec/s） | 8.4753 | 0.2543 | 1.3902 | 3.31×（乐观） | 0.61×（偏悲观 1.65×） |
+
+读法：
+
+- **Cedar 只在 unopt 这种“单 worker 纯 local”计划上自洽**：预测 22.98 vs 实测 21.64（差 6%，唯一可直接比
+  的一行）。其余计划的实测是 W 个 worker 的系统吞吐，而 Cedar 给的是单 worker 代价，两者不可直接比较
+  （§5 已展示它在 ray/local 上方向相反）。
+- **Plumber ÷W** 在 plumber 自己那个“单 worker、瓶颈是本地 stage”的计划上很准（7.774 vs 9.353，1.20×），
+  但凡 W>1 就系统性乐观 2.5–4.7×：它把 `X·W` 当成线性放大，没有 worker 之间的竞争/内存带宽项。
+- **PICO（S/W）** 在 unopt / old-dp / cedar 上落在 0.80–0.85×（略偏悲观，方向与量级都对），但在 §5 的
+  fuse-local 上偏乐观到 0.31×（3.25× 高估）——与之前在 commonvoice 上的结论一致：它对“全 local + 宽 W”
+  的折扣仍偏松。
+
+复算：`scripts/score_plan_cost_models.py --workload simclrv2 --profile <shared.yaml> --plan unopt=<plan> --plan old-dp=<plan> --plan plumber=<plan> --plan cedar=<plan>`。
+
+## 7. 产物
 
 - 计划：`outputs/simclrv2_local_vs_ray_9469_20260920/plans/{cedar_opt_local_w1,cedar_opt_ray_w1}.yaml`
 - 结果 JSON：`outputs/simclrv2_local_vs_ray_9469_20260920/results/round{1,2,3}__{local,ray}.json`（+ `smoke_local.json`）
