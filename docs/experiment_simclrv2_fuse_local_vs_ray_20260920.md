@@ -245,7 +245,41 @@ worker 均分输入、彼此无干扰”的理想化假设）：
 每个 worker 落一个 `worker_<i>.json`（含 `wall_latency_samples`、`process_latency_ns_per_sample`、
 `service_stats`、`pipe_counters`），本次数据在 `outputs/simclrv2_breakdown_20260920/`。
 
-## 8. 产物
+## 8. 指定顺序 / 指定融合的 5 个候选计划的 Cedar cost（2026-09-21 追加）
+
+字母表取自论文图例（`my_paper/69e75a0100d7b4afeb1cfc20/figures/build_pipeline_cooptimization_simclr.py`）：
+**R**=reader, **F**=to_float, **C**=Crop(RandomResizedCrop), **H**=Flip, **J**=Jitter, **G**=Grayscale,
+**B**=Blur(GaussianBlur), **N**=Normalize, **T**=Batcher。所有计划 R 固定在最前（source 之后），
+末尾接 Prefetcher；口径同 §4：`Optimizer.calculate_cost`，ms/source-record、单 worker、模型不用 W。
+
+复算脚本：`scripts/score_cedar_simclrv2_plan_variants.py`。
+
+| # | 计划 | Cedar cost |
+| --- | --- | ---: |
+| 1 | R → G C B H J F T N（无 fuse、全 local） | **10.5481** |
+| 1b | R → G C B H J F N T（同上，仅 T/N 互换） | **10.5481** |
+| 2 | R → F N B G J C H T（无 fuse、全 local） | **79.3948** |
+| 3 | R → Fused{G,C,B,H,J,F,T,N}（panel 1 全 fuse、local） | **4.5319** |
+| 3b | R → Fused{G,C,B,H,J,F} → T → N（只 fuse 可映射算子、T 原位） | **9.2923** |
+| 4 | cedar plan（R → G → C → Fused{B,H,J} → F → N → T）把 fuse 块换成 **SMP w=1** | **8.4753** |
+| 5 | R → Fused{F,N,B,G,J,C,H} → T（plan 2 的 7 个算子全 fuse、local） | **11.0793** |
+| 5b | R → Fused{F,N,B,G,J,C,H,T}（连 Batcher 一起 fuse、local） | **5.1382** |
+
+参照（同 profile）：不融合且按 profile 声明顺序（R F C H J G B N T）**22.9795**；cedar plan 原样（fuse 块
+RAY w=1）**8.4753**；同一计划 fuse 块改 local **9.1662**。
+
+读法：
+
+- **plan 2 的 79.39 来自“Blur 排在 Crop 之前”**：Cedar 的尺寸比模型让 Blur 在 597×597 float32
+  （2.39 MB/record，是基线 244×244=238 KB 的 10×）上执行，单算子被计到 **60.45 ms**（基线 6.02 ms），
+  仅 `to_float` 的 ×4、`Crop` 太晚这两点就把整条计划推到基线的 3.5×。plan 1 反过来（G、C 提前）→ 10.55。
+- **plan 4（SMP）与 RAY 版完全同价（8.4753）**：`{B,H,J}` 三个成员在 RAY 和 SMP 下都被 Amdahl 判成
+  cost = 0，所以这个模型看不出后端差别；而同一个块放 local 要 9.1662（贵 8%）。
+- **全 fuse 明显更便宜**：plan 1 的 8 个算子合成一块 → 4.5319（相对不融合 10.5481 便宜 57%）；
+  差别来自 Cedar 的融合 IO 折扣（§4/§5 的同一机制）。把 Batcher 留在块外（3b/5）会让折扣少拿一次，
+  5 与 5b 的 11.08 vs 5.14 就是这个效应。
+
+## 9. 产物
 
 - 计划：`outputs/simclrv2_local_vs_ray_9469_20260920/plans/{cedar_opt_local_w1,cedar_opt_ray_w1}.yaml`
 - 结果 JSON：`outputs/simclrv2_local_vs_ray_9469_20260920/results/round{1,2,3}__{local,ray}.json`（+ `smoke_local.json`）
