@@ -1,6 +1,7 @@
 import abc
 import random
 import logging
+import os
 import ray
 import queue
 import threading
@@ -13,6 +14,15 @@ from typing import Any, List
 from cedar.utils.threading import limit_native_threadpools
 
 logger = logging.getLogger(__name__)
+
+# Client-side Ray path timing: serialize+submit per batch, and ray.get per
+# batch.  Off by default so production runs are unaffected.
+_RAY_PATH_TIMING = os.environ.get("CEDAR_RAY_PATH_TIMING", "0") in (
+    "1",
+    "true",
+    "True",
+    "yes",
+)
 
 
 class RayActor:
@@ -64,6 +74,12 @@ class SampleBatch:
         self.backend_compute_ns = None
         self._timing_consumed = False
         self._result_sample_count = 0
+        # Client-side path timing (CEDAR_RAY_PATH_TIMING): how long the worker
+        # spends serializing/submitting the batch, and how long ray.get() takes
+        # (queue wait + actor compute + return transfer + deserialization).
+        self.submit_ns = None
+        self.get_ns = None
+        self._path_timing_consumed = False
 
     def append(self, x: Any) -> bool:
         """
@@ -84,14 +100,24 @@ class SampleBatch:
             x.data = None
 
         self.profile_backend_compute = profile_backend_compute
+        started = (
+            time.perf_counter_ns() if _RAY_PATH_TIMING else None
+        )
         if profile_backend_compute:
             self.future = actor.process_profiled.remote(batch)
         else:
             self.future = actor.process.remote(batch)
+        if started is not None:
+            self.submit_ns = time.perf_counter_ns() - started
 
     def next(self) -> Any:
         if not self.has_result:
+            started = (
+                time.perf_counter_ns() if _RAY_PATH_TIMING else None
+            )
             result = ray.get(self.future)
+            if started is not None:
+                self.get_ns = time.perf_counter_ns() - started
             if self.profile_backend_compute:
                 result, self.backend_compute_ns = result
                 self._result_sample_count = len(result)
@@ -112,6 +138,14 @@ class SampleBatch:
             return None
         self._timing_consumed = True
         return float(self.backend_compute_ns) / sample_count
+
+    def take_path_timing_observation(self):
+        """Return client-side (submit_ns, get_ns, samples) once per batch."""
+        if self._path_timing_consumed or self.submit_ns is None:
+            return None
+        self._path_timing_consumed = True
+        samples = max(1, len(self.submit_batch_samples))
+        return float(self.submit_ns), float(self.get_ns or 0), samples
 
     def exhausted(self) -> bool:
         return len(self.submit_batch_samples) == 0
@@ -138,6 +172,10 @@ class RayService:
         self._backend_compute_count = 0
         self._backend_compute_sum_ns = 0.0
         self._backend_compute_sum_sq_ns = 0.0
+        self._path_timing_batches = 0
+        self._path_timing_samples = 0
+        self._path_submit_ns = 0.0
+        self._path_get_ns = 0.0
 
         self._actors = None
         self._inflight_tasks = None
@@ -205,6 +243,7 @@ class RayService:
                 self._num_inflight_tasks -= 1
             sample = self._receive_batch.next()
             self._record_backend_compute(self._receive_batch)
+            self._record_path_timing(self._receive_batch)
             return sample
 
         # Otherwise, need to fetch a new batch
@@ -255,6 +294,7 @@ class RayService:
             self._num_inflight_tasks -= 1
         sample = self._receive_batch.next()
         self._record_backend_compute(self._receive_batch)
+        self._record_path_timing(self._receive_batch)
         return sample
 
     def _record_backend_compute(self, batch: SampleBatch) -> None:
@@ -264,6 +304,30 @@ class RayService:
         self._backend_compute_count += 1
         self._backend_compute_sum_ns += value
         self._backend_compute_sum_sq_ns += value * value
+
+    def _record_path_timing(self, batch: SampleBatch) -> None:
+        """Accumulate client-side submit/ray.get timings (per batch)."""
+        observation = batch.take_path_timing_observation()
+        if observation is None:
+            return
+        submit_ns, get_ns, samples = observation
+        self._path_timing_batches += 1
+        self._path_timing_samples += samples
+        self._path_submit_ns += submit_ns
+        self._path_get_ns += get_ns
+
+    def get_path_timing_stats(self):
+        """Per-sample client-side Ray path costs (ms), or None when disabled."""
+        samples = self._path_timing_samples
+        if samples < 1:
+            return None
+        return {
+            "method": "client_perf_counter_around_submit_and_ray_get",
+            "batches": self._path_timing_batches,
+            "samples": samples,
+            "submit_ms_per_sample": self._path_submit_ns / samples / 1e6,
+            "get_ms_per_sample": self._path_get_ns / samples / 1e6,
+        }
 
     def get_backend_compute_stats(self):
         count = self._backend_compute_count

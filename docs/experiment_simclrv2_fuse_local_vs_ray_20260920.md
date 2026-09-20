@@ -245,6 +245,39 @@ worker 均分输入、彼此无干扰”的理想化假设）：
 每个 worker 落一个 `worker_<i>.json`（含 `wall_latency_samples`、`process_latency_ns_per_sample`、
 `service_stats`、`pipe_counters`），本次数据在 `outputs/simclrv2_breakdown_20260920/`。
 
+### 7.3 RAY 融合块的三段式拆分：序列化 / 传输 / 计算（2026-09-21 追加）
+
+§7.1 把 `FusedPipe{2,5,4}` 的 4.21 s 段延迟整体算作"RAY 段"，这里再拆开。两个数据源：
+
+1. **in-plan 计时**（新增 env 开关 `CEDAR_RAY_PATH_TIMING=1`，在 Ray 客户端埋点：`submit` = 参数
+   序列化 + `.remote()` 提交；`ray.get` = 取回；actor 侧计算仍由 `process_profiled` 记录），
+   随 `worker_*.json` 的 `service_stats[11].path_timing` 落盘；
+2. **跨主机边界微基准**（`scripts/measure_ray_boundary_payload.py`）：在远端节点上放一个空转 actor
+   做 echo，用同一批大小的真实 payload（fused 块的输入 238,562 B/样本、输出 714,852 B/样本，
+   batch=16，30 次），把"回程序列化+传输+反序列化+框架"从计算里剥出来。
+
+| 组成 | 实测 | 来源 |
+| --- | ---: | --- |
+| 进入 fused pipe：客户端**序列化**（cloudpickle.dumps，单样本） | 0.035 ms（238 KB）/ 0.179 ms（714 KB） | 微基准 |
+| 进入 fused pipe：**序列化+提交**（`.remote()` 返回） | 0.265 / 0.328 ms；真实计划里 **0.347 ms**（p50 0.337，64 worker 分布 0.231–0.524） | 微基准 + in-plan |
+| **fused pipe 内真正计算**（actor 侧 wall clock） | **10.98 ms**（p50 11.07，7.65–16.23） | in-plan |
+| 离开 fused pipe：**回程**（结果序列化 + 跨主机传输 + 客户端反序列化 + 框架） | **6.56 ms**（238 KB）/ **16.56 ms**（714 KB） | 微基准（空转 actor，单批次在飞的下界） |
+| 其中客户端**反序列化**（cloudpickle.loads，单样本） | 0.017 / 0.110 ms；真实计划里 `ray.get` 只要 0.330 ms（结果通常已在本机 object store） | 微基准 + in-plan |
+| **排队 / 在飞窗口等待**（prefetch 吸收的那部分） | ≈ **4.19 s**（4.21 s 减去上面各实测量） | in-plan 段延迟 |
+| 单条记录在该段的墙钟延迟 | 4.21 s（p50）/ 4.27 s（mean） | in-plan |
+
+读法：
+
+- **真正的算子计算只占 11 ms/record，而"进出 + 传输"的可用下界已经 7–17 ms/record**；同一块在本地
+  执行只要 5.75 ms/record（§7.2），也就是说放进 actor 后算子本身慢了约 1.9×（单线程 actor、无批量红利）。
+- 单位成本（提交 0.35 + 计算 11.0 + 回程 ≥16.6 ≈ **28 ms/record**）已经超过本地版整条流水线的每 worker
+  周期 27.05 ms/record —— 这正是 RAY 版吞吐只有本地版一半的直接原因。
+- 剩下的 4.19 s/record 是**排队**：结果通常已经在本机，所以 `ray.get` 只要 0.33 ms；等待发生在
+  "批次凑齐 + inflight 窗口（`max_inflight=100`）"这一段，被 prefetch 隐藏，但它把每 worker 的在飞
+  样本数推到 ~79（Little 定律），并算出 18.66 rec/s 的节拍。
+- 注意微基准是**单批次在飞**的下界：真实运行时 64 个 worker 同时在跨主机搬运（每 batch 入 3.8 MB、
+  回 11.4 MB），争用会让回程更慢——这也是"单位成本合计 28 ms"仍低于实测 53.6 ms/record 的原因。
+
 ## 8. 指定顺序 / 指定融合的 5 个候选计划的 Cedar cost（2026-09-21 追加）
 
 字母表取自论文图例（`my_paper/69e75a0100d7b4afeb1cfc20/figures/build_pipeline_cooptimization_simclr.py`）：

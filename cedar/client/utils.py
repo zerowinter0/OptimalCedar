@@ -59,13 +59,28 @@ def _collect_service_stats(feature) -> Dict[str, Any]:
             service = getattr(
                 getattr(variant, "variant_ctx", None), "service", None
             )
+        entry: Dict[str, Any] = {}
         getter = getattr(service, "get_backend_compute_stats", None)
-        if not callable(getter):
-            continue
-        try:
-            entry = getter()
-        except Exception:  # noqa: BLE001
-            entry = None
+        if callable(getter):
+            try:
+                backend = getter()
+            except Exception:  # noqa: BLE001
+                backend = None
+            if backend:
+                entry.update(backend)
+        # Client-side Ray path: serialize+submit per batch, and ray.get per
+        # batch (queue wait + actor compute + return transfer + deserialize).
+        path_getter = getattr(service, "get_path_timing_stats", None)
+        if callable(path_getter):
+            try:
+                path = path_getter()
+            except Exception:  # noqa: BLE001
+                path = None
+            if path:
+                entry["path_timing"] = path
+                entry.setdefault("method", path["method"])
+                entry.setdefault("observation_unit", "sample")
+                entry.setdefault("count", path["samples"])
         if entry:
             stats[str(p_id)] = entry
     return stats
