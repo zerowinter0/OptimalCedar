@@ -159,11 +159,24 @@ search space.`），因此该行 PICO 记 n/a；`old-dp` 的整块 SMP 融合计
 | plumber | 9.353（106.9 rec/s） | 22.9795 | 7.7742 | n/a | 1.20×（乐观） | n/a |
 | cedar | 0.842（1187.7 rec/s） | 8.4753 | 0.2543 | 1.3902 | 3.31×（乐观） | 0.61×（偏悲观 1.65×） |
 
+**单 worker 视角**（Cedar 给的是单 worker 代价，这样才可逐项比较；每 worker 实测代价 = W/T，隐含“W 个
+worker 均分输入、彼此无干扰”的理想化假设）：
+
+| 计划 | 每 worker 实测 W/T | Cedar | 实测 / Cedar |
+| --- | ---: | ---: | ---: |
+| unopt | 21.64 | 22.9795 | 0.94×（Cedar 悲观 6%） |
+| old-dp（SMP 全融合） | 90.67 | 7.9084 | 11.5×（Cedar 乐观） |
+| plumber（逐算子 SMP） | 9.35 | 22.9795 | 0.41×（Cedar 悲观 2.5×） |
+| cedar（RAY 融合） | 53.89 | 8.4753 | 6.4×（Cedar 乐观） |
+| （§3）fuse-local @9,469 | 26.77 | 9.1662 | 2.9×（Cedar 乐观） |
+| （§3）fuse-ray @9,469 | 55.62 | 8.4753 | 6.6×（Cedar 乐观） |
+
 读法：
 
-- **Cedar 只在 unopt 这种“单 worker 纯 local”计划上自洽**：预测 22.98 vs 实测 21.64（差 6%，唯一可直接比
-  的一行）。其余计划的实测是 W 个 worker 的系统吞吐，而 Cedar 给的是单 worker 代价，两者不可直接比较
-  （§5 已展示它在 ray/local 上方向相反）。
+- **Cedar 的精度取决于计划形态**（见上面的单 worker 表）：纯 local 单 worker 计划几乎精确（unopt 0.94×）；
+  纯 local 但宽 W 时偏乐观约 2.9×（64 个 worker 抢核的开销它不算）；带 offload 的计划偏乐观 6–11×；
+  而逐算子 SMP 的 plumber 计划它反倒悲观 2.5×（Cedar 的 Amdahl 反转认为那些 offload 没有收益，给出的
+  22.98 与“完全不融合的基线”一模一样）。
 - **Plumber ÷W** 在 plumber 自己那个“单 worker、瓶颈是本地 stage”的计划上很准（7.774 vs 9.353，1.20×），
   但凡 W>1 就系统性乐观 2.5–4.7×：它把 `X·W` 当成线性放大，没有 worker 之间的竞争/内存带宽项。
 - **PICO（S/W）** 在 unopt / old-dp / cedar 上落在 0.80–0.85×（略偏悲观，方向与量级都对），但在 §5 的
