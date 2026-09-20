@@ -185,9 +185,71 @@ worker 均分输入、彼此无干扰”的理想化假设）：
 
 复算：`scripts/score_plan_cost_models.py --workload simclrv2 --profile <shared.yaml> --plan unopt=<plan> --plan old-dp=<plan> --plan plumber=<plan> --plan cedar=<plan>`。
 
-## 7. 产物
+## 7. 单条记录的全流程耗时拆分（cedar plan）
+
+方法：用 `CEDAR_RECONCILE_DIR` 打开逐步 trace（每个 pipe 记录 `perf_counter_ns` 的 wall 时间戳与
+`process_time_ns` 的 CPU 时间戳），跑同一份计划（W=64、batch 4、9,472 条），再把 64 个 worker 的
+原始样本聚合。**每段的耗时 = 本 pipe 打点 − 上一 pipe 结束打点**，即这段在 worker 时间线上占用的时间，
+包含算子本身的计算、以及算子之间的排队/序列化/远端往返。trace 开销很小：cedar 臂 1,193.9 rec/s
+（无 trace 1,150.8）、local 臂 2,366.0 rec/s（无 trace 2,391.0）。
+
+### 7.1 cedar plan（`FusedPipe{2,5,4}` 在 RAY 上，就是 campaign 选中的计划）
+
+| 段（按流水线顺序） | pipe | 中位耗时 ms/record | mean | p90 |
+| --- | ---: | ---: | ---: | ---: |
+| LocalFSListerPipe（source，列目录） | 9 | 0.079 | 0.117 | 0.113 |
+| ImageReaderPipe（JPEG 解码 + fix） | 8 | 3.168 | 3.641 | 5.519 |
+| Grayscale | 3 | 2.217 | 3.971 | 6.158 |
+| RandomResizedCrop | 6 | 1.532 | 1.782 | 2.843 |
+| **FusedPipe{2,5,4}（GaussianBlur+Flip+ColorJitter）@RAY** | 11 | **4209.718** | 4267.506 | 5685.425 |
+| to_float（RAY 之后） | 7 | 0.108 | 0.191 | 0.445 |
+| Normalize | 1 | 0.336 | 0.454 | 0.812 |
+| BatcherPipe(4) | 0 | 0.262 | 0.308 | 0.568 |
+| PrefetcherPipe（sink） | 10 | 0.029 | 0.034 | 0.050 |
+| **本地算子段合计（不含 RAY、不含 sink）** | | **7.73 ms** | | |
+| **单条记录端到端延迟（各段之和）** | | **4217.4 ms** | | |
+
+- RAY 段的 4.21 s 是 **延迟**不是吞吐成本：其中 actor 侧真正的算子计算只有 **11.2 ms/record**
+  （`service_stats`，actor 用自己的时钟整段计时，不受跨机时钟影响），其余约 4.2 s 是
+  提交 / 序列化 / 远端排队 / 取回。用 Little 定律核对：每 worker 18.66 rec/s × 4.21 s ≈ 79 条在飞，
+  与计划里的 `max_inflight=100`、实测 buffer 一致 —— 正是 prefetch 把这些排队隐藏掉了。
+- 该臂每 worker 的实测周期 `W/T = 64/1193.9 = 53.6 ms/record`，而本地算子只占 7.73 ms → RAY 路径
+  净成本约 **45.9 ms/record**（提交、2×序列化、`ray.get`、批量凑批等待）。
+
+### 7.2 对照：同一计划把 `{2,5,4}` 放本地（fuse-local）
+
+| 段 | pipe | 中位耗时 ms/record | mean | p90 |
+| --- | ---: | ---: | ---: | ---: |
+| LocalFSListerPipe | 9 | 0.039 | 0.065 | 0.060 |
+| ImageReaderPipe | 8 | 3.524 | 3.757 | 5.690 |
+| Grayscale | 3 | 1.918 | 3.128 | 4.805 |
+| RandomResizedCrop | 6 | 1.397 | 1.605 | 1.885 |
+| FusedPipe{2,5,4}（本地） | 11 | 5.753 | 12.287 | 38.807 |
+| to_float | 7 | 0.048 | 0.053 | 0.072 |
+| Normalize | 1 | 0.212 | 0.239 | 0.295 |
+| BatcherPipe(4)（凑批等待为主） | 0 | 6.395 | 7.832 | 18.077 |
+| PrefetcherPipe（sink，消费者等待，不计成本） | 10 | 174.238 | 158.232 | 302.660 |
+| **算子段合计（不含 sink）** | | **19.29 ms** | | |
+| **每 worker 实测周期 W/T** | | **27.05 ms** | | |
+
+读法：
+
+- 纯本地执行时，“算子间”几乎没有开销：各段之和 19.29 ms 已接近每 worker 周期 27.05 ms，差值 ~7.8 ms
+  是 worker 主循环（队列投递、prefetch、profiling 记账）的成本。单算子耗时排序：
+  ImageReader 3.52 ＞ Batcher 凑批 6.40（等待 4 条凑批） ＞ Fused 增广 5.75 ＞ Grayscale 1.92 ＞
+  crop 1.40 ＞ Normalize 0.21 ＞ to_float 0.05 ＞ source 0.04。
+- 放 RAY 后，本地算子被压到 7.73 ms（与远端排队重叠），但 RAY 路径把每 worker 周期从 27.0 ms 推到
+  53.6 ms —— **算子本身最大的那 5.8 ms 反而最便宜，算子之间（提交/序列化/排队）才是贵的那一半**。
+
+复现：`CEDAR_RECONCILE_DIR=<dir> python -u scripts/run_fixed_plan_throughput.py --plan <plan> ...`，
+每个 worker 落一个 `worker_<i>.json`（含 `wall_latency_samples`、`process_latency_ns_per_sample`、
+`service_stats`、`pipe_counters`），本次数据在 `outputs/simclrv2_breakdown_20260920/`。
+
+## 8. 产物
 
 - 计划：`outputs/simclrv2_local_vs_ray_9469_20260920/plans/{cedar_opt_local_w1,cedar_opt_ray_w1}.yaml`
 - 结果 JSON：`outputs/simclrv2_local_vs_ray_9469_20260920/results/round{1,2,3}__{local,ray}.json`（+ `smoke_local.json`）
 - 日志：`outputs/simclrv2_local_vs_ray_9469_20260920/logs/`
+- §7 的逐步 trace：`outputs/simclrv2_breakdown_20260920/{reconcile_ray,reconcile_local}/worker_*.json`（各 64 个），
+  汇总结果 `results/trace_{ray,local}.json`、日志 `logs/trace_{ray,local}.log`
 - 复算：`python -u scripts/score_plan_cost_models.py --workload simclrv2 --profile <shared.yaml> --plan local=<plan> --plan ray=<plan>`
