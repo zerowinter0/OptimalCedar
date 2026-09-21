@@ -18,6 +18,7 @@ docs/figure_data_20260921.md.
 import json
 import logging
 import math
+import re
 import statistics
 import sys
 from pathlib import Path
@@ -192,8 +193,55 @@ def score_plans(workload: str) -> dict:
             entry["pico_cost_ms_per_source_record"] = round(score / workers, 4)
         except Exception as exc:  # noqa: BLE001
             entry["pico_error"] = f"{type(exc).__name__}: {exc}"
+            entry["pico_error_detail"] = _pico_error_detail(
+                pico, profile, plan, str(exc)
+            )
         scores[label] = entry
     return scores, inner_ops
+
+
+def _pico_error_detail(pico, profile, plan, message: str) -> dict:
+    """Explain a PICO replay rejection from the plan and the profile."""
+    if "non-fusable operator" in message:
+        blocks = []
+        for _p_id, desc in plan.pipe_descs.items():
+            members = list(desc.fused_pipes or [])
+            if len(members) < 2:
+                continue
+            offenders = [m for m in members if not pico._allowed_fusion(m)]
+            if not offenders:
+                continue
+            blocks.append(
+                {
+                    "fused_pipes": members,
+                    "variant": desc.variant_type.name if desc.variant_type else None,
+                    "non_fusable": [
+                        pico.logical_pipes[m].get_logical_name() for m in offenders
+                    ],
+                }
+            )
+        return {"kind": "fusion_legality", "blocks": blocks}
+    match = re.search(r"Operator (\d+) has no (\w+) cost", message)
+    if match:
+        p_id, variant = int(match.group(1)), match.group(2)
+        entries = (profile.get("offloads", {}) or {}).get(variant, {}) or {}
+        record = entries.get(p_id, entries.get(str(p_id), {})) or {}
+        direct = record.get("backend_compute") or {}
+        adaptive = direct.get("adaptive_profile") or {}
+        return {
+            "kind": "unusable_backend_measurement",
+            "operator": p_id,
+            "operator_name": pico.logical_pipes[p_id].get_logical_name(),
+            "variant": variant,
+            "has_profile_entry": bool(record),
+            "mean_ms_per_sample": direct.get("mean_ms_per_sample"),
+            "count": direct.get("count"),
+            "observed_rse": adaptive.get("observed_rse"),
+            "target_rse": adaptive.get("target_rse"),
+            "converged": adaptive.get("converged"),
+            "stop_reason": adaptive.get("stop_reason"),
+        }
+    return {"kind": "other"}
 
 
 def _ranks(values, reverse: bool):
@@ -559,6 +607,40 @@ def main() -> int:
                 )
                 + "。\n"
             )
+            details = [
+                (label, block["scores"][label].get("pico_error_detail", {}))
+                for label, _reason in agreement["excluded"]
+            ]
+            md.append("**无法定价的根因**\n")
+            for label, detail in details:
+                if detail.get("kind") == "fusion_legality":
+                    for entry in detail.get("blocks", []):
+                        md.append(
+                            "- `{label}`：该 plan 的融合块 `{members}` 含 PICO 判定为"
+                            "**不可融合**的算子 `{bad}`（`_allowed_fusion` 为 False）。\n".format(
+                                label=label,
+                                members=entry["fused_pipes"],
+                                bad="、".join(entry["non_fusable"]),
+                            )
+                        )
+                elif detail.get("kind") == "unusable_backend_measurement":
+                    md.append(
+                        "- `{label}`：PICO 需要 `{variant}` 下算子 {pid}（`{name}`）的"
+                        "分层 backend_compute，profile 里**有**这条测量（mean {mean:.2f} ms/record，"
+                        "count {count}），但 adaptive 采样 **未收敛**（RSE {rse:.1%} > 目标 {target:.0%}，"
+                        "stop = {stop}），`_valid_backend_compute()` 因此拒绝它。\n".format(
+                            label=label,
+                            variant=detail["variant"],
+                            pid=detail["operator"],
+                            name=detail["operator_name"],
+                            mean=detail["mean_ms_per_sample"] or 0.0,
+                            count=detail["count"],
+                            rse=detail["observed_rse"] or 0.0,
+                            target=detail["target_rse"] or 0.1,
+                            stop=detail["stop_reason"],
+                        )
+                    )
+            md.append("")
 
     md.append("## 4. 复现\n")
     md.append("```bash\n# 容器内\npython -u scripts/collect_figure_data_20260921.py\n```\n")

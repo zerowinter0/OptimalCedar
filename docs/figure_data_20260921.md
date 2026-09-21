@@ -222,6 +222,15 @@
 
 被排除在排序之外的 cell（有 plan 但 PICO 无法定价）：`raydata` — ValueError: The materialized block contains a non-fusable operator.；`cedar` — ValueError: Operator 1 has no RAY cost.；`cedar-dp` — ValueError: Operator 1 has no RAY cost.。
 
+**无法定价的根因**
+
+- `raydata`：该 plan 的融合块 `[5, 4, 3, 2, 1, 0]` 含 PICO 判定为**不可融合**的算子 `MapperPipe_to_tensor`（`_allowed_fusion` 为 False）。
+
+- `cedar`：PICO 需要 `RAY` 下算子 1（`MapperPipe_distort`）的分层 backend_compute，profile 里**有**这条测量（mean 99.94 ms/record，count 22），但 adaptive 采样 **未收敛**（RSE 11.7% > 目标 10%，stop = max_duration），`_valid_backend_compute()` 因此拒绝它。
+
+- `cedar-dp`：PICO 需要 `RAY` 下算子 1（`MapperPipe_distort`）的分层 backend_compute，profile 里**有**这条测量（mean 99.94 ms/record，count 22），但 adaptive 采样 **未收敛**（RSE 11.7% > 目标 10%，stop = max_duration），`_valid_backend_compute()` 因此拒绝它。
+
+
 ### 3.5 llava_pretrain
 
 | optimizer | cedar cost (ms) | plumber cost (ms) | PICO score S | PICO S/W | 实测吞吐(rec/s) | 实测排名 | cedar 排名 | plumber 排名 | PICO 排名 |
