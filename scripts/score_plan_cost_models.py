@@ -36,29 +36,79 @@ from cedar.compose.simple_dp_ablation_optimizer import (  # noqa: E402
     SimpleDpWorkersWidthBoundaryOptimizer,
 )
 
-DATASETS = {
-    "simclrv2": (
-        "evaluation/pipelines/simclrv2/cedar_dataset.py",
-        "evaluation/datasets/imagenette2/imagenette2/train",
-        4,
-    ),
-    "commonvoice": (
-        "evaluation/pipelines/commonvoice/cedar_dataset.py",
-        "datasets/commonvoice/cv15_en_train_300000",
-        1,
-    ),
+# Every workload of the formal campaign, with the feature module and the source
+# the campaign's own dataset module builds.  Rebuilding the feature from the
+# same module keeps pipe ids aligned with the profile each plan was scored with.
+WORKLOADS = {
+    "simclrv2": {
+        "module": "evaluation/pipelines/simclrv2/cedar_dataset.py",
+        "feature": "SimCLRV2Feature",
+        "feature_kwargs": {"batch_size": 4},
+        "source": "local_fs",
+        "source_path": "evaluation/datasets/imagenette2/imagenette2/train",
+        "source_kwargs": {"recursive": True},
+    },
+    "simclrv2_cache": {
+        "module": "evaluation/pipelines/simclrv2/cedar_cache_dataset.py",
+        "feature": "SimCLRV2Feature",
+        "feature_kwargs": {"batch_size": 4},
+        "source": "local_fs",
+        "source_path": "evaluation/datasets/imagenette2/imagenette2/train",
+        "source_kwargs": {"recursive": True},
+    },
+    "commonvoice": {
+        "module": "evaluation/pipelines/commonvoice/cedar_dataset.py",
+        "feature": "CommonvoiceFeature",
+        "feature_kwargs": {"batch_size": 1},
+        "source": "local_fs",
+        "source_path": "datasets/commonvoice/cv15_en_train_300000",
+        "source_kwargs": {"recursive": True},
+    },
+    "coco": {
+        "module": "evaluation/pipelines/coco/cedar_dataset.py",
+        "feature": "COCOFeature",
+        "feature_kwargs": {"batch_size": 1},
+        "source": "coco",
+        "source_path": "evaluation/datasets/coco",
+        "source_kwargs": {"split": "train2017"},
+    },
+    "llava_pretrain": {
+        "module": "evaluation/pipelines/llava_pretrain/cedar_dataset.py",
+        "feature": "LlavaPretrainFeature",
+        "feature_kwargs": {"image_root": "evaluation/datasets/llava_pretrain"},
+        "source": "local_line",
+        "source_path": "outputs/ultimate_eight_optimizers_20260920/inputs/llava_pretrain.jsonl",
+        "source_kwargs": {},
+    },
+    "stackexchange": {
+        "module": "evaluation/pipelines/stackexchange/cedar_dataset.py",
+        "feature": "StackExchangeFeature",
+        "feature_kwargs": {},
+        "source": "local_line",
+        "source_path": "outputs/ultimate_eight_optimizers_20260920/inputs/stackexchange.jsonl",
+        "source_kwargs": {},
+    },
 }
+
+DATASETS = WORKLOADS
 
 
 def build_feature(workload: str):
-    from cedar.sources import LocalFSSource
+    from cedar.sources import COCOSource, LocalFSSource, LocalLineSource
     from evaluation.eval_cedar import import_module_from_path
 
-    module_path, data_dir, batch_size = DATASETS[workload]
-    module = import_module_from_path(str((ROOT / module_path).resolve()))
-    feature = module.CommonvoiceFeature(batch_size=batch_size) if workload == "commonvoice" \
-        else module.SimCLRV2Feature(batch_size=batch_size)
-    feature.apply(LocalFSSource(str(ROOT / data_dir), recursive=True, max_samples=64))
+    spec = WORKLOADS[workload]
+    module = import_module_from_path(str((ROOT / spec["module"]).resolve()))
+    feature = getattr(module, spec["feature"])(**spec["feature_kwargs"])
+    path = str((ROOT / spec["source_path"]).resolve())
+    kwargs = dict(spec["source_kwargs"])
+    if spec["source"] == "local_fs":
+        source = LocalFSSource(path, max_samples=64, **kwargs)
+    elif spec["source"] == "coco":
+        source = COCOSource(path, **kwargs)
+    else:
+        source = LocalLineSource(path, **kwargs)
+    feature.apply(source)
     return feature
 
 
@@ -149,6 +199,46 @@ def plumber_cost(plan: PhysicalPlan, profile: dict):
     }
 
 
+def build_scorers(
+    workload: str, profile: dict, cpu_budget: int = 64, enable_caching: bool = False
+):
+    """Return (cedar, pico, inner_ops) set up on the workload's own feature.
+
+    ``enable_caching`` must match the campaign's switch for the workload
+    (``*_cache`` workloads run with caching enabled), otherwise PICO's cache
+    policy rejects every plan that carries an ObjectDiskCachePipe.
+    """
+    feature = build_feature(workload)
+
+    cedar = Optimizer()
+    feature.set_optimizer(cedar)
+    cedar.profiled_stats = profile
+    cedar._init_stats()
+
+    # PICO: the latest DP design (affine operators + boundary + workers + width).
+    pico = SimpleDpWorkersWidthBoundaryOptimizer()
+    feature.set_optimizer(pico)
+    pico.profiled_stats = profile
+    pico.options = OptimizerOptions(
+        enable_prefetch=True,
+        est_throughput=None,
+        available_local_cpus=cpu_budget,
+        enable_offload=True,
+        enable_reorder=True,
+        enable_local_parallelism=True,
+        enable_fusion=True,
+        enable_caching=enable_caching,
+        num_samples=0,
+        use_my_optimizer=27,
+        reorder_timeout_sec=7200.0,
+    )
+    pico._validate_stats()
+    pico._init_stats()
+    inner_ops = pico._get_linear_inner_ops()
+    pico._prepare_dp_metadata(inner_ops)
+    return cedar, pico, inner_ops
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workload", choices=sorted(DATASETS), required=True)
@@ -161,34 +251,8 @@ def main() -> int:
     logging.disable(logging.INFO)
     profile = yaml.safe_load(args.profile.read_text())
 
-    # Cedar's own model.
-    feature = build_feature(args.workload)
-    cedar = Optimizer()
-    feature.set_optimizer(cedar)
-    cedar.profiled_stats = profile
-    cedar._init_stats()
+    cedar, pico, inner_ops = build_scorers(args.workload, profile, args.cpu_budget)
     cedar_unfused = 1000.0 / profile["baseline"]["throughput"]
-
-    # PICO: the latest DP design (affine operators + boundary + workers + width).
-    pico = SimpleDpWorkersWidthBoundaryOptimizer()
-    feature.set_optimizer(pico)
-    pico.profiled_stats = profile
-    pico.options = OptimizerOptions(
-        enable_prefetch=True,
-        est_throughput=None,
-        available_local_cpus=args.cpu_budget,
-        enable_offload=True,
-        enable_reorder=True,
-        enable_local_parallelism=True,
-        enable_fusion=True,
-        num_samples=0,
-        use_my_optimizer=27,
-        reorder_timeout_sec=7200.0,
-    )
-    pico._validate_stats()
-    pico._init_stats()
-    inner_ops = pico._get_linear_inner_ops()
-    pico._prepare_dp_metadata(inner_ops)
 
     rows = []
     for raw in args.plan:
