@@ -6,7 +6,7 @@ import time
 import yaml
 
 REPO = pathlib.Path("/workspace/OptimalCedar")
-ULT = REPO / "outputs/ultimate_eight_optimizers_20260920"
+ULT = REPO / "outputs/ultimate_eight_optimizers_fix_20260921"
 SMALL = REPO / "outputs/six_workload_formal_v3_20260919"
 W_MODEL_FRAGMENT = REPO / "docs/experiment_results_20260920_w_models.inc.md"
 
@@ -26,10 +26,18 @@ SMALL_METHODS = [
     ("simple_dp_workers_width_boundary", "dp-boundary-affine-W-width"),
 ]
 ULT_DATA = {"simclrv2": "189,380 (9,469 张 × 20 epoch)", "simclrv2_cache": "189,380 (= simclrv2)",
-            "commonvoice": "300,000", "coco": "50,000 (train2017)", "llava_pretrain": "50,000", "stackexchange": "20,000"}
+            "commonvoice": "300,000", "coco": "50,000 (train2017)",
+            "llava_pretrain": "43,940 (输入 50,000，过滤后)", "stackexchange": "7,238 (输入 20,000，过滤后)"}
 SMALL_DATA = {"simclrv2": "9,469", "simclrv2_cache": "9,469", "commonvoice": "15,000",
               "coco": "5,000 (val2017)", "llava_pretrain": "1,000 / 907 processed", "stackexchange": "2,000"}
-DONE = ["simclrv2", "simclrv2_cache", "commonvoice", "coco"]
+DONE = [
+    "simclrv2",
+    "simclrv2_cache",
+    "commonvoice",
+    "coco",
+    "llava_pretrain",
+    "stackexchange",
+]
 # status.json records cells by the runner's method label, while results and
 # plans are named after the internal optimizer module.
 STATUS_LABELS = {
@@ -245,10 +253,12 @@ state = json.loads((ULT / "status.json").read_text())
 out += [
     "## 3. 未完成与不可用记录",
     "",
-    "- 放大 campaign 已于 2026-09-20 14:30（UTC+8）暂停：llava_pretrain / stackexchange 尚未开始，coco 的 `simple-dp-opt` / `old-dp-opt` 未运行（详见 `docs/experiment_status_20260920_pause.md`）；",
+    "- 放大 campaign 已完成（修复 teardown 后于 `outputs/ultimate_eight_optimizers_fix_20260921` 续跑，2026-09-21 08:07（UTC+8）写出 COMPLETE）：54 个 cell 中 48 个 completed、2 个真超时、4 个按规则跳过；",
     "- `commonvoice` 的 `unopti` 超过 2 小时上限，记为 `timeout`（unavailable）；",
     "- `coco` 的 `unopti` 真的慢：2 小时内只处理 47,635/50,000（约 6.6 rec/s），记为 `timeout`；",
-    "- `coco` 的 `dp-boundary` / `dp-boundary-affine` 实际已测完（226.5 / 240.0 rec/s，结果 JSON 已落盘），但进程在 teardown 阶段挂住 2 小时才被 runner 杀掉，因此状态记为 `timeout`；根因是本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 该子进程。该缺陷已在 `cedar/client/dataset.py` 修复（分级 shutdown + 进程树 SIGKILL + 有界 join），修复后需重跑这两个 cell；",
+    "- `coco` 的 `dp-boundary` / `dp-boundary-affine` 在修复前曾在 teardown 阶段挂住 2 小时被 runner 杀掉（根因：本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 子进程）；`cedar/client/dataset.py` 的分级 shutdown（进程树 SIGKILL + 有界 join）修复后重跑，分别 270 s / 264 s 正常收尾，吞吐 230.8 / 241.1 rec/s；",
+    "- `llava_pretrain` 与 `stackexchange` 的 `cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width`（PICO）因已知的超时记为 `skipped_previous_timeout`（见 §4 的复杂度分析）；",
+    "- 输入记录数 vs 实际处理量：`llava_pretrain` 配置 50,000 实际处理 43,940，`stackexchange` 配置 20,000 实际处理 7,238 —— 两个 pipeline 内含 `FilterPipe`（文本质量/语言过滤、图像存在性等），被过滤的记录不进入统计；同一负载内所有 optimizer 处理量一致，横向比较仍然公平；",
     "- 小数据集 campaign 的 `llava_pretrain`：`cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width` 因 1 小时上限记为 `timeout`（单次 W 的精确 DP 在 16 层中的第 10 层被截断）；",
     "- 小数据集 campaign 的 `stackexchange` 按用户要求提前停止（只完成 plumber-opt / ray-opt），本文件不将其计入对照。",
     "",

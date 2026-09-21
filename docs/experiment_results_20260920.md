@@ -197,11 +197,11 @@
 | plumber-opt | 50,000 | 2627.6 s | 19.0 /s | 0.71× | 20.9 s | 2648.8 s | completed |
 | ray-opt | 50,000 | 6598.3 s | 7.6 /s | 0.28× | 27.1 s | 6642.7 s | completed |
 | unopti | 50,000 (train2017) | — | — | — | — | — | timeout |
-| dp-boundary | 50,000 | 220.8 s | 226.5 /s | 8.49× | 8.9 s | 251.2 s | timeout |
-| dp-boundary-affine | 50,000 | 208.4 s | 240.0 /s | 8.99× | 9.3 s | 235.9 s | timeout |
+| dp-boundary | 50,000 | 216.7 s | 230.8 /s | 8.65× | 8.9 s | 246.2 s | completed |
+| dp-boundary-affine | 50,000 | 207.4 s | 241.1 /s | 9.04× | 8.9 s | 239.8 s | completed |
 | dp-boundary-affine-W-width | 50,000 | 169.9 s | 294.3 /s | 11.03× | 21.6 s | 221.1 s | completed |
-| simple-dp-opt (new profile, no boundary) | 50,000 (train2017) | — | — | — | — | — | 未运行 |
-| old-dp-opt (legacy profile, no boundary) | 50,000 (train2017) | — | — | — | — | — | 未运行 |
+| simple-dp-opt (new profile, no boundary) | 50,000 | 3320.4 s | 15.1 /s | 0.56× | 6.1 s | 3364.7 s | completed |
+| old-dp-opt (legacy profile, no boundary) | 50,000 | 1934.3 s | 25.8 /s | 0.97× | 9.0 s | 1981.9 s | completed |
 
 **各 optimizer 选中的计划**
 
@@ -214,8 +214,72 @@
 | dp-boundary | 32 | COCOSourcePipe -> FusedPipe{1,5,4,3,2}[SMP w=1] -> to_tensor -> PrefetcherPipe | 无 |
 | dp-boundary-affine | 32 | COCOSourcePipe -> distort[SMP w=1] -> FusedPipe{5,4,3,2} -> to_tensor -> PrefetcherPipe | 无 |
 | dp-boundary-affine-W-width | 64 | COCOSourcePipe -> FusedPipe{1,5,4,3,2} -> to_tensor -> PrefetcherPipe | 无 |
-| simple-dp-opt (new profile, no boundary) | — | 无计划文件（未运行/超时） | — |
-| old-dp-opt (legacy profile, no boundary) | — | 无计划文件（未运行/超时） | — |
+| simple-dp-opt (new profile, no boundary) | 21 | COCOSourcePipe -> distort[SMP w=1] -> zoom_out -> crop[RAY w=3] -> FusedPipe{3,2} -> to_tensor[SMP w=1] -> PrefetcherPipe | 无 |
+| old-dp-opt (legacy profile, no boundary) | 32 | COCOSourcePipe -> FusedPipe{1,5,4,3,2}[RAY w=2] -> to_tensor[SMP w=1] -> PrefetcherPipe | 无 |
+
+### 1.6 llava_pretrain
+
+- 数据量：43,940 (输入 50,000，过滤后)
+
+**结果**
+
+| optimizer | 总数据量 | 稳态时间 | 稳态吞吐 | 相对 cedar-opt | 非稳态 setup(含启动+优化) | 总时长 | 状态 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| cedar-opt | 43,940 (输入 50,000，过滤后) | — | — | — | — | — | skipped_user_requested |
+| plumber-opt | 43,940 | 2541.0 s | 17.3 /s | — | 3.0 s | 2551.2 s | completed |
+| ray-opt | 43,940 | 2856.0 s | 15.4 /s | — | 5.9 s | 2869.7 s | completed |
+| unopti | 43,940 | 2731.8 s | 16.1 /s | — | 2.8 s | 2737.9 s | completed |
+| dp-boundary | 43,940 | 1668.2 s | 26.3 /s | — | 56.7 s | 1738.5 s | completed |
+| dp-boundary-affine | 43,940 | 1556.4 s | 28.2 /s | — | 60.3 s | 1623.5 s | completed |
+| dp-boundary-affine-W-width | 43,940 (输入 50,000，过滤后) | — | — | — | — | — | skipped_previous_timeout |
+| simple-dp-opt (new profile, no boundary) | 43,940 | 1553.5 s | 28.3 /s | — | 58.3 s | 1618.8 s | completed |
+| old-dp-opt (legacy profile, no boundary) | 43,940 | 1712.9 s | 25.7 /s | — | 44.1 s | 1766.4 s | completed |
+
+**各 optimizer 选中的计划**
+
+| optimizer | W | 计划（source → ... → sink，未标注即 INPROCESS） | cache |
+| --- | ---: | --- | --- |
+| cedar-opt | — | 无计划文件（未运行/超时） | — |
+| plumber-opt | 1 | LocalLinePipe -> parse_json_line -> SetImageRootMapper -> FixUnicodeMapper -> PunctuationNormalizationMapper -> AlphanumericFilter -> CharacterRepetitionFilter -> FlaggedWordsFilter[SMP w=2] -> PerplexityFilter[SMP w=2] -> SpecialCharactersFilter -> WordRepetitionFilter[SMP w=2] -> ImageAspectRatioFilter -> ImageShapeFilter -> ImageSizeFilter -> ImageTextSimilarityFilter -> ImageTextMatchingFilter -> sync_text_key -> PrefetcherPipe | 无 |
+| ray-opt | 1 | LocalLinePipe -> FusedPipe{15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0}[RAY w=1] -> PrefetcherPipe | 无 |
+| unopti | 1 | LocalLinePipe -> parse_json_line -> SetImageRootMapper -> FixUnicodeMapper -> PunctuationNormalizationMapper -> AlphanumericFilter -> CharacterRepetitionFilter -> FlaggedWordsFilter -> PerplexityFilter -> SpecialCharactersFilter -> WordRepetitionFilter -> ImageAspectRatioFilter -> ImageShapeFilter -> ImageSizeFilter -> ImageTextSimilarityFilter -> ImageTextMatchingFilter -> sync_text_key | 无 |
+| dp-boundary | 1 | LocalLinePipe -> FusedPipe{15,14,13,12}[RAY w=32] -> ImageTextSimilarityFilter -> ImageTextMatchingFilter[RAY w=1] -> FusedPipe{8,6,5,3,4,7} -> FusedPipe{9,10}[RAY w=31] -> FusedPipe{11,0}[SMP w=63] -> PrefetcherPipe | 无 |
+| dp-boundary-affine | 1 | LocalLinePipe -> FusedPipe{15,14,13,12,6,9,8,10,11,7,2}[RAY w=1] -> FusedPipe{1,3,4,5,0} -> PrefetcherPipe | 无 |
+| dp-boundary-affine-W-width | — | 无计划文件（未运行/超时） | — |
+| simple-dp-opt (new profile, no boundary) | 1 | LocalLinePipe -> FusedPipe{15,14} -> FusedPipe{13,12,6,9,8,10,11,7,2}[RAY w=1] -> FusedPipe{1,3,4,5,0} -> PrefetcherPipe | 无 |
+| old-dp-opt (legacy profile, no boundary) | 1 | LocalLinePipe -> FusedPipe{15,14,13,12,2,8,6,5,3,4,7} -> FusedPipe{1,9,11,10}[RAY w=1] -> sync_text_key[SMP w=63] -> PrefetcherPipe | 无 |
+
+### 1.7 stackexchange
+
+- 数据量：7,238 (输入 20,000，过滤后)
+
+**结果**
+
+| optimizer | 总数据量 | 稳态时间 | 稳态吞吐 | 相对 cedar-opt | 非稳态 setup(含启动+优化) | 总时长 | 状态 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| cedar-opt | 7,238 (输入 20,000，过滤后) | — | — | — | — | — | skipped_user_requested |
+| plumber-opt | 7,238 | 104.9 s | 69.0 /s | — | 3.9 s | 109.5 s | completed |
+| ray-opt | 7,238 | 113.2 s | 63.9 /s | — | 9.1 s | 126.5 s | completed |
+| unopti | 7,238 | 2369.1 s | 3.1 /s | — | 2.5 s | 2372.8 s | completed |
+| dp-boundary | 7,238 | 89.1 s | 81.2 /s | — | 87.3 s | 259.2 s | completed |
+| dp-boundary-affine | 7,238 | 119.1 s | 60.7 /s | — | 116.1 s | 341.3 s | completed |
+| dp-boundary-affine-W-width | 7,238 (输入 20,000，过滤后) | — | — | — | — | — | skipped_previous_timeout |
+| simple-dp-opt (new profile, no boundary) | 7,238 | 209.7 s | 34.5 /s | — | 103.7 s | 390.6 s | completed |
+| old-dp-opt (legacy profile, no boundary) | 7,238 | 49.6 s | 146.1 /s | — | 91.0 s | 284.8 s | completed |
+
+**各 optimizer 选中的计划**
+
+| optimizer | W | 计划（source → ... → sink，未标注即 INPROCESS） | cache |
+| --- | ---: | --- | --- |
+| cedar-opt | — | 无计划文件（未运行/超时） | — |
+| plumber-opt | 1 | LocalLinePipe -> parse_json_line -> CleanEmailMapper -> CleanLinksMapper -> FixUnicodeMapper -> PunctuationNormalizationMapper -> WhitespaceNormalizationMapper -> AlphanumericFilter -> AverageLineLengthFilter -> CharacterRepetitionFilter -> FlaggedWordsFilter[SMP w=21] -> LanguageIDScoreFilter -> MaximumLineLengthFilter -> PerplexityFilter -> SpecialCharactersFilter -> TextLengthFilter -> WordsNumFilter[SMP w=21] -> WordRepetitionFilter[SMP w=21] -> sync_text_key -> extract_output_text -> PrefetcherPipe | 无 |
+| ray-opt | 1 | LocalLinePipe -> FusedPipe{18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0}[RAY w=64] -> PrefetcherPipe | 无 |
+| unopti | 1 | LocalLinePipe -> parse_json_line -> CleanEmailMapper -> CleanLinksMapper -> FixUnicodeMapper -> PunctuationNormalizationMapper -> WhitespaceNormalizationMapper -> AlphanumericFilter -> AverageLineLengthFilter -> CharacterRepetitionFilter -> FlaggedWordsFilter -> LanguageIDScoreFilter -> MaximumLineLengthFilter -> PerplexityFilter -> SpecialCharactersFilter -> TextLengthFilter -> WordsNumFilter -> WordRepetitionFilter -> sync_text_key -> extract_output_text | 无 |
+| dp-boundary | 16 | LocalLinePipe -> FusedPipe{18,17,16,15}[SMP w=1] -> FusedPipe{14,13} -> WordsNumFilter[RAY w=4] -> WordRepetitionFilter[SMP w=1] -> FusedPipe{6,10,5,12,8,4,7,11} -> FusedPipe{9,1,0}[SMP w=1] -> PrefetcherPipe | 无 |
+| dp-boundary-affine | 21 | LocalLinePipe -> parse_json_line -> FusedPipe{17,16,15,14,13,2,3}[SMP w=1] -> FusedPipe{9,5}[RAY w=3] -> FusedPipe{6,10,12,8}[SMP w=1] -> FusedPipe{7,11,4,1,0} -> PrefetcherPipe | 无 |
+| dp-boundary-affine-W-width | — | 无计划文件（未运行/超时） | — |
+| simple-dp-opt (new profile, no boundary) | 12 | LocalLinePipe -> parse_json_line -> CleanEmailMapper[RAY w=1] -> FusedPipe{16,15}[SMP w=1] -> FusedPipe{14,13}[RAY w=1] -> FusedPipe{2,3}[SMP w=1] -> FlaggedWordsFilter[RAY w=2] -> FusedPipe{6,10}[SMP w=1] -> FusedPipe{12,5}[RAY w=1] -> LanguageIDScoreFilter[SMP w=1] -> FusedPipe{7,11,4,1,0} -> PrefetcherPipe | 无 |
+| old-dp-opt (legacy profile, no boundary) | 32 | LocalLinePipe -> FusedPipe{18,17,16,15,14,13,3}[RAY w=2] -> FusedPipe{6,10,5,12,8,4,7,11} -> FusedPipe{2,9,1,0}[SMP w=1] -> PrefetcherPipe | 无 |
 
 ## 2. 小数据集 campaign（`outputs/six_workload_formal_v3_20260919`）
 
@@ -343,10 +407,12 @@
 
 ## 3. 未完成与不可用记录
 
-- 放大 campaign 已于 2026-09-20 14:30（UTC+8）暂停：llava_pretrain / stackexchange 尚未开始，coco 的 `simple-dp-opt` / `old-dp-opt` 未运行（详见 `docs/experiment_status_20260920_pause.md`）；
+- 放大 campaign 已完成（修复 teardown 后于 `outputs/ultimate_eight_optimizers_fix_20260921` 续跑，2026-09-21 08:07（UTC+8）写出 COMPLETE）：54 个 cell 中 48 个 completed、2 个真超时、4 个按规则跳过；
 - `commonvoice` 的 `unopti` 超过 2 小时上限，记为 `timeout`（unavailable）；
 - `coco` 的 `unopti` 真的慢：2 小时内只处理 47,635/50,000（约 6.6 rec/s），记为 `timeout`；
-- `coco` 的 `dp-boundary` / `dp-boundary-affine` 实际已测完（226.5 / 240.0 rec/s，结果 JSON 已落盘），但进程在 teardown 阶段挂住 2 小时才被 runner 杀掉，因此状态记为 `timeout`；根因是本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 该子进程。该缺陷已在 `cedar/client/dataset.py` 修复（分级 shutdown + 进程树 SIGKILL + 有界 join），修复后需重跑这两个 cell；
+- `coco` 的 `dp-boundary` / `dp-boundary-affine` 在修复前曾在 teardown 阶段挂住 2 小时被 runner 杀掉（根因：本地 worker 阻塞在 `result_queue.put()` 后忽略 SIGTERM，解释器退出时无超时 join 子进程）；`cedar/client/dataset.py` 的分级 shutdown（进程树 SIGKILL + 有界 join）修复后重跑，分别 270 s / 264 s 正常收尾，吞吐 230.8 / 241.1 rec/s；
+- `llava_pretrain` 与 `stackexchange` 的 `cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width`（PICO）因已知的超时记为 `skipped_previous_timeout`（见 §4 的复杂度分析）；
+- 输入记录数 vs 实际处理量：`llava_pretrain` 配置 50,000 实际处理 43,940，`stackexchange` 配置 20,000 实际处理 7,238 —— 两个 pipeline 内含 `FilterPipe`（文本质量/语言过滤、图像存在性等），被过滤的记录不进入统计；同一负载内所有 optimizer 处理量一致，横向比较仍然公平；
 - 小数据集 campaign 的 `llava_pretrain`：`cedar-opt` 按用户要求跳过，`dp-boundary-affine-W-width` 因 1 小时上限记为 `timeout`（单次 W 的精确 DP 在 16 层中的第 10 层被截断）；
 - 小数据集 campaign 的 `stackexchange` 按用户要求提前停止（只完成 plumber-opt / ray-opt），本文件不将其计入对照。
 
