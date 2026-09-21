@@ -523,7 +523,15 @@ class SimpleDpOptimizer(DpOptimizer):
             if not self.joint_actor_allocation:
                 specs = [(order, variant, cache, 1)
                          for order, variant, cache, width in specs]
-            return self._replay_dp_objective(specs, ops).score
+            # Scoring a materialized plan must price the widths that plan
+            # declares, including widths the resource-conditioned search would
+            # not have explored (e.g. a 64-actor Ray stage in a W=1 plan).
+            previous = getattr(self, "_dp_scoring_required_widths", None)
+            self._dp_scoring_required_widths = self._dp_plan_stage_widths(plan)
+            try:
+                return self._replay_dp_objective(specs, ops).score
+            finally:
+                self._dp_scoring_required_widths = previous
         return float(search_result.cost)
 
     def _calculate_materialized_cedar_cost(

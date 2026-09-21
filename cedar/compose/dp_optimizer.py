@@ -548,6 +548,17 @@ _LANE_EXPOSURE: Dict[str, float] = {
 }
 
 
+def _dp_allow_fixed_remote() -> bool:
+    """Allow remote placement of operators whose PipeSpec forbids it.
+
+    Off by default: the ablation contract is that the declared variants are the
+    search space.  Enabled, an operator still needs a measured offload entry in
+    the loaded profile (see ``_dp_pipe_allows_variant``).
+    """
+    raw = os.environ.get("CEDAR_DP_ALLOW_FIXED_REMOTE", "0")
+    return str(raw).strip() in ("1", "true", "True", "yes")
+
+
 def set_lane_exposure(exposure: Optional[Dict[str, float]]) -> None:
     """Install the calibrated lane-exposure vector for this process."""
     for key, value in (exposure or {}).items():
@@ -725,7 +736,7 @@ class BlockCandidateProvider:
             costs_v = [float("inf")] * self.n
             for i, p_id in enumerate(self.inner_ops):
                 pipe: Optional[Pipe] = opt.logical_pipes.get(p_id)
-                if pipe is None or not pipe.can_mutate_to(vt):
+                if pipe is None or not opt._dp_pipe_allows_variant(p_id, vt, strict=True):
                     continue
                 # SMP has no accelerator resource scheduling.  Treat it as an
                 # infeasible placement for CUDA operators rather than hiding
@@ -920,10 +931,7 @@ class BlockCandidateProvider:
             # ``mutable`` flag is false but whose declared INPROCESS variant
             # must remain executable.
             if any(
-                vt
-                not in opt.logical_pipes[self.inner_ops[i]]
-                .get_spec()
-                .mutable_variants
+                not opt._dp_pipe_allows_variant(self.inner_ops[i], vt)
                 for i in range(self.n)
                 if mask & (1 << i)
             ):
@@ -4495,6 +4503,41 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         if not math.isfinite(value) or value <= 0.0:
             return 1.0
         return value
+
+    def _dp_pipe_allows_variant(
+        self, p_id: int, variant: PipeVariantType, strict: bool = False
+    ) -> bool:
+        """Whether the DP may place ``variant`` on pipe ``p_id``.
+
+        The logical PipeSpec is the source of truth: an operator that declares
+        only INPROCESS (a fixed batcher or reader, for example) stays local by
+        default.  ``CEDAR_DP_ALLOW_FIXED_REMOTE=1`` additionally allows such an
+        operator to be placed on a backend the loaded profile carries a
+        measured offload entry for: the backend demonstrably executes that
+        operator there, and the DP prices it with the measured cost instead of
+        refusing the placement outright.
+
+        ``strict`` mirrors ``Pipe.can_mutate_to`` (it also requires the spec's
+        ``mutable`` flag) and is used when building per-operator costs; the
+        looser form is used for block candidates, which historically accepted
+        every operator that declares the variant.
+        """
+        pipe = self.logical_pipes.get(p_id)
+        if pipe is None:
+            return False
+        spec = pipe.pipe_spec if pipe.pipe_spec is not None else pipe.get_spec()
+        allowed = (
+            pipe.can_mutate_to(variant)
+            if strict
+            else variant in spec.mutable_variants
+        )
+        if allowed:
+            return True
+        if not _dp_allow_fixed_remote():
+            return False
+        stats = (self.profiled_stats or {}).get("offloads", {})
+        backend = stats.get(variant.name) or {}
+        return p_id in backend or str(p_id) in backend
 
     def _dp_variant_allowed_for_execution_resource(
         self,
