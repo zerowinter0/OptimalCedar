@@ -289,3 +289,92 @@ ms/record** —— 差两个数量级。
 - 这些点是把**不同尺寸的 payload 单独喂给算子**测出来的；放回真实流水线（上游节奏、内存布局、是否融合
   都不同）绝对值会有出入 —— 所以 §2 / §4 只用 profile 的 k/b **形状**，锚点仍是同一份 declared 实测。
 - 原始数字随时可以从上面的 yaml 路径重读（`physical_model.operator_affine.operators`）。
+
+## 7. 修正版：reordered 顺序下每个算子的 input / cedar 估计 / 实测（全量 trace）
+
+数据来源：`outputs/unopt_order_transfer_repeats_traceall_20260921/reconcile_{declared,pico,cedar,old-dp}_r1`
+—— 这次是**每条记录都 trace**（`CEDAR_TRACE_FREQUENCY_SEC=0`，每个 cell 2,368 条全部采到），因此
+
+- `input` 是该顺序下**整个 pass 的精确均值**，不再是按时间抽样的子集（§5.3 的 646.6 vs 678.8 kB 就是
+  抽样造成的）；
+- T Batcher 的窗口是修复后的**自身 stack 开销**（§5.1），不再是"整批组装跨度"；
+- 四个 cell 处理的记录集合完全相同（reader 输出 666.1 kB，四个 worker 逐项一致），所以同一张表内
+  declared ↔ reordered 的对比不含抽样子集差异。
+
+列的含义：`input x` = 该算子在该顺序下的输入（B/source record）；`cedar est` = 把 declared 实测按
+Cedar 的过原点等比例迁移 `t_declared × x / x_declared`；`measured` = 该顺序下实测 process-time
+（ms/source record）；`affine est` = 同一锚点下换成 profile 的 kx+b 形状。
+
+### 7.1 PICO 顺序
+
+| operator | input x (B/record) | cedar est (ms) | measured (ms) | err | affine est (ms) | err |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| T Batcher | 238,144 | 0.0580 | 0.0478 | +21.4% | 0.0580 | +21.4% |
+| N Normalize | 238,144 | 0.2423 | 0.1724 | +40.6% | 0.2423 | +40.6% |
+| B Blur | 59,536 | 2.4008 | 9.0331 | **−73.4%** | 2.6304 | −70.9% |
+| G Grayscale | 178,608 | 0.0892 | 0.2629 | **−66.1%** | 0.1563 | −40.5% |
+| J Jitter | 59,536 | 0.7097 | 0.4807 | +47.6% | 1.0661 | +121.8%（越界外推） |
+| H Flip | 59,536 | 0.0105 | 0.0788 | **−86.7%** | 0.0508 | −35.5% |
+| C Crop | 666,126 | 0.4708 | 1.8660 | **−74.8%** | 1.5716 | −15.8% |
+| F to_float | 59,536 | 0.0394 | 0.0614 | −35.8% | 0.0394 | −35.8% |
+| R ImageReader | 157 | 2.0613 | 1.9911 | +3.5% | 2.0613 | +3.5% |
+
+平均 |误差|：9 个算子 cedar **50.0%** / affine **42.9%**；只看输入尺寸变化的 6 个 mapper
+（B/G/J/H/C/F）cedar **64.1%** / affine **53.4%**。
+
+### 7.2 cedar 顺序
+
+| operator | input x (B/record) | cedar est (ms) | measured (ms) | err | affine est (ms) | err |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| T Batcher | 238,144 | 0.0580 | 0.0436 | +33.0% | 0.0580 | +33.0% |
+| N Normalize | 238,144 | 0.2423 | 0.1338 | +81.1% | 0.2423 | +81.1% |
+| B Blur | 59,536 | 2.4008 | 8.8865 | **−73.0%** | 2.6304 | −70.4% |
+| G Grayscale | 666,126 | 0.3327 | 1.5151 | **−78.0%** | 0.3387 | −77.6% |
+| J Jitter | 59,536 | 0.7097 | 0.5279 | +34.4% | 1.0661 | +101.9% |
+| H Flip | 59,536 | 0.0105 | 0.1077 | **−90.3%** | 0.0508 | −52.9% |
+| C Crop | 222,042 | 0.1569 | 0.7483 | **−79.0%** | 1.5024 | +100.8% |
+| F to_float | 59,536 | 0.0394 | 0.0487 | −19.1% | 0.0394 | −19.1% |
+| R ImageReader | 157 | 2.0613 | 2.0457 | +0.8% | 2.0613 | +0.8% |
+
+平均 |误差|：9 个算子 cedar 54.3% / affine 59.7%；6 个 mapper cedar **62.3%** / affine 70.5%。
+
+### 7.3 old-dp 顺序
+
+| operator | input x (B/record) | cedar est (ms) | measured (ms) | err | affine est (ms) | err |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| T Batcher | 238,144 | 0.0580 | 0.0655 | −11.5% | 0.0580 | −11.5% |
+| N Normalize | 2,644,349 | 2.6905 | 0.9977 | +169.7% | 1.5196 | +52.3% |
+| B Blur | 2,644,349 | 106.6356 | 52.7090 | +102.3% | 103.5432 | +96.4% |
+| G Grayscale | 2,644,349 | 1.3206 | 1.0599 | +24.6% | 1.0788 | +1.8% |
+| J Jitter | 881,450 | 10.5080 | 1.3534 | +676.4% | 10.4171 | +669.7% |
+| H Flip | 238,144 | 0.0418 | 0.1234 | −66.1% | 0.0712 | −42.4% |
+| C Crop | 881,450 | 0.6229 | 0.7190 | −13.4% | 1.6052 | +123.2% |
+| F to_float | 661,087 | 0.4377 | 0.4484 | −2.4% | 0.4377 | −2.4% |
+| R ImageReader | 157 | 2.0606 | 2.0461 | +0.7% | 2.0613 | +0.7% |
+
+平均 |误差|：9 个算子 cedar 118.6% / affine 111.2%；6 个 mapper cedar **147.5%** / affine 156.0%
+（该顺序把 Blur/Jitter 的输入抬到 2.6 MB / 0.88 MB，外推幅度最大，两个模型都失效）。
+
+### 7.4 declared 锚点（= profile 的测量点）
+
+| operator | input x (B/record) | measured (ms/record) |
+| --- | ---: | ---: |
+| T Batcher | 238,144 | 0.0580 |
+| N Normalize | 238,144 | 0.2423 |
+| B Blur | 238,144 | 9.6034 |
+| G Grayscale | 714,432 | 0.3568 |
+| J Jitter | 714,432 | 8.5169 |
+| H Flip | 714,432 | 0.1255 |
+| C Crop | 2,664,505 | 1.8831 |
+| F to_float | 666,126 | 0.4411 |
+| R ImageReader | 157 | 2.0613 |
+
+**两条使用限制**
+
+1. **不要跨 campaign 比绝对值**：这份全量 trace 运行与 §4 的按时间抽样运行是两次不同的运行，机器状态
+   不同（例如 reader 在这里 2.06 ms/record，§4 里是 2.38 ms/record）。只有**同一次运行内部**的
+   declared ↔ reordered 对比是有效对照。
+2. T Batcher / N Normalize 两行已经不是 §5 里那种伪影（一个是自身 stack 开销，一个是真实上下文效应），
+   它们的误差小、但也不由算子尺寸解释；迁移结论仍应看 B/G/J/H/C/F 六个 mapper。
+
+复现：`python -u tmp_analysis/reordered_operator_table.py`（打印上面三张表 + 平均值）。
