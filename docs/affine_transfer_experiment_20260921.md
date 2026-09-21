@@ -215,6 +215,26 @@ ms/record** —— 差两个数量级。
 顺序改变**的算子上（低估 −69% ~ −86%），它们不受 5.1 影响；**T Batcher 行作废**，**N Normalize 行是
 上下文边界**而不是 affine 形式的问题。
 
+### 5.3 Reader 的输出尺寸差异（declared 646.6 kB vs pico 678.8 kB）也是抽样伪影
+
+§4 的另一个疑点：`R ImageReader` 在四个顺序里输入完全相同（157 B/record），但它的**输出**尺寸却随顺序
+不同——三次重复的均值分别是 declared **646.6 kB**、pico **678.8 kB**、cedar 629.7 kB、old-dp 564.3 kB
+（每 record）。核查后同样是测量伪影，不是数据不同：
+
+- reader 的输出尺寸 = **解码后像素字节数**（`get_sizeof_data(PIL.Image)` → `W×H×bands`），而 imagenette2/train
+  的尺寸分布是**重尾**的：9,469 张图的均值 675.9 kB、标准差 **1,339 kB**（CV 1.98，最大一张解码后 38 MB）；
+- reconcile 的 `output_sizes` 只是**被采样到的那部分记录**的均值，而 trace 是**按时间**抽的（默认每
+  0.1 s 一条），所以每个顺序抽到的记录集合都不同：n ≈ 440 时的标准误 **≈64 kB（9.4%）**，
+  646.6 ↔ 678.8 的 32 kB 差异远在噪声内；
+- **直接验证**：把 trace 改成每条记录都打（`CEDAR_TRACE_FREQUENCY_SEC=0`，即 §5.1 之后 reconcile
+  实验的默认设置）后，declared / pico / cedar 三个顺序的 reader 输出尺寸**完全相同**——
+  均值 666.1 kB，连四个 worker 的分项都逐一对上（639.0 / 702.4 / 689.4 / 633.7 kB）；old-dp 是 661.1 kB，
+  只因为那次运行的 old-dp cell 被提前中止（2,252 / 2,368 条）。
+
+→ 结论：**不采样时该算子的尺寸在每个顺序里都一样**；只要用按时间抽样的 trace，重尾分布算子的"每记录
+尺寸/成本"就会带上约 10% 的抽样抖动，跨顺序比较时不能把它当成数据差异。复现：
+`tmp_analysis/probe_reader_size_sampling.py`（数据集尺寸分布 + 步长抽样仿真）。
+
 ## 6. 附：新 profile 里 simclrv2 各算子的 affine 拟合原始数据
 
 数据来源：**大规模正式实验那一份新的 layered profile** ——
