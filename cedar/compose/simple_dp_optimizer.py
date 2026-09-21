@@ -256,8 +256,8 @@ class SimpleDpOptimizer(DpOptimizer):
 
         cedar_cost = (
             self._calculate_materialized_cedar_cost(self.physical_plan)
-            if self.cedar_objective else self.calculate_dp_objective_cost(
-                plan=self.physical_plan)
+            if self.cedar_objective
+            else self._score_own_plan(self.physical_plan)
         )
         search_cost = getattr(self, "_last_dp_state_cost", None)
         if search_cost is not None and not math.isclose(
@@ -508,6 +508,28 @@ class SimpleDpOptimizer(DpOptimizer):
         return objective
 
     def calculate_dp_objective_cost(
+        self,
+        plan: Optional[PhysicalPlan] = None,
+        search_result: Optional[SearchResult] = None,
+        inner_ops: Optional[List[int]] = None,
+        lenient_replay: Optional[bool] = None,
+    ) -> float:
+        """Price a materialized plan, or read a search result's objective.
+
+        Scoring somebody else's plan is lenient (see ``_dp_lenient_replay``):
+        the replay reports what the plan costs even when it leaves this
+        ablation's search space.  The DP search keeps the strict space.
+
+        ``lenient_replay=False`` forces the strict model.
+        """
+        if lenient_replay is None:
+            lenient_replay = plan is not None
+        with self._dp_lenient_replay_scope(lenient_replay):
+            return self._calculate_dp_objective_cost_impl(
+                plan, search_result, inner_ops
+            )
+
+    def _calculate_dp_objective_cost_impl(
         self,
         plan: Optional[PhysicalPlan] = None,
         search_result: Optional[SearchResult] = None,

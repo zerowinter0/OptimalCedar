@@ -3,6 +3,7 @@ import math
 import multiprocessing as mp
 import os
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -1234,7 +1235,11 @@ class BlockCandidateProvider:
         for idx in ordered:
             mask |= 1 << idx
         is_multi = len(ordered) > 1
-        if is_multi:
+        # Search-space legality: a materialized plan is priced as it is, so the
+        # gates that keep the *search* inside this model's space are skipped
+        # while replaying somebody else's plan and the measured per-operator
+        # costs carry the price instead.
+        if is_multi and not self.optimizer._dp_lenient_replay():
             if not self.optimizer.options.enable_fusion:
                 raise ValueError("A fused plan is outside the disabled fusion space.")
             if not all(self._fusion_allowed_flags[idx] for idx in ordered):
@@ -4504,6 +4509,43 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             return 1.0
         return value
 
+    def _dp_lenient_replay(self) -> bool:
+        """Whether the DP is pricing a materialized plan right now.
+
+        Replaying somebody else's plan must report what that plan costs, even
+        when the plan is outside this optimizer's own search space: a baseline
+        may fuse operators this model keeps separate, fuse a block whose order
+        the search would never emit, or use a backend measurement that did not
+        reach its convergence target.  Those plans are ranking inputs for other
+        optimizers, not candidates, so the replay skips the search-space
+        legality gates and accepts measured backend costs as they are.  The DP
+        search itself keeps the strict space: ``_dp_replay_lenient`` is only
+        set while a plan is scored, never while a candidate is generated.
+        """
+        return bool(getattr(self, "_dp_replay_lenient", False))
+
+    @contextmanager
+    def _dp_lenient_replay_scope(self, enabled: bool):
+        previous = getattr(self, "_dp_replay_lenient", False)
+        self._dp_replay_lenient = bool(enabled)
+        try:
+            yield
+        finally:
+            self._dp_replay_lenient = previous
+
+    def _score_own_plan(self, plan: PhysicalPlan) -> float:
+        """Price the plan the optimizer just produced with the search's model.
+
+        ``calculate_dp_objective_cost(plan=...)`` is lenient because it is also
+        the cross-plan scoring entry point; the optimizer's own final plan must
+        stay on the strict model the search optimised, otherwise the reported
+        cost would answer a different question than the plan search.
+        """
+        with self._dp_lenient_replay_scope(False):
+            return self.calculate_dp_objective_cost(
+                plan=plan, lenient_replay=False
+            )
+
     def _dp_pipe_allows_variant(
         self, p_id: int, variant: PipeVariantType, strict: bool = False
     ) -> bool:
@@ -5679,6 +5721,30 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
         plan: Optional[PhysicalPlan] = None,
         search_result: Optional[SearchResult] = None,
         inner_ops: Optional[List[int]] = None,
+        lenient_replay: Optional[bool] = None,
+    ) -> float:
+        """Price a materialized plan, or read a search result's objective.
+
+        A materialized plan is priced leniently (see ``_dp_lenient_replay``):
+        the replay must report what that plan costs even when the plan leaves
+        this optimizer's search space, because cross-plan ranking is how the
+        cost models are compared.  Searching keeps the strict space.
+
+        ``lenient_replay=False`` forces the strict model, which the optimizer
+        itself uses when it prices the plan its own search just produced.
+        """
+        if lenient_replay is None:
+            lenient_replay = plan is not None
+        with self._dp_lenient_replay_scope(lenient_replay):
+            return self._calculate_dp_objective_cost_impl(
+                plan, search_result, inner_ops
+            )
+
+    def _calculate_dp_objective_cost_impl(
+        self,
+        plan: Optional[PhysicalPlan] = None,
+        search_result: Optional[SearchResult] = None,
+        inner_ops: Optional[List[int]] = None,
     ) -> float:
         """Score a plan with exactly the objective used by DP transitions.
 
@@ -5798,9 +5864,7 @@ class DpOptimizer(AffineDpCostMixin, MyOptimizer):
             self._insert_prefetch()
 
         try:
-            optimized_cost = self.calculate_dp_objective_cost(
-                plan=self.physical_plan
-            )
+            optimized_cost = self._score_own_plan(self.physical_plan)
             search_cost = getattr(self, "_last_dp_state_cost", None)
             if search_cost is not None and not math.isclose(
                 optimized_cost, search_cost, rel_tol=1e-10, abs_tol=1e-10

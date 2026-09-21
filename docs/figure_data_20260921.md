@@ -26,7 +26,16 @@
 - **llava 的 PICO** 只有 W-only 结果：`CEDAR_DP_WIDTH_LADDER=1` 只约束搜索候选，最终资源分配仍把 stage 扩宽到 `SMP w=63`，因此不是严格的 width=1 消融；该次 harness 以 **4 张图/记录**计数（175,760 个计数样本），文档已折算成 records/s（÷4 → 43,940 条）。
 - **吞吐口径**：稳态吞吐 = 数据量 / 稳态时间，其中稳态时间取 cell 的 `perf_time_sec`（= Σ epoch_run_times）。`summary.csv` 里的 `mean_input_records_per_sec` 用的是「数据量 / workload wall」（含每个 epoch 的启动与排空），数值更高，两者不要混用。
 - **cost 口径**：cedar 是单 worker 的 ms/source-record；plumber 已按 plan 的 W 折算（`1000/(瓶颈单 worker 速率 × W)`）；PICO 的 `calculate_dp_objective_cost` 是 W-conditioned 的 S，表里同时给 S 与 S/W。
-- **模型覆盖率**：只有 PICO 会拒绝 plan（coco 3 个、原因见 §3.0）。被拒绝的 cell 从排序统计里剔除，**三个模型都在同一子集上比较**，避免“谁覆盖得多谁占便宜”。
+- **模型覆盖率**：放宽之后三个模型都能给每个有 plan 的 cell 定价（此前 PICO 拒绝的 coco `raydata` / `cedar` / `cedar-dp` 现在也能定价）。如果将来还有 cell 打不了分，它会被剔除，**三个模型始终在同一子集上比较**，避免“谁覆盖得多谁占便宜”。
+
+- **PICO 给别人的 plan 打分时是宽松模式**（`_dp_lenient_replay`）：replay 只负责报告该 plan 实际花多少，因此跳过“搜索空间合法性”闸门（例如 baseline 把 to_tensor 一起融了），并接受已经测到但未收敛的 backend_compute（允许未收敛时打 warning，见下）。优化器**给自己**搜索出的 plan 打分仍用严格口径（`lenient_replay=False`），搜索空间本身没有放宽。
+
+**宽松定价用到的未收敛测量**（这些算子在搜索阶段仍然不可选）：
+
+- coco: [LayeredSimpleDp] pricing pipe 0 on RAY with an unconverged backend measurement: mean=15.1177 ms/sample count=18 rse=0.14095003828658706 stop=max_duration
+
+- coco: [LayeredSimpleDp] pricing pipe 1 on RAY with an unconverged backend measurement: mean=99.9425 ms/sample count=22 rse=0.1168285213060327 stop=max_duration
+
 
 ## 1. 稳态吞吐量（柱状图）
 
@@ -145,7 +154,7 @@
 | simclrv2 | 8 | 8 | 8 | 8 | — |
 | simclrv2_cache | 8 | 8 | 8 | 8 | — |
 | commonvoice | 7 | 7 | 7 | 7 | — |
-| coco | 7 | 7 | 7 | 4 | raydata（ValueError）、cedar（ValueError）、cedar-dp（ValueError） |
+| coco | 7 | 7 | 7 | 7 | — |
 | llava_pretrain | 7 | 7 | 7 | 7 | — |
 | stackexchange | 6 | 6 | 6 | 6 | — |
 
@@ -156,7 +165,7 @@
 | simclrv2 | 8 | 0.4072 | 0.8264 | 0.9762 | 0.2546 | 0.691 | 0.9286 | PICO | cedar-dp | cedar | PICO |
 | simclrv2_cache | 8 | 0.253 | 0.9157 | 0.994 | 0.1482 | 0.8154 | 0.982 | PICO-Resource-Op | cedar-dp | PICO-Resource-Op | PICO-Resource-Op |
 | commonvoice | 7 | -0.1637 | 0.6301 | 0.955 | -0.0501 | 0.5143 | 0.8783 | PICO | PICO-Resource | cedar | PICO-Resource-Op |
-| coco | 4 | 0.4 | 0.4 | 1.0 | 0.3333 | 0.3333 | 1.0 | PICO | PICO-Resource | PICO | PICO |
+| coco | 7 | 0.1261 | 0.4364 | 1.0 | 0.0 | 0.3504 | 1.0 | PICO | cedar | cedar | PICO |
 | llava_pretrain | 7 | 0.0901 | 0.1112 | 0.6071 | 0.0976 | 0.1029 | 0.5238 | PICO | cedar-dp | unopt | PICO |
 | stackexchange | 6 | 0.4638 | 0.7247 | 0.3714 | 0.414 | 0.5521 | 0.3333 | cedar-dp | cedar-dp | plumber | raydata |
 
@@ -210,26 +219,15 @@
 | optimizer | cedar cost (ms) | plumber cost (ms) | PICO score S | PICO S/W | 实测吞吐(rec/s) | 实测排名 | cedar 排名 | plumber 排名 | PICO 排名 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | unopt | — | — | — | — | — | — | — | — | — |
-| plumber | 168.63 | 3.94 | 187.95 | 187.95 | 19.0 | 4.0 | 4.0 | 2.0 | 4.0 |
-| raydata | 38.97 | 151.37 | — | — | 7.6 | — | — | — | — *(pico error)* |
-| cedar | 22.81 | 2.79 | — | — | 26.7 | — | — | — | — *(pico error)* |
-| cedar-dp | 22.81 | 4.73 | — | — | 25.8 | — | — | — | — *(pico error)* |
-| PICO-Resource | 24.22 | 5.59 | 98.67 | 3.08 | 230.8 | 3.0 | 1.0 | 4.0 | 3.0 |
-| PICO-Resource-Op | 46.23 | 4.73 | 71.65 | 2.24 | 241.1 | 2.0 | 3.0 | 3.0 | 2.0 |
-| PICO | 27.34 | 2.79 | 79.70 | 1.25 | 294.3 | 1.0 | 2.0 | 1.0 | 1.0 |
+| plumber | 168.63 | 3.94 | 187.95 | 187.95 | 19.0 | 6.0 | 7.0 | 3.0 | 6.0 |
+| raydata | 38.97 | 151.37 | 229.61 | 229.61 | 7.6 | 7.0 | 5.0 | 7.0 | 7.0 |
+| cedar | 22.81 | 2.79 | 3968.19 | 62.00 | 26.7 | 4.0 | 1.5 | 1.5 | 4.0 |
+| cedar-dp | 22.81 | 4.73 | 2136.34 | 66.76 | 25.8 | 5.0 | 1.5 | 4.5 | 5.0 |
+| PICO-Resource | 24.22 | 5.59 | 98.67 | 3.08 | 230.8 | 3.0 | 3.0 | 6.0 | 3.0 |
+| PICO-Resource-Op | 46.23 | 4.73 | 71.65 | 2.24 | 241.1 | 2.0 | 6.0 | 4.5 | 2.0 |
+| PICO | 27.34 | 2.79 | 79.70 | 1.25 | 294.3 | 1.0 | 4.0 | 1.5 | 1.0 |
 
-可比 cell 4 个（三者都能定价的）；实测最优 = `PICO`；cedar 最优 = `PICO-Resource`；plumber 最优 = `PICO`；PICO 最优 = `PICO`。Spearman ρ（cost 排名 vs 吞吐排名，越接近 1 越好）：cedar 0.4、plumber 0.4、PICO 1.0；Kendall τ：cedar 0.3333、plumber 0.3333、PICO 1.0。
-
-被排除在排序之外的 cell（有 plan 但 PICO 无法定价）：`raydata` — ValueError: The materialized block contains a non-fusable operator.；`cedar` — ValueError: Operator 1 has no RAY cost.；`cedar-dp` — ValueError: Operator 1 has no RAY cost.。
-
-**无法定价的根因**
-
-- `raydata`：该 plan 的融合块 `[5, 4, 3, 2, 1, 0]` 含 PICO 判定为**不可融合**的算子 `MapperPipe_to_tensor`（`_allowed_fusion` 为 False）。
-
-- `cedar`：PICO 需要 `RAY` 下算子 1（`MapperPipe_distort`）的分层 backend_compute，profile 里**有**这条测量（mean 99.94 ms/record，count 22），但 adaptive 采样 **未收敛**（RSE 11.7% > 目标 10%，stop = max_duration），`_valid_backend_compute()` 因此拒绝它。
-
-- `cedar-dp`：PICO 需要 `RAY` 下算子 1（`MapperPipe_distort`）的分层 backend_compute，profile 里**有**这条测量（mean 99.94 ms/record，count 22），但 adaptive 采样 **未收敛**（RSE 11.7% > 目标 10%，stop = max_duration），`_valid_backend_compute()` 因此拒绝它。
-
+可比 cell 7 个（三者都能定价的）；实测最优 = `PICO`；cedar 最优 = `cedar`；plumber 最优 = `cedar`；PICO 最优 = `PICO`。Spearman ρ（cost 排名 vs 吞吐排名，越接近 1 越好）：cedar 0.1261、plumber 0.4364、PICO 1.0；Kendall τ：cedar 0.0、plumber 0.3504、PICO 1.0。
 
 ### 3.5 llava_pretrain
 

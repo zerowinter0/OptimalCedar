@@ -83,7 +83,17 @@ class _LayeredProfileCostMixin:
         return mapping.get(p_id, mapping.get(str(p_id)))
 
     @staticmethod
-    def _valid_backend_compute(entry):
+    def _valid_backend_compute(
+        entry, allow_unconverged: bool = False, label: str = ""
+    ):
+        """Measured backend compute of one operator, or None when unusable.
+
+        The search only accepts measurements that reached their convergence
+        target.  Pricing a materialized plan (``allow_unconverged``) also
+        accepts a measurement whose adaptive run stopped at the time cap: that
+        plan exists and has to be ranked, and dropping the measurement would
+        silently replace it with the local cost instead.
+        """
         if not isinstance(entry, dict):
             return None
         direct = entry.get("backend_compute")
@@ -95,17 +105,25 @@ class _LayeredProfileCostMixin:
         except (KeyError, TypeError, ValueError):
             return None
         adaptive = direct.get("adaptive_profile", {})
-        if (
-            count <= 0
-            or not math.isfinite(mean)
-            or mean < 0.0
-            or (
-                isinstance(adaptive, dict)
-                and adaptive
-                and adaptive.get("converged") is not True
-            )
-        ):
+        unconverged = bool(
+            isinstance(adaptive, dict)
+            and adaptive
+            and adaptive.get("converged") is not True
+        )
+        if count <= 0 or not math.isfinite(mean) or mean < 0.0:
             return None
+        if unconverged:
+            if not allow_unconverged:
+                return None
+            logger.warning(
+                "[LayeredSimpleDp] pricing %s with an unconverged backend "
+                "measurement: mean=%.4f ms/sample count=%d rse=%s stop=%s",
+                label or "a pipe",
+                mean,
+                count,
+                adaptive.get("observed_rse"),
+                adaptive.get("stop_reason"),
+            )
         return mean
 
     def _init_stats(self):
@@ -170,7 +188,11 @@ class _LayeredProfileCostMixin:
             desc.variant_type.name, {}
         )
         entry = self._profile_entry(entries, p_id)
-        mean = self._valid_backend_compute(entry)
+        mean = self._valid_backend_compute(
+            entry,
+            allow_unconverged=self._dp_lenient_replay(),
+            label=f"pipe {p_id} on {desc.variant_type.name}",
+        )
         if mean is None:
             raise RuntimeError(
                 f"Pipe {p_id} has no valid layered "
@@ -302,17 +324,23 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
         return _SharedCommunicationObjective(local_serial=float(
             self._base_cost_map[self._get_source_p_id()]))
 
-    def calculate_dp_objective_cost(self, plan=None, search_result=None, inner_ops=None):
+    def calculate_dp_objective_cost(
+        self, plan=None, search_result=None, inner_ops=None, lenient_replay=None
+    ):
         # Replaying a materialized plan must use its W, not the W from the
         # most recent candidate search or another plan.
+        kwargs = dict(
+            plan=plan,
+            search_result=search_result,
+            inner_ops=inner_ops,
+            lenient_replay=lenient_replay,
+        )
         if plan is None:
-            return super().calculate_dp_objective_cost(
-                plan=plan, search_result=search_result, inner_ops=inner_ops)
+            return super().calculate_dp_objective_cost(**kwargs)
         previous = getattr(self, '_dp_selected_workers', None)
         self._dp_selected_workers = max(1, int(plan.n_local_workers))
         try:
-            return super().calculate_dp_objective_cost(
-                plan=plan, search_result=search_result, inner_ops=inner_ops)
+            return super().calculate_dp_objective_cost(**kwargs)
         finally:
             self._dp_selected_workers = previous
 

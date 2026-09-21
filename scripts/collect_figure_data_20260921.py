@@ -167,37 +167,52 @@ def score_plans(workload: str) -> dict:
     cedar, pico, inner_ops = build_scorers(
         workload, profile, enable_caching=workload.endswith("_cache")
     )
+    warnings: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda record: warnings.append(record.getMessage())
+    pico_logger = logging.getLogger(
+        "cedar.compose.simple_dp_ablation_optimizer"
+    )
+    pico_logger.addHandler(handler)
     scores = {}
-    for label, _method, stem, _doc_name, _note in CELLS:
-        plan_path = CAMPAIGN / workload / f"plans/round1__{stem}.yaml"
-        if workload in PICO_PLAN_OVERRIDE and stem == "simple_dp_workers_width_boundary":
-            plan_path = PICO_PLAN_OVERRIDE[workload]
-        if not plan_path.exists():
-            continue
-        plan = load_plan(plan_path)
-        workers = max(1, int(plan.n_local_workers or 1))
-        entry = {
-            "plan_path": str(plan_path.relative_to(ROOT)),
-            "workers": workers,
-            "chain": plan_chain(plan),
-            "cedar_cost_ms_per_source_record": round(
-                cedar.calculate_cost(plan.graph, plan=plan), 4
-            ),
-            "plumber_cost_ms_per_source_record": plumber_cost(plan, profile)[
-                "cost_ms_per_source_record"
-            ],
-        }
-        try:
-            score = pico.calculate_dp_objective_cost(plan=plan)
-            entry["pico_score"] = round(score, 4)
-            entry["pico_cost_ms_per_source_record"] = round(score / workers, 4)
-        except Exception as exc:  # noqa: BLE001
-            entry["pico_error"] = f"{type(exc).__name__}: {exc}"
-            entry["pico_error_detail"] = _pico_error_detail(
-                pico, profile, plan, str(exc)
-            )
-        scores[label] = entry
-    return scores, inner_ops
+    try:
+        for label, _method, stem, _doc_name, _note in CELLS:
+            plan_path = CAMPAIGN / workload / f"plans/round1__{stem}.yaml"
+            if (
+                workload in PICO_PLAN_OVERRIDE
+                and stem == "simple_dp_workers_width_boundary"
+            ):
+                plan_path = PICO_PLAN_OVERRIDE[workload]
+            if not plan_path.exists():
+                continue
+            plan = load_plan(plan_path)
+            workers = max(1, int(plan.n_local_workers or 1))
+            entry = {
+                "plan_path": str(plan_path.relative_to(ROOT)),
+                "workers": workers,
+                "chain": plan_chain(plan),
+                "cedar_cost_ms_per_source_record": round(
+                    cedar.calculate_cost(plan.graph, plan=plan), 4
+                ),
+                "plumber_cost_ms_per_source_record": plumber_cost(plan, profile)[
+                    "cost_ms_per_source_record"
+                ],
+            }
+            try:
+                score = pico.calculate_dp_objective_cost(plan=plan)
+                entry["pico_score"] = round(score, 4)
+                entry["pico_cost_ms_per_source_record"] = round(
+                    score / workers, 4
+                )
+            except Exception as exc:  # noqa: BLE001
+                entry["pico_error"] = f"{type(exc).__name__}: {exc}"
+                entry["pico_error_detail"] = _pico_error_detail(
+                    pico, profile, plan, str(exc)
+                )
+            scores[label] = entry
+    finally:
+        pico_logger.removeHandler(handler)
+    return scores, inner_ops, warnings
 
 
 def _pico_error_detail(pico, profile, plan, message: str) -> dict:
@@ -361,13 +376,14 @@ def main() -> int:
             for label, method, stem, _doc_name, _note in CELLS
         }
         print(f"[{workload}] measuring done, scoring plans ...", flush=True)
-        scores, inner_ops = score_plans(workload)
+        scores, inner_ops, scoring_notes = score_plans(workload)
         agreement = rank_agreement(scores, measured)
         data["workloads"][workload] = {
             "measured": measured,
             "scores": scores,
             "rank_agreement": agreement,
             "inner_ops": inner_ops,
+            "scoring_notes": scoring_notes,
         }
         print(
             f"[{workload}] scored {len(scores)} plans; "
@@ -416,9 +432,26 @@ def main() -> int:
         "- **cost 口径**：cedar 是单 worker 的 ms/source-record；plumber 已按 plan 的 W 折算"
         "（`1000/(瓶颈单 worker 速率 × W)`）；PICO 的 `calculate_dp_objective_cost` 是 W-conditioned 的 "
         "S，表里同时给 S 与 S/W。\n"
-        "- **模型覆盖率**：只有 PICO 会拒绝 plan（coco 3 个、原因见 §3.0）。被拒绝的 cell 从排序统计里"
-        "剔除，**三个模型都在同一子集上比较**，避免“谁覆盖得多谁占便宜”。\n"
+        "- **模型覆盖率**：放宽之后三个模型都能给每个有 plan 的 cell 定价（此前 PICO 拒绝的 coco "
+        "`raydata` / `cedar` / `cedar-dp` 现在也能定价）。如果将来还有 cell 打不了分，它会被剔除，"
+        "**三个模型始终在同一子集上比较**，避免“谁覆盖得多谁占便宜”。\n"
     )
+    md.append(
+        "- **PICO 给别人的 plan 打分时是宽松模式**（`_dp_lenient_replay`）：replay 只负责报告"
+        "该 plan 实际花多少，因此跳过“搜索空间合法性”闸门（例如 baseline 把 to_tensor 一起融了），"
+        "并接受已经测到但未收敛的 backend_compute（允许未收敛时打 warning，见下）。优化器**给自己**"
+        "搜索出的 plan 打分仍用严格口径（`lenient_replay=False`），搜索空间本身没有放宽。\n"
+    )
+    if any(
+        data["workloads"][w].get("scoring_notes")
+        for w in data["workloads"]
+    ):
+        md.append("**宽松定价用到的未收敛测量**（这些算子在搜索阶段仍然不可选）：\n")
+        for workload in WORKLOADS:
+            notes = data["workloads"][workload].get("scoring_notes") or []
+            for note in sorted(set(notes)):
+                md.append(f"- {workload}: {note}\n")
+        md.append("")
 
     md.append("## 1. 稳态吞吐量（柱状图）\n")
     md.append("单位：records/s（= 数据量 / 稳态时间 `perf_time_sec`）。\n")
