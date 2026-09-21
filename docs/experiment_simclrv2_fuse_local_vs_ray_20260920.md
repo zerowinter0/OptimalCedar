@@ -312,7 +312,36 @@ RAY w=1）**8.4753**；同一计划 fuse 块改 local **9.1662**。
   差别来自 Cedar 的融合 IO 折扣（§4/§5 的同一机制）。把 Batcher 留在块外（3b/5）会让折扣少拿一次，
   5 与 5b 的 11.08 vs 5.14 就是这个效应。
 
-## 9. 产物
+## 9. 追加实验：同一份计划在 W=1 与 W=64 下的 RAY / local 对照（2026-09-21）
+
+目的：核实"profile 里 RAY offload 让整条流水线变快、但执行时 RAY 更贵"这个矛盾。做法：取 cedar plan
+（`Fused{B,H,J}` 在 RAY）与它的 local 融合版，各把 `n_local_workers` 设成 1 和 64，其余完全不变，
+9,469 条（9,472 样本）单次运行。脚本 `scripts/run_simclrv2_raylocal_w1_w64_20260921.sh`，
+数据在 `outputs/simclrv2_raylocal_w1_w64_20260921/`。
+
+| cell | 稳态吞吐 | 单 worker 每记录 | 相对同 W 的另一臂 |
+| --- | ---: | ---: | --- |
+| RAY 融合，W=1 | **97.20 rec/s** | 10.29 ms | RAY 比 local **快 1.34×** |
+| local 融合，W=1 | 72.43 rec/s | 13.81 ms | — |
+| RAY 融合，W=64 | 1181.01 rec/s | 54.2 ms（每 worker 周期） | local 比 RAY **快 2.06×** |
+| local 融合，W=64 | **2437.15 rec/s** | 26.3 ms | — |
+
+读法：
+
+- **W=1 时 RAY 确实更快（1.34×）**，这正是 profile 测到"offload 提升整条吞吐"的原因：W=1 时 worker 串行跑
+  完整条链，把 `{B,H,J}`（本地 5.75–12 ms）交给远端 actor 做可以与 worker 的其余 stage **重叠**，于是瓶颈
+  从"本地串行总和"变成 `max(本地剩余链, actor lane)` —— profile 的 `profile_scope=single_local_worker`、
+  `ray_actors_per_stage=1` 就是同一个配置（其 offload 测量里 Blur 43.52→72.27 rec/s，actor 侧计算 10.7 ms
+  反而比本地 6.0 ms 更慢，也说明收益来自并发而不是单价）。
+- **W=64 时结论反转（local 快 2.06×）**：64 个 worker 已经把本地工作并行化，RAY 这一跳的每记录开销
+  （提交 0.35 ms + actor 计算 11.0 ms + 回程序列化/传输/反序列化 6.6–16.6 ms ≈ 18–28 ms）**加在**每个
+  worker 的关键路径上，而同样三个算子本地只要 5.75 ms。每 worker 周期从 26.3 ms 涨到 54.2 ms，差值
+  ≈28 ms/record，与 §7.3 的分段一致。
+- 结论：Cedar 把"W=1、单算子、单 actor 的整条吞吐提升"通过 Amdahl 反演成"该算子 per-record cost 归零"，
+  隐含假设收益与 W / payload / 并发流数无关；实测这两个 W 下的方向刚好相反。PICO 因为显式建模了
+  boundary 与跨主机传输（`bytes × W / bandwidth`），在 simclrv2 上给出全 local 融合计划，方向正确。
+
+## 10. 产物
 
 - 计划：`outputs/simclrv2_local_vs_ray_9469_20260920/plans/{cedar_opt_local_w1,cedar_opt_ray_w1}.yaml`
 - 结果 JSON：`outputs/simclrv2_local_vs_ray_9469_20260920/results/round{1,2,3}__{local,ray}.json`（+ `smoke_local.json`）
