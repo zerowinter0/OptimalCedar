@@ -31,13 +31,14 @@ DATA = json.loads(
 )
 OUT = ROOT / "outputs/figures_20260921"
 
+# stackexchange is dropped from the figures (per request); its data stays in
+# docs/figure_data_20260921.md and outputs/figure_data_20260921/.
 WORKLOADS = [
     "simclrv2",
     "simclrv2_cache",
     "commonvoice",
     "coco",
     "llava_pretrain",
-    "stackexchange",
 ]
 WLABEL = {
     "simclrv2": "simclrv2",
@@ -171,87 +172,97 @@ def fig_throughput():
 
 
 def fig_optimization_time():
-    fig, ax = plt.subplots(figsize=(10.0, 3.4))
+    values_all = [
+        measured(w, label).get("setup_time_sec") or 0.0
+        for w in WORKLOADS
+        for label in LABELS
+    ]
+    full_max = max(values_all) * 1.05
+    zoom_max = 460.0
+    fig, (ax, ax_zoom) = plt.subplots(
+        2, 1, figsize=(10.0, 5.4), sharex=True,
+    )
+    fig.subplots_adjust(top=0.90, bottom=0.20, left=0.08, right=0.99, hspace=0.12)
     positions = np.arange(len(WORKLOADS))
     width = 0.10
-    for index, label in enumerate(LABELS):
-        values = []
-        for workload in WORKLOADS:
-            cell = measured(workload, label)
-            values.append(cell.get("setup_time_sec") or np.nan)
-        offset = (index - (len(LABELS) - 1) / 2) * width
-        bars = ax.bar(
-            positions + offset,
-            values,
-            width * 0.92,
-            label=label,
-            color=COLORS[label],
-            edgecolor="white",
-            linewidth=0.4,
-            hatch="///" if label == "PICO" else None,
-        )
-        for bar, value in zip(bars, values):
-            if np.isnan(value):
-                ax.bar(
-                    bar.get_x(),
-                    0.16,
-                    bar.get_width(),
-                    bottom=0.5,
-                    color="#f2f2f2",
-                    edgecolor="#b00020",
-                    linewidth=0.5,
-                    hatch="//",
-                )
-                ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    0.63,
-                    "×",
-                    ha="center",
-                    va="center",
-                    fontsize=6.5,
-                    color="#b00020",
-                )
-                continue
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                value * 1.08,
-                f"{value:,.0f}",
-                ha="center",
-                va="bottom",
-                rotation=90,
-                fontsize=4.6,
-                color="#333333",
+    for panel, annotate_all in ((ax, False), (ax_zoom, True)):
+        for index, label in enumerate(LABELS):
+            values = []
+            for workload in WORKLOADS:
+                cell = measured(workload, label)
+                values.append(cell.get("setup_time_sec") or np.nan)
+            offset = (index - (len(LABELS) - 1) / 2) * width
+            bars = panel.bar(
+                positions + offset,
+                values,
+                width * 0.92,
+                label=label,
+                color=COLORS[label],
+                edgecolor="white",
+                linewidth=0.4,
+                hatch="///" if label == "PICO" else None,
             )
-    ax.set_yscale("log")
-    ax.set_ylim(0.5, 1.2e4)
-    ax.set_ylabel("optimization / setup time (s, log)")
-    ax.set_xticks(positions)
-    ax.set_xticklabels([WLABEL[w] for w in WORKLOADS])
-    ax.grid(axis="y", which="both", color="#e6e6e6", linewidth=0.5)
-    ax.set_axisbelow(True)
+            stub = (panel is ax_zoom) and 4.0 or 24.0
+            for bar, value in zip(bars, values):
+                if np.isnan(value):
+                    panel.bar(
+                        bar.get_x(),
+                        stub,
+                        bar.get_width(),
+                        bottom=0.0,
+                        color="#f2f2f2",
+                        edgecolor="#b00020",
+                        linewidth=0.5,
+                        hatch="//",
+                    )
+                    panel.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        stub * 1.9,
+                        "×",
+                        ha="center",
+                        va="center",
+                        fontsize=6.5,
+                        color="#b00020",
+                    )
+                    continue
+                if not annotate_all and value < 100.0:
+                    continue
+                inside = panel is ax_zoom and value > zoom_max * 0.95
+                panel.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    min(value + stub * 0.3, zoom_max * 0.94) if inside
+                    else value + (stub * 0.3),
+                    f"{value:,.0f}",
+                    ha="center",
+                    va="top" if inside else "bottom",
+                    rotation=90,
+                    fontsize=5.2 if annotate_all else 5.6,
+                    color="#333333",
+                )
+        panel.set_ylim(0.0, full_max if panel is ax else zoom_max)
+        panel.grid(axis="y", color="#e6e6e6", linewidth=0.5)
+        panel.set_axisbelow(True)
+    ax.set_ylabel("time (s, full)")
+    ax_zoom.set_ylabel("time (s, zoom)")
+    ax_zoom.set_xticks(positions)
+    ax_zoom.set_xticklabels([WLABEL[w] for w in WORKLOADS])
     handles, labels = ax.get_legend_handles_labels()
     handles.append(Line2D([], [], color="#b00020", marker="$×$", linestyle="none"))
-    labels.append("no cell (timeout / skipped)")
+    labels.append(
+        "no cell (cedar: known timeout on llava; unopt: timeout on "
+        "commonvoice/coco)"
+    )
     fig.legend(
         handles,
         labels,
         ncol=5,
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.24),
+        bbox_to_anchor=(0.5, 0.0),
         frameon=False,
     )
-    ax.text(
-        0.5,
-        1.02,
-        "cedar-opt has no cell on llava-pretrain / stackexchange "
-        "(known Cedar optimization timeout); PICO has none on stackexchange",
-        transform=ax.transAxes,
-        ha="center",
-        va="bottom",
-        fontsize=6.2,
-        color="#b00020",
+    fig.suptitle(
+        "Optimization (setup) time per optimizer and workload", y=0.975
     )
-    fig.suptitle("Optimization (setup) time per optimizer and workload", y=1.02)
     save(fig, "fig2_optimization_time")
 
 
@@ -307,6 +318,8 @@ def fig_cost_rank():
         ax.set_ylabel("model cost rank (1 = cheapest)")
     for ax in axes[1, :]:
         ax.set_xlabel("measured rank (1 = fastest)")
+    for ax in axes.ravel()[len(WORKLOADS):]:
+        ax.axis("off")
     fig.legend(
         [handles[model] for model, _nice, _color in MODELS],
         [nice for _m, nice, _c in MODELS],
