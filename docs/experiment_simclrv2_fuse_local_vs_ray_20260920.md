@@ -133,6 +133,7 @@ latency 全部相同，所以 Plumber 给出的 cost **完全一样**（它不�
 
 | 计划 | W | 计划形态 | Cedar | **Plumber ÷W** | PICO S | **PICO S/W** |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| pico（PICO 自己选中的计划：`R → Fused{6,3,4,5,2,7,1} → T`，全 local） | 64 | 七算子融合、batcher 在外 | **8.9731** | 0.2987 | 8.2057 | 0.1282 |
 | unopt | 1 | 全 INPROCESS、无融合、无 prefetch | 22.9795 | 8.4977 | 25.4090 | 25.4090 |
 | old-dp | 32 | `ImageReader → FusedPipe{7,1,2,3,4,6,5}[SMP w=1] → Batcher → Prefetch` | 7.9084 | 0.5975 | 113.5186 | 3.5475 |
 | plumber | 1 | 逐算子 SMP（to_float 2 / crop 7 / jitter 27 / grayscale 2 / blur 25） | 22.9795 | 7.7742 | n/a | n/a |
