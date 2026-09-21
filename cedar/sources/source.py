@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import logging
+import os
 import time
 import tempfile
 import pathlib
@@ -12,7 +13,12 @@ from cedar.pipes import Pipe, DataSample, Partition
 
 from cedar.utils.frameworks import tensorflow
 
-TRACE_FREQUENCY_SEC = 0.1
+# Minimum wall-clock gap between two traced source records.  The default keeps
+# profiling cheap; reconcile/analysis runs that need a trace for every record
+# set CEDAR_TRACE_FREQUENCY_SEC=0 (with sampling on, a downstream stage such as
+# the batcher can only anchor on the most recently *sampled* record, which
+# inflates its measured window by the whole batch-assembly span).
+TRACE_FREQUENCY_SEC = float(os.environ.get("CEDAR_TRACE_FREQUENCY_SEC", "0.1"))
 DISABLE_DATASAMPLES = False  # for benchmarking only
 logger = logging.getLogger(__name__)
 

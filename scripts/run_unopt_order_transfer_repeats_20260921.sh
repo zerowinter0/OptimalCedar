@@ -26,7 +26,8 @@ cp -n "$SOURCE_RUN"/plans/*.yaml "$RUN/plans/" 2>/dev/null || true
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
        NUMEXPR_NUM_THREADS=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
        CEDAR_RAY_PLACEMENT_RESOURCE=cedar_remote CEDAR_RAY_REQUIRE_REMOTE=1 \
-       CEDAR_WORKER_READY_TIMEOUT_SEC=600
+       CEDAR_WORKER_READY_TIMEOUT_SEC=600 \
+       CEDAR_TRACE_FREQUENCY_SEC=0    # trace every record: the batcher anchors on its last input
 
 for rep in $(seq 1 "$REPEATS"); do
   for cell in declared pico cedar old-dp; do
