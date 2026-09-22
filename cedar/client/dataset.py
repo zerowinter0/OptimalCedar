@@ -992,9 +992,22 @@ class DataSet:
                    )[optimizer_selector - 20]
             for feature in self.features.values():
                 feature.set_optimizer(cls())
+        elif optimizer_selector in (31, 32, 33):
+            from cedar.compose.staged_ablation_optimizer import (
+                StagedBoundaryOptimizer,
+                StagedBoundaryAffineOptimizer,
+                StagedWorkersBoundaryAffineOptimizer,
+            )
+            staged_cls = (
+                StagedBoundaryOptimizer,
+                StagedBoundaryAffineOptimizer,
+                StagedWorkersBoundaryAffineOptimizer,
+            )[optimizer_selector - 31]
+            for feature in self.features.values():
+                feature.set_optimizer(staged_cls())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be between 0 and 29."
+                "OptimizerOptions.use_my_optimizer must be 0-29 or 31-33."
             )
 
         if len(self.features) == 0:

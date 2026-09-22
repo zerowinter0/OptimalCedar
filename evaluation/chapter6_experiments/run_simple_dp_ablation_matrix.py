@@ -19,6 +19,11 @@ METHODS = {
     'simple_dp_workers_boundary': 'simple_dp_workers_boundary',
     'simple_dp_workers_width_boundary': 'simple_dp_workers_width_boundary',
     'old_dp_boundary': 'old_dp_boundary',
+    # Cedar's staged search priced by the matching PICO cost model.  The
+    # staged/DP pairs share a cost model, so the difference is the search.
+    'staged-boundary': 'staged_boundary',
+    'staged-boundary-affine': 'staged_boundary_affine',
+    'staged-boundary-affine-W': 'staged_workers_boundary_affine',
     'old-dp-opt': 'old_dp_legacy_optimizer',
     'plumber-opt': 'plumber_optimizer',
     'dj-cedar-opt': 'dj_optimizer',

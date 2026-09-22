@@ -51,6 +51,11 @@ OPTIMIZERS = {
     "simple_dp_workers_boundary": 25,
     "simple_dp_workers_width_boundary": 27,
     "old_dp_boundary": 28,
+    # Cedar's staged search priced by the three PICO cost models (ablation:
+    # same cost model as the matching DP variant, greedy staged search).
+    "staged_boundary": 31,
+    "staged_boundary_affine": 32,
+    "staged_workers_boundary_affine": 33,
     "dj_optimizer": 3,
     "optimizer": 0,
     "cm_optimizer": 16,
