@@ -29,6 +29,9 @@
 | PICO-Resource-Op | dp-boundary-affine | SimpleDpBoundaryOptimizer (21) | boundary + 每算子 kx+b |
 | PICO | dp-boundary-affine-W-width | SimpleDpWorkersWidthBoundaryOptimizer (27) | boundary + kx+b + Workers + width |
 | （消融对照）| simple-dp-opt | LayeredSimpleDpOptimizer (29) | 与 PICO-Resource-Op 同模型但不加 boundary |
+| （§4.6 消融）| staged-boundary | StagedBoundaryOptimizer (31) | Cedar staged 搜索 + boundary 模型 |
+| （§4.6 消融）| staged-boundary-affine | StagedBoundaryAffineOptimizer (32) | Cedar staged 搜索 + boundary + kx+b |
+| （§4.6 消融）| staged-boundary-affine-W | StagedWorkersBoundaryAffineOptimizer (33) | Cedar staged 搜索 + boundary + kx+b + W |
 
 ## 0.1 文档地图
 
@@ -39,6 +42,7 @@
 | 图件底层数据 | `outputs/figure_data_20260921/figure_data.json`（`scripts/collect_figure_data_20260921.py`） |
 | 正式放大 campaign 原始产物 | `outputs/ultimate_eight_optimizers_fix_20260921/`（= `..._20260920` 的续跑完整版） |
 | 新增 Cedar 负载原始产物 | `outputs/ultimate_new_workloads_20260922/`（小数据验证在 `outputs/new_workloads_validation_20260922/`） |
+| staged vs DP 消融原始产物 | `outputs/staged_ablation_20260922/`（小数据验证在 `outputs/staged_ablation_validation_20260922/`，§4.6） |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -1503,6 +1507,106 @@ python -m evaluation.pipelines.target_pipeline.plot_latency_scaling --help
 `outputs/dp_vs_old_dp_simclrv2_20260911/profile.yaml`，脚本会断言两者一致
 （`profiles_identical: true`，见该目录 `metadata.json`）。
 
+### 4.6 staged 搜索 + PICO cost model：把"cost model 有效"和"DP 有效"分开
+
+**问题**：前面所有结论都混着两件事——cost model 变准了，以及搜索从"分阶段贪心"换成了
+"联合 DP"。这一节把两者分开：用 **Cedar 原来的 staged 搜索**（同一套 pass：reorder →
+offload/fusion → TF fusion → 事后 stage 宽度；同样的候选集、同样的"更便宜就接受"规则），
+只把**计划评价函数**换成 PICO 的三种 cost model，得到三个新 optimizer
+（`cedar/compose/staged_ablation_optimizer.py`，selector 31/32/33）：
+
+| 新 optimizer（selector） | cost model | 同 cost model 的 DP 对照（selector） |
+| --- | --- | --- |
+| `staged-boundary` (31) | new profile + stage boundary（Cedar 计算量口径） | `old_dp_boundary` (28) |
+| `staged-boundary-affine` (32) | + 每算子 kx+b | `simple_dp_boundary` (21) |
+| `staged-boundary-affine-W` (33) | + W（replica 数）维度 | `simple_dp_workers_boundary` (25) |
+
+实现上保证"成对的 cost model 完全一致"：staged 每次 `calculate_cost(graph, specs,
+fused_pipes)` 都被物化成一个合法 `PhysicalPlan`，再交给**对应的那个 DP 消融类**做 replay
+定价（同一份代码，分数可直接比较）。tier 3 因为 staged 没有联合 W 维度，只能在计划定稿后按
+`score / W` 枚举合法 W 取最优。6 个 optimizer 在**同一个 run**
+（`outputs/staged_ablation_20260922`）里跑完，读同一份 campaign profile，同一天、同协议
+（64 CPU、远端 Ray、1 轮、2 h cell 上限）。
+
+**结果**（稳态吞吐 rec/s；score = 该 tier 的模型分，越低越好；setup = 该 cell 的规划/构建时间）
+
+**simclrv2（189,380 条）**
+
+| tier | staged | DP 对照 | DP/staged |
+| --- | ---: | ---: | ---: |
+| boundary | 2389.4（score 10.5481，setup 23.0 s） | 1943.2（8.9166，12.4 s） | **0.81×** |
+| +affine | 2442.9（8.2057，22.9 s） | 1932.2（7.8110，12.5 s） | **0.79×** |
+| +W | 2443.9（8.2057，23.3 s） | 2476.9（8.2057，116.8 s） | 1.01× |
+
+**simclrv2_cache（189,380 条，cache 开）**
+
+| tier | staged | DP 对照 | DP/staged |
+| --- | ---: | ---: | ---: |
+| boundary | 1595.9（8.0577，22.8 s） | 2229.6（6.0601，12.5 s） | **1.40×** |
+| +affine | 2750.1（5.7115，23.2 s） | 5612.0（2.8726，22.8 s） | **2.04×** |
+| +W | 2719.8（5.7115，23.1 s） | 5532.1（2.8726，131.7 s） | **2.03×** |
+
+**commonvoice（300,000 条）**
+
+| tier | staged | DP 对照 | DP/staged |
+| --- | ---: | ---: | ---: |
+| boundary | 716.5（26.1175，19.3 s） | 652.4（12.0793，10.0 s） | **0.91×** |
+| +affine | 724.8（27.0707，19.3 s） | 725.0（27.0707，19.6 s） | 1.00× |
+| +W | 713.2（27.0707，19.4 s） | 722.6（27.0707，20.5 s） | 1.01× |
+
+**coco（50,000 条）**
+
+| tier | staged | DP 对照 | DP/staged |
+| --- | ---: | ---: | ---: |
+| boundary | 284.8（65.5017，17.1 s） | 227.4（55.1507，9.0 s） | **0.80×** |
+| +affine | 288.5（79.6981，17.5 s） | 243.2（65.1022，9.2 s） | **0.84×** |
+| +W | 295.9（79.6981，17.5 s） | 291.5（79.6981，18.1 s） | 0.99× |
+
+**llava_pretrain**：按用户要求整个负载从本轮消融中去掉。原因是三个 staged tier 都无法规划——
+Cedar 的 reorder pass 要枚举拓扑序（`calculate_reorderings`），16 个算子的 LLaVA 流水线连
+候选生成都跑不完（> 2 h，与 campaign 里 `cedar-opt` 在同一负载上超时同因），
+`status.json` 记为 `skipped_previous_timeout` / `skipped_user_requested`；该负载的 DP 参考值见
+§2.6（PICO-Resource 26.3、PICO-Resource-Op 28.2 rec/s，W-only 29.4 rec/s）。
+
+用同族的 DP 变体交叉验证过这份 run 与 campaign 的一致性：本 run 的 `simple_dp_workers_boundary`
+（W-only）计划与 campaign 的 PICO 计划相同，吞吐 2476.9 vs 2501.5（simclrv2）、5532.1 vs 5399.4
+（simclrv2_cache）、722.6 vs 743.2（commonvoice）、291.5 vs 294.3（coco），偏差 ≤ 2.5%。
+
+**计划形态**
+
+| 负载 / tier | staged | DP |
+| --- | --- | --- |
+| simclrv2 boundary | 全 INPROCESS，W=64，Grayscale/RandomResizedCrop 互换 | `Fused{3,6}` → `Fused{2,4,5}[SMP w=1]` → `Fused{7,1}`，W=32 |
+| simclrv2 +affine | 全 INPROCESS，W=64（声明顺序） | `Fused{6,3}` → `GaussianBlur[SMP w=1]` → `Fused{4,5,7,1}`，W=32 |
+| simclrv2 +W | 全 INPROCESS，W=64 | `Fused{6,3,4,5,2,7,1}`（全 local），W=64 |
+| simclrv2_cache boundary | cache + `GaussianBlur[RAY w=1]`，W=64 | cache + `Fused{2,4,5}[SMP w=1]` + `Fused{7,1}`，W=32 |
+| simclrv2_cache +affine / +W | cache + 全 INPROCESS，W=64 | `Fused{3,2}` → cache → `Fused{6,4,5,7,1}`，W=64 |
+| commonvoice 三 tier | 全 INPROCESS，W=64 | boundary：`Fused{6,5,4,3}[SMP w=1]` + `Fused{2,1,0}`；affine/W：整条 fuse、全 local |
+| coco 三 tier | 全 INPROCESS，W=64 | boundary：`Fused{1,5,4,3,2}[SMP w=1]`；affine：`distort[SMP w=1]` + `Fused{5,4,3,2}`；W：`Fused{1,5,4,3,2}` 全 local |
+
+**分析**
+
+1. **DP 的收益不是无条件的，取决于该 tier 的模型是否准。** simclrv2_cache 上模型和实测方向一致：
+   DP 分数 2.8726 vs staged 5.7115，实测 5612.0 vs 2750.1 rec/s（**2.04×**）——同一份模型下，
+   联合搜索把 cache 两侧的融合块与顺序一起决定，贪心 staged 只能停在"cache + 全 local"。
+   commonvoice / coco 的 tier 3 两边分数完全相同（DP 的计划就是 staged 计划的融合版），
+   实测也只差 1–2%。
+2. **模型错了的地方，DP 救不回来。** simclrv2 / coco 的 tier 1–2 上 DP 的模型分更低
+   （simclrv2：7.8110 vs 8.2057；coco：65.1022 vs 79.6981），实测**更慢**
+   （1932.2 vs 2442.9 rec/s；243.2 vs 288.5 rec/s）。原因是 DP 按模型把一两个算子放到 SMP
+   （跨进程、每记录一次 IPC），而模型对这一跳只收 0.4 ms/record（8.2057 → 7.8110，约 5%），
+   实测却要付 **+0.108 ms/record（约 +26%）**（2443 → 1932 rec/s 的倒数差）。
+   也就是说：**先把 SMP 边界定价修准，DP 的搜索优势才能在这些负载上兑现**。
+3. **长流水线上 DP 是唯一可行的搜索。** LLaVA 16 算子：staged 的 reorder 枚举 > 2 h 跑不完
+   （campaign 的 `cedar-opt` 同因超时），而 DP 用子集 DP 在多项式时间内给出计划
+   （§2.6：PICO-Resource 26.3、PICO-Resource-Op 28.2 rec/s）。
+4. **更好的 cost model 本身就会改变 staged 的决定，但不足以改变它的计划族**：tier 1 → tier 2
+   让 simclrv2_cache 从 1595.9 涨到 2750.1 rec/s、simclrv2 从 2389.4 涨到 2442.9；
+   而 W 维度对 staged 的计划形态没有影响（它只能在事后挑 W，tier 2/3 的 staged 计划完全相同）。
+5. **规划时间**：staged 三个 tier 都在 17–23 s 完成（比 DP 的 9–132 s 快），但在
+   simclrv2_cache 上它换来的是慢 1.4–2.0× 的计划；DP 的 tier 3 多花的规划时间（116.8 / 131.7 s）
+   换来了 2× 的吞吐。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射
@@ -1779,6 +1883,12 @@ python -m evaluation.pipelines.target_pipeline.plot_latency_scaling --help
 5. **"边界代价"本身不是文本负载输的原因**：小记录的 RAY boundary 按字节计价几乎为 0
    （2.8 KB 中位记录 ≈25 ns/条），PICO 输在它主动放弃了 Ray 计划、
    而"本地 64 worker 线性加速"的假设不成立（3.4）。
+6. **cost model 与搜索是两件事，DP 的收益取决于模型的准度**（4.6）：把 Cedar 的 staged
+   搜索配上同一份 PICO cost model 逐 tier 对照后，DP 在 simclrv2_cache 上快 **2.04×**
+   （5612 vs 2750 rec/s，模型分 2.87 vs 5.71，方向一致）；但在 simclrv2 / coco 的 tier 1–2 上，
+   DP 按模型选出的 SMP 计划实测反而慢 20%（1932 vs 2443 rec/s、243 vs 289 rec/s，模型分更低），
+   因为模型把一次跨进程只算 0.4 ms/record、实测要付约 +26%。LLaVA 上 staged 连规划都跑不完
+   （reorder 枚举 > 2 h），只有 DP 可行。
 
 **未决问题（按优先级）**
 
@@ -1795,6 +1905,9 @@ python -m evaluation.pipelines.target_pipeline.plot_latency_scaling --help
    （4.4），并且 `CEDAR_DP_WIDTH_LADDER` 只约束搜索、最终分配仍会加宽。
 6. **per-record 拆分的边界项**：simclrv2 的 Ray 段有约 45.9 ms/record 花在提交/序列化/取回，
    其中 actor 计算只有 11.2 ms（4.2）；这条量级现在只被"边界吞吐 × 字节"近似。
+7. **SMP 边界被定价得过低**（4.6）：模型认为把 `GaussianBlur` / `distort` 放进 SMP 能省
+   ~5%（simclrv2 8.2057 → 7.8110；coco 79.6981 → 65.1022），实测这些计划比全 local 慢 20%
+   （+0.108 ms/record）。修准 SMP 每记录 IPC 项之后，tier 1–2 的 DP 才可能真正赢过 staged。
 
 ## 7. 复现命令速查
 
@@ -1812,6 +1925,9 @@ python -u scripts/verify_pico_dp_optimality_ilp.py --workload commonvoice \
     --profile outputs/ultimate_eight_optimizers_20260920/commonvoice/profiles/shared.yaml --workers 64
 bash scripts/run_pico_w_only_20260921.sh
 bash scripts/run_unopt_order_transfer_repeats_20260921.sh      # affine 顺序交换（§4.1）
+# staged vs DP 消融（§4.6；复用 campaign profile，llava 的 staged 侧按设计跳过）
+MODE=formal bash scripts/run_staged_ablation_20260922.sh
+python -u scripts/staged_ablation_report.py outputs/staged_ablation_20260922
 python -u tmp_analysis/reordered_operator_table.py
 python -u tmp_analysis/probe_ray_local_pricing.py wikitext103 \
     outputs/ultimate_new_workloads_20260922/wikitext103/profiles/shared.yaml \

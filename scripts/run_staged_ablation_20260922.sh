@@ -46,7 +46,20 @@ else
   EXTRA=(--cell-timeout-sec 7200 --simclrv2-epochs 20
          --commonvoice-max-samples 300000
          --commonvoice-dataset-path /workspace/OptimalCedar/datasets/commonvoice/cv15_en_train_300000
-         --llava-samples 50000)
+         --llava-samples 50000
+         # Cedar's staged reordering enumerates topological orders, so the
+         # 16-operator LLaVA pipeline cannot even finish candidate generation
+         # (the campaign's cedar-opt timed out the same way).  Keep the DP
+         # counterparts on llava and record the staged side as unavailable.
+         --skip-cell staged-boundary@llava_pretrain
+         --skip-cell staged-boundary-affine@llava_pretrain
+         --skip-cell staged-boundary-affine-W@llava_pretrain
+         # Per user instruction the whole llava workload is dropped from this
+         # ablation: every staged tier is a timeout there, and the campaign
+         # already carries the DP/PICO numbers for that workload.
+         --skip-cell old_dp_boundary@llava_pretrain
+         --skip-cell simple_dp_boundary@llava_pretrain
+         --skip-cell simple_dp_workers_boundary@llava_pretrain)
 fi
 
 nohup python -u evaluation/chapter6_experiments/run_simple_dp_ablation_matrix.py \
