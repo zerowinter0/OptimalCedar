@@ -144,7 +144,7 @@ def _object_disk_cache_is_complete(dataset: Any) -> bool:
 
 def _wait_for_object_disk_cache_complete(
     dataset: Any,
-    timeout_sec: float = 60.0,
+    timeout_sec: Optional[float] = None,
     poll_interval_sec: float = 0.1,
 ) -> bool:
     """Wait for multiprocessing cache workers to commit their manifests.
@@ -154,6 +154,13 @@ def _wait_for_object_disk_cache_complete(
     Treat that short shutdown window as asynchronous completion rather than a
     failed cache warmup.
     """
+    if timeout_sec is None:
+        # The budget-limited warmup pass can stop while several workers are
+        # still draining their shard, so the grace period has to cover the
+        # slowest shard's commit on long cache workloads.
+        timeout_sec = float(
+            os.environ.get("CEDAR_CACHE_WARMUP_GRACE_SEC", "60")
+        )
     deadline = time.monotonic() + timeout_sec
     while True:
         if _object_disk_cache_is_complete(dataset):

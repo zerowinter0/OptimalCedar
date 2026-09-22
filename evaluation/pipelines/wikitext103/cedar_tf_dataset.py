@@ -70,14 +70,19 @@ class Wikitext103Feature(Feature):
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+    data_dir = pathlib.Path(
+        (spec.kwargs or {}).get("dataset_path")
+        or pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
     )
     train_filepath = pathlib.Path(data_dir) / pathlib.Path(
         "wikitext-103/wiki.train.tokens"
     )
     ctx = CedarContext(ray_config=spec.to_ray_config())
-    source = LocalLineSource(str(train_filepath))
+    max_samples = (spec.kwargs or {}).get("max_samples")
+    source = LocalLineSource(
+        str(train_filepath),
+        max_samples=int(max_samples) if max_samples is not None else None,
+    )
     feature = Wikitext103Feature(batch_size=spec.batch_size)
     feature.apply(source)
 

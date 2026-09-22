@@ -6,14 +6,15 @@
 
 数据来源：正式放大 campaign `outputs/ultimate_eight_optimizers_fix_20260921`（simclrv2 189,380 条、
 commonvoice 300,000、coco 50,000、llava_pretrain 43,940 条过过滤），llava 的 PICO 取 W-only 运行
-`outputs/pico_w_only_20260921`。口径与注意事项见 `docs/figure_data_20260921.md`。
+`outputs/pico_w_only_20260921`。口径与注意事项见 `docs/experiments.md` §5。
 
 **图中不含 stackexchange**（按要求去掉）；它的吞吐/优化时间/cost 数据仍完整保留在
-`docs/figure_data_20260921.md` 与 `outputs/figure_data_20260921/figure_data.json`。
+`docs/experiments.md` §5 与 `outputs/figure_data_20260921/figure_data.json`。
 
 ## fig1_throughput
 
-每个负载 × 8 个 optimizer 的**稳态吞吐**（records/s，log 轴，柱顶数字为实测值）：
+每个负载 × 8 个 optimizer 的**稳态吞吐**（records/s；**每个负载一个面板、各自独立线性纵轴**——
+负载之间跨度 3.1–5{,}502 rec/s，共用一根线性轴会把小柱子压平；柱顶数字为实测值）：
 `unopt / plumber / raydata / cedar / cedar-dp / PICO-Resource / PICO-Resource-Op / PICO`。
 红叉 = 该 cell 没有结果（unopt 在 commonvoice/coco 执行超时；cedar 在 llava/stackexchange 因已知优化
 超时跳过）。

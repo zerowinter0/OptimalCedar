@@ -2128,6 +2128,17 @@ class DataSet:
         """Measure one backend with fixed inputs until confidence converges."""
         replay = _ProfileReplayPipeVariant(snapshots, 1)
         predecessor = pipe.input_pipes[0]
+        # Replaying a TF operator needs an explicit input signature: the
+        # synthetic replay source is not a TF pipe, and this path builds the
+        # variant directly instead of going through Pipe.mutate(), so derive
+        # the signature from the logical predecessor once.
+        if pipe.is_tf() and getattr(pipe, "_input_tf_spec", None) is None:
+            try:
+                derived_spec = predecessor.generate_output_tf_spec()
+            except Exception:  # noqa: BLE001 - only a fallback safeguard
+                derived_spec = None
+            if derived_spec is not None:
+                pipe._input_tf_spec = derived_spec
         replay.p_id = predecessor.id
         old_predecessor_variant = predecessor.pipe_variant
         predecessor.pipe_variant = replay
@@ -2947,6 +2958,15 @@ class DataSet:
             for p_id, pipe in feature.logical_pipes.items():
                 if pipe.pipe_spec is None or len(pipe.input_pipes) != 1:
                     continue
+                if variant_type == PipeVariantType.SMP and pipe.is_tf():
+                    # A TensorFlow operator keeps its tf.data iterator and
+                    # symbolic tensors inside the pipeline process; the SMP
+                    # process pool cannot host it, and replaying the operator
+                    # there deadlocks instead of returning a measurement.
+                    logger.info(
+                        "Skipping SMP profile for TF pipe %s", p_id
+                    )
+                    continue
                 effective_variant = variant_type
                 if (
                     variant_type == PipeVariantType.RAY
@@ -3307,6 +3327,12 @@ class DataSet:
             d["offloads"] = {}
         d["offloads"][PipeVariantType.SMP.name] = {}
         for p_id, pipe in feature_to_profile.logical_pipes.items():
+            if pipe.is_tf():
+                # TF operators keep their tf.data iterators in-process; the SMP
+                # process pool cannot host them (the profile replay deadlocks),
+                # so this workload is profiled without SMP entries.
+                logger.info("Skipping SMP profile for TF pipe %s", p_id)
+                continue
             if (
                 pipe.pipe_spec is not None
                 and PipeVariantType.SMP in pipe.pipe_spec.mutable_variants

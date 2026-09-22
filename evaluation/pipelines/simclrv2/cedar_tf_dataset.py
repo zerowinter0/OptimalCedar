@@ -115,11 +115,16 @@ class SimCLRV2Feature(Feature):
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
-    )
-
-    train_filepath = pathlib.Path(data_dir) / pathlib.Path("imagenette2/train")
+    explicit = (spec.kwargs or {}).get("dataset_path")
+    if explicit:
+        train_filepath = pathlib.Path(explicit)
+    else:
+        data_dir = (
+            pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+        )
+        train_filepath = pathlib.Path(data_dir) / pathlib.Path(
+            "imagenette2/train"
+        )
 
     ctx = CedarContext(ray_config=spec.to_ray_config())
     source = LocalFSSource(str(train_filepath), recursive=True)

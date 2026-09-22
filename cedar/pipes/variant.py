@@ -64,7 +64,11 @@ class PipeVariant(abc.ABC):
         logger.info(
             "Creating new PipeVariant Iterator for {}".format(self.p_id)
         )
-        logger.info(self.variant_ctx.variant_type)
+        # The context can already be torn down when a TensorFlow pipeline
+        # closes a variant from inside a tf.data generator; this is only a
+        # log line, so never let it fail the iteration.
+        if self.variant_ctx is not None:
+            logger.info(self.variant_ctx.variant_type)
         self._create_input_iter()
         self._output_iter = self._iter_impl()
         if self.mutation_event is not None:
@@ -383,7 +387,8 @@ class _AsyncPipeVariant(PipeVariant):
                 yield data
 
             yield from self._check_callback()
-            logger.info(self.variant_ctx.variant_type)
+            if self.variant_ctx is not None:
+                logger.info(self.variant_ctx.variant_type)
         else:
             logger.info("Not using threads for pipe {}".format(self.p_id))
 

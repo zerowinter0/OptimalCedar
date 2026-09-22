@@ -12,7 +12,8 @@ Usage (inside the container):
   python -u scripts/collect_figure_data_20260921.py
 
 Writes outputs/figure_data_20260921/figure_data.json and
-docs/figure_data_20260921.md.
+outputs/figure_data_20260921/figure_data.md; the numbers are merged into
+docs/experiments.md §5 (论文图件与底层数据).
 """
 
 import json
@@ -39,7 +40,7 @@ from score_plan_cost_models import (  # noqa: E402
 CAMPAIGN = ROOT / "outputs/ultimate_eight_optimizers_fix_20260921"
 LLAVA_PICO_RUN = ROOT / "outputs/pico_w_only_20260921"
 OUT_JSON = ROOT / "outputs/figure_data_20260921/figure_data.json"
-OUT_MD = ROOT / "docs/figure_data_20260921.md"
+OUT_MD = ROOT / "outputs/figure_data_20260921/figure_data.md"
 
 WORKLOADS = [
     "simclrv2",

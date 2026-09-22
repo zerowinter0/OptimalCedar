@@ -88,6 +88,14 @@ WORKLOADS = {
         "source_path": "outputs/ultimate_eight_optimizers_20260920/inputs/stackexchange.jsonl",
         "source_kwargs": {},
     },
+    "wikitext103": {
+        "module": "evaluation/pipelines/wikitext103/cedar_dataset.py",
+        "feature": "Wikitext103Feature",
+        "feature_kwargs": {"batch_size": 1},
+        "source": "local_line",
+        "source_path": "evaluation/datasets/wikitext103/wikitext-103/wiki.train.tokens",
+        "source_kwargs": {},
+    },
 }
 
 DATASETS = WORKLOADS

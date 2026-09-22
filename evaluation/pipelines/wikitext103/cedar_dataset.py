@@ -69,8 +69,11 @@ class Wikitext103Feature(Feature):
 
 
 def get_dataset(spec: CedarEvalSpec) -> DataSet:
-    data_dir = (
-        pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
+    # An explicit dataset_path keeps the module usable from a copied module
+    # tree whose DATASET_LOC does not exist.
+    data_dir = pathlib.Path(
+        (spec.kwargs or {}).get("dataset_path")
+        or pathlib.Path(__file__).resolve().parents[2].joinpath(DATASET_LOC)
     )
     train_filepath = pathlib.Path(data_dir) / pathlib.Path(
         "wikitext-103/wiki.train.tokens"

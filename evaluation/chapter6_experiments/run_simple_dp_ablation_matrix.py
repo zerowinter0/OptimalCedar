@@ -28,8 +28,11 @@ METHODS = {
     'unopti': 'unopti',
 }
 
+# Cedar's own workloads and their cache/TF variants, added on request.
 WORKLOADS = ['simclrv2', 'simclrv2_cache', 'commonvoice', 'coco',
-             'llava_pretrain', 'stackexchange']
+             'llava_pretrain', 'stackexchange',
+             'wikitext103', 'wikitext103_cache', 'wikitext103_tf',
+             'commonvoice_cache', 'simclrv2_tf', 'coco_tf']
 
 
 def write_json(path, value):
@@ -147,17 +150,39 @@ def config(root, workload, commonvoice_max_samples=300,
            commonvoice_dataset_path=None, coco_split='val2017',
            simclrv2_dataset=None):
     batch = 4 if workload.startswith('simclrv2') else 1
-    filename = 'cedar_cache_dataset.py' if workload == 'simclrv2_cache' else 'cedar_dataset.py'
-    folder = 'simclrv2' if workload.startswith('simclrv2') else workload
+    # folder in the copied module tree, dataset module file, and (for the
+    # wikitext-style modules that resolve DATASET_LOC themselves) the record cap
+    folder = {
+        'simclrv2_tf': 'simclrv2',
+        'commonvoice_cache': 'commonvoice',
+        'coco_tf': 'coco',
+        'wikitext103_cache': 'wikitext103',
+        'wikitext103_tf': 'wikitext103',
+    }.get(workload, 'simclrv2' if workload.startswith('simclrv2') else workload)
+    filename = {
+        'simclrv2_cache': 'cedar_cache_dataset.py',
+        'simclrv2_tf': 'cedar_tf_dataset.py',
+        'commonvoice_cache': 'cedar_cache_dataset.py',
+        'coco_tf': 'cedar_tf_dataset.py',
+        'wikitext103_cache': 'cedar_cache_dataset.py',
+        'wikitext103_tf': 'cedar_tf_dataset.py',
+    }.get(workload, 'cedar_dataset.py')
     simclrv2_path = simclrv2_dataset or (REPO / SIMCLRV2_DATASET)
     kwargs = {
         'simclrv2': f'dataset_path={simclrv2_path}',
         'simclrv2_cache': f'dataset_path={simclrv2_path}',
+        'simclrv2_tf': f'dataset_path={simclrv2_path}',
         'commonvoice': (f'dataset_path={commonvoice_dataset_path or (REPO / "datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips")},'
             f'max_samples={commonvoice_max_samples}'),
+        'commonvoice_cache': (f'dataset_path={commonvoice_dataset_path or (REPO / "datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips")},'
+            f'max_samples={commonvoice_max_samples}'),
         'coco': f'dataset_path={REPO}/evaluation/datasets/coco,split={coco_split}',
+        'coco_tf': f'dataset_path={REPO}/evaluation/datasets/coco,split={coco_split}',
         'llava_pretrain': f'dataset_path={root}/inputs/llava_pretrain.jsonl,image_root={REPO}/evaluation/datasets/llava_pretrain',
         'stackexchange': f'dataset_path={root}/inputs/stackexchange.jsonl',
+        'wikitext103': f'dataset_path={REPO}/evaluation/datasets/wikitext103,max_samples={record_counts()[workload]}',
+        'wikitext103_cache': f'dataset_path={REPO}/evaluation/datasets/wikitext103,max_samples={record_counts()[workload]}',
+        'wikitext103_tf': f'dataset_path={REPO}/evaluation/datasets/wikitext103,max_samples={record_counts()[workload]}',
     }[workload]
     epochs = 1
     if workload.startswith('simclrv2'):
@@ -188,6 +213,15 @@ RECORD_COUNTS = {
     'coco': 50000,
     'llava_pretrain': 50000,
     'stackexchange': 20000,
+    # Cedar's own workloads and variants, at the scales used in its paper
+    # (WikiText-103 is capped at 100k tokenized lines, CV keeps the 300k clips,
+    # the TF variants process the same input as their non-TF counterparts).
+    'wikitext103': 100000,
+    'wikitext103_cache': 100000,
+    'wikitext103_tf': 100000,
+    'commonvoice_cache': 300000,
+    'simclrv2_tf': 189380,
+    'coco_tf': 50000,
 }
 
 
@@ -211,6 +245,9 @@ def main():
     parser.add_argument('--skip-cell', action='append', default=[],
         metavar='LABEL@WORKLOAD',
         help='mark a previously timed-out cell as skipped without running it')
+    parser.add_argument('--record-override', action='append', default=[],
+        metavar='LABEL=COUNT',
+        help='shrink one workload record count (small-data validation pass)')
     parser.add_argument('--cell-timeout-sec', type=int, default=3600)
     parser.add_argument('--commonvoice-dataset-path', type=Path)
     parser.add_argument('--simclrv2-dataset', type=Path,
@@ -247,6 +284,11 @@ def main():
         if len(files) < args.commonvoice_max_samples:
             parser.error('CommonVoice dataset contains fewer real clips than requested')
     skip_cells = set()
+    for raw in args.record_override:
+        label, _, count = raw.partition('=')
+        if label not in RECORD_COUNTS or not count.isdigit() or int(count) < 1:
+            parser.error('unknown --record-override target: ' + raw)
+        RECORD_COUNTS[label] = int(count)
     for raw in args.skip_cell:
         if '@' not in raw:
             parser.error('--skip-cell must be LABEL@WORKLOAD: ' + raw)
@@ -285,6 +327,8 @@ def main():
         CEDAR_PROFILE_RAY_ACTORS='1', CEDAR_PROFILE_SMP_PROCS='1',
         CEDAR_PROFILE_TIME_SEC='10', CEDAR_PROFILE_BOUNDARY_MODEL='1',
         CEDAR_REUSE_BOUNDARY_MODEL='0', CEDAR_PROFILE_INFER_COMPUTE_SCALING='1',
+        CEDAR_CACHE_WARMUP_GRACE_SEC=os.environ.get(
+            'CEDAR_CACHE_WARMUP_GRACE_SEC', '60'),
         CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC='240', CEDAR_WORKER_READY_TIMEOUT_SEC='600')
     if args.smp_aggregate_profile:
         env["CEDAR_PROFILE_SMP_AGGREGATE_TRANSPORT"] = "1"
@@ -305,6 +349,7 @@ def main():
         env.pop(key, None)
     input_records = record_counts()
     input_records['commonvoice'] = args.commonvoice_max_samples
+    input_records['commonvoice_cache'] = args.commonvoice_max_samples
     input_records['llava_pretrain'] = args.llava_samples
     input_records['stackexchange'] = args.stackexchange_samples
     if args.resume:

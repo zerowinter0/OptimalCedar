@@ -32,7 +32,7 @@ DATA = json.loads(
 OUT = ROOT / "outputs/figures_20260921"
 
 # stackexchange is dropped from the figures (per request); its data stays in
-# docs/figure_data_20260921.md and outputs/figure_data_20260921/.
+# docs/experiments.md §5 and outputs/figure_data_20260921/.
 WORKLOADS = [
     "simclrv2",
     "simclrv2_cache",
@@ -104,16 +104,73 @@ def save(fig, name):
 
 
 def fig_throughput():
-    fig, ax = plt.subplots(figsize=(10.0, 3.4))
+    # One panel per workload, each with its own linear axis: the workloads span
+    # 3.1-5502 records/s, so a single linear axis would flatten the small ones.
+    fig, axes = plt.subplots(2, 3, figsize=(9.8, 4.6))
+    positions = np.arange(len(LABELS))
+    handles, legend_labels = [], None
+    for ax, workload in zip(axes.ravel(), WORKLOADS):
+        values = []
+        for label in LABELS:
+            rate = measured(workload, label).get("throughput_records_per_sec")
+            values.append(rate if rate else np.nan)
+        top = np.nanmax(values) * 1.22
+        stub = top * 0.012
+        for index, (label, value) in enumerate(zip(LABELS, values)):
+            if np.isnan(value):
+                ax.bar(
+                    index, stub, 0.82, color="#f2f2f2",
+                    edgecolor="#b00020", linewidth=0.5, hatch="//",
+                )
+                ax.text(
+                    index, stub * 2.4, "×", ha="center", va="center",
+                    fontsize=6, color="#b00020",
+                )
+                continue
+            ax.bar(
+                index, value, 0.82, label=label, color=COLORS[label],
+                edgecolor="white", linewidth=0.4,
+            )
+            ax.text(
+                index, value + top * 0.015, f"{value:,.0f}",
+                ha="center", va="bottom", rotation=90, fontsize=4.4,
+                color="#333333",
+            )
+        ax.set_ylim(0.0, top)
+        ax.set_title(workload, fontsize=8.5)
+        ax.set_xticks(positions)
+        ax.set_xticklabels(LABELS, rotation=90, fontsize=5.2)
+        ax.grid(axis="y", color="#e6e6e6", linewidth=0.5)
+        ax.set_axisbelow(True)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
+        if legend_labels is None:
+            legend_labels = ax.get_legend_handles_labels()[1]
+            handles = ax.get_legend_handles_labels()[0]
+    axes.ravel()[-1].axis("off")
+    for ax in axes[:, 0]:
+        ax.set_ylabel("throughput (rec/s)", fontsize=7.5)
+    handles.append(Line2D([], [], color="#b00020", marker="$×$", linestyle="none"))
+    legend_labels.append("cell missing (timeout / skipped)")
+    fig.legend(
+        handles, legend_labels, ncol=5, loc="lower center",
+        bbox_to_anchor=(0.5, -0.02), frameon=False,
+    )
+    fig.suptitle(
+        "Steady-state throughput per optimizer and workload", y=0.99
+    )
+    fig.tight_layout(rect=(0.0, 0.06, 1.0, 0.95))
+    save(fig, "fig1_throughput")
+
+
+def fig_optimization_time():
+    fig, ax = plt.subplots(figsize=(10.0, 3.6))
     positions = np.arange(len(WORKLOADS))
     width = 0.10
     for index, label in enumerate(LABELS):
-        values, missing = [], []
+        values = []
         for workload in WORKLOADS:
             cell = measured(workload, label)
-            rate = cell.get("throughput_records_per_sec")
-            values.append(rate if rate else np.nan)
-            missing.append(rate is None)
+            values.append(cell.get("setup_time_sec") or np.nan)
         offset = (index - (len(LABELS) - 1) / 2) * width
         bars = ax.bar(
             positions + offset,
@@ -123,129 +180,28 @@ def fig_throughput():
             color=COLORS[label],
             edgecolor="white",
             linewidth=0.4,
+            hatch="///" if label == "PICO" else None,
         )
-        for bar, value, gap in zip(bars, values, missing):
-            if gap:
+        for bar, value in zip(bars, values):
+            center = bar.get_x() + bar.get_width() / 2
+            if np.isnan(value):
                 ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    2.2,
-                    "×",
-                    ha="center",
-                    va="center",
-                    fontsize=7,
-                    color="#b00020",
+                    center, 0.95, "×", ha="center", va="center",
+                    fontsize=6.5, color="#b00020",
                 )
                 continue
             ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                value * 1.08,
-                f"{value:,.0f}",
-                ha="center",
-                va="bottom",
-                rotation=90,
-                fontsize=4.6,
+                center, value * 1.12, f"{value:,.0f}",
+                ha="center", va="bottom", rotation=90, fontsize=4.6,
                 color="#333333",
             )
     ax.set_yscale("log")
-    ax.set_ylim(1.2, 2.6e4)
-    ax.set_ylabel("steady throughput (records/s, log)")
+    ax.set_ylim(0.8, 4.5e3)
+    ax.set_ylabel("optimization / setup time (s, log)")
     ax.set_xticks(positions)
     ax.set_xticklabels([WLABEL[w] for w in WORKLOADS])
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
     ax.grid(axis="y", which="both", color="#e6e6e6", linewidth=0.5)
     ax.set_axisbelow(True)
-    handles, labels = ax.get_legend_handles_labels()
-    handles.append(Line2D([], [], color="#b00020", marker="$×$", linestyle="none"))
-    labels.append("cell missing (timeout / skipped)")
-    fig.legend(
-        handles,
-        labels,
-        ncol=5,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.24),
-        frameon=False,
-    )
-    fig.suptitle(
-        "Steady-state throughput on the formal campaign (log scale)", y=1.02
-    )
-    save(fig, "fig1_throughput")
-
-
-def fig_optimization_time():
-    values_all = [
-        measured(w, label).get("setup_time_sec") or 0.0
-        for w in WORKLOADS
-        for label in LABELS
-    ]
-    full_max = max(values_all) * 1.05
-    zoom_max = 460.0
-    fig, (ax, ax_zoom) = plt.subplots(
-        2, 1, figsize=(10.0, 5.4), sharex=True,
-    )
-    fig.subplots_adjust(top=0.90, bottom=0.20, left=0.08, right=0.99, hspace=0.12)
-    positions = np.arange(len(WORKLOADS))
-    width = 0.10
-    for panel, annotate_all in ((ax, False), (ax_zoom, True)):
-        for index, label in enumerate(LABELS):
-            values = []
-            for workload in WORKLOADS:
-                cell = measured(workload, label)
-                values.append(cell.get("setup_time_sec") or np.nan)
-            offset = (index - (len(LABELS) - 1) / 2) * width
-            bars = panel.bar(
-                positions + offset,
-                values,
-                width * 0.92,
-                label=label,
-                color=COLORS[label],
-                edgecolor="white",
-                linewidth=0.4,
-                hatch="///" if label == "PICO" else None,
-            )
-            stub = (panel is ax_zoom) and 4.0 or 24.0
-            for bar, value in zip(bars, values):
-                if np.isnan(value):
-                    panel.bar(
-                        bar.get_x(),
-                        stub,
-                        bar.get_width(),
-                        bottom=0.0,
-                        color="#f2f2f2",
-                        edgecolor="#b00020",
-                        linewidth=0.5,
-                        hatch="//",
-                    )
-                    panel.text(
-                        bar.get_x() + bar.get_width() / 2,
-                        stub * 1.9,
-                        "×",
-                        ha="center",
-                        va="center",
-                        fontsize=6.5,
-                        color="#b00020",
-                    )
-                    continue
-                if not annotate_all and value < 100.0:
-                    continue
-                inside = panel is ax_zoom and value > zoom_max * 0.95
-                panel.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    min(value + stub * 0.3, zoom_max * 0.94) if inside
-                    else value + (stub * 0.3),
-                    f"{value:,.0f}",
-                    ha="center",
-                    va="top" if inside else "bottom",
-                    rotation=90,
-                    fontsize=5.2 if annotate_all else 5.6,
-                    color="#333333",
-                )
-        panel.set_ylim(0.0, full_max if panel is ax else zoom_max)
-        panel.grid(axis="y", color="#e6e6e6", linewidth=0.5)
-        panel.set_axisbelow(True)
-    ax.set_ylabel("time (s, full)")
-    ax_zoom.set_ylabel("time (s, zoom)")
-    ax_zoom.set_xticks(positions)
-    ax_zoom.set_xticklabels([WLABEL[w] for w in WORKLOADS])
     handles, labels = ax.get_legend_handles_labels()
     handles.append(Line2D([], [], color="#b00020", marker="$×$", linestyle="none"))
     labels.append(
@@ -257,12 +213,10 @@ def fig_optimization_time():
         labels,
         ncol=5,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.0),
+        bbox_to_anchor=(0.5, -0.24),
         frameon=False,
     )
-    fig.suptitle(
-        "Optimization (setup) time per optimizer and workload", y=0.975
-    )
+    fig.suptitle("Optimization (setup) time per optimizer and workload", y=1.02)
     save(fig, "fig2_optimization_time")
 
 

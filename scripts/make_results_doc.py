@@ -1,14 +1,21 @@
-"""Generate the experiment results document from the recorded JSON/YAML."""
+"""Generate the campaign result tables (docs/experiments.md §1-§2) from JSON/YAML.
+
+The consolidated experiment document is hand-maintained; this script only
+regenerates the campaign tables so they can be diffed against the frozen copy
+inside `docs/experiments.md`.  Default output: `outputs/experiment_tables.md`,
+override with `--out PATH`.
+"""
 import collections
 import json
 import pathlib
+import sys
 import time
 import yaml
 
 REPO = pathlib.Path("/workspace/OptimalCedar")
 ULT = REPO / "outputs/ultimate_eight_optimizers_fix_20260921"
 SMALL = REPO / "outputs/six_workload_formal_v3_20260919"
-W_MODEL_FRAGMENT = REPO / "docs/experiment_results_20260920_w_models.inc.md"
+W_MODEL_FRAGMENT = REPO / "scripts/templates/commonvoice_w_models.inc.md"
 
 ULT_METHODS = [
     ("optimizer", "cedar-opt"), ("plumber_optimizer", "plumber-opt"),
@@ -271,6 +278,11 @@ out += [
     "",
 ]
 doc = "\n".join(out) + "\n"
-target = REPO / "docs/experiment_results_20260920.md"
+target = pathlib.Path(
+    sys.argv[sys.argv.index("--out") + 1]
+    if "--out" in sys.argv
+    else REPO / "outputs/experiment_tables.md"
+)
+target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(doc)
 print(f"wrote {target} ({len(doc.splitlines())} lines)")
