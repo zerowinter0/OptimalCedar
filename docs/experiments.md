@@ -1632,6 +1632,9 @@ R-U / R-F = remote Ray 三 actor / 一个融合 actor（真实 `Ray*PipeVariant`
 
 U/F 保留比例（fused/unfused）：local 计算 1.0088 / 余项 1.0139 / 总时间 1.0127；
 Ray 计算 0.7487 / 余项 0.5215 / 总时间 **0.5492**。
+两轮独立 repeat（766/774 batches，`service_summary_repeats.csv`）的总时间：
+L-U 10.6036 ± 0.0584、L-F 10.6732 ± 0.0321、R-U 31.7173 ± 0.1806、
+R-F 17.2334 ± 0.3607 ms/record（组内跨轮偏差 ≤2.1%）。
 
 **Cedar 模型复算**（原实现导出，`cedar_cost_breakdown.json`）：Q0 = 22.9795 ms/记录；
 f_i（B/H/J）= 0.2621/0.0047/0.2915，基础成本 6.0228/0.1070/6.6984；

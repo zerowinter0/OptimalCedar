@@ -106,6 +106,70 @@ def build(run_dir: Path) -> Dict[str, Any]:
             return None
         return fast / slow
 
+    # Cross-repeat statistics: the primary run plus any repeat*/ directories.
+    repeat_sources = [(1, summary)]
+    for extra_dir in sorted(run_dir.glob("repeat*")):
+        extra = _read_csv(extra_dir / "service_summary.csv")
+        if extra:
+            repeat_sources.append((len(repeat_sources) + 1, extra))
+    repeats: Dict[str, Any] = {}
+    for config in configs:
+        rows = []
+        for index, table in repeat_sources:
+            match = next((r for r in table if r["config"] == config), None)
+            if match is None:
+                continue
+            records = int(match["measured_records"]) or 1
+            batches = int(match["measured_batches"]) or 1
+            rows.append(
+                {
+                    "repeat": index,
+                    "elapsed_ms_per_record": float(match["elapsed_ms_mean"]) * batches / records,
+                    "compute_ms_per_record": float(match["compute_sum_ms_mean"]) * batches / records,
+                    "residual_ms_per_record": float(match["residual_ms_mean"]) * batches / records,
+                }
+            )
+        if not rows:
+            continue
+        repeats[config] = {
+            key: {
+                "mean": _mean([row[key] for row in rows]),
+                "stdev": (
+                    statistics.stdev([row[key] for row in rows])
+                    if len(rows) > 1
+                    else 0.0
+                ),
+                "per_repeat": [row[key] for row in rows],
+            }
+            for key in ("elapsed_ms_per_record", "compute_ms_per_record",
+                        "residual_ms_per_record")
+        }
+        repeats[config]["repeats"] = len(rows)
+
+    if repeats:
+        repeat_csv = run_dir / "service_summary_repeats.csv"
+        with repeat_csv.open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                ["config", "repeats", "elapsed_ms_per_record_mean",
+                 "elapsed_ms_per_record_stdev", "compute_ms_per_record_mean",
+                 "compute_ms_per_record_stdev", "residual_ms_per_record_mean",
+                 "residual_ms_per_record_stdev"]
+            )
+            for config, payload in repeats.items():
+                writer.writerow(
+                    [
+                        config,
+                        payload["repeats"],
+                        payload["elapsed_ms_per_record"]["mean"],
+                        payload["elapsed_ms_per_record"]["stdev"],
+                        payload["compute_ms_per_record"]["mean"],
+                        payload["compute_ms_per_record"]["stdev"],
+                        payload["residual_ms_per_record"]["mean"],
+                        payload["residual_ms_per_record"]["stdev"],
+                    ]
+                )
+
     retention = {}
     for backend, unfused, fused in (("local", "L-U", "L-F"), ("ray", "R-U", "R-F")):
         if unfused not in configs or fused not in configs:
@@ -195,6 +259,7 @@ def build(run_dir: Path) -> Dict[str, Any]:
     return {
         "service": {
             "configs": configs,
+            "repeats": repeats,
             "retention": retention,
             "cedar_model": cedar_ratios,
             "verification": verification,
