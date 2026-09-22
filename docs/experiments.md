@@ -1775,7 +1775,7 @@ python -m evaluation.pipelines.target_pipeline.plot_latency_scaling --help
    wikitext103 上 cedar 5466.5 rec/s 是 PICO 1148.0 的 4.8 倍，wikitext103_cache 上
    simple-dp-opt / cedar / dp-boundary 三者在 7435–7533 之间并列，PICO 只有 1473.1（见 3.3）。
    在这两个负载上 **cedar 的模型反而准**（预测 4816 vs 实测 5466，差 13%），
-   PICO 的模型乐观 60–76 倍——原因见 2、3 与 3.4。
+   PICO 的模型乐观 60–76 倍——原因见 3.4 的 (b)/(c)。
 5. **"边界代价"本身不是文本负载输的原因**：小记录的 RAY boundary 按字节计价几乎为 0
    （2.8 KB 中位记录 ≈25 ns/条），PICO 输在它主动放弃了 Ray 计划、
    而"本地 64 worker 线性加速"的假设不成立（3.4）。
