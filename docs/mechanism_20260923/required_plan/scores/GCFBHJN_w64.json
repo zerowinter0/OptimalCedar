@@ -1,0 +1,20 @@
+{
+  "order": "GCFBHJN",
+  "order_ids": [
+    3,
+    6,
+    7,
+    2,
+    5,
+    4,
+    1
+  ],
+  "structure": [
+    "INPROCESS:3,6,7",
+    "SMP:2,5,4,1"
+  ],
+  "workers": 64,
+  "plan_path": "outputs/simclrv2_required_plan_20260923/plans/GCFBHJN_w64.yaml",
+  "final_cedar_cost_ms_per_record": 8.144868242740674,
+  "reorder_only_cedar_cost_ms_per_record": 16.766513568254606
+}

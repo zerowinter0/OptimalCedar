@@ -1685,6 +1685,23 @@ R-F 96.77±1.67 / 1195.32±35.42。R-U@W=64 需要 64×3=192 个 Ray CPU 请求�
 3. **仍未确定**：R-U 与 R-F 成员计算差的剩余原因（见上）；"其他开销"中 driver 侧约 12 ms/record
    的构成；以及"融合是否真的改变了算子计算"本身——现有测量无法把真实计算变化与执行上下文差异分离。
 
+**附：构造计划——"顺序更差、最终更便宜、实测更快"**（`outputs/simclrv2_required_plan_20260923/`，
+小文件同步在 `docs/mechanism_20260923/required_plan/`）。把 `to_float` 提前会让下游算子按 float32
+尺寸计价，因此这类顺序的**仅 reorder 代价**远高于 cedar plan；再把 B/H/J/N 放进 SMP 融合块
+（成员被 Amdahl 反演 clip 到 0，块再乘 I/O 折扣）就能把**最终代价**压到 cedar 之下：
+
+| 计划（W=64） | 顺序 | 结构 | reorder-only cost | 最终 cost | 实测吞吐（2 轮） |
+| --- | --- | --- | ---: | ---: | ---: |
+| **CFGBHJN** | C F G B H J N | `Fused{6,7,3}[INPROCESS] → Fused{2,5,4,1}[SMP w=1]` | **17.1171** | **8.1422** | **2010.9**（2007.0/2014.8） |
+| FCGBJHN | F C G B J H N | `Fused{7,6,3}[INPROCESS] → Fused{2,4,5,1}[SMP]` | 18.4425 | 8.1526 | 1990.2 |
+| FCGBHJN | F C G B H J N | `Fused{7,6,3}[INPROCESS] → Fused{2,5,4,1}[SMP]` | 18.4425 | 8.1526 | 1969.5 |
+| GCFBHJN | G C F B H J N | `Fused{3,6,7}[INPROCESS] → Fused{2,5,4,1}[SMP]` | 16.7665 | 8.1449 | 1953.7 |
+| cedar 参考 | G C B H J F N | `Fused{2,5,4}[RAY w=1]` | 10.5481 | 8.4753 | 1226.9（同场；campaign 1187.7） |
+
+四条同时成立（顺序不同、reorder 代价高 62%、最终 cost 低 3.9%、吞吐高 64%），
+可用于说明"Cedar 的顺序项与结构项可以给出相反的方向"：reorder 只反映尺寸轨迹，
+而最终代价由后端/clip/融合折扣主导。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射

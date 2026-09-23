@@ -1,0 +1,104 @@
+{
+  "reference": {
+    "plan": "cedar_reference_w64",
+    "final_cost": 8.475284151362082,
+    "reorder_only": 10.548091505585212,
+    "throughput_mean": 1226.8965310273334,
+    "throughput_runs": [
+      1206.1920502172159,
+      1247.601011837451
+    ],
+    "order": "GCBHJFNT",
+    "plan_file": "plans/cedar_reference_w64.yaml"
+  },
+  "candidates": [
+    {
+      "plan": "CFGBHJN_w64",
+      "order": "CFGBHJN",
+      "structure": [
+        "INPROCESS:6,7,3",
+        "SMP:2,5,4,1"
+      ],
+      "final_cost": 8.142200512363205,
+      "reorder_cost": 17.117104876988627,
+      "throughput_mean": 2010.9207409812234,
+      "throughput_runs": [
+        2014.849860021103,
+        2006.991621941344
+      ],
+      "checks": {
+        "final_cost_lower": true,
+        "throughput_higher": true,
+        "order_differs": true,
+        "reorder_cost_higher": true,
+        "reorder_cost_above_11": true
+      }
+    },
+    {
+      "plan": "FCGBHJN_w64",
+      "order": "FCGBHJN",
+      "structure": [
+        "INPROCESS:7,6,3",
+        "SMP:2,5,4,1"
+      ],
+      "final_cost": 8.152639321401518,
+      "reorder_cost": 18.442526698006724,
+      "throughput_mean": 1969.5373567506804,
+      "throughput_runs": [
+        1978.212968771274,
+        1960.8617447300867
+      ],
+      "checks": {
+        "final_cost_lower": true,
+        "throughput_higher": true,
+        "order_differs": true,
+        "reorder_cost_higher": true,
+        "reorder_cost_above_11": true
+      }
+    },
+    {
+      "plan": "FCGBJHN_w64",
+      "order": "FCGBJHN",
+      "structure": [
+        "INPROCESS:7,6,3",
+        "SMP:2,4,5,1"
+      ],
+      "final_cost": 8.152639321401518,
+      "reorder_cost": 18.442526698006724,
+      "throughput_mean": 1990.2319309779036,
+      "throughput_runs": [
+        1977.361143624429,
+        2003.1027183313784
+      ],
+      "checks": {
+        "final_cost_lower": true,
+        "throughput_higher": true,
+        "order_differs": true,
+        "reorder_cost_higher": true,
+        "reorder_cost_above_11": true
+      }
+    },
+    {
+      "plan": "GCFBHJN_w64",
+      "order": "GCFBHJN",
+      "structure": [
+        "INPROCESS:3,6,7",
+        "SMP:2,5,4,1"
+      ],
+      "final_cost": 8.144868242740674,
+      "reorder_cost": 16.766513568254606,
+      "throughput_mean": 1953.7349992871182,
+      "throughput_runs": [
+        1944.1449507435952,
+        1963.3250478306413
+      ],
+      "checks": {
+        "final_cost_lower": true,
+        "throughput_higher": true,
+        "order_differs": true,
+        "reorder_cost_higher": true,
+        "reorder_cost_above_11": true
+      }
+    }
+  ]
+}

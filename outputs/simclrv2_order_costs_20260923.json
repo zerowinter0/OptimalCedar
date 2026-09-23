@@ -1,0 +1,114 @@
+{
+  "profile_path": "/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "baseline_declared_order_cost_ms_per_record": 22.979454709849225,
+  "results": [
+    {
+      "order": "GCHBJFN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_Grayscale -> MapperPipe_RandomResizedCrop -> MapperPipe_RandomHorizontalFlip -> MapperPipe_GaussianBlur -> MapperPipe_ColorJitter -> MapperPipe_to_float -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 10.548091505585212,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_Grayscale": 0.230074226041032,
+        "MapperPipe_RandomResizedCrop": 0.12746302013928618,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_GaussianBlur": 1.5056913527428188,
+        "MapperPipe_ColorJitter": 0.5581986025111759,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_Normalize": 0.1840066005672712
+      }
+    },
+    {
+      "order": "GCBJHFN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_Grayscale -> MapperPipe_RandomResizedCrop -> MapperPipe_GaussianBlur -> MapperPipe_ColorJitter -> MapperPipe_RandomHorizontalFlip -> MapperPipe_to_float -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 10.548091505585214,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_Grayscale": 0.230074226041032,
+        "MapperPipe_RandomResizedCrop": 0.12746302013928618,
+        "MapperPipe_GaussianBlur": 1.5056913527428188,
+        "MapperPipe_ColorJitter": 0.5581986025111759,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_Normalize": 0.1840066005672712
+      }
+    },
+    {
+      "order": "GCBHJFN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_Grayscale -> MapperPipe_RandomResizedCrop -> MapperPipe_GaussianBlur -> MapperPipe_RandomHorizontalFlip -> MapperPipe_ColorJitter -> MapperPipe_to_float -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 10.548091505585212,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_Grayscale": 0.230074226041032,
+        "MapperPipe_RandomResizedCrop": 0.12746302013928618,
+        "MapperPipe_GaussianBlur": 1.5056913527428188,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_ColorJitter": 0.5581986025111759,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_Normalize": 0.1840066005672712
+      }
+    },
+    {
+      "order": "GCJHBFN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_Grayscale -> MapperPipe_RandomResizedCrop -> MapperPipe_ColorJitter -> MapperPipe_RandomHorizontalFlip -> MapperPipe_GaussianBlur -> MapperPipe_to_float -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 10.548091505585212,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_Grayscale": 0.230074226041032,
+        "MapperPipe_RandomResizedCrop": 0.12746302013928618,
+        "MapperPipe_ColorJitter": 0.5581986025111759,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_GaussianBlur": 1.5056913527428188,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_Normalize": 0.1840066005672712
+      }
+    },
+    {
+      "order": "CGBHJFN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_RandomResizedCrop -> MapperPipe_Grayscale -> MapperPipe_GaussianBlur -> MapperPipe_RandomHorizontalFlip -> MapperPipe_ColorJitter -> MapperPipe_to_float -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 10.641712349547223,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_RandomResizedCrop": 0.3823890604178586,
+        "MapperPipe_Grayscale": 0.06876902972446788,
+        "MapperPipe_GaussianBlur": 1.505691352742819,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_ColorJitter": 0.5581986025111759,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_Normalize": 0.18400660056727122
+      }
+    },
+    {
+      "order": "GCBHFJN",
+      "pipeline": "LocalFSListerPipe -> ImageReaderPipe -> MapperPipe_Grayscale -> MapperPipe_RandomResizedCrop -> MapperPipe_GaussianBlur -> MapperPipe_RandomHorizontalFlip -> MapperPipe_to_float -> MapperPipe_ColorJitter -> MapperPipe_Normalize -> BatcherPipe(batch_size=4) -> PrefetcherPipe",
+      "cedar_cost_ms_per_record": 12.22268731311874,
+      "workers": 1,
+      "fusion": "none",
+      "backend": "INPROCESS (all local)",
+      "per_operator_ms": {
+        "ImageReaderPipe": 1.754876983806131,
+        "MapperPipe_Grayscale": 0.230074226041032,
+        "MapperPipe_RandomResizedCrop": 0.12746302013928618,
+        "MapperPipe_GaussianBlur": 1.5056913527428188,
+        "MapperPipe_RandomHorizontalFlip": 0.008917398969135988,
+        "MapperPipe_to_float": 0.025331687799305412,
+        "MapperPipe_ColorJitter": 2.2327944100447037,
+        "MapperPipe_Normalize": 0.1840066005672712
+      }
+    }
+  ]
+}
