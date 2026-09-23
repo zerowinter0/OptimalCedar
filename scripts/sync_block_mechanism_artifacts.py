@@ -28,6 +28,7 @@ SMALL_FILES = (
     "service_meta.json",
     "service_verification.json",
     "operator_timing.columns.json",
+    "operator_timing_summary.csv",
     "cedar_cost_breakdown.json",
     "figure_data.json",
     "figure_data.md",
