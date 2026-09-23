@@ -264,10 +264,15 @@ def main() -> int:
         )["usable_sorted"][:10]
         if (run / "candidate_blocks.json").exists() else [],
         "experiment_A_instrument_off": {
-            "cells": group_summary(
-                read_csv(run / "expA_instrument_off" / "expA_off_summary.csv"),
-                ["config", "level"],
-            ),
+            "cells": {
+                f"{config}@{level}": payload
+                for (config, level), payload in group_summary(
+                    read_csv(
+                        run / "expA_instrument_off" / "expA_off_summary.csv"
+                    ),
+                    ["config", "level"],
+                ).items()
+            },
             "note": (
                 "instrument=none: member timings disabled, only the batch "
                 "end-to-end clock runs; the same protocol and CPU pins."

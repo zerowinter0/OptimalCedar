@@ -565,7 +565,58 @@
     }
   ],
   "experiment_A_instrument_off": {
-    "cells": {},
+    "cells": {
+      "U@1": {
+        "elapsed_ms_per_record": 37.68337960208333,
+        "elapsed_stdev": 0.0,
+        "compute_ms_per_record": 0.0,
+        "compute_stdev": 0.0,
+        "other_ms_per_record": 37.68337960208333,
+        "other_stdev": 0.0,
+        "rounds": 1,
+        "actors": 3
+      },
+      "U@64": {
+        "elapsed_ms_per_record": 190.33875493541666,
+        "elapsed_stdev": 0.0,
+        "compute_ms_per_record": 0.0,
+        "compute_stdev": 0.0,
+        "other_ms_per_record": 190.33875493541666,
+        "other_stdev": 0.0,
+        "rounds": 1,
+        "actors": 3
+      },
+      "F@1": {
+        "elapsed_ms_per_record": 16.8432250875,
+        "elapsed_stdev": 0.0,
+        "compute_ms_per_record": 0.0,
+        "compute_stdev": 0.0,
+        "other_ms_per_record": 16.8432250875,
+        "other_stdev": 0.0,
+        "rounds": 1,
+        "actors": 1
+      },
+      "F@64": {
+        "elapsed_ms_per_record": 141.93025833958333,
+        "elapsed_stdev": 0.0,
+        "compute_ms_per_record": 0.0,
+        "compute_stdev": 0.0,
+        "other_ms_per_record": 141.93025833958333,
+        "other_stdev": 0.0,
+        "rounds": 1,
+        "actors": 1
+      },
+      "P@64": {
+        "elapsed_ms_per_record": 162.54815192083333,
+        "elapsed_stdev": 0.0,
+        "compute_ms_per_record": 0.0,
+        "compute_stdev": 0.0,
+        "other_ms_per_record": 162.54815192083333,
+        "other_stdev": 0.0,
+        "rounds": 1,
+        "actors": 2
+      }
+    },
     "note": "instrument=none: member timings disabled, only the batch end-to-end clock runs; the same protocol and CPU pins."
   }
 }
