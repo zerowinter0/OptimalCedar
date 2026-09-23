@@ -1,0 +1,25 @@
+{
+  "order": "FCHJGBN",
+  "order_ids": [
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1
+  ],
+  "structure": [
+    "RAY:7",
+    "RAY:6",
+    "RAY:5",
+    "INPROCESS:4",
+    "INPROCESS:3",
+    "INPROCESS:2",
+    "INPROCESS:1"
+  ],
+  "workers": 1,
+  "plan_path": "outputs/fusion_discount_20260923/expC/plans/U.yaml",
+  "final_cedar_cost_ms_per_record": 47.11590177492121,
+  "reorder_only_cedar_cost_ms_per_record": 22.97945470984922
+}

@@ -1,0 +1,62 @@
+{
+  "run_dir": "/workspace/OptimalCedar/outputs/fusion_discount_20260923",
+  "copied_files": [
+    "README.md",
+    "candidate_blocks.json",
+    "cedar_costs.json",
+    "figure_data.json",
+    "figure_data.csv",
+    "figure_data.md",
+    "expA/expA_config.json",
+    "expA/expA_summary.csv",
+    "expA/expA_raw.csv",
+    "expA/expA_verification.json",
+    "expA/expA_run_order.json",
+    "expA_instrument_off/expA_off_config.json",
+    "expA_instrument_off/expA_off_summary.csv",
+    "expA_instrument_off/expA_off_raw.csv",
+    "expB/expB_config.json",
+    "expB/expB_summary.csv",
+    "expB/expB_raw.csv",
+    "expB/expB_verification.json",
+    "expB/expB_run_order.json",
+    "expC/plans/U.yaml",
+    "expC/plans/P.yaml",
+    "expC/plans/F.yaml",
+    "expC/scores/U.json",
+    "expC/scores/P.json",
+    "expC/scores/F.json",
+    "expC/actor_probe_expC_U.json",
+    "expC/actor_probe_expC_P.json",
+    "expC/actor_probe_expC_F.json",
+    "expC/throughput/F_r1.json",
+    "expC/throughput/F_r2.json",
+    "expC/throughput/F_r3.json",
+    "expC/throughput/P_r1.json",
+    "expC/throughput/P_r2.json",
+    "expC/throughput/P_r3.json",
+    "expC/throughput/U_r1.json",
+    "expC/throughput/U_r2.json",
+    "expC/throughput/U_r3.json"
+  ],
+  "large_artifacts_kept_in_outputs": [
+    {
+      "path": "/workspace/OptimalCedar/outputs/fusion_discount_20260923/expA/expA_operator_timing.csv",
+      "size_bytes": 3233552,
+      "sha256": "ba6d44569aaac3024827777ef11604debf43a8c663a4319ba74269b8f4db47f4",
+      "rows": 38880
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/fusion_discount_20260923/expB/expB_operator_timing.csv",
+      "size_bytes": 1102172,
+      "sha256": "27a40f688b13e571f96bd07c24cd09e35a636b574c6aae8edb8767b20a4f772a",
+      "rows": 12960
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/fusion_discount_20260923/expB/inputs/block_inputs.pt",
+      "size_bytes": 281436283,
+      "sha256": "c6ca23560c40c81acbae4f41e2089978ea07cd48f54d84a166eaec4917364058"
+    }
+  ],
+  "notes": "Large measurement files (per-batch raw, per-event timings, the real block input blob, logs) stay under outputs/; this manifest carries their path, size, row count and sha256."
+}

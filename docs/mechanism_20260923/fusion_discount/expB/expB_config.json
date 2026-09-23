@@ -1,0 +1,62 @@
+{
+  "tensor_shape": [
+    3,
+    375,
+    500
+  ],
+  "tensor_dtype": "torch.uint8",
+  "tensor_bytes_per_record": 562500,
+  "batch_size": 4,
+  "levels": [
+    0
+  ],
+  "partial_level": 0,
+  "rounds": 3,
+  "warmup_batches": 40,
+  "measured_batches": 120,
+  "instrument": "full",
+  "local_cpu": 12,
+  "remote_cpu": 8,
+  "kernel": [
+    0.0625,
+    0.125,
+    0.0625,
+    0.125,
+    0.25,
+    0.125,
+    0.0625,
+    0.125,
+    0.0625
+  ],
+  "rho_U": 0.5,
+  "rho_P": 0.6666666666666666,
+  "configs": {
+    "U": [
+      [
+        "to_float"
+      ],
+      [
+        "crop"
+      ],
+      [
+        "flip"
+      ]
+    ],
+    "P": [
+      [
+        "to_float",
+        "crop"
+      ],
+      [
+        "flip"
+      ]
+    ],
+    "F": [
+      [
+        "to_float",
+        "crop",
+        "flip"
+      ]
+    ]
+  }
+}

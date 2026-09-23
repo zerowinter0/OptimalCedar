@@ -1,0 +1,1040 @@
+{
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "declared_plan": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/plans/round1__unopti.yaml",
+  "declared_order": [
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1
+  ],
+  "member_table": {
+    "7": {
+      "pipe_id": 7,
+      "name": "to_float",
+      "declared_input_bytes": 597552.3797468354,
+      "declared_output_bytes": 2390209.518987342,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 0.2542497031624366,
+      "ray_cost_ms_per_record": 14.867440005044259,
+      "ray_throughput": 26.600948129293457,
+      "latency_share_f_i": 0.01106421829293724,
+      "amdahl_threshold": 1.0111880048205342,
+      "ray_total_speedup": 0.6112752827761474,
+      "clipped_to_zero": false
+    },
+    "6": {
+      "pipe_id": 6,
+      "name": "RandomResizedCrop",
+      "declared_input_bytes": 2390209.518987342,
+      "declared_output_bytes": 714432.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 1.5295562416714343,
+      "ray_cost_ms_per_record": 11.159821792491236,
+      "ray_throughput": 30.66570310957595,
+      "latency_share_f_i": 0.06656190327335536,
+      "amdahl_threshold": 1.0713083208268153,
+      "ray_total_speedup": 0.704681135752183,
+      "clipped_to_zero": false
+    },
+    "5": {
+      "pipe_id": 5,
+      "name": "RandomHorizontalFlip",
+      "declared_input_bytes": 714432.0,
+      "declared_output_bytes": 714432.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 0.10700878762963187,
+      "ray_cost_ms_per_record": 0,
+      "ray_throughput": 51.54363913722633,
+      "latency_share_f_i": 0.004656715704562251,
+      "amdahl_threshold": 1.00467850215904,
+      "ray_total_speedup": 1.1844447211347044,
+      "clipped_to_zero": true
+    },
+    "4": {
+      "pipe_id": 4,
+      "name": "ColorJitter",
+      "declared_input_bytes": 714432.0,
+      "declared_output_bytes": 714432.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 6.6983832301341115,
+      "ray_cost_ms_per_record": 0,
+      "ray_throughput": 69.19810436673362,
+      "latency_share_f_i": 0.2914944377362931,
+      "amdahl_threshold": 1.411421523361024,
+      "ray_total_speedup": 1.590134705302775,
+      "clipped_to_zero": true
+    },
+    "3": {
+      "pipe_id": 3,
+      "name": "Grayscale",
+      "declared_input_bytes": 714432.0,
+      "declared_output_bytes": 238144.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 0.27507611889787154,
+      "ray_cost_ms_per_record": 0,
+      "ray_throughput": 70.17042750297117,
+      "latency_share_f_i": 0.011970524208303827,
+      "amdahl_threshold": 1.012115553737617,
+      "ray_total_speedup": 1.6124781607752843,
+      "clipped_to_zero": true
+    },
+    "2": {
+      "pipe_id": 2,
+      "name": "GaussianBlur",
+      "declared_input_bytes": 238144.0,
+      "declared_output_bytes": 238144.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 6.022765410971276,
+      "ray_cost_ms_per_record": 0,
+      "ray_throughput": 72.26836532178274,
+      "latency_share_f_i": 0.2620934868567555,
+      "amdahl_threshold": 1.3551852195209952,
+      "ray_total_speedup": 1.6606876278667448,
+      "clipped_to_zero": true
+    },
+    "1": {
+      "pipe_id": 1,
+      "name": "Normalize",
+      "declared_input_bytes": 238144.0,
+      "declared_output_bytes": 238144.0,
+      "has_ray_profile": true,
+      "can_mutate_to_ray": true,
+      "inprocess_cost_ms_per_record": 0.18400660056727122,
+      "ray_cost_ms_per_record": 0,
+      "ray_throughput": 43.97691389102556,
+      "latency_share_f_i": 0.008007439814853577,
+      "amdahl_threshold": 1.0080720764814597,
+      "ray_total_speedup": 1.0105655010377612,
+      "clipped_to_zero": true
+    }
+  },
+  "windows": [
+    {
+      "members": [
+        7,
+        6
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop"
+      ],
+      "size": 2,
+      "io_base_bytes": 6092403.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.21534758777308624,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 5.604908044437869,
+      "all_members_nonzero": true,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 2,
+      "io_base_bytes": 4533505.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.6848213829197746,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 7.642484593072086,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        5,
+        4
+      ],
+      "member_names": [
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 2,
+      "io_base_bytes": 2857728.0,
+      "io_fused_bytes": 1428864.0,
+      "rho": 0.5,
+      "ray_member_costs_ms_per_record": {
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        4,
+        3
+      ],
+      "member_names": [
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 2,
+      "io_base_bytes": 2381440.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.4,
+      "ray_member_costs_ms_per_record": {
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        3,
+        2
+      ],
+      "member_names": [
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 2,
+      "io_base_bytes": 1428864.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.6666666666666666,
+      "ray_member_costs_ms_per_record": {
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        2,
+        1
+      ],
+      "member_names": [
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 2,
+      "io_base_bytes": 952576.0,
+      "io_fused_bytes": 476288.0,
+      "rho": 0.5,
+      "ray_member_costs_ms_per_record": {
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        7,
+        6,
+        5
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 3,
+      "io_base_bytes": 7521267.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.17443660847047582,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 4.540107275735272,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 3,
+      "io_base_bytes": 5962369.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.520705989305178,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 5.810986046928634,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 3,
+      "io_base_bytes": 3810304.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.25,
+      "ray_member_costs_ms_per_record": {
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 3,
+      "io_base_bytes": 2857728.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.3333333333333333,
+      "ray_member_costs_ms_per_record": {
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 3,
+      "io_base_bytes": 1905152.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.5,
+      "ray_member_costs_ms_per_record": {
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 4,
+      "io_base_bytes": 8950131.41772152,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.14658828105574723,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 3.815291567488646,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 4,
+      "io_base_bytes": 6914945.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.38009750210906224,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 4.241820387308197,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 4,
+      "io_base_bytes": 4286592.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.2222222222222222,
+      "ray_member_costs_ms_per_record": {
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 4,
+      "io_base_bytes": 3334016.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.2857142857142857,
+      "ray_member_costs_ms_per_record": {
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 5,
+      "io_base_bytes": 9902707.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08439069685642778,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.1964587603587016,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 5,
+      "io_base_bytes": 7391233.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.3556041778730659,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 3.9684792537287708,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 5,
+      "io_base_bytes": 4762880.0,
+      "io_fused_bytes": 952576.0,
+      "rho": 0.2,
+      "ray_member_costs_ms_per_record": {
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 0,
+      "formula_block_cost_ms_per_record": 0.0,
+      "all_members_nonzero": false,
+      "nonzero_members": 0,
+      "usable": false
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 6,
+      "io_base_bytes": 10378995.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08051804111214207,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.095664135450448,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 6,
+      "io_base_bytes": 7867521.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.33407643215771554,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 3.728233447951394,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 7,
+      "io_base_bytes": 10855283.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.07698521978546782,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.0037144698971803,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    }
+  ],
+  "usable_sorted": [
+    {
+      "members": [
+        7,
+        6
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop"
+      ],
+      "size": 2,
+      "io_base_bytes": 6092403.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.21534758777308624,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 5.604908044437869,
+      "all_members_nonzero": true,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 3,
+      "io_base_bytes": 7521267.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.17443660847047582,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 4.540107275735272,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 4,
+      "io_base_bytes": 8950131.41772152,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.14658828105574723,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 3.815291567488646,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 5,
+      "io_base_bytes": 9902707.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08439069685642778,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.1964587603587016,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 6,
+      "io_base_bytes": 10378995.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08051804111214207,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.095664135450448,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 7,
+      "io_base_bytes": 10855283.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.07698521978546782,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.0037144698971803,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 2,
+      "io_base_bytes": 4533505.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.6848213829197746,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 7.642484593072086,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 3,
+      "io_base_bytes": 5962369.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.520705989305178,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 5.810986046928634,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 4,
+      "io_base_bytes": 6914945.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.38009750210906224,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 4.241820387308197,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 5,
+      "io_base_bytes": 7391233.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.3556041778730659,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 3.9684792537287708,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 6,
+      "io_base_bytes": 7867521.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.33407643215771554,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 3.728233447951394,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    }
+  ]
+}

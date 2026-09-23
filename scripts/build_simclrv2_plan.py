@@ -69,8 +69,11 @@ def build_plan_dict(
             node = members[0]
             pipes[node] = {
                 "name": PIPE_NAMES[node],
-                "variant": "INPROCESS",
-                "variant_ctx": dict(INPROCESS_CTX),
+                "variant": variant,
+                "variant_ctx": dict(
+                    {"INPROCESS": INPROCESS_CTX, "SMP": SMP_CTX,
+                     "RAY": RAY_CTX}[variant]
+                ),
                 "execution_resource": "cpu",
             }
             nodes.append(node)

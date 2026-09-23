@@ -1,0 +1,20 @@
+{
+  "optimizer": "expC_U",
+  "plan_path": "outputs/fusion_discount_20260923/expC/plans/U.yaml",
+  "plan_sha256": "6373bb7dbdfe6071ef518d5bb447141a3d9f4c2c84171fd022a5197658170fcb",
+  "profile_path": "/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "profile_sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+  "setup_time_sec": 11.064483050256968,
+  "workload_wall_time_sec": 21.289807051885873,
+  "total_time_sec": 32.35429010214284,
+  "perf_time_sec": 15.260640719905496,
+  "num_samples": 200,
+  "throughput_samples_per_sec": 13.10560963139158,
+  "time_per_sample_us": 76303.20359952748,
+  "epoch_run_times": [
+    15.260640719905496
+  ],
+  "epoch_num_samples": [
+    200
+  ]
+}

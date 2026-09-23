@@ -1,0 +1,489 @@
+{
+  "profile_path": "/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "block_pipes": [
+    7,
+    6,
+    5
+  ],
+  "block_member_names": [
+    "to_float",
+    "RandomResizedCrop",
+    "RandomHorizontalFlip"
+  ],
+  "declared_order_block": {
+    "io_base_bytes": 7521267.417721519,
+    "io_fused_bytes": 1311984.3797468354,
+    "rho": 0.17443660847047582,
+    "member_ray_costs_ms_per_record": {
+      "to_float": 14.867440005044259,
+      "RandomResizedCrop": 11.159821792491236,
+      "RandomHorizontalFlip": 0
+    },
+    "member_ray_cost_sum_ms_per_record": 26.027261797535495,
+    "member_input_bytes": {
+      "to_float": 597552.3797468354,
+      "RandomResizedCrop": 2390209.518987342,
+      "RandomHorizontalFlip": 714432.0
+    },
+    "member_output_bytes": {
+      "to_float": 2390209.518987342,
+      "RandomResizedCrop": 714432.0,
+      "RandomHorizontalFlip": 714432.0
+    },
+    "charged_block_cost_ms_per_record": 1.890814732463503,
+    "block_external_cost_ms_per_record": 21.088639977385718,
+    "walk_total_ms_per_record": 22.97945470984922,
+    "nodes": [
+      {
+        "kind": "single",
+        "node": 8,
+        "members": [
+          8
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 1.754876983806131
+      },
+      {
+        "kind": "single",
+        "node": 7,
+        "members": [
+          7
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 0.2542497031624366
+      },
+      {
+        "kind": "single",
+        "node": 6,
+        "members": [
+          6
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 1.5295562416714343
+      },
+      {
+        "kind": "single",
+        "node": 5,
+        "members": [
+          5
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 0.10700878762963187
+      },
+      {
+        "kind": "single",
+        "node": 4,
+        "members": [
+          4
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 6.6983832301341115
+      },
+      {
+        "kind": "single",
+        "node": 3,
+        "members": [
+          3
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 0.27507611889787154
+      },
+      {
+        "kind": "single",
+        "node": 2,
+        "members": [
+          2
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 6.022765410971276
+      },
+      {
+        "kind": "single",
+        "node": 1,
+        "members": [
+          1
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 0.18400660056727122
+      },
+      {
+        "kind": "single",
+        "node": 0,
+        "members": [
+          0
+        ],
+        "variant": "INPROCESS",
+        "charged_cost": 6.128080349967608
+      }
+    ]
+  },
+  "plans": [
+    {
+      "label": "U",
+      "plan_path": "outputs/fusion_discount_20260923/expC/plans/U.yaml",
+      "workers": 1,
+      "whole_plan_cost_ms_per_record": 47.11590177492121,
+      "block": {
+        "io_base_bytes": 7521267.417721519,
+        "io_fused_bytes": 1311984.3797468354,
+        "rho": 0.17443660847047582,
+        "member_ray_costs_ms_per_record": {
+          "to_float": 14.867440005044259,
+          "RandomResizedCrop": 11.159821792491236,
+          "RandomHorizontalFlip": 0
+        },
+        "member_ray_cost_sum_ms_per_record": 26.027261797535495,
+        "member_input_bytes": {
+          "to_float": 597552.3797468354,
+          "RandomResizedCrop": 2390209.518987342,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "member_output_bytes": {
+          "to_float": 2390209.518987342,
+          "RandomResizedCrop": 714432.0,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "charged_block_cost_ms_per_record": 26.027261797535495,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "walk_total_ms_per_record": 47.11590177492121,
+        "nodes": [
+          {
+            "kind": "single",
+            "node": 8,
+            "members": [
+              8
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 1.754876983806131
+          },
+          {
+            "kind": "single",
+            "node": 7,
+            "members": [
+              7
+            ],
+            "variant": "RAY",
+            "charged_cost": 14.867440005044259
+          },
+          {
+            "kind": "single",
+            "node": 6,
+            "members": [
+              6
+            ],
+            "variant": "RAY",
+            "charged_cost": 11.159821792491236
+          },
+          {
+            "kind": "single",
+            "node": 5,
+            "members": [
+              5
+            ],
+            "variant": "RAY",
+            "charged_cost": 0
+          },
+          {
+            "kind": "single",
+            "node": 4,
+            "members": [
+              4
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.6983832301341115
+          },
+          {
+            "kind": "single",
+            "node": 3,
+            "members": [
+              3
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.27507611889787154
+          },
+          {
+            "kind": "single",
+            "node": 2,
+            "members": [
+              2
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.022765410971276
+          },
+          {
+            "kind": "single",
+            "node": 1,
+            "members": [
+              1
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.18400660056727122
+          },
+          {
+            "kind": "single",
+            "node": 0,
+            "members": [
+              0
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.128080349967608
+          },
+          {
+            "kind": "optimizer_pipe",
+            "node": 10,
+            "members": [
+              10
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.0
+          }
+        ]
+      },
+      "block_charged_cost_ms_per_record": 26.027261797535495,
+      "block_external_cost_ms_per_record": 21.088639977385718,
+      "walk_vs_calculate_cost_delta": 0.0
+    },
+    {
+      "label": "P",
+      "plan_path": "outputs/fusion_discount_20260923/expC/plans/P.yaml",
+      "workers": 1,
+      "whole_plan_cost_ms_per_record": 26.69354802182359,
+      "block": {
+        "io_base_bytes": 7521267.417721519,
+        "io_fused_bytes": 1311984.3797468354,
+        "rho": 0.17443660847047582,
+        "member_ray_costs_ms_per_record": {
+          "to_float": 14.867440005044259,
+          "RandomResizedCrop": 11.159821792491236,
+          "RandomHorizontalFlip": 0
+        },
+        "member_ray_cost_sum_ms_per_record": 26.027261797535495,
+        "member_input_bytes": {
+          "to_float": 597552.3797468354,
+          "RandomResizedCrop": 2390209.518987342,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "member_output_bytes": {
+          "to_float": 2390209.518987342,
+          "RandomResizedCrop": 714432.0,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "charged_block_cost_ms_per_record": 5.604908044437869,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "walk_total_ms_per_record": 26.69354802182359,
+        "nodes": [
+          {
+            "kind": "single",
+            "node": 8,
+            "members": [
+              8
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 1.754876983806131
+          },
+          {
+            "kind": "fused",
+            "node": 11,
+            "members": [
+              7,
+              6
+            ],
+            "variant": "RAY",
+            "rho": 0.21534758777308624,
+            "member_costs": {
+              "to_float": 14.867440005044259,
+              "RandomResizedCrop": 11.159821792491236
+            },
+            "member_cost_sum": 26.027261797535495,
+            "charged_cost": 5.604908044437869
+          },
+          {
+            "kind": "single",
+            "node": 5,
+            "members": [
+              5
+            ],
+            "variant": "RAY",
+            "charged_cost": 0
+          },
+          {
+            "kind": "single",
+            "node": 4,
+            "members": [
+              4
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.6983832301341115
+          },
+          {
+            "kind": "single",
+            "node": 3,
+            "members": [
+              3
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.27507611889787154
+          },
+          {
+            "kind": "single",
+            "node": 2,
+            "members": [
+              2
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.022765410971276
+          },
+          {
+            "kind": "single",
+            "node": 1,
+            "members": [
+              1
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.18400660056727122
+          },
+          {
+            "kind": "single",
+            "node": 0,
+            "members": [
+              0
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.128080349967608
+          },
+          {
+            "kind": "optimizer_pipe",
+            "node": 10,
+            "members": [
+              10
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.0
+          }
+        ]
+      },
+      "block_charged_cost_ms_per_record": 5.604908044437869,
+      "block_external_cost_ms_per_record": 21.088639977385718,
+      "walk_vs_calculate_cost_delta": 0.0,
+      "predicted_speedup_vs_first": 1.7650670392860892
+    },
+    {
+      "label": "F",
+      "plan_path": "outputs/fusion_discount_20260923/expC/plans/F.yaml",
+      "workers": 1,
+      "whole_plan_cost_ms_per_record": 25.62874725312099,
+      "block": {
+        "io_base_bytes": 7521267.417721519,
+        "io_fused_bytes": 1311984.3797468354,
+        "rho": 0.17443660847047582,
+        "member_ray_costs_ms_per_record": {
+          "to_float": 14.867440005044259,
+          "RandomResizedCrop": 11.159821792491236,
+          "RandomHorizontalFlip": 0
+        },
+        "member_ray_cost_sum_ms_per_record": 26.027261797535495,
+        "member_input_bytes": {
+          "to_float": 597552.3797468354,
+          "RandomResizedCrop": 2390209.518987342,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "member_output_bytes": {
+          "to_float": 2390209.518987342,
+          "RandomResizedCrop": 714432.0,
+          "RandomHorizontalFlip": 714432.0
+        },
+        "charged_block_cost_ms_per_record": 4.540107275735272,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "walk_total_ms_per_record": 25.62874725312099,
+        "nodes": [
+          {
+            "kind": "single",
+            "node": 8,
+            "members": [
+              8
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 1.754876983806131
+          },
+          {
+            "kind": "fused",
+            "node": 11,
+            "members": [
+              7,
+              6,
+              5
+            ],
+            "variant": "RAY",
+            "rho": 0.17443660847047582,
+            "member_costs": {
+              "to_float": 14.867440005044259,
+              "RandomResizedCrop": 11.159821792491236,
+              "RandomHorizontalFlip": 0
+            },
+            "member_cost_sum": 26.027261797535495,
+            "charged_cost": 4.540107275735272
+          },
+          {
+            "kind": "single",
+            "node": 4,
+            "members": [
+              4
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.6983832301341115
+          },
+          {
+            "kind": "single",
+            "node": 3,
+            "members": [
+              3
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.27507611889787154
+          },
+          {
+            "kind": "single",
+            "node": 2,
+            "members": [
+              2
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.022765410971276
+          },
+          {
+            "kind": "single",
+            "node": 1,
+            "members": [
+              1
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.18400660056727122
+          },
+          {
+            "kind": "single",
+            "node": 0,
+            "members": [
+              0
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 6.128080349967608
+          },
+          {
+            "kind": "optimizer_pipe",
+            "node": 10,
+            "members": [
+              10
+            ],
+            "variant": "INPROCESS",
+            "charged_cost": 0.0
+          }
+        ]
+      },
+      "block_charged_cost_ms_per_record": 4.540107275735272,
+      "block_external_cost_ms_per_record": 21.088639977385718,
+      "walk_vs_calculate_cost_delta": 0.0,
+      "predicted_speedup_vs_first": 1.8384005004061827
+    }
+  ],
+  "block_external_identical": true
+}

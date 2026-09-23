@@ -1,0 +1,20 @@
+{
+  "optimizer": "F_r3",
+  "plan_path": "outputs/fusion_discount_20260923/expC/plans/F.yaml",
+  "plan_sha256": "939cfa8595869280cab8186b3916499f0a4a599f61f5aefd44bedb1cb52c077a",
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "profile_sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+  "setup_time_sec": 7.19931659521535,
+  "workload_wall_time_sec": 80.02138409810141,
+  "total_time_sec": 87.22070069331676,
+  "perf_time_sec": 79.2810197211802,
+  "num_samples": 4000,
+  "throughput_samples_per_sec": 50.453437835025554,
+  "time_per_sample_us": 19820.25493029505,
+  "epoch_run_times": [
+    79.2810197211802
+  ],
+  "epoch_num_samples": [
+    4000
+  ]
+}

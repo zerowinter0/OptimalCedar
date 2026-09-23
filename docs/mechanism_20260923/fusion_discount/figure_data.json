@@ -1,0 +1,571 @@
+{
+  "experiment_A": {
+    "config": {
+      "tensor_shape": [
+        1,
+        244,
+        244
+      ],
+      "tensor_dtype": "torch.float32",
+      "tensor_bytes_per_record": 238144,
+      "batch_size": 4,
+      "levels": [
+        1,
+        4,
+        16,
+        64
+      ],
+      "partial_level": 16,
+      "rounds": 3,
+      "warmup_batches": 40,
+      "measured_batches": 120,
+      "instrument": "full",
+      "local_cpu": 12,
+      "remote_cpu": 8,
+      "kernel": [
+        0.0625,
+        0.125,
+        0.0625,
+        0.125,
+        0.25,
+        0.125,
+        0.0625,
+        0.125,
+        0.0625
+      ],
+      "rho_U": 0.5,
+      "rho_P": 0.6666666666666666,
+      "configs": {
+        "U": [
+          [
+            "A"
+          ],
+          [
+            "B"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "P": [
+          [
+            "A",
+            "B"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "F": [
+          [
+            "A",
+            "B",
+            "C"
+          ]
+        ]
+      }
+    },
+    "levels": [
+      {
+        "level": 1,
+        "rho": 0.5,
+        "T_U_ms_per_record": 37.274172613194445,
+        "T_U_stdev": 3.3305445411722565,
+        "T_F_ms_per_record": 16.026943845138888,
+        "T_F_stdev": 2.00249839090968,
+        "measured_retention_T_F_over_T_U": 0.42997450302801926,
+        "member_compute_retention": 0.9048766221422521,
+        "other_overhead_retention": 0.3342877102366056,
+        "unfused_member_share": 0.16769830397131283,
+        "rule_prediction_T_F": 18.637086306597222,
+        "rule_vs_measured_ratio": 1.162859649767227,
+        "U_compute_ms_per_record": 6.250815529166666,
+        "U_other_ms_per_record": 31.02335708402778,
+        "F_compute_ms_per_record": 5.656216841666667,
+        "F_other_ms_per_record": 10.370727003472224
+      },
+      {
+        "level": 4,
+        "rho": 0.5,
+        "T_U_ms_per_record": 53.77252178333333,
+        "T_U_stdev": 4.7451737071762174,
+        "T_F_ms_per_record": 22.744712568055558,
+        "T_F_stdev": 1.993782931914837,
+        "measured_retention_T_F_over_T_U": 0.42298021022151927,
+        "member_compute_retention": 0.66078835723383,
+        "other_overhead_retention": 0.2885432894813912,
+        "unfused_member_share": 0.3611516508515171,
+        "rule_prediction_T_F": 26.886260891666666,
+        "rule_vs_measured_ratio": 1.1820884001597725,
+        "U_compute_ms_per_record": 19.420035012499998,
+        "U_other_ms_per_record": 34.35248677083333,
+        "F_compute_ms_per_record": 12.832533033333334,
+        "F_other_ms_per_record": 9.912179534722222
+      },
+      {
+        "level": 16,
+        "rho": 0.5,
+        "T_U_ms_per_record": 84.62543449375,
+        "T_U_stdev": 5.265545612493684,
+        "T_F_ms_per_record": 45.982289880555555,
+        "T_F_stdev": 6.392972219405639,
+        "measured_retention_T_F_over_T_U": 0.5433625263566779,
+        "member_compute_retention": 0.724304380871223,
+        "other_overhead_retention": 0.26779650094081475,
+        "unfused_member_share": 0.603639143004216,
+        "rule_prediction_T_F": 42.312717246875,
+        "rule_vs_measured_ratio": 0.9201959571127775,
+        "U_compute_ms_per_record": 51.08322475416667,
+        "U_other_ms_per_record": 33.542209739583335,
+        "F_compute_ms_per_record": 36.999803478472224,
+        "F_other_ms_per_record": 8.982486402083333,
+        "rho_partial": 0.6666666666666666,
+        "T_P_ms_per_record": 62.92205474583333,
+        "measured_retention_T_P_over_T_U": 0.7435359726333863,
+        "rule_prediction_T_P": 56.416956329166666
+      },
+      {
+        "level": 64,
+        "rho": 0.5,
+        "T_U_ms_per_record": 187.99731895416664,
+        "T_U_stdev": 31.12124337627512,
+        "T_F_ms_per_record": 170.58325233125,
+        "T_F_stdev": 8.211075808687122,
+        "measured_retention_T_F_over_T_U": 0.907370665072292,
+        "member_compute_retention": 1.0549047173037713,
+        "other_overhead_retention": 0.2987027406726144,
+        "unfused_member_share": 0.804901260786521,
+        "rule_prediction_T_F": 93.99865947708332,
+        "rule_vs_measured_ratio": 0.5510427207387887,
+        "U_compute_ms_per_record": 151.31927905069446,
+        "U_other_ms_per_record": 36.67803990347222,
+        "F_compute_ms_per_record": 159.62742128958334,
+        "F_other_ms_per_record": 10.955831041666665
+      }
+    ],
+    "verification": {
+      "F@1": {
+        "max_abs_diff": 0.0
+      },
+      "F@4": {
+        "max_abs_diff": 0.0
+      },
+      "F@16": {
+        "max_abs_diff": 0.0
+      },
+      "P@16": {
+        "max_abs_diff": 0.0
+      },
+      "F@64": {
+        "max_abs_diff": 0.0
+      }
+    }
+  },
+  "experiment_B": {
+    "rho": 0.17443660847047582,
+    "io_base_bytes": 7521267.417721519,
+    "io_fused_bytes": 1311984.3797468354,
+    "member_ray_costs_ms_per_record": {
+      "to_float": 14.867440005044259,
+      "RandomResizedCrop": 11.159821792491236,
+      "RandomHorizontalFlip": 0
+    },
+    "member_ray_cost_sum_ms_per_record": 26.027261797535495,
+    "formula_block_cost_ms_per_record": 1.890814732463503,
+    "formula_block_cost_from_rho": 4.540107275735272,
+    "rule_prediction_T_F": 21.20086646588243,
+    "organisations": [
+      {
+        "organisation": "U",
+        "elapsed_ms_per_record": 121.53908890902778,
+        "elapsed_stdev": 0.24630084056720006,
+        "compute_ms_per_record": 6.82483103125,
+        "other_ms_per_record": 114.71425787777777,
+        "actors": 3,
+        "retention_vs_U": 1.0,
+        "compute_retention_vs_U": 1.0,
+        "other_retention_vs_U": 1.0
+      },
+      {
+        "organisation": "P",
+        "elapsed_ms_per_record": 51.55843871458333,
+        "elapsed_stdev": 0.41672347642140717,
+        "compute_ms_per_record": 6.686897751388888,
+        "other_ms_per_record": 44.87154096319444,
+        "actors": 2,
+        "retention_vs_U": 0.42421281233377445,
+        "compute_retention_vs_U": 0.9797894952666911,
+        "other_retention_vs_U": 0.39115923158394833
+      },
+      {
+        "organisation": "F",
+        "elapsed_ms_per_record": 28.313800527777776,
+        "elapsed_stdev": 0.13223590881581432,
+        "compute_ms_per_record": 6.564344161111111,
+        "other_ms_per_record": 21.749456366666667,
+        "actors": 1,
+        "retention_vs_U": 0.23296044739129734,
+        "compute_retention_vs_U": 0.9618324806949574,
+        "other_retention_vs_U": 0.18959680138313417
+      }
+    ]
+  },
+  "experiment_C": {
+    "block_external_identical": true,
+    "plans": [
+      {
+        "label": "U",
+        "plan_path": "outputs/fusion_discount_20260923/expC/plans/U.yaml",
+        "workers": 1,
+        "whole_plan_cost_ms_per_record": 47.11590177492121,
+        "block_cost_ms_per_record": 26.027261797535495,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "predicted_speedup_vs_U": 1.0,
+        "throughput_mean_rec_s": 17.347658260981014,
+        "throughput_stdev": 0.46749665984987093,
+        "throughput_runs": [
+          17.03171733823445,
+          17.126565235625062,
+          17.88469220908353
+        ],
+        "measured_speedup_vs_U": 1.0,
+        "repeats_ok": 3
+      },
+      {
+        "label": "P",
+        "plan_path": "outputs/fusion_discount_20260923/expC/plans/P.yaml",
+        "workers": 1,
+        "whole_plan_cost_ms_per_record": 26.69354802182359,
+        "block_cost_ms_per_record": 5.604908044437869,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "predicted_speedup_vs_U": 1.7650670392860892,
+        "throughput_mean_rec_s": 46.988321357705125,
+        "throughput_stdev": 1.143296497675833,
+        "throughput_runs": [
+          45.93216580471971,
+          48.20234991050862,
+          46.83044835788702
+        ],
+        "measured_speedup_vs_U": 2.70862618174771,
+        "repeats_ok": 3
+      },
+      {
+        "label": "F",
+        "plan_path": "outputs/fusion_discount_20260923/expC/plans/F.yaml",
+        "workers": 1,
+        "whole_plan_cost_ms_per_record": 25.62874725312099,
+        "block_cost_ms_per_record": 4.540107275735272,
+        "block_external_cost_ms_per_record": 21.088639977385718,
+        "predicted_speedup_vs_U": 1.8384005004061827,
+        "throughput_mean_rec_s": 52.63577214968924,
+        "throughput_stdev": 1.8900617076319233,
+        "throughput_runs": [
+          53.74683812451231,
+          53.707040489529845,
+          50.453437835025554
+        ],
+        "measured_speedup_vs_U": 3.0341716073621035,
+        "repeats_ok": 3
+      }
+    ]
+  },
+  "candidate_blocks": [
+    {
+      "members": [
+        7,
+        6
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop"
+      ],
+      "size": 2,
+      "io_base_bytes": 6092403.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.21534758777308624,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 5.604908044437869,
+      "all_members_nonzero": true,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 3,
+      "io_base_bytes": 7521267.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.17443660847047582,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 4.540107275735272,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 4,
+      "io_base_bytes": 8950131.41772152,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.14658828105574723,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 3.815291567488646,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 5,
+      "io_base_bytes": 9902707.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08439069685642778,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.1964587603587016,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 6,
+      "io_base_bytes": 10378995.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.08051804111214207,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.095664135450448,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1
+      ],
+      "member_names": [
+        "to_float",
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur",
+        "Normalize"
+      ],
+      "size": 7,
+      "io_base_bytes": 10855283.41772152,
+      "io_fused_bytes": 835696.3797468354,
+      "rho": 0.07698521978546782,
+      "ray_member_costs_ms_per_record": {
+        "to_float": 14.867440005044259,
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0,
+        "Normalize": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 26.027261797535495,
+      "formula_block_cost_ms_per_record": 2.0037144698971803,
+      "all_members_nonzero": false,
+      "nonzero_members": 2,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip"
+      ],
+      "size": 2,
+      "io_base_bytes": 4533505.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.6848213829197746,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 7.642484593072086,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter"
+      ],
+      "size": 3,
+      "io_base_bytes": 5962369.518987342,
+      "io_fused_bytes": 3104641.518987342,
+      "rho": 0.520705989305178,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 5.810986046928634,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale"
+      ],
+      "size": 4,
+      "io_base_bytes": 6914945.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.38009750210906224,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 4.241820387308197,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    },
+    {
+      "members": [
+        6,
+        5,
+        4,
+        3,
+        2
+      ],
+      "member_names": [
+        "RandomResizedCrop",
+        "RandomHorizontalFlip",
+        "ColorJitter",
+        "Grayscale",
+        "GaussianBlur"
+      ],
+      "size": 5,
+      "io_base_bytes": 7391233.518987342,
+      "io_fused_bytes": 2628353.518987342,
+      "rho": 0.3556041778730659,
+      "ray_member_costs_ms_per_record": {
+        "RandomResizedCrop": 11.159821792491236,
+        "RandomHorizontalFlip": 0,
+        "ColorJitter": 0,
+        "Grayscale": 0,
+        "GaussianBlur": 0
+      },
+      "ray_member_cost_sum_ms_per_record": 11.159821792491236,
+      "formula_block_cost_ms_per_record": 3.9684792537287708,
+      "all_members_nonzero": false,
+      "nonzero_members": 1,
+      "usable": true
+    }
+  ],
+  "experiment_A_instrument_off": {
+    "cells": {},
+    "note": "instrument=none: member timings disabled, only the batch end-to-end clock runs; the same protocol and CPU pins."
+  }
+}
