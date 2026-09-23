@@ -1,0 +1,5 @@
+config,rounds,elapsed_ms_per_record_mean,elapsed_ms_per_record_stdev,compute_ms_per_record_mean,compute_ms_per_record_stdev,other_overhead_ms_per_record_mean,other_overhead_ms_per_record_stdev,schema_source
+L-F,1,10.65050561983204,0.0,10.212811897286823,0.0,0.4376937225452196,0.0,legacy_v1_recovered
+L-U,1,10.644868986434108,0.0,10.253525560400517,0.0,0.3913434260335918,0.0,legacy_v1_recovered
+R-F,1,16.97830231007752,0.0,11.564086420219638,0.0,5.414215889857881,0.0,legacy_v1_recovered
+R-U,1,31.589600912790697,0.0,15.209780801679585,0.0,16.379820111111112,0.0,legacy_v1_recovered

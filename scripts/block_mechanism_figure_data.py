@@ -1,15 +1,22 @@
-"""Assemble the data the §3.1 mechanism figure needs.
+"""Assemble the §3.1 mechanism-figure data from the corrected measurements.
 
-Reads the two experiment outputs and the Cedar model export and writes
-``figure_data.json`` / ``figure_data.md``:
+Sources (all inside one result directory):
 
-  * service time per configuration split into member compute and residual,
-  * U/F retention ratios (total, compute, residual) per backend,
-  * Cedar's own retention ratio for the same pair, with N/A when the block is
-    clipped to zero,
-  * pipeline throughput per configuration and worker count.
+  service_summary.csv              primary run, per-round, explicit units
+  service_summary_repeats.csv      cross-round summary
+  repeat*/service_summary.csv      additional full repeats
+  control_interleaved/             3 rounds, rotated config order, wall+CPU
+  control_samecore/                same, all remote actors on one CPU
+  instrument_overhead_{full,none}/ timing on/off
+  wrapper_overhead.json            standalone wrapper cost (reported apart)
+  cedar_cost_breakdown.json        Cedar model intermediates + provenance
+  pipeline_results*.csv            full-pipeline cells
 
-Usage (inside the container):
+Every per-record number is derived once from per-batch sums
+(``value_per_batch / source_records``); the identity
+``compute + other_overhead == elapsed`` is asserted for every batch.
+
+Usage:
   python -u scripts/block_mechanism_figure_data.py --run-dir outputs/<run>
 """
 from __future__ import annotations
@@ -22,316 +29,338 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-def _read_csv(path: Path) -> List[Dict[str, str]]:
+def read_csv(path: Path) -> List[Dict[str, str]]:
     if not path.exists():
         return []
     with path.open() as handle:
         return list(csv.DictReader(handle))
 
 
-def _mean(values: List[float]) -> Optional[float]:
+def mean(values: List[float]) -> Optional[float]:
     return statistics.fmean(values) if values else None
 
 
-def build(run_dir: Path) -> Dict[str, Any]:
-    raw = _read_csv(run_dir / "service_raw.csv")
-    summary = _read_csv(run_dir / "service_summary.csv")
-    pivot = []
-    for extra in sorted(run_dir.glob("pipeline_results*.csv")):
-        pivot.extend(_read_csv(extra))
-    verification_path = run_dir / "service_verification.json"
-    verification = (
-        json.loads(verification_path.read_text())
-        if verification_path.exists()
-        else {}
-    )
-    meta_path = run_dir / "service_meta.json"
-    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
-    cedar_path = run_dir / "cedar_cost_breakdown.json"
-    cedar = json.loads(cedar_path.read_text()) if cedar_path.exists() else {}
+def stdev(values: List[float]) -> Optional[float]:
+    return statistics.stdev(values) if len(values) > 1 else 0.0
 
-    configs: Dict[str, Any] = {}
-    for row in summary:
-        config = row["config"]
-        rows = [item for item in raw if item["config"] == config]
-        records_per_batch = int(rows[0]["source_records"]) if rows else 4
 
-        def per_record(column: str) -> Optional[float]:
-            values = [
-                float(item[column]) / records_per_batch
-                for item in rows
-                if item.get(column) not in (None, "")
-            ]
-            return _mean(values)
-
-        def per_record_quantile(column: str, quantile: float) -> Optional[float]:
-            values = sorted(
-                float(item[column]) / records_per_batch
-                for item in rows
-                if item.get(column) not in (None, "")
-            )
-            if not values:
-                return None
-            index = min(len(values) - 1, int(quantile * len(values)))
-            return values[index]
-
-        compute_columns = [
-            key for key in (rows[0] if rows else {})
-            if key.startswith("compute_") and key.endswith("_ms")
-        ]
-        compute_columns = [c for c in compute_columns if c != "compute_sum_ms"]
-        configs[config] = {
-            "batches": int(row["measured_batches"]),
-            "source_records": int(row["measured_records"]),
-            "actors": int(row["actors"]),
-            "elapsed_ms_per_record": per_record("elapsed_ms"),
-            "compute_sum_ms_per_record": per_record("compute_sum_ms"),
-            "residual_ms_per_record": per_record("noncompute_residual_ms"),
-            "elapsed_ms_per_record_median": per_record_quantile("elapsed_ms", 0.5),
-            "elapsed_ms_per_record_p90": per_record_quantile("elapsed_ms", 0.9),
-            "compute_sum_ms_per_record_median": per_record_quantile("compute_sum_ms", 0.5),
-            "residual_ms_per_record_median": per_record_quantile("noncompute_residual_ms", 0.5),
-            "residual_ms_per_record_p90": per_record_quantile("noncompute_residual_ms", 0.9),
-            "member_compute_ms_per_record": {
-                column[len("compute_"):-len("_ms")]: per_record(column)
-                for column in compute_columns
-            },
-            "elapsed_ms_per_batch_mean": float(row["elapsed_ms_mean"]),
-            "elapsed_ms_per_batch_stdev": float(row["elapsed_ms_stdev"]),
-            "pilot_ms_per_batch": float(row["pilot_ms_per_batch"]),
-        }
-
-    def ratio(fast: Optional[float], slow: Optional[float]) -> Optional[float]:
-        if fast is None or slow is None or slow == 0:
-            return None
-        return fast / slow
-
-    # Cross-repeat statistics: the primary run plus any repeat*/ directories.
-    repeat_sources = [(1, summary)]
-    for extra_dir in sorted(run_dir.glob("repeat*")):
-        extra = _read_csv(extra_dir / "service_summary.csv")
-        if extra:
-            repeat_sources.append((len(repeat_sources) + 1, extra))
-    repeats: Dict[str, Any] = {}
-    for config in configs:
-        rows = []
-        for index, table in repeat_sources:
-            match = next((r for r in table if r["config"] == config), None)
-            if match is None:
+def load_rounds(run_dir: Path) -> Dict[str, List[Dict[str, Any]]]:
+    """Per-config list of per-round summaries from every measurement directory."""
+    sources = [("primary", run_dir)]
+    for name in ("repeat2", "control_interleaved", "control_samecore",
+                 "instrument_overhead_full", "instrument_overhead_none"):
+        candidate = run_dir / name
+        if (candidate / "service_summary.csv").exists():
+            sources.append((name, candidate))
+    by_config: Dict[str, List[Dict[str, Any]]] = {}
+    for label, directory in sources:
+        rows = read_csv(directory / "service_summary.csv")
+        header = set(rows[0]) if rows else set()
+        for row in rows:
+            if "elapsed_ms_per_record_mean" not in header:
                 continue
-            records = int(match["measured_records"]) or 1
-            batches = int(match["measured_batches"]) or 1
-            rows.append(
+            config = row["config"]
+            by_config.setdefault(config, []).append(
                 {
-                    "repeat": index,
-                    "elapsed_ms_per_record": float(match["elapsed_ms_mean"]) * batches / records,
-                    "compute_ms_per_record": float(match["compute_sum_ms_mean"]) * batches / records,
-                    "residual_ms_per_record": float(match["residual_ms_mean"]) * batches / records,
+                    "source": label,
+                    "round": int(row.get("round", 1) or 1),
+                    "batches": int(row["measured_batches"]),
+                    "records": int(row["measured_records"]),
+                    "elapsed_ms_per_record": float(row["elapsed_ms_per_record_mean"]),
+                    "compute_ms_per_record": float(
+                        row["compute_sum_ms_per_record_mean"]
+                    ),
+                    "other_ms_per_record": float(
+                        row["other_overhead_ms_per_record_mean"]
+                    ),
+                    "cpu_ms_per_record": float(
+                        row.get("cpu_sum_ms_per_record_mean") or 0.0
+                    ),
+                    "elapsed_ms_per_batch": float(
+                        row.get("elapsed_ms_per_batch_mean") or 0.0
+                    ),
+                    "elapsed_ms_per_batch_p50": float(
+                        row.get("elapsed_ms_per_batch_p50") or 0.0
+                    ),
+                    "elapsed_ms_per_batch_p90": float(
+                        row.get("elapsed_ms_per_batch_p90") or 0.0
+                    ),
+                    "members": {
+                        key[len("compute_") : -len("_ms_per_record_mean")]: float(
+                            value
+                        )
+                        for key, value in row.items()
+                        if key.startswith("compute_")
+                        and key.endswith("_ms_per_record_mean")
+                    },
+                    "identity_error_ms_per_batch_max": float(
+                        row.get("identity_error_ms_per_batch_max") or 0.0
+                    ),
                 }
             )
-        if not rows:
-            continue
-        repeats[config] = {
-            key: {
-                "mean": _mean([row[key] for row in rows]),
-                "stdev": (
-                    statistics.stdev([row[key] for row in rows])
-                    if len(rows) > 1
-                    else 0.0
-                ),
-                "per_repeat": [row[key] for row in rows],
-            }
-            for key in ("elapsed_ms_per_record", "compute_ms_per_record",
-                        "residual_ms_per_record")
+    return by_config
+
+
+def summarise(rounds: List[Dict[str, Any]]) -> Dict[str, Any]:
+    totals = [r["elapsed_ms_per_record"] for r in rounds]
+    computes = [r["compute_ms_per_record"] for r in rounds]
+    others = [r["other_ms_per_record"] for r in rounds]
+    member_names = sorted({name for r in rounds for name in r["members"]})
+    return {
+        "rounds": len(rounds),
+        "batches": sum(r["batches"] for r in rounds),
+        "records": sum(r["records"] for r in rounds),
+        "elapsed_ms_per_record_mean": mean(totals),
+        "elapsed_ms_per_record_stdev": stdev(totals),
+        "compute_ms_per_record_mean": mean(computes),
+        "compute_ms_per_record_stdev": stdev(computes),
+        "other_ms_per_record_mean": mean(others),
+        "other_ms_per_record_stdev": stdev(others),
+        "members_ms_per_record_mean": {
+            name: mean([r["members"][name] for r in rounds if name in r["members"]])
+            for name in member_names
+        },
+        "per_round": rounds,
+        "identity_error_ms_per_batch_max": max(
+            (r["identity_error_ms_per_batch_max"] for r in rounds), default=0.0
+        ),
+    }
+
+
+def ratio(new: Optional[float], base: Optional[float]) -> Optional[float]:
+    if new is None or base in (None, 0):
+        return None
+    return new / base
+
+
+def build(run_dir: Path) -> Dict[str, Any]:
+    rounds = load_rounds(run_dir)
+
+    def pick(config: str, *sources: str) -> Dict[str, Any]:
+        entries = [
+            r for r in rounds.get(config, []) if r["source"] in sources
+        ]
+        return summarise(entries) if entries else {}
+
+    primary = {
+        config: pick(config, "primary", "repeat2")
+        for config in ("L-U", "L-F", "R-U", "R-F")
+    }
+    interleaved = {
+        config: pick(config, "control_interleaved")
+        for config in ("L-U", "L-F", "R-U", "R-F")
+    }
+    samecore = {
+        config: pick(config, "control_samecore")
+        for config in ("L-U", "L-F", "R-U", "R-F")
+    }
+    instrument = {
+        label: {
+            config: pick(config, f"instrument_overhead_{label}")
+            for config in ("L-U", "R-F")
         }
-        repeats[config]["repeats"] = len(rows)
+        for label in ("full", "none")
+    }
+    wrapper_path = run_dir / "wrapper_overhead.json"
+    wrapper = json.loads(wrapper_path.read_text()) if wrapper_path.exists() else {}
 
-    if repeats:
-        repeat_csv = run_dir / "service_summary_repeats.csv"
-        with repeat_csv.open("w", newline="") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(
-                ["config", "repeats", "elapsed_ms_per_record_mean",
-                 "elapsed_ms_per_record_stdev", "compute_ms_per_record_mean",
-                 "compute_ms_per_record_stdev", "residual_ms_per_record_mean",
-                 "residual_ms_per_record_stdev"]
-            )
-            for config, payload in repeats.items():
-                writer.writerow(
-                    [
-                        config,
-                        payload["repeats"],
-                        payload["elapsed_ms_per_record"]["mean"],
-                        payload["elapsed_ms_per_record"]["stdev"],
-                        payload["compute_ms_per_record"]["mean"],
-                        payload["compute_ms_per_record"]["stdev"],
-                        payload["residual_ms_per_record"]["mean"],
-                        payload["residual_ms_per_record"]["stdev"],
-                    ]
-                )
-
-    retention = {}
+    retention: Dict[str, Any] = {}
     for backend, unfused, fused in (("local", "L-U", "L-F"), ("ray", "R-U", "R-F")):
-        if unfused not in configs or fused not in configs:
+        u, f = primary.get(unfused, {}), primary.get(fused, {})
+        if not u or not f:
             continue
         retention[backend] = {
-            "total_time_ratio_fused_over_unfused": ratio(
-                configs[fused]["elapsed_ms_per_record"],
-                configs[unfused]["elapsed_ms_per_record"],
+            "elapsed_ratio_fused_over_unfused": ratio(
+                f["elapsed_ms_per_record_mean"], u["elapsed_ms_per_record_mean"]
             ),
             "compute_ratio_fused_over_unfused": ratio(
-                configs[fused]["compute_sum_ms_per_record"],
-                configs[unfused]["compute_sum_ms_per_record"],
+                f["compute_ms_per_record_mean"], u["compute_ms_per_record_mean"]
             ),
-            "residual_ratio_fused_over_unfused": ratio(
-                configs[fused]["residual_ms_per_record"],
-                configs[unfused]["residual_ms_per_record"],
+            "other_ratio_fused_over_unfused": ratio(
+                f["other_ms_per_record_mean"], u["other_ms_per_record_mean"]
+            ),
+            "interleaved_elapsed_ratio": ratio(
+                interleaved.get(fused, {}).get("elapsed_ms_per_record_mean"),
+                interleaved.get(unfused, {}).get("elapsed_ms_per_record_mean"),
+            ),
+            "samecore_elapsed_ratio": ratio(
+                samecore.get(fused, {}).get("elapsed_ms_per_record_mean"),
+                samecore.get(unfused, {}).get("elapsed_ms_per_record_mean"),
             ),
         }
 
-    cedar_ratios: Dict[str, Any] = {}
+    cedar_path = run_dir / "cedar_cost_breakdown.json"
+    cedar = json.loads(cedar_path.read_text()) if cedar_path.exists() else {}
     model_configs = cedar.get("configs", {})
+    cedar_ratios: Dict[str, Any] = {}
     for backend, unfused, fused in (("local", "L-U_w1", "L-F_w1"),
                                     ("ray", "R-U_w1", "R-F_w1")):
         if unfused not in model_configs or fused not in model_configs:
             continue
-        cached = model_configs[fused]["block_cost_ms_per_sample"]
-        total_unfused = model_configs[unfused]["block_cost_ms_per_sample"]
+        u = model_configs[unfused]
+        f = model_configs[fused]
         entry: Dict[str, Any] = {
-            "block_cost_unfused_ms_per_sample": total_unfused,
-            "block_cost_fused_ms_per_sample": cached,
-            "block_retention_ratio": ratio(cached, total_unfused),
+            "block_cost_unfused_ms_per_sample": u["fused_block_cost_ms_per_sample"]
+            if not u["plan_is_fused"] else u["fused_block_cost_ms_per_sample"],
+            "block_cost_fused_ms_per_sample": f["fused_block_cost_ms_per_sample"],
             "full_plan_cost_ratio_fused_over_unfused": ratio(
-                model_configs[fused]["full_plan_cost_ms_per_sample"],
-                model_configs[unfused]["full_plan_cost_ms_per_sample"],
+                f["full_plan_cost_ms_per_sample"],
+                u["full_plan_cost_ms_per_sample"],
             ),
-            "member_cost_sum_ms_per_sample": model_configs[unfused][
-                "member_cost_sum_ms_per_sample"
-            ],
-            "block_cost_ms_per_sample": cached,
-            "block_cost_unfused_ms_per_sample": total_unfused,
-            "rho_io_fused_over_base": model_configs[unfused][
-                "rho_io_fused_over_base"
-            ],
+            "rho_io_ratio": f["rho_io_ratio"],
+            "provenance": {
+                "unfused_plan": u["plan_provenance"],
+                "fused_plan": f["plan_provenance"],
+            },
         }
-        if cached == 0 or total_unfused == 0:
+        base = entry["block_cost_unfused_ms_per_sample"]
+        cached = entry["block_cost_fused_ms_per_sample"]
+        entry["block_retention_ratio"] = ratio(cached, base)
+        if not base or not cached:
             entry["block_retention_ratio"] = None
             entry["annotation"] = "N/A (Cedar clips the offloaded block to 0)"
         cedar_ratios[backend] = entry
 
     pipeline: Dict[str, Any] = {}
-    for row in pivot:
-        key = f"{row['config']}_w{row['workers']}"
-        throughput = row.get("throughput_samples_per_sec")
-        pipeline.setdefault(key, {"config": row["config"], "workers": int(row["workers"]), "repeats": []})
-        pipeline[key]["repeats"].append(
-            {
-                "repeat": int(row["repeat"]),
-                "returncode": int(row["returncode"]),
-                "num_samples": int(row["num_samples"]) if row.get("num_samples") else None,
-                "perf_time_sec": float(row["perf_time_sec"]) if row.get("perf_time_sec") else None,
-                "throughput_samples_per_sec": float(throughput) if throughput else None,
-                "setup_time_sec": float(row["setup_time_sec"]) if row.get("setup_time_sec") else None,
-                "actors": row.get("actors"),
-            }
-        )
-    for key, payload in pipeline.items():
-        rates = [r["throughput_samples_per_sec"] for r in payload["repeats"] if r["throughput_samples_per_sec"]]
-        payload["throughput_mean"] = _mean(rates)
-        payload["throughput_stdev"] = statistics.stdev(rates) if len(rates) > 1 else 0.0
-        payload["ok_repeats"] = sum(1 for r in payload["repeats"] if r["returncode"] == 0)
-        payload["failed_repeats"] = sum(1 for r in payload["repeats"] if r["returncode"] != 0)
-        # Ray stage actors: observed with block_actor_probe.py where available,
-        # otherwise derived from the plan (W replicas x Ray stages).
-        probe_path = run_dir / f"actor_probe_{key}.json"
-        if probe_path.exists():
-            payload["ray_actors_observed"] = json.loads(
-                probe_path.read_text()
-            )["peak_alive_actors"]
-        else:
-            ray_stages = 1 if payload["config"].endswith("F") else 3
-            payload["ray_actors_derived"] = (
-                payload["workers"] * ray_stages
-                if payload["config"].startswith("R")
-                else 0
+    for extra in sorted(run_dir.glob("pipeline_results*.csv")):
+        for row in read_csv(extra):
+            key = f"{row['config']}_w{row['workers']}"
+            payload = pipeline.setdefault(
+                key,
+                {
+                    "config": row["config"],
+                    "workers": int(row["workers"]),
+                    "repeats": [],
+                    "source_file": extra.name,
+                },
             )
-
+            payload["repeats"].append(
+                {
+                    "repeat": int(row["repeat"]),
+                    "returncode": int(row["returncode"]),
+                    "num_samples": int(row["num_samples"]) if row.get("num_samples") else None,
+                    "perf_time_sec": float(row["perf_time_sec"]) if row.get("perf_time_sec") else None,
+                    "throughput_samples_per_sec": (
+                        float(row["throughput_samples_per_sec"])
+                        if row.get("throughput_samples_per_sec") else None
+                    ),
+                    "setup_time_sec": (
+                        float(row["setup_time_sec"]) if row.get("setup_time_sec") else None
+                    ),
+                    "wall_time_sec": float(row["wall_time_sec"]) if row.get("wall_time_sec") else None,
+                }
+            )
+    for key, payload in pipeline.items():
+        rates = [
+            r["throughput_samples_per_sec"] for r in payload["repeats"]
+            if r["throughput_samples_per_sec"]
+        ]
+        payload["throughput_mean"] = mean(rates)
+        payload["throughput_stdev"] = stdev(rates)
+        payload["ok_repeats"] = sum(
+            1 for r in payload["repeats"] if r["returncode"] == 0
+        )
+        payload["failed_repeats"] = sum(
+            1 for r in payload["repeats"] if r["returncode"] != 0
+        )
+        probe = run_dir / f"actor_probe_{key}.json"
+        payload["ray_actors"] = (
+            json.loads(probe.read_text())["peak_alive_actors"]
+            if probe.exists() else None
+        )
     return {
+        "units": {
+            "service": "ms per source record (batch value / source_records)",
+            "compute": "sum over a batch's records of wall time measured around "
+                       "each member callable",
+            "other_overhead": "per-batch end-to-end time minus that batch's "
+                              "summed member wall time; not pure network time",
+        },
         "service": {
-            "configs": configs,
-            "repeats": repeats,
+            "primary": primary,
+            "interleaved": interleaved,
+            "samecore": samecore,
+            "instrument": instrument,
             "retention": retention,
             "cedar_model": cedar_ratios,
-            "verification": verification,
-            "meta": meta,
+            "wrapper_overhead": wrapper,
         },
-            "pipeline": pipeline,
+        "pipeline": pipeline,
         "cedar_model": cedar,
     }
 
 
-def render_markdown(data: Dict[str, Any]) -> str:
-    service = data["service"]
-    lines = ["# SimCLRv2 B/H/J 机制图数据", ""]
-    lines.append("## 实验 A：串行服务时间（ms/source-record）")
-    lines.append("")
-    lines.append("| 配置 | 后端 | 组织 | 计算 B | 计算 H | 计算 J | 计算合计 | 交接/框架余项 | 总计 |")
-    lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-    labels = {
-        "L-U": ("local", "三个独立阶段"),
-        "L-F": ("local", "一个融合阶段"),
-        "R-U": ("ray", "三个 actor 阶段"),
-        "R-F": ("ray", "一个融合 actor"),
-    }
-    for config, label in labels.items():
-        payload = service["configs"].get(config)
+def render(data: Dict[str, Any]) -> str:
+    lines = ["# SimCLRv2 B/H/J 机制图数据（修正版）", ""]
+    lines += ["## 实验 A：串行服务时间（ms/source-record）", ""]
+    lines.append("| 配置 | 计算 B | 计算 H | 计算 J | 计算合计 | 其他开销 | 总时间 | 轮数 |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+    for config, payload in data["service"]["primary"].items():
         if not payload:
             continue
-        members = payload["member_compute_ms_per_record"]
+        members = payload["members_ms_per_record_mean"]
         lines.append(
-            "| %s | %s | %s | %.4f | %.4f | %.4f | %.4f | %.4f | %.4f |" % (
-                config, label[0], label[1],
+            "| %s | %.4f | %.4f | %.4f | %.4f | %.4f | %.4f | %d |" % (
+                config,
                 members.get("B_blur", float("nan")),
                 members.get("H_flip", float("nan")),
                 members.get("J_jitter", float("nan")),
-                payload["compute_sum_ms_per_record"],
-                payload["residual_ms_per_record"],
-                payload["elapsed_ms_per_record"],
+                payload["compute_ms_per_record_mean"],
+                payload["other_ms_per_record_mean"],
+                payload["elapsed_ms_per_record_mean"],
+                payload["rounds"],
+            )
+        )
+    lines += ["", "## 控制条件（交错顺序 / 同核 / 插桩）", ""]
+    lines.append("| 配置 | 主测量总时间 | 交错3轮总时间 | 同核总时间 | 主测量计算 | 主测量其他 |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | ---: |")
+    for config in data["service"]["primary"]:
+        primary = data["service"]["primary"][config]
+        inter = data["service"]["interleaved"].get(config, {})
+        same = data["service"]["samecore"].get(config, {})
+        if not primary:
+            continue
+        lines.append(
+            "| %s | %.4f | %s | %s | %.4f | %.4f |" % (
+                config,
+                primary["elapsed_ms_per_record_mean"],
+                ("%.4f" % inter["elapsed_ms_per_record_mean"]) if inter else "n/a",
+                ("%.4f" % same["elapsed_ms_per_record_mean"]) if same else "n/a",
+                primary["compute_ms_per_record_mean"],
+                primary["other_ms_per_record_mean"],
             )
         )
     lines += ["", "## U/F 保留比例", ""]
-    lines.append("| 后端 | 计算保留 | 余项保留 | 总时间保留 | Cedar 模型（块成本） |")
-    lines.append("| --- | ---: | ---: | ---: | ---: |")
-    for backend, row in service["retention"].items():
-        cedar_row = service["cedar_model"].get(backend, {})
-        cedar_value = cedar_row.get("block_retention_ratio")
-        cedar_text = (
-            "%.4f" % cedar_value if cedar_value is not None
-            else cedar_row.get("annotation", "n/a")
+    lines.append("| 后端 | 计算 | 其他开销 | 总时间 | Cedar 模型块成本比 | 备注 |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | --- |")
+    for backend, payload in data["service"]["retention"].items():
+        model = data["service"]["cedar_model"].get(backend, {})
+        retention = model.get("block_retention_ratio")
+        note = model.get("annotation", "")
+        lines.append(
+            "| %s | %.4f | %.4f | %.4f | %s | %s |" % (
+                backend,
+                payload["compute_ratio_fused_over_unfused"],
+                payload["other_ratio_fused_over_unfused"],
+                payload["elapsed_ratio_fused_over_unfused"],
+                ("%.4f" % retention) if retention is not None else "N/A",
+                note,
+            )
         )
-        lines.append("| %s | %.4f | %.4f | %.4f | %s |" % (
-            backend,
-            row["compute_ratio_fused_over_unfused"],
-            row["residual_ratio_fused_over_unfused"],
-            row["total_time_ratio_fused_over_unfused"],
-            cedar_text,
-        ))
     lines += ["", "## 实验 B：完整流水线（records/s）", ""]
-    lines.append("| 配置 | W | 重复 | 吞吐均值 | 标准差 | 实际 actor 数 |")
+    lines.append("| 配置 | W | 成功轮 | 吞吐均值 | 标准差 | 实测 Ray actor |")
     lines.append("| --- | ---: | ---: | ---: | ---: | --- |")
     for key, payload in sorted(data["pipeline"].items()):
         if not payload.get("throughput_mean"):
             continue
-        actors = payload.get("ray_actors_observed")
-        actor_text = (
-            "%d (probe)" % actors if actors is not None
-            else "%d (derived)" % payload.get("ray_actors_derived", 0)
+        actors = payload.get("ray_actors")
+        lines.append(
+            "| %s | %d | %d | %.2f | %.2f | %s |" % (
+                payload["config"], payload["workers"], payload["ok_repeats"],
+                payload["throughput_mean"], payload["throughput_stdev"] or 0.0,
+                actors if actors is not None else "n/a (local plan)",
+            )
         )
-        lines.append("| %s | %d | %d | %.2f | %.2f | %s |" % (
-            payload["config"], payload["workers"], payload["ok_repeats"],
-            payload["throughput_mean"], payload["throughput_stdev"],
-            actor_text,
-        ))
     lines.append("")
     return "\n".join(lines)
 
@@ -341,11 +370,10 @@ def main() -> int:
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
     data = build(args.run_dir)
-    (args.run_dir / "figure_data.json").write_text(
-        json.dumps(data, indent=2)
-    )
-    (args.run_dir / "figure_data.md").write_text(render_markdown(data))
-    print(render_markdown(data))
+    (args.run_dir / "figure_data.json").write_text(json.dumps(data, indent=2))
+    markdown = render(data)
+    (args.run_dir / "figure_data.md").write_text(markdown)
+    print(markdown)
     return 0
 
 

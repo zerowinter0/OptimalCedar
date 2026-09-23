@@ -1,0 +1,13 @@
+{
+  "label": "R-U_w1",
+  "plan": "outputs/simclrv2_fusion_offload_mechanism_20260923/plans/R-U_w1.yaml",
+  "peak_alive_actors": 3,
+  "actor_names_observed": {
+    "RayActorMapperPipeVariant": 21
+  },
+  "actor_locations": {
+    "?": 21
+  },
+  "returncode": 0,
+  "num_samples": 2000
+}

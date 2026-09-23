@@ -1,0 +1,22 @@
+{
+  "configs": [
+    "L-U",
+    "L-F",
+    "R-U",
+    "R-F"
+  ],
+  "batch_size": 4,
+  "min_seconds": 30.0,
+  "warmup_batches": 120,
+  "pilot_batches": 40,
+  "actor_warmup": 5,
+  "cpu_affinity": [
+    12
+  ],
+  "ray_ip": "172.23.166.105:6379",
+  "remote_cpu_base": 8,
+  "path_timing_enabled": "1",
+  "gc_disabled_during_measurement": true,
+  "elapsed_definition": "caller monotonic clock from before the first submit of the batch until the last stage's result is materialised",
+  "residual_definition": "elapsed - sum(member compute)"
+}

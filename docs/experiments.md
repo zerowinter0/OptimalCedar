@@ -43,7 +43,7 @@
 | 正式放大 campaign 原始产物 | `outputs/ultimate_eight_optimizers_fix_20260921/`（= `..._20260920` 的续跑完整版） |
 | 新增 Cedar 负载原始产物 | `outputs/ultimate_new_workloads_20260922/`（小数据验证在 `outputs/new_workloads_validation_20260922/`） |
 | staged vs DP 消融原始产物 | `outputs/staged_ablation_20260922/`（小数据验证在 `outputs/staged_ablation_validation_20260922/`，§4.6） |
-| §3.1 机制实验原始产物 | `outputs/simclrv2_fusion_offload_mechanism_20260923/`（README + figure_data.json，§4.7） |
+| §3.1 机制实验原始产物 | `outputs/simclrv2_fusion_offload_mechanism_20260923/`（README + figure_data.json，§4.7）；仓库内小文件快照 `docs/mechanism_20260923/`（含 `MANIFEST.json` 记录大文件 sha256） |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -1610,64 +1610,80 @@ Cedar 的 reorder pass 要枚举拓扑序（`calculate_reorderings`），16 个�
 
 ### 4.7 机制实验：SimCLRv2 的 B/H/J 块——融合与卸载到底改变了什么
 
+> **本节的 v1 数字已作废**：v1 把"每批端到端时间"与"每记录成员时间"相减，并在此后的汇总里
+> 又除了一次记录数（重复归一化）。修正版从**批级**求和再相减、每记录只除一次，且逐批校验
+> `计算 + 其他开销 = 总时间`（最大误差 1.4e-14）。v1 原始文件留档在
+> `outputs/simclrv2_fusion_offload_mechanism_20260923/legacy_v1/INVALID.md`。
+> 仓库内的可复现快照：`docs/mechanism_20260923/`（README、汇总 CSV、模型 JSON、图数据；
+> 大文件路径/行数/sha256 见其 `MANIFEST.json`）。
+
 **问题**：Cedar 把卸载收益记进算子成本、再对整块施加融合 I/O 折扣 `rho = IO_fused / IO_base`；
-这个简化能否表示"计算"与"交接"的真实变化？用同一组流量、只改块的组织方式来回答（不预设结论）。
+这个简化能否表示"计算"与"数据交接"的真实变化？固定顺序
+`ImageReader(8) → Grayscale(3) → RandomResizedCrop(6) → [B(2) H(5) J(4)] → to_float(7) →
+Normalize(1) → Batcher(0)`，只改块的组织：L-U / L-F = local 三独立阶段 / 一个融合阶段
+（真实 `InProcess*PipeVariant`）；R-U / R-F = remote Ray 三 actor / 一个融合 actor
+（真实 `Ray*PipeVariant`，段间结果经 driver 转发，与 runtime 相同）。种子按 (record_id, op)
+绑定，四组输出逐位相同（`max_abs_diff = 0.0`）；输入是真实流水线捕获的 400 条进入 B 前的记录
+（实测 59,944 B/条，shape `1x244x244` uint8、contiguous）。
 
-固定顺序 `ImageReader(8) → Grayscale(3) → RandomResizedCrop(6) → [B(2) H(5) J(4)] →
-to_float(7) → Normalize(1) → Batcher(0)`（与 Cedar 在 SimCLRv2 上选中的计划同序），四种组织：
-L-U / L-F = local 三独立阶段 / 一个融合阶段（真实 `InProcess*PipeVariant`）；
-R-U / R-F = remote Ray 三 actor / 一个融合 actor（真实 `Ray*PipeVariant`，R-U 的段间结果经 driver
-转发，与 runtime 相同）。种子按 (record_id, op) 绑定，四组输出**逐位相同**
-（`max_abs_diff = 0.0`）；输入是从真实流水线捕获的 400 条进入 B 前的记录（实测 59,944 B/条）。
-数据与完整说明：`outputs/simclrv2_fusion_offload_mechanism_20260923/README.md`。
+**实验 A（串行服务时间，单 batch 在飞；主测量 766/774 batches×2 轮，最快组 30.0 s）**，
+ms/source-record（`其他开销 = 每批端到端 − 该批成员墙钟之和`）：
 
-**实验 A（串行服务时间，单 batch 在飞，766 batches/组，最快组 30.0 s）**，ms/记录：
-
-| 配置 | 计算 B | H | J | 计算合计 | 交接/框架余项 | 总计 |
+| 配置 | 计算 B | H | J | 计算合计 | 其他开销 | 总时间（2 轮） |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| L-U | 2.4200 | 0.0115 | 0.1110 | 2.5425 | 8.0198 | **10.5623** |
-| L-F | 2.4373 | 0.0160 | 0.1114 | 2.5647 | 8.1312 | **10.6959** |
-| R-U | 3.5540 | 0.0312 | 0.2959 | 3.8811 | 27.9639 | **31.8451** |
-| R-F | 2.7290 | 0.0218 | 0.1550 | 2.9058 | 14.5826 | **17.4884** |
+| L-U | 9.7216 | 0.0461 | 0.4440 | 10.2117 | 0.3919 | **10.6036 ± 0.058** |
+| L-F | 9.7220 | 0.0642 | 0.4496 | 10.2359 | 0.4374 | **10.6732 ± 0.032** |
+| R-U | 14.0654 | 0.1270 | 1.1748 | 15.3671 | 16.3502 | **31.7173 ± 0.181** |
+| R-F | 10.8831 | 0.0867 | 0.6239 | 11.5936 | 5.6397 | **17.2334 ± 0.361** |
 
-U/F 保留比例（fused/unfused）：local 计算 1.0088 / 余项 1.0139 / 总时间 1.0127；
-Ray 计算 0.7487 / 余项 0.5215 / 总时间 **0.5492**。
-两轮独立 repeat（766/774 batches，`service_summary_repeats.csv`）的总时间：
-L-U 10.6036 ± 0.0584、L-F 10.6732 ± 0.0321、R-U 31.7173 ± 0.1806、
-R-F 17.2334 ± 0.3607 ms/record（组内跨轮偏差 ≤2.1%）。
+U/F 保留比例：local 计算 1.0024 / 其他 1.1160 / 总 1.0066；Ray 计算 0.7544 / 其他 0.3449 /
+总 **0.5433**。控制（3 轮交错顺序 / 3 轮同核 / 单独运行）总时间：L-U 10.53/10.57、L-F 10.53/10.47、
+R-U 35.08/36.23/29.7、R-F 19.60/18.47/15.4 ms/record —— 差异稳定存在，不是顺序或 CPU 绑定伪影。
 
-**Cedar 模型复算**（原实现导出，`cedar_cost_breakdown.json`）：Q0 = 22.9795 ms/记录；
-f_i（B/H/J）= 0.2621/0.0047/0.2915，基础成本 6.0228/0.1070/6.6984；
-RAY 的 total_speedup = 1.661/1.184/1.590 ≥ Amdahl 阈值 1.3552/1.0047/1.4114 →
-**三个算子全部 clip 到 0**（SMP 同样：1.693/1.120/2.148）；`rho = 0.2500`
-（IO_base 12.828 / IO_fused 3.207 MB/记录）。于是块成本 L-U 12.8282 → L-F 3.2070（模型比 0.2500），
-而 **R-U 与 R-F 都是 0（0/0 → N/A）**，整计划成本 8.4753 vs 8.4753（比 1.0000）。
+**成员计算差异的排查**（`operator_timing.csv` + 诊断探针）：逐事件记录显示四配置输入
+shape/dtype/stride/contiguity 完全相同、事件数各 9,096 无重复、CPU 时间≈墙钟时间；
+同核控制不变（15.37→15.31）；成对交错微基准给出包装开销 <0.1 ms/次（种子设置 +0.088/0.058/0.100）；
+80 ms 空闲间隔成对探针 0.99×；常驻 vs 新建输入张量 1.00×；单独运行 R-U/R-F 比例不变。
+**结论**：R-U 成员时间系统性高于 R-F（B 14.07 vs 10.88）这一事实稳定，但**剩余原因仍未确定**
+（候选为 actor 进程级执行上下文/分配器与缓存状态、或节点功耗-频率耦合），需要硬件计数器级测量；
+**不能**据此写成"融合减少了计算"。
 
-**实验 B（完整流水线，fixed plan，80,000 条/轮 ×3 轮 round-robin）**，rec/s：
+**交接可拆到什么程度**：同一次执行里，客户端直接计时（ms/sample）：R-U 每阶段
+submit 0.92–1.03、get 0.49–0.58（3 阶段）；R-F submit 1.04–1.06、get 0.54–0.57。
+get 窗口**包含 actor 内计算**，不能与 compute 相加；`get − compute` 才是交接部分。
+其余"其他开销"（R-U 16.35 ms/record 中约 12 ms）发生在 driver 侧组批/调度/future 处理，
+运行时无更细计时，不做拆分。**"其他开销"不等于网络时间。**
 
-| 配置 | W=1 | W=64 | 实测 Ray actor |
-| --- | ---: | ---: | --- |
-| L-U | 73.80 ± 0.33 | 2296.74 ± 21.43 | 0 |
-| L-F | 73.80 ± 0.51 | 2343.59 ± 29.57 | 0 |
-| R-U | 102.37 ± 1.98 | **不可用（3/3 失败）** | 3（W=1） |
-| R-F | 96.77 ± 1.67 | 1195.32 ± 35.42 | 1（W=1）/ 64（W=64） |
+**Cedar 模型复算与溯源**（`cedar_cost_breakdown.json`）：Q0 = 22.9795 ms/record；
+f_i(B/H/J)=0.2621/0.0047/0.2915；RAY total_speedup 1.661/1.184/1.590 ≥ Amdahl 阈值
+1.3552/1.0047/1.4114 → **三个成员全部 clip 到 0**（SMP 同样）；
+**真 IO 字节（目标顺序）** 357,216 → 119,072 B，**rho = 1/3**（声明顺序 3,810,304 → 952,576 B，
+rho = 1/5）；目标顺序成员成本 1.5057/0.0089/0.5582 → 合计 2.0728，融合块 0.6909；
+整计划 L-U/L-F/R-U/R-F = 10.5481/9.1662/8.4753/8.4753（R-U 与 R-F 的块成本都是 0/0 → **N/A**）。
+函数级逐字节比对（对首版 commit `f062305` 与 `optimizer.py.orig`）：`_calculate_cost_fused`
+与后端枚举函数（`_offload_and_fuse`/`_local_fusion`/`_fuse_local_smp`/`_fuse_tf`/`_enumerate_fusions`）
+**全部原生未改**，且**不区分后端、也从不枚举普通 INPROCESS 融合**；`calculate_cost`
+（materialized fused node 分支、多组 fused_pipes）与 `_calculate_pipe_cost`（INPROCESS 早退）
+是后来加入的（Amdahl 反演与 clip 阈值未改）。因此 **L-U / R-U / R-F 走原生路径，
+L-F 属于"公式可应用于扩展计划"**——原版 Cedar 不会用该折扣去选择本地融合。
 
-**结论（含明确不支持的部分）**
+**实验 B（完整流水线 fixed plan，80,000 条/轮 ×3 轮）**，rec/s：L-U 73.80±0.33 / 2296.74±21.43、
+L-F 73.80±0.51 / 2343.59±29.57、R-U 102.37±1.98 / **W=64 N/A（3/3 失败）**、
+R-F 96.77±1.67 / 1195.32±35.42。R-U@W=64 需要 64×3=192 个 Ray CPU 请求（actor `num_cpus=1`）
+超过远端 128 CPU，超时提高到 900 s 仍失败，保持 N/A，不用降 W 或加资源的结果替代。
+**A 的倒数不能当 B 的吞吐预测**（R-U 在 A 为 31.7 ms/record，在 B 的 W=1 实测 102.37 rec/s）。
 
-1. **融合省的主要是交接，不是计算**：Ray 上 U→F 的总服务时间 0.549×，其中成员计算只到 0.749×、
-   余项到 0.522×。把交接并进"整块折扣"与实测不是同一件事。
-2. **Cedar 在 Ray 上无法区分 U/F**：三个算子都被 Amdahl 反演 clip 到 0，块成本 0/0；
-   模型给 R-U 与 R-F 完全相同的成本（8.4753），实测相差 1.82×。比例必须标 N/A，
-   并单独展示"实测仍有计算与交接"。
-3. **local 上 `rho = 0.25` 不成立**：U/F 实测差只有 1%（A 1.013×；B 的 W=1 1.000×、W=64 1.020×），
-   因为本地没有跨进程交接可省；折扣只在融合真的移除后端交接时才有物理对应物。
-4. **W=64 排序反转**：local 融合 2343.6 vs 单 actor Ray 融合 1195.3（1.96×），
-   而模型认为 Ray 更好（9.1662 vs 8.4753）——与 4.6 的"SMP/Ray 边界被低估"一致。
-5. **不可外推**：A 是串行服务时间（R-U 31.85 ms/记录），B 有重叠（R-U@W=1 实测 102 rec/s），
-   A 的倒数不能当 B 的预测；B 的余项也不能解释为纯网络时间。
-6. **限制**：R-U@W=64 在原生 runtime 下需要 64×3 = 192 个 Ray CPU 请求（actor 每个 `num_cpus=1`），
-   超过远端 128 CPU，3/3 失败（`Multiprocess dataset worker exited during startup`），
-   actor-ready 超时提到 900 s 仍失败；因此 W=64 的融合效应只在 local 与单 actor Ray 上验证。
+**结论分三类**：
+
+1. **直接支持"计算与交接不能统一折扣"**：Ray 上 U→F 总时间 0.5433× 而计算/其他分别
+   0.7544×/0.3449×；模型把 RAY 卸载块 clip 到 0，使 R-U 与 R-F 块成本相同（N/A）、整计划同为
+   8.4753，而实测相差 1.84×；local 上实测 U/F 差 0.7% 而模型折扣为 0.3333×；
+   交接本身可直接测（submit 可加、get 含计算）且占总时间 33–52%。
+2. **只说明预测失准**：B 的 W=64 上 local 融合 2343.6 vs 单 actor Ray 融合 1195.3 而模型偏好 Ray
+   （9.1662 vs 8.4753），但该对比缺少 R-U@W=64 且资源形不同；声明顺序与目标顺序的 IO/成本差异
+   （rho 1/5 vs 1/3）也只是模型行为。
+3. **仍未确定**：R-U 与 R-F 成员计算差的剩余原因（见上）；"其他开销"中 driver 侧约 12 ms/record
+   的构成；以及"融合是否真的改变了算子计算"本身——现有测量无法把真实计算变化与执行上下文差异分离。
 
 ## 5. 论文图件与底层数据
 
@@ -1953,9 +1969,9 @@ RAY 的 total_speedup = 1.661/1.184/1.590 ≥ Amdahl 阈值 1.3552/1.0047/1.4114
    （reorder 枚举 > 2 h），只有 DP 可行。
 7. **Cedar 对卸载块的定价在 Ray 上完全失真**（4.7，机制实验）：B/H/J 三个算子的 RAY/SMP
    卸载都被 Amdahl 反演 clip 到 0，块成本 0/0（N/A），模型给 R-U 与 R-F 相同的 8.4753，
-   实测串行服务时间相差 **1.82×**（31.85 vs 17.49 ms/record）；融合省下的是交接
-   （余项 0.522×）而不是计算（0.749×）。local 上 `rho = 0.25` 的折扣也不成立
-   （U/F 实测差 ~1%），因为本地没有跨进程交接可省。
+   实测串行服务时间相差 **1.84×**（31.72 vs 17.23 ms/record）；其中计算 0.754×、
+   其他开销 0.345×——一个标量折扣无法同时表示两者。local 上模型折扣 1/3 而实测 U/F 差 0.7%。
+   （v1 的 31.85/17.49/0.522 等数字因单位口径错误已作废。）
 
 **未决问题（按优先级）**
 
@@ -1978,6 +1994,9 @@ RAY 的 total_speedup = 1.661/1.184/1.590 ≥ Amdahl 阈值 1.3552/1.0047/1.4114
 8. **卸载块的"零成本"是模型缺陷的集中体现**（4.7）：Amdahl 反演把 RAY/SMP 卸载块直接 clip 到 0，
    使模型无法区分"三阶段 Ray"和"融合 Ray"，也无法表示融合省下的交接量。需要把
    "卸载后的剩余计算 + 每段交接"显式建模（与 4.6 的 SMP 低估是同一个根因）。
+9. **成员计算差的原因未定**（4.7）：R-U 的成员时间系统性高于 R-F（B 14.07 vs 10.88 ms/record，
+   三轮交错稳定），已排除输入表示、CPU 绑定/HT、顺序、事件计数、包装开销、空闲间隔与张量新鲜度；
+   剩余候选是 actor 进程级执行上下文或节点功耗-频率耦合，需要硬件计数器级测量。
 
 ## 7. 复现命令速查
 
@@ -2001,7 +2020,15 @@ python -u scripts/staged_ablation_report.py outputs/staged_ablation_20260922
 # §3.1 机制实验（§4.7）：B/H/J 的四种组织 + 串行服务时间 + Cedar 中间量
 RUN=outputs/simclrv2_fusion_offload_mechanism_20260923 \
   bash scripts/run_block_mechanism_20260923.sh
+# v1→v2 口径修正（单位）+ 控制/诊断 + 图数据 + 仓库同步
+python -u scripts/reaggregate_block_service.py --run-dir $RUN --include-subdirs
+python -u scripts/block_service_harness.py service --run-dir $RUN/control_interleaved \
+    --configs L-U L-F R-U R-F --rounds 3 --warmup-batches 60 --min-batches 120 \
+    --min-seconds 30 --cpu 12 --remote-cpu-base 8
+python -u scripts/block_wrapper_overhead.py --run-dir $RUN --cpu 12 --calls 250
+python -u scripts/block_cpu_topology_probe.py --cpus 8 9 10 12 --out $RUN/cpu_topology.json
 python -u scripts/block_mechanism_figure_data.py --run-dir outputs/simclrv2_fusion_offload_mechanism_20260923
+python -u scripts/sync_block_mechanism_artifacts.py --run-dir $RUN --dest docs/mechanism_20260923
 python -u tmp_analysis/reordered_operator_table.py
 python -u tmp_analysis/probe_ray_local_pricing.py wikitext103 \
     outputs/ultimate_new_workloads_20260922/wikitext103/profiles/shared.yaml \

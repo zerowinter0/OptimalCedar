@@ -94,17 +94,34 @@ class TimedOp:
 
     ``events`` is filled inside whichever process executes the callable (the
     harness process for local stages, the Ray actor for remote ones); every
-    entry is ``(record_key, ns)`` so per-batch attribution is exact.
+    entry is ``(record_key, wall_ns, cpu_ns, meta)`` where ``meta`` describes
+    the input of that single call (shape/dtype/contiguity/stride/bytes), so
+    per-batch attribution and per-input-representation checks are exact.
     """
 
     def __init__(self, name: str, fn: Any) -> None:
         self.name = name
         self.fn = fn
         self.record_timings = True
-        self.events: List[Tuple[int, int]] = []
+        self.events: List[Tuple[int, int, int, Dict[str, Any]]] = []
         self.bytes_in: List[int] = []
         self.bytes_out: List[int] = []
         self.measure_bytes = False
+
+    @staticmethod
+    def describe(data: Any) -> Dict[str, Any]:
+        info: Dict[str, Any] = {"type": type(data).__name__}
+        if isinstance(data, torch.Tensor):
+            info.update(
+                {
+                    "shape": list(data.shape),
+                    "dtype": str(data.dtype),
+                    "contiguous": bool(data.is_contiguous()),
+                    "strides": list(data.stride()),
+                    "element_size": int(data.element_size()),
+                }
+            )
+        return info
 
     def __call__(self, data: Any) -> Any:
         record_id, _ = current_record()
@@ -112,17 +129,17 @@ class TimedOp:
         torch.manual_seed(seed)
         random.seed(seed)
         np.random.seed(seed % (2**32 - 1))
-        if self.measure_bytes:
-            size_in = payload_bytes(data)
         if self.record_timings:
-            started = time.perf_counter_ns()
+            wall_started = time.perf_counter_ns()
+            cpu_started = time.process_time_ns()
             out = self.fn(data)
-            elapsed = time.perf_counter_ns() - started
-            self.events.append((record_id, elapsed))
+            wall_ns = time.perf_counter_ns() - wall_started
+            cpu_ns = time.process_time_ns() - cpu_started
+            self.events.append((record_id, wall_ns, cpu_ns, self.describe(data)))
         else:
             out = self.fn(data)
         if self.measure_bytes:
-            self.bytes_in.append(size_in or 0)
+            self.bytes_in.append(payload_bytes(data) or 0)
             self.bytes_out.append(payload_bytes(out) or 0)
         return out
 
@@ -249,6 +266,21 @@ def _ray_actor_classes():
 
     @ray.remote(num_cpus=0)
     class TimedRayMapperActor(RayActor):
+        @staticmethod
+        def _describe(data: Any) -> Dict[str, Any]:
+            info: Dict[str, Any] = {"type": type(data).__name__}
+            if isinstance(data, torch.Tensor):
+                info.update(
+                    {
+                        "shape": list(data.shape),
+                        "dtype": str(data.dtype),
+                        "contiguous": bool(data.is_contiguous()),
+                        "strides": list(data.stride()),
+                        "element_size": int(data.element_size()),
+                    }
+                )
+            return info
+
         def __init__(
             self,
             name: str,
@@ -265,7 +297,7 @@ def _ray_actor_classes():
             self.seed_modulus = seed_modulus
             self.seed_offset = seed_offset
             self.next_id = 0
-            self.events: List[Tuple[int, int, int]] = []
+            self.events: List[Tuple[int, int, int, int, Dict[str, Any]]] = []
             self.record_timings = True
 
         def process(self, data: Any) -> Any:
@@ -280,10 +312,18 @@ def _ray_actor_classes():
                 random.seed(seed)
                 np.random.seed(seed % (2**32 - 1))
                 if self.record_timings:
-                    started = time.perf_counter_ns()
+                    wall_started = time.perf_counter_ns()
+                    cpu_started = time.process_time_ns()
                     value = self.fn(item)
+                    meta = self._describe(item)
                     self.events.append(
-                        (key, 0, time.perf_counter_ns() - started)
+                        (
+                            key,
+                            0,
+                            time.perf_counter_ns() - wall_started,
+                            time.process_time_ns() - cpu_started,
+                            meta,
+                        )
                     )
                 else:
                     value = self.fn(item)
@@ -311,6 +351,21 @@ def _ray_actor_classes():
 
     @ray.remote(num_cpus=0)
     class TimedRayFusedActor(RayActor):
+        @staticmethod
+        def _describe(data: Any) -> Dict[str, Any]:
+            info: Dict[str, Any] = {"type": type(data).__name__}
+            if isinstance(data, torch.Tensor):
+                info.update(
+                    {
+                        "shape": list(data.shape),
+                        "dtype": str(data.dtype),
+                        "contiguous": bool(data.is_contiguous()),
+                        "strides": list(data.stride()),
+                        "element_size": int(data.element_size()),
+                    }
+                )
+            return info
+
         def __init__(
             self,
             name: str,
@@ -325,7 +380,7 @@ def _ray_actor_classes():
             self.seed_modulus = seed_modulus
             self.seed_offsets = seed_offsets
             self.next_id = 0
-            self.events: List[Tuple[int, int, int]] = []
+            self.events: List[Tuple[int, int, int, int, Dict[str, Any]]] = []
             self.record_timings = True
 
         def process(self, data: Any) -> Any:
@@ -342,10 +397,18 @@ def _ray_actor_classes():
                     random.seed(seed)
                     np.random.seed(seed % (2**32 - 1))
                     if self.record_timings:
-                        started = time.perf_counter_ns()
+                        wall_started = time.perf_counter_ns()
+                        cpu_started = time.process_time_ns()
                         value = fn(value)
+                        meta = self._describe(value)
                         self.events.append(
-                            (key, index, time.perf_counter_ns() - started)
+                            (
+                                key,
+                                index,
+                                time.perf_counter_ns() - wall_started,
+                                time.process_time_ns() - cpu_started,
+                                meta,
+                            )
                         )
                     else:
                         value = fn(value)
@@ -570,19 +633,37 @@ def cmd_service(args: argparse.Namespace) -> int:
                     service._backend_compute_sum_ns = 0.0
                     service._backend_compute_sum_sq_ns = 0.0
 
-        def compute_by_record(self) -> Dict[int, Dict[str, int]]:
-            """Per-record member compute times (ns) collected in the workers."""
-            table: Dict[int, Dict[str, int]] = {}
+        def timing_rows(self) -> List[Dict[str, Any]]:
+            """One row per (record, member): wall/cpu time plus input metadata."""
+            rows: List[Dict[str, Any]] = []
             if self.remote:
                 for index, actor in enumerate(self.actors):
                     names = self.actor_ops[index]
-                    for key, op_index, ns in ray.get(actor.take_events.remote()):
-                        table.setdefault(key, {})[names[op_index]] = ns
-                return table
+                    for key, op_index, wall_ns, cpu_ns, meta in ray.get(
+                        actor.take_events.remote()
+                    ):
+                        rows.append(
+                            {
+                                "record_key": key,
+                                "operator": names[op_index],
+                                "wall_ms": wall_ns / 1e6,
+                                "cpu_ms": cpu_ns / 1e6,
+                                **meta,
+                            }
+                        )
+                return rows
             for op in self.ops:
-                for key, ns in op.events:
-                    table.setdefault(key, {})[op.name] = ns
-            return table
+                for key, wall_ns, cpu_ns, meta in op.events:
+                    rows.append(
+                        {
+                            "record_key": key,
+                            "operator": op.name,
+                            "wall_ms": wall_ns / 1e6,
+                            "cpu_ms": cpu_ns / 1e6,
+                            **meta,
+                        }
+                    )
+            return rows
 
         def member_names(self) -> List[str]:
             if self.remote:
@@ -676,10 +757,8 @@ def cmd_service(args: argparse.Namespace) -> int:
             flush=True,
         )
 
-        results: Dict[str, Any] = {}
-        rows: List[Dict[str, Any]] = []
-        for config, runner in runners.items():
-            instrumented = args.instrument == "full"
+        instrumented = args.instrument == "full"
+        for runner in runners.values():
             for op in runner.ops:
                 op.record_timings = instrumented
             if runner.remote:
@@ -687,79 +766,168 @@ def cmd_service(args: argparse.Namespace) -> int:
                     actor.set_record_timings.remote(instrumented)
                     for actor in runner.actors
                 ])
-            runner.reset()
-            run_batches(runner, args.warmup_batches, collect=False)
-            runner.reset()
-            # Keep the timing window free of garbage-collection pauses; the
-            # same treatment is applied to every configuration.
-            gc.collect()
-            gc.freeze()
-            gc.disable()
-            elapsed_list, total_records = run_batches(
-                runner, measured_batches, collect=True
-            )
-            gc.enable()
-            compute_by_record = runner.compute_by_record()
-            member_names = runner.member_names()
-            per_batch: List[Dict[str, Any]] = []
-            for index, elapsed_ms in enumerate(elapsed_list):
-                _, keys = batch_inputs(index)
-                row = {
-                    "config": config,
-                    "repeat": args.repeat,
-                    "batch_id": index,
-                    "source_records": batch_size,
-                    "elapsed_ms": elapsed_ms,
-                }
-                for name in member_names:
-                    values = [
-                        compute_by_record.get(key, {}).get(name, 0) / 1e6
-                        for key in keys
-                    ]
-                    row[f"compute_{name}_ms"] = statistics.fmean(values)
-                row["compute_sum_ms"] = sum(
-                    row[f"compute_{name}_ms"] for name in member_names
+
+        results: Dict[str, Any] = {}
+        rows: List[Dict[str, Any]] = []
+        timing_rows: List[Dict[str, Any]] = []
+        run_order: List[Dict[str, Any]] = []
+        config_names = list(runners)
+        for round_index in range(args.rounds):
+            order = config_names[round_index % len(config_names):] + \
+                config_names[: round_index % len(config_names)]
+            run_order.append({"round": round_index + 1, "order": list(order)})
+            for position, config in enumerate(order):
+                runner = runners[config]
+                runner.reset()
+                run_batches(runner, args.warmup_batches, collect=False)
+                runner.reset()
+                # Keep the timing window free of garbage-collection pauses;
+                # the same treatment is applied to every configuration.
+                gc.collect()
+                gc.freeze()
+                gc.disable()
+                elapsed_list, total_records = run_batches(
+                    runner, measured_batches, collect=True
                 )
-                row["noncompute_residual_ms"] = elapsed_ms - row["compute_sum_ms"]
-                per_batch.append(row)
-            rows.extend(per_batch)
-            results[config] = {
-                "pilot_ms_per_batch": pilot[config],
-                "measured_batches": len(elapsed_list),
-                "measured_records": total_records,
-                "elapsed_ms_mean": statistics.fmean(elapsed_list),
-                "elapsed_ms_stdev": (
-                    statistics.stdev(elapsed_list) if len(elapsed_list) > 1 else 0.0
-                ),
-                "compute_sum_ms_mean": statistics.fmean(
-                    [r["compute_sum_ms"] for r in per_batch]
-                ),
-                "residual_ms_mean": statistics.fmean(
-                    [r["noncompute_residual_ms"] for r in per_batch]
-                ),
-                "actors": len(runner.actors),
-                "actor_cpus": getattr(runner, "pinned_cpus", []),
-                "actor_locations": getattr(runner, "actor_locations", []),
-                "path_timing": runner.path_stats(),
-            }
-            print(
-                f"RESULT {config}: batches={len(elapsed_list)} "
-                f"elapsed={results[config]['elapsed_ms_mean']:.3f} ms "
-                f"compute={results[config]['compute_sum_ms_mean']:.3f} ms "
-                f"residual={results[config]['residual_ms_mean']:.3f} ms",
-                flush=True,
-            )
+                gc.enable()
+                events = runner.timing_rows()
+                member_names = runner.member_names()
+                # Batch-level sums first: one normalisation step only.
+                per_batch_compute = {name: [0.0] * len(elapsed_list)
+                                     for name in member_names}
+                per_batch_cpu = {name: [0.0] * len(elapsed_list)
+                                 for name in member_names}
+                for event in events:
+                    record_key = event["record_key"]
+                    batch_index = record_key // batch_size
+                    if batch_index >= len(elapsed_list):
+                        continue
+                    name = event["operator"]
+                    per_batch_compute[name][batch_index] += event["wall_ms"]
+                    per_batch_cpu[name][batch_index] += event["cpu_ms"]
+                    timing_rows.append(
+                        {
+                            "config": config,
+                            "round": round_index + 1,
+                            "order_index": position,
+                            "batch_id": batch_index,
+                            "record_key": record_key,
+                            **event,
+                        }
+                    )
+                per_batch: List[Dict[str, Any]] = []
+                for index, elapsed_ms in enumerate(elapsed_list):
+                    row: Dict[str, Any] = {
+                        "config": config,
+                        "round": round_index + 1,
+                        "order_index": position,
+                        "batch_id": index,
+                        "source_records": batch_size,
+                        "elapsed_ms_per_batch": elapsed_ms,
+                    }
+                    for name in member_names:
+                        row[f"compute_{name}_ms_per_batch"] = (
+                            per_batch_compute[name][index]
+                        )
+                        row[f"cpu_{name}_ms_per_batch"] = per_batch_cpu[name][index]
+                    compute_total = sum(
+                        per_batch_compute[name][index] for name in member_names
+                    )
+                    cpu_total = sum(
+                        per_batch_cpu[name][index] for name in member_names
+                    )
+                    row["compute_sum_ms_per_batch"] = compute_total
+                    row["cpu_sum_ms_per_batch"] = cpu_total
+                    row["other_overhead_ms_per_batch"] = elapsed_ms - compute_total
+                    for key in (
+                        "elapsed_ms_per_batch",
+                        "compute_sum_ms_per_batch",
+                        "cpu_sum_ms_per_batch",
+                        "other_overhead_ms_per_batch",
+                    ):
+                        row[key.replace("_per_batch", "_per_record")] = (
+                            row[key] / batch_size
+                        )
+                    for name in member_names:
+                        row[f"compute_{name}_ms_per_record"] = (
+                            row[f"compute_{name}_ms_per_batch"] / batch_size
+                        )
+                    # Invariant: compute + other overhead == end-to-end time.
+                    assert abs(
+                        row["compute_sum_ms_per_batch"]
+                        + row["other_overhead_ms_per_batch"]
+                        - row["elapsed_ms_per_batch"]
+                    ) < 1e-9
+                    per_batch.append(row)
+                rows.extend(per_batch)
+                key = f"{config}_r{round_index + 1}"
+                results[key] = {
+                    "config": config,
+                    "round": round_index + 1,
+                    "order_index": position,
+                    "pilot_ms_per_batch": pilot.get(config),
+                    "measured_batches": len(elapsed_list),
+                    "measured_records": total_records,
+                    "elapsed_ms_per_batch_mean": statistics.fmean(elapsed_list),
+                    "elapsed_ms_per_batch_stdev": (
+                        statistics.stdev(elapsed_list)
+                        if len(elapsed_list) > 1 else 0.0
+                    ),
+                    "compute_sum_ms_per_batch_mean": statistics.fmean(
+                        [r["compute_sum_ms_per_batch"] for r in per_batch]
+                    ),
+                    "cpu_sum_ms_per_batch_mean": statistics.fmean(
+                        [r["cpu_sum_ms_per_batch"] for r in per_batch]
+                    ),
+                    "other_overhead_ms_per_batch_mean": statistics.fmean(
+                        [r["other_overhead_ms_per_batch"] for r in per_batch]
+                    ),
+                    "actors": len(runner.actors),
+                    "actor_cpus": getattr(runner, "pinned_cpus", []),
+                    "actor_locations": getattr(runner, "actor_locations", []),
+                    "path_timing": runner.path_stats(),
+                }
+                print(
+                    f"RESULT {key}: batches={len(elapsed_list)} "
+                    f"elapsed={results[key]['elapsed_ms_per_batch_mean']:.3f} "
+                    f"ms/batch compute="
+                    f"{results[key]['compute_sum_ms_per_batch_mean']:.3f} "
+                    f"other="
+                    f"{results[key]['other_overhead_ms_per_batch_mean']:.3f}",
+                    flush=True,
+                )
     finally:
         for runner in runners.values():
             runner.shutdown()
         ray.shutdown()
 
     # ---- verification across configurations -----------------------------
-    _write_service_csvs(run_dir, rows, results, verification, args)
+    _write_service_csvs(
+        run_dir, rows, results, verification, args, timing_rows, run_order
+    )
     return 0
 
 
-def _write_service_csvs(run_dir: Path, rows, results, verification, args) -> None:
+def _quantile(values: List[float], q: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, int(q * len(ordered)))]
+
+
+def _mean_of(rows: List[Dict[str, Any]], column: str) -> float:
+    values = [float(row[column]) for row in rows if column in row]
+    return statistics.fmean(values) if values else 0.0
+
+
+def _stdev_of(rows: List[Dict[str, Any]], column: str) -> float:
+    values = [float(row[column]) for row in rows if column in row]
+    return statistics.stdev(values) if len(values) > 1 else 0.0
+
+
+def _write_service_csvs(
+    run_dir: Path, rows, results, verification, args, timing_rows, run_order
+) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     raw_path = run_dir / "service_raw.csv"
     fieldnames = list(rows[0].keys()) if rows else ["config", "batch_id"]
@@ -770,40 +938,163 @@ def _write_service_csvs(run_dir: Path, rows, results, verification, args) -> Non
             writer.writerow(row)
 
     summary_path = run_dir / "service_summary.csv"
-    fields = [
-        "config", "repeat", "elapsed_ms_mean", "elapsed_ms_stdev",
-        "compute_sum_ms_mean", "residual_ms_mean", "measured_batches",
-        "measured_records", "actors", "pilot_ms_per_batch",
-    ]
-    compute_fields = [f"compute_{name}_ms_mean" for name in BLOCK_NAMES.values()]
-    fields = fields[:4] + compute_fields + fields[4:]
+    member_names = list(BLOCK_NAMES.values())
+    fields = (
+        ["config", "round", "order_index", "repeat", "measured_batches",
+         "measured_records", "source_records", "actors"]
+        + [f"compute_{name}_ms_per_record_mean" for name in member_names]
+        + [
+            "compute_sum_ms_per_record_mean",
+            "compute_sum_ms_per_record_stdev",
+            "other_overhead_ms_per_record_mean",
+            "other_overhead_ms_per_record_stdev",
+            "elapsed_ms_per_record_mean",
+            "elapsed_ms_per_record_stdev",
+            "cpu_sum_ms_per_record_mean",
+            "elapsed_ms_per_batch_mean",
+            "elapsed_ms_per_batch_stdev",
+            "elapsed_ms_per_batch_p50",
+            "elapsed_ms_per_batch_p90",
+            "compute_sum_ms_per_batch_mean",
+            "other_overhead_ms_per_batch_mean",
+            "identity_error_ms_per_batch_max",
+        ]
+    )
     with summary_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        for config, payload in results.items():
-            if "elapsed_ms_mean" not in payload:
+        for key, payload in results.items():
+            if "elapsed_ms_per_batch_mean" not in payload:
                 continue
-            compute_means = {}
-            for name in BLOCK_NAMES.values():
-                values = [r[f"compute_{name}_ms"] for r in rows if r["config"] == config]
-                compute_means[f"compute_{name}_ms_mean"] = (
-                    statistics.fmean(values) if values else 0.0
+            config = payload["config"]
+            round_index = payload["round"]
+            subset = [
+                r for r in rows
+                if r["config"] == config and r["round"] == round_index
+            ]
+            compute_means = {
+                f"compute_{name}_ms_per_record_mean": _mean_of(
+                    subset, f"compute_{name}_ms_per_record"
                 )
+                for name in member_names
+            }
+            elapsed_batches = [r["elapsed_ms_per_batch"] for r in subset]
+            compute_batches = [r["compute_sum_ms_per_batch"] for r in subset]
+            other_batches = [r["other_overhead_ms_per_batch"] for r in subset]
             writer.writerow(
                 {
                     "config": config,
+                    "round": round_index,
+                    "order_index": payload["order_index"],
                     "repeat": args.repeat,
-                    "elapsed_ms_mean": payload["elapsed_ms_mean"],
-                    "elapsed_ms_stdev": payload["elapsed_ms_stdev"],
-                    **compute_means,
-                    "compute_sum_ms_mean": payload["compute_sum_ms_mean"],
-                    "residual_ms_mean": payload["residual_ms_mean"],
                     "measured_batches": payload["measured_batches"],
                     "measured_records": payload["measured_records"],
+                    "source_records": args.batch_size,
                     "actors": payload["actors"],
-                    "pilot_ms_per_batch": payload["pilot_ms_per_batch"],
+                    **compute_means,
+                    "compute_sum_ms_per_record_mean": _mean_of(
+                        subset, "compute_sum_ms_per_record"
+                    ),
+                    "compute_sum_ms_per_record_stdev": _stdev_of(
+                        subset, "compute_sum_ms_per_record"
+                    ),
+                    "other_overhead_ms_per_record_mean": _mean_of(
+                        subset, "other_overhead_ms_per_record"
+                    ),
+                    "other_overhead_ms_per_record_stdev": _stdev_of(
+                        subset, "other_overhead_ms_per_record"
+                    ),
+                    "elapsed_ms_per_record_mean": _mean_of(
+                        subset, "elapsed_ms_per_record"
+                    ),
+                    "elapsed_ms_per_record_stdev": _stdev_of(
+                        subset, "elapsed_ms_per_record"
+                    ),
+                    "cpu_sum_ms_per_record_mean": _mean_of(
+                        subset, "cpu_sum_ms_per_record"
+                    ),
+                    "elapsed_ms_per_batch_mean": statistics.fmean(elapsed_batches),
+                    "elapsed_ms_per_batch_stdev": (
+                        statistics.stdev(elapsed_batches)
+                        if len(elapsed_batches) > 1 else 0.0
+                    ),
+                    "elapsed_ms_per_batch_p50": _quantile(elapsed_batches, 0.5),
+                    "elapsed_ms_per_batch_p90": _quantile(elapsed_batches, 0.9),
+                    "compute_sum_ms_per_batch_mean": statistics.fmean(
+                        compute_batches
+                    ),
+                    "other_overhead_ms_per_batch_mean": statistics.fmean(
+                        other_batches
+                    ),
+                    "identity_error_ms_per_batch_max": max(
+                        abs(c + o - e)
+                        for c, o, e in zip(
+                            compute_batches, other_batches, elapsed_batches
+                        )
+                    ),
                 }
             )
+
+    # Cross-round summary: mean/stdev over the per-round means.
+    cross_path = run_dir / "service_summary_repeats.csv"
+    with cross_path.open("w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            ["config", "rounds", "elapsed_ms_per_record_mean",
+             "elapsed_ms_per_record_stdev", "compute_ms_per_record_mean",
+             "compute_ms_per_record_stdev", "other_overhead_ms_per_record_mean",
+             "other_overhead_ms_per_record_stdev"]
+        )
+        by_config: Dict[str, List[Dict[str, Any]]] = {}
+        for payload in results.values():
+            if "elapsed_ms_per_batch_mean" not in payload:
+                continue
+            by_config.setdefault(payload["config"], []).append(payload)
+        for config, payloads in by_config.items():
+            records = [p["measured_records"] for p in payloads]
+            totals = [
+                p["elapsed_ms_per_batch_mean"] * p["measured_batches"] / rec
+                for p, rec in zip(payloads, records)
+            ]
+            computes = [
+                p["compute_sum_ms_per_batch_mean"] * p["measured_batches"] / rec
+                for p, rec in zip(payloads, records)
+            ]
+            others = [
+                p["other_overhead_ms_per_batch_mean"] * p["measured_batches"] / rec
+                for p, rec in zip(payloads, records)
+            ]
+            writer.writerow(
+                [
+                    config,
+                    len(payloads),
+                    statistics.fmean(totals),
+                    statistics.stdev(totals) if len(totals) > 1 else 0.0,
+                    statistics.fmean(computes),
+                    statistics.stdev(computes) if len(computes) > 1 else 0.0,
+                    statistics.fmean(others),
+                    statistics.stdev(others) if len(others) > 1 else 0.0,
+                ]
+            )
+
+    timing_path = run_dir / "operator_timing.csv"
+    timing_fields = [
+        "config", "round", "order_index", "batch_id", "record_key", "operator",
+        "wall_ms", "cpu_ms", "type", "shape", "dtype", "contiguous", "strides",
+        "element_size",
+    ]
+    with timing_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=timing_fields,
+                                extrasaction="ignore")
+        writer.writeheader()
+        for row in timing_rows:
+            payload = dict(row)
+            if "shape" in payload and isinstance(payload["shape"], list):
+                payload["shape"] = "x".join(str(x) for x in payload["shape"])
+            if "strides" in payload and isinstance(payload["strides"], list):
+                payload["strides"] = "x".join(str(x) for x in payload["strides"])
+            writer.writerow(payload)
+
     (run_dir / "service_verification.json").write_text(
         json.dumps(verification, indent=2)
     )
@@ -816,6 +1107,9 @@ def _write_service_csvs(run_dir: Path, rows, results, verification, args) -> Non
                 "warmup_batches": args.warmup_batches,
                 "pilot_batches": args.pilot_batches,
                 "actor_warmup": args.actor_warmup,
+                "rounds": args.rounds,
+                "run_order": run_order,
+                "instrument": args.instrument,
                 "cpu_affinity": sorted(os.sched_getaffinity(0)),
                 "ray_ip": args.ray_ip,
                 "remote_cpu_base": args.remote_cpu_base,
@@ -825,7 +1119,17 @@ def _write_service_csvs(run_dir: Path, rows, results, verification, args) -> Non
                     "caller monotonic clock from before the first submit of the "
                     "batch until the last stage's result is materialised"
                 ),
-                "residual_definition": "elapsed - sum(member compute)",
+                "compute_definition": (
+                    "sum over the batch's records of the wall time measured "
+                    "directly around each member callable"
+                ),
+                "other_overhead_definition": (
+                    "per-batch end-to-end time minus the batch's summed member "
+                    "wall time; contains handoff/serialisation/scheduling and "
+                    "framework effects, not pure network time"
+                ),
+                "units": "ms per batch (source_records = batch_size) and ms per record",
+                "per_round_results": list(results.values()),
             },
             indent=2,
         )
@@ -850,6 +1154,10 @@ def build_parser() -> argparse.ArgumentParser:
     service.add_argument("--warmup-batches", type=int, default=120)
     service.add_argument("--min-batches", type=int, default=120)
     service.add_argument("--max-batches", type=int, default=0)
+    service.add_argument(
+        "--rounds", type=int, default=1,
+        help="number of measurement rounds; the config order rotates each round",
+    )
     service.add_argument("--min-seconds", type=float, default=30.0)
     service.add_argument("--actor-warmup", type=int, default=5)
     service.add_argument("--record-space", type=int, default=4000)

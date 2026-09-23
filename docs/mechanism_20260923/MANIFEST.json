@@ -1,0 +1,133 @@
+{
+  "run_dir": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923",
+  "copied_files": [
+    "README.md",
+    "run_manifest.json",
+    "service_raw.csv",
+    "service_summary.csv",
+    "service_summary_repeats.csv",
+    "service_meta.json",
+    "service_verification.json",
+    "operator_timing.columns.json",
+    "cedar_cost_breakdown.json",
+    "figure_data.json",
+    "figure_data.md",
+    "pipeline_results.csv",
+    "actor_probe_R-F_w1.json",
+    "actor_probe_R-F_w64.json",
+    "actor_probe_R-U_w1.json",
+    "actor_placement_check.json",
+    "cpu_topology.json",
+    "wrapper_overhead.json",
+    "burst_idle_probe_remote.json",
+    "burst_idle_probe_remote_gap80.json",
+    "burst_idle_probe_paired.json",
+    "tensor_state_probe.json",
+    "reaggregation_report.json",
+    "control_interleaved/service_summary.csv",
+    "control_interleaved/service_summary_repeats.csv",
+    "control_samecore/service_summary.csv",
+    "control_samecore/service_summary_repeats.csv",
+    "repeat2/service_summary.csv",
+    "repeat2/service_summary_repeats.csv",
+    "instrument_overhead_full/service_summary.csv",
+    "instrument_overhead_full/service_summary_repeats.csv",
+    "instrument_overhead_none/service_summary.csv",
+    "instrument_overhead_none/service_summary_repeats.csv",
+    "probe_ray_alone/service_summary.csv",
+    "probe_ray_alone/service_summary_repeats.csv"
+  ],
+  "copied_sizes": {
+    "README.md": 16113,
+    "run_manifest.json": 1002,
+    "service_raw.csv": 562607,
+    "service_summary.csv": 1819,
+    "service_summary_repeats.csv": 586,
+    "service_meta.json": 535,
+    "service_verification.json": 600,
+    "operator_timing.columns.json": 294,
+    "cedar_cost_breakdown.json": 23367,
+    "figure_data.json": 79469,
+    "figure_data.md": 1729,
+    "pipeline_results.csv": 6160,
+    "actor_probe_R-F_w1.json": 288,
+    "actor_probe_R-F_w64.json": 295,
+    "actor_probe_R-U_w1.json": 282,
+    "actor_placement_check.json": 468,
+    "cpu_topology.json": 1878,
+    "wrapper_overhead.json": 2576,
+    "burst_idle_probe_remote.json": 2023,
+    "burst_idle_probe_remote_gap80.json": 2035,
+    "burst_idle_probe_paired.json": 4462,
+    "tensor_state_probe.json": 264,
+    "reaggregation_report.json": 202,
+    "control_interleaved/service_summary.csv": 4419,
+    "control_interleaved/service_summary_repeats.csv": 685,
+    "control_samecore/service_summary.csv": 4430,
+    "control_samecore/service_summary_repeats.csv": 680,
+    "repeat2/service_summary.csv": 1823,
+    "repeat2/service_summary_repeats.csv": 589,
+    "instrument_overhead_full/service_summary.csv": 1185,
+    "instrument_overhead_full/service_summary_repeats.csv": 395,
+    "instrument_overhead_none/service_summary.csv": 994,
+    "instrument_overhead_none/service_summary_repeats.csv": 370,
+    "probe_ray_alone/service_summary.csv": 1712,
+    "probe_ray_alone/service_summary_repeats.csv": 425
+  },
+  "large_artifacts_kept_in_outputs": [
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/inputs/block_inputs.pt",
+      "size_bytes": 23918459,
+      "sha256": "8e0448d60698ef1ef99a735b808c53f255bab08870f94d112a70f225985c5faa"
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/control_interleaved/operator_timing.csv",
+      "size_bytes": 9940131,
+      "sha256": "73669f67d9ec2011b72d03f314e6b39ee46cb82ab83c4377dbe8671740dceaba",
+      "rows": 109152
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/control_samecore/operator_timing.csv",
+      "size_bytes": 10216772,
+      "sha256": "d5c5b738c93e437dad586784d49a1c59deb36d314e07f10dda4fb1f848159183",
+      "rows": 112176
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/control_interleaved/service_raw.csv",
+      "size_bytes": 2168634,
+      "sha256": "5122f3bff4473ab059934ba02610af19c0b2e0c84a419fc3af12839fa30c2c84",
+      "rows": 9096
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/control_samecore/service_raw.csv",
+      "size_bytes": 2228364,
+      "sha256": "193022875922bb7d7eb43423f7fb1dc4954ed7e79ee2ec53d7d9b7404057c61d",
+      "rows": 9348
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/repeat2/service_raw.csv",
+      "size_bytes": 567828,
+      "sha256": "2f40d088b2487a5949412fc1f5d0b6f9b29543d891096a595f1a7a952bb34c0d",
+      "rows": 3096
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/probe_ray_alone/service_raw.csv",
+      "size_bytes": 187831,
+      "sha256": "46d617ac2e0bd88754cc99eb2273fda847cde885c9da51b8eff76bcdfaa66ee1",
+      "rows": 800
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/instrument_overhead_full/service_raw.csv",
+      "size_bytes": 80127,
+      "sha256": "237d7117ade60b4899cdf3d3d0bc7719aa9df15f8b9fa66f3b1b3bc3ad308db6",
+      "rows": 436
+    },
+    {
+      "path": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/instrument_overhead_none/service_raw.csv",
+      "size_bytes": 47896,
+      "sha256": "c832e8e70260ff8b4366d159fac1d7ef3a6c398777546038f052096ad3da09e4",
+      "rows": 444
+    }
+  ],
+  "notes": "Large per-event/per-batch files stay under outputs/; this manifest carries their path, size, row count and sha256 for verification."
+}

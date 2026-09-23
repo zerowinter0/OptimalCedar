@@ -1,0 +1,22 @@
+{
+  "run_dir": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923",
+  "git_commit": "129fe21575a2543f0eb615cb61a4d07eec4103c7",
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "profile_sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+  "base_plan_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/plans/round1__optimizer.yaml",
+  "base_plan_sha256": "183b5d583655c2d99a2a9a579e717f17a8594093f403c9353519357c501b5924",
+  "hostname": "xc-lab",
+  "python": "3.10.12 (main, Jun 22 2026, 18:55:27) [GCC 11.4.0]",
+  "pipeline_samples": 80000,
+  "pipeline_repeats": 3,
+  "service_min_seconds": 30,
+  "input_records": 400,
+  "env": {
+    "CEDAR_RAY_PLACEMENT_RESOURCE": "cedar_remote",
+    "CEDAR_RAY_ACTOR_READY_TIMEOUT_SEC": "240",
+    "CEDAR_RAY_REQUIRE_REMOTE": "1",
+    "CEDAR_RAY_PATH_TIMING": "1",
+    "CEDAR_LOCAL_WORKERS_MAX": "64",
+    "CEDAR_WORKER_READY_TIMEOUT_SEC": "600"
+  }
+}

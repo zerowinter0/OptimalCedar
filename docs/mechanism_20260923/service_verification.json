@@ -1,0 +1,38 @@
+{
+  "L-U": {
+    "matches_reference": true
+  },
+  "L-F": {
+    "matches_reference": true,
+    "shape_dtype_mismatches": 0,
+    "max_abs_diff": 0.0,
+    "shape": [
+      1,
+      244,
+      244
+    ],
+    "dtype": "torch.uint8"
+  },
+  "R-U": {
+    "matches_reference": true,
+    "shape_dtype_mismatches": 0,
+    "max_abs_diff": 0.0,
+    "shape": [
+      1,
+      244,
+      244
+    ],
+    "dtype": "torch.uint8"
+  },
+  "R-F": {
+    "matches_reference": true,
+    "shape_dtype_mismatches": 0,
+    "max_abs_diff": 0.0,
+    "shape": [
+      1,
+      244,
+      244
+    ],
+    "dtype": "torch.uint8"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "driver_ip": "172.23.166.103",
+  "actor_locations": [
+    {
+      "node_ip": "172.23.166.105",
+      "gpu_ids": []
+    },
+    {
+      "node_ip": "172.23.166.105",
+      "gpu_ids": []
+    },
+    {
+      "node_ip": "172.23.166.105",
+      "gpu_ids": []
+    }
+  ],
+  "placement_resource": "cedar_remote",
+  "require_remote": "1",
+  "all_remote": true,
+  "actor_options": {
+    "num_cpus": "1.0",
+    "num_gpus": "0.0",
+    "resources": "{'cedar_remote': 0.001}"
+  }
+}

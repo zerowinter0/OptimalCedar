@@ -1,0 +1,13 @@
+{
+  "label": "R-F_w64",
+  "plan": "outputs/simclrv2_fusion_offload_mechanism_20260923/plans/R-F_w64.yaml",
+  "peak_alive_actors": 64,
+  "actor_names_observed": {
+    "RayActorFusedOptimizerPipeVariant": 176
+  },
+  "actor_locations": {
+    "?": 176
+  },
+  "returncode": 0,
+  "num_samples": 2000
+}

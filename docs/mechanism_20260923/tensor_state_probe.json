@@ -1,0 +1,10 @@
+{
+  "cpu_pin": 8,
+  "repeats": 60,
+  "warm_ms_mean": 2.8067899708333335,
+  "warm_ms_median": 2.614268,
+  "cold_ms_mean": 2.7673761916666666,
+  "cold_ms_median": 2.6026905,
+  "cold_over_warm_mean": 0.9859577027222436,
+  "cold_over_warm_median": 0.9955714180795542
+}

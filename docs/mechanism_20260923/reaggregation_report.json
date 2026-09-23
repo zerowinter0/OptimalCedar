@@ -1,0 +1,11 @@
+{
+  "run_dir": "outputs/simclrv2_fusion_offload_mechanism_20260923",
+  "batches": 3064,
+  "configs": [
+    "L-F",
+    "L-U",
+    "R-F",
+    "R-U"
+  ],
+  "identity_error_max_ms": 1.4210854715202004e-14
+}

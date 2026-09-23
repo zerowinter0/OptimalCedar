@@ -1,0 +1,19 @@
+{
+  "columns": [
+    "config",
+    "round",
+    "order_index",
+    "batch_id",
+    "record_key",
+    "operator",
+    "wall_ms",
+    "cpu_ms",
+    "type",
+    "shape",
+    "dtype",
+    "contiguous",
+    "strides",
+    "element_size"
+  ],
+  "note": "per-event rows; large file kept in outputs/"
+}

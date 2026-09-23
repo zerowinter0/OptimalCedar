@@ -1,0 +1,95 @@
+{
+  "calls": 250,
+  "operators": {
+    "B_blur": {
+      "raw": {
+        "mean_ms": 8.760499104,
+        "median_ms": 2.5893975,
+        "p90_ms": 34.086433
+      },
+      "seeded": {
+        "mean_ms": 8.846338628,
+        "median_ms": 2.6862624999999998,
+        "p90_ms": 31.248889
+      },
+      "instrument": {
+        "mean_ms": 8.730326696,
+        "median_ms": 2.5679075,
+        "p90_ms": 31.128036
+      },
+      "paired_seeding_ms_per_call": {
+        "mean": 0.08583952399999988,
+        "median": 0.08753650000000013,
+        "stdev": 20.67683541052695
+      },
+      "paired_instrument_ms_per_call": {
+        "mean": -0.030172408000000067,
+        "median": -0.02686450000000007,
+        "stdev": 20.720721897982454
+      },
+      "seeding_ms_per_call": 0.08583952399999895,
+      "instrument_minus_raw_ms_per_call": -0.030172408000000317,
+      "events_recorded": 250
+    },
+    "H_flip": {
+      "raw": {
+        "mean_ms": 0.031627292,
+        "median_ms": 0.035088999999999995,
+        "p90_ms": 0.050008
+      },
+      "seeded": {
+        "mean_ms": 0.09203292,
+        "median_ms": 0.092142,
+        "p90_ms": 0.111494
+      },
+      "instrument": {
+        "mean_ms": 0.03485768,
+        "median_ms": 0.030969999999999998,
+        "p90_ms": 0.047484
+      },
+      "paired_seeding_ms_per_call": {
+        "mean": 0.060405628,
+        "median": 0.0582535,
+        "stdev": 0.025550521342727173
+      },
+      "paired_instrument_ms_per_call": {
+        "mean": 0.0032303880000000003,
+        "median": 0.007188500000000004,
+        "stdev": 0.025661239371585293
+      },
+      "seeding_ms_per_call": 0.060405628,
+      "instrument_minus_raw_ms_per_call": 0.0032303880000000007,
+      "events_recorded": 250
+    },
+    "J_jitter": {
+      "raw": {
+        "mean_ms": 0.415963804,
+        "median_ms": 0.4114545,
+        "p90_ms": 0.431821
+      },
+      "seeded": {
+        "mean_ms": 0.513495112,
+        "median_ms": 0.5118959999999999,
+        "p90_ms": 0.527509
+      },
+      "instrument": {
+        "mean_ms": 0.432569068,
+        "median_ms": 0.43075050000000004,
+        "p90_ms": 0.445249
+      },
+      "paired_seeding_ms_per_call": {
+        "mean": 0.097531308,
+        "median": 0.099695,
+        "stdev": 0.03852395868724921
+      },
+      "paired_instrument_ms_per_call": {
+        "mean": 0.016605264,
+        "median": 0.01991900000000002,
+        "stdev": 0.04141273645502162
+      },
+      "seeding_ms_per_call": 0.09753130799999998,
+      "instrument_minus_raw_ms_per_call": 0.01660526400000001,
+      "events_recorded": 250
+    }
+  }
+}

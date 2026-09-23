@@ -1,0 +1,617 @@
+{
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "profile_sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+  "base_plan_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/plans/round1__optimizer.yaml",
+  "base_plan_sha256": "183b5d583655c2d99a2a9a579e717f17a8594093f403c9353519357c501b5924",
+  "declared_plan_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/plans/round1__unopti.yaml",
+  "git_commit": "3245161e7d4b21f10a455d0f839ee3447c02e1d8",
+  "units": {
+    "cost": "ms per source record of one worker (Cedar's model has no W)",
+    "bytes": "serialized bytes per source record, from the profile's baseline input/output sizes",
+    "latency_share_f_i": "fraction of the profiled whole-pipeline latency",
+    "io_bytes": "byte-level split of the same I/O accounting _calculate_cost_fused applies to costs"
+  },
+  "provenance": {
+    "import_commit": "f062305",
+    "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+    "functions": {
+      "_calculate_cost_fused": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_calculate_cost_fused"
+      },
+      "_calculate_pipe_cost": {
+        "identical_to_import_commit": false,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_calculate_pipe_cost"
+      },
+      "calculate_cost": {
+        "identical_to_import_commit": false,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::calculate_cost"
+      },
+      "_offload_and_fuse": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_offload_and_fuse"
+      },
+      "_local_fusion": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_local_fusion"
+      },
+      "_fuse_local_smp": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_fuse_local_smp"
+      },
+      "_fuse_tf": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_fuse_tf"
+      },
+      "_enumerate_fusions": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_enumerate_fusions"
+      },
+      "_calculate_offloads": {
+        "identical_to_import_commit": true,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_calculate_offloads"
+      },
+      "_is_optimizer_pipe": {
+        "identical_to_import_commit": false,
+        "identical_to_vendored_snapshot": true,
+        "import_commit": "f062305",
+        "vendored_snapshot": "/workspace/OptimalCedar/cedar/compose/optimizer.py.orig",
+        "location": "cedar/compose/optimizer.py::_is_optimizer_pipe"
+      }
+    },
+    "added_since_import": [
+      "_cap_local_workers",
+      "_log_final_plan_cost_breakdown",
+      "_physical_block_parallelism",
+      "calculate_final_plan_cost_breakdown"
+    ],
+    "notes": {
+      "fusion_discount": "_calculate_cost_fused is byte-identical in the import commit, the vendored snapshot and the current file: the discount formula itself is original Cedar code and is backend-agnostic (it consumes an already backend-priced pipe_cost_map).",
+      "backend_enumeration": "_offload_and_fuse/_local_fusion/_fuse_local_smp/_fuse_tf are byte-identical: the original search enumerates RAY (non-TF, offload+fusion on), TF_RAY (TF graphs), TF (all-TF) and SMP (only when local parallelism is forbidden). It never fuses plain INPROCESS pipes.",
+      "materialized_fused_pricing": "calculate_cost gained the 'materialized fused node' branch and multi-group fused_pipes support after the import commit, and _is_optimizer_pipe gained its plan argument. Pricing an already-materialized fused block (including an INPROCESS one) is therefore an extension, not original search behaviour.",
+      "inprocess_shortcut": "_calculate_pipe_cost gained an early return for None/INPROCESS variants; the Amdahl inversion and its clip-to-zero threshold are unchanged from the import commit."
+    }
+  },
+  "baseline": {
+    "q0_ms_per_sample": 22.979454709849225,
+    "throughput_samples_per_sec": 43.51713357111951,
+    "fractional_latency_sum": 0.9999999999999998
+  },
+  "operators": [
+    {
+      "pipe_id": 0,
+      "logical_name": "BatcherPipe(batch_size=4)",
+      "baseline_input_bytes": 238144.0,
+      "baseline_output_bytes": 238144.0,
+      "baseline_latency_ns": 7774243.303797469,
+      "latency_share_f_i": 0.2666764911240932,
+      "base_cost_ms_per_sample": 6.128080349967608
+    },
+    {
+      "pipe_id": 1,
+      "logical_name": "MapperPipe_Normalize",
+      "baseline_input_bytes": 238144.0,
+      "baseline_output_bytes": 238144.0,
+      "baseline_latency_ns": 233435.59493670886,
+      "latency_share_f_i": 0.008007439814853577,
+      "base_cost_ms_per_sample": 0.18400660056727122
+    },
+    {
+      "pipe_id": 2,
+      "logical_name": "MapperPipe_GaussianBlur",
+      "baseline_input_bytes": 238144.0,
+      "baseline_output_bytes": 238144.0,
+      "baseline_latency_ns": 7640638.012658228,
+      "latency_share_f_i": 0.2620934868567555,
+      "base_cost_ms_per_sample": 6.022765410971276
+    },
+    {
+      "pipe_id": 3,
+      "logical_name": "MapperPipe_Grayscale",
+      "baseline_input_bytes": 714432.0,
+      "baseline_output_bytes": 238144.0,
+      "baseline_latency_ns": 348968.7721518987,
+      "latency_share_f_i": 0.011970524208303827,
+      "base_cost_ms_per_sample": 0.27507611889787154
+    },
+    {
+      "pipe_id": 4,
+      "logical_name": "MapperPipe_ColorJitter",
+      "baseline_input_bytes": 714432.0,
+      "baseline_output_bytes": 714432.0,
+      "baseline_latency_ns": 8497744.48101266,
+      "latency_share_f_i": 0.2914944377362931,
+      "base_cost_ms_per_sample": 6.6983832301341115
+    },
+    {
+      "pipe_id": 5,
+      "logical_name": "MapperPipe_RandomHorizontalFlip",
+      "baseline_input_bytes": 714432.0,
+      "baseline_output_bytes": 714432.0,
+      "baseline_latency_ns": 135754.15189873418,
+      "latency_share_f_i": 0.004656715704562251,
+      "base_cost_ms_per_sample": 0.10700878762963187
+    },
+    {
+      "pipe_id": 6,
+      "logical_name": "MapperPipe_RandomResizedCrop",
+      "baseline_input_bytes": 2390209.518987342,
+      "baseline_output_bytes": 714432.0,
+      "baseline_latency_ns": 1940435.1265822784,
+      "latency_share_f_i": 0.06656190327335536,
+      "base_cost_ms_per_sample": 1.5295562416714343
+    },
+    {
+      "pipe_id": 7,
+      "logical_name": "MapperPipe_to_float",
+      "baseline_input_bytes": 597552.3797468354,
+      "baseline_output_bytes": 2390209.518987342,
+      "baseline_latency_ns": 322547.83544303797,
+      "latency_share_f_i": 0.01106421829293724,
+      "base_cost_ms_per_sample": 0.2542497031624366
+    },
+    {
+      "pipe_id": 8,
+      "logical_name": "ImageReaderPipe",
+      "baseline_input_bytes": 159.08860759493672,
+      "baseline_output_bytes": 597552.3797468354,
+      "baseline_latency_ns": 2226282.924050633,
+      "latency_share_f_i": 0.07636721610517473,
+      "base_cost_ms_per_sample": 1.754876983806131
+    },
+    {
+      "pipe_id": 9,
+      "logical_name": "LocalFSListerPipe",
+      "baseline_input_bytes": 0.0,
+      "baseline_output_bytes": 159.08860759493672,
+      "baseline_latency_ns": 32288.164556962027,
+      "latency_share_f_i": 0.0011075668836711084,
+      "base_cost_ms_per_sample": 0.025451283041449082
+    }
+  ],
+  "orders": {
+    "target": {
+      "plan_path": "outputs/simclrv2_fusion_offload_mechanism_20260923/plans/L-U_w1.yaml",
+      "plan_sha256": "c6814b51ad2b7d4543573c336ad81eee749c7f15840415a35fcfad8b5febcfce",
+      "order": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "chain": [
+        "9",
+        "8",
+        "3",
+        "6",
+        "2",
+        "5",
+        "4",
+        "7",
+        "1",
+        "0",
+        "10"
+      ],
+      "member_input_bytes_per_source_record": {
+        "B_blur": 59535.99999999999,
+        "H_flip": 59535.99999999999,
+        "J_jitter": 59535.99999999999
+      },
+      "member_output_bytes_per_source_record": {
+        "B_blur": 59535.99999999999,
+        "H_flip": 59535.99999999999,
+        "J_jitter": 59535.99999999999
+      },
+      "member_cost_ms_per_sample_by_variant": {
+        "INPROCESS": {
+          "B_blur": 1.5056913527428188,
+          "H_flip": 0.008917398969135988,
+          "J_jitter": 0.5581986025111759
+        },
+        "RAY": {
+          "B_blur": 0,
+          "H_flip": 0,
+          "J_jitter": 0
+        },
+        "SMP": {
+          "B_blur": 0,
+          "H_flip": 0,
+          "J_jitter": 0
+        }
+      },
+      "block_io": {
+        "io_base_bytes_per_source_record": 357215.99999999994,
+        "io_fused_bytes_per_source_record": 119071.99999999999,
+        "rho_io_ratio": 0.33333333333333337
+      }
+    },
+    "declared": {
+      "plan_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/plans/round1__unopti.yaml",
+      "plan_sha256": "13ca679d4a793836230f88b4931139a2d73f12370f081517996bd934bee1b927",
+      "order": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "chain": [
+        "9",
+        "8",
+        "7",
+        "6",
+        "5",
+        "4",
+        "3",
+        "2",
+        "1",
+        "0"
+      ],
+      "member_input_bytes_per_source_record": {
+        "B_blur": 238144.0,
+        "H_flip": 714432.0,
+        "J_jitter": 714432.0
+      },
+      "member_output_bytes_per_source_record": {
+        "B_blur": 238144.0,
+        "H_flip": 714432.0,
+        "J_jitter": 714432.0
+      },
+      "member_cost_ms_per_sample_by_variant": {
+        "INPROCESS": {
+          "B_blur": 6.022765410971276,
+          "H_flip": 0.10700878762963187,
+          "J_jitter": 6.6983832301341115
+        },
+        "RAY": {
+          "B_blur": 0,
+          "H_flip": 0,
+          "J_jitter": 0
+        },
+        "SMP": {
+          "B_blur": 0,
+          "H_flip": 0,
+          "J_jitter": 0
+        }
+      },
+      "block_io": {
+        "io_base_bytes_per_source_record": 3810304.0,
+        "io_fused_bytes_per_source_record": 952576.0,
+        "rho_io_ratio": 0.25
+      }
+    }
+  },
+  "single_operator_offloads": {
+    "B_blur": {
+      "INPROCESS": {
+        "pipe_id": 2,
+        "name": "B_blur",
+        "variant": "INPROCESS",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2620934868567555,
+        "base_cost_ms_per_sample": 6.022765410971276,
+        "baseline_input_bytes": 238144.0,
+        "amdahl_threshold_total_speedup": 1.3551852195209952,
+        "cost_before_clip_ms_per_sample": 6.022765410971276,
+        "cost_after_clip_ms_per_sample": 6.022765410971276,
+        "clipped_to_zero": false
+      },
+      "RAY": {
+        "pipe_id": 2,
+        "name": "B_blur",
+        "variant": "RAY",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2620934868567555,
+        "base_cost_ms_per_sample": 6.022765410971276,
+        "baseline_input_bytes": 238144.0,
+        "amdahl_threshold_total_speedup": 1.3551852195209952,
+        "cost_before_clip_ms_per_sample": 6.022765410971276,
+        "offload_throughput_samples_per_sec": 72.26836532178274,
+        "total_speedup": 1.6606876278667448,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 16.956689298877944,
+        "pipeline_speedup_vs_baseline": 1.3551852195209957
+      },
+      "SMP": {
+        "pipe_id": 2,
+        "name": "B_blur",
+        "variant": "SMP",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2620934868567555,
+        "base_cost_ms_per_sample": 6.022765410971276,
+        "baseline_input_bytes": 238144.0,
+        "amdahl_threshold_total_speedup": 1.3551852195209952,
+        "cost_before_clip_ms_per_sample": 6.022765410971276,
+        "offload_throughput_samples_per_sec": 73.67127148761764,
+        "total_speedup": 1.6929256465667162,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 16.956689298877944,
+        "pipeline_speedup_vs_baseline": 1.3551852195209957
+      }
+    },
+    "H_flip": {
+      "INPROCESS": {
+        "pipe_id": 5,
+        "name": "H_flip",
+        "variant": "INPROCESS",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.004656715704562251,
+        "base_cost_ms_per_sample": 0.10700878762963187,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.00467850215904,
+        "cost_before_clip_ms_per_sample": 0.10700878762963187,
+        "cost_after_clip_ms_per_sample": 0.10700878762963187,
+        "clipped_to_zero": false
+      },
+      "RAY": {
+        "pipe_id": 5,
+        "name": "H_flip",
+        "variant": "RAY",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.004656715704562251,
+        "base_cost_ms_per_sample": 0.10700878762963187,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.00467850215904,
+        "cost_before_clip_ms_per_sample": 0.10700878762963187,
+        "offload_throughput_samples_per_sec": 51.54363913722633,
+        "total_speedup": 1.1844447211347044,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 22.87244592221959,
+        "pipeline_speedup_vs_baseline": 1.0046785021590403
+      },
+      "SMP": {
+        "pipe_id": 5,
+        "name": "H_flip",
+        "variant": "SMP",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.004656715704562251,
+        "base_cost_ms_per_sample": 0.10700878762963187,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.00467850215904,
+        "cost_before_clip_ms_per_sample": 0.10700878762963187,
+        "offload_throughput_samples_per_sec": 48.736906896337096,
+        "total_speedup": 1.1199475447225167,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 22.87244592221959,
+        "pipeline_speedup_vs_baseline": 1.0046785021590403
+      }
+    },
+    "J_jitter": {
+      "INPROCESS": {
+        "pipe_id": 4,
+        "name": "J_jitter",
+        "variant": "INPROCESS",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2914944377362931,
+        "base_cost_ms_per_sample": 6.6983832301341115,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.411421523361024,
+        "cost_before_clip_ms_per_sample": 6.6983832301341115,
+        "cost_after_clip_ms_per_sample": 6.6983832301341115,
+        "clipped_to_zero": false
+      },
+      "RAY": {
+        "pipe_id": 4,
+        "name": "J_jitter",
+        "variant": "RAY",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2914944377362931,
+        "base_cost_ms_per_sample": 6.6983832301341115,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.411421523361024,
+        "cost_before_clip_ms_per_sample": 6.6983832301341115,
+        "offload_throughput_samples_per_sec": 69.19810436673362,
+        "total_speedup": 1.590134705302775,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 16.28107147971511,
+        "pipeline_speedup_vs_baseline": 1.4114215233610243
+      },
+      "SMP": {
+        "pipe_id": 4,
+        "name": "J_jitter",
+        "variant": "SMP",
+        "baseline_throughput_samples_per_sec": 43.51713357111951,
+        "latency_share_f_i": 0.2914944377362931,
+        "base_cost_ms_per_sample": 6.6983832301341115,
+        "baseline_input_bytes": 714432.0,
+        "amdahl_threshold_total_speedup": 1.411421523361024,
+        "cost_before_clip_ms_per_sample": 6.6983832301341115,
+        "offload_throughput_samples_per_sec": 93.49137601507606,
+        "total_speedup": 2.1483808408999243,
+        "clipped_to_zero": true,
+        "cost_after_clip_ms_per_sample": 0,
+        "pipeline_cost_ms_per_sample": 16.28107147971511,
+        "pipeline_speedup_vs_baseline": 1.4114215233610243
+      }
+    }
+  },
+  "configs": {
+    "L-U_w1": {
+      "config": "L-U",
+      "workers": 1,
+      "block_variant": "INPROCESS",
+      "member_costs_ms_per_sample": {
+        "B_blur": 1.5056913527428188,
+        "H_flip": 0.008917398969135988,
+        "J_jitter": 0.5581986025111759
+      },
+      "member_cost_sum_ms_per_sample": 2.072807354223131,
+      "fusion_discount_applied": false,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 2.072807354223131,
+      "full_plan_cost_ms_per_sample": 10.548091505585212,
+      "plan_is_fused": false,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    },
+    "L-U_w64": {
+      "config": "L-U",
+      "workers": 64,
+      "block_variant": "INPROCESS",
+      "member_costs_ms_per_sample": {
+        "B_blur": 1.5056913527428188,
+        "H_flip": 0.008917398969135988,
+        "J_jitter": 0.5581986025111759
+      },
+      "member_cost_sum_ms_per_sample": 2.072807354223131,
+      "fusion_discount_applied": false,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 2.072807354223131,
+      "full_plan_cost_ms_per_sample": 10.548091505585212,
+      "plan_is_fused": false,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    },
+    "L-F_w1": {
+      "config": "L-F",
+      "workers": 1,
+      "block_variant": "INPROCESS",
+      "member_costs_ms_per_sample": {
+        "B_blur": 1.5056913527428188,
+        "H_flip": 0.008917398969135988,
+        "J_jitter": 0.5581986025111759
+      },
+      "member_cost_sum_ms_per_sample": 2.072807354223131,
+      "fusion_discount_applied": true,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0.6909357847410437,
+      "full_plan_cost_ms_per_sample": 9.166219936103126,
+      "plan_is_fused": true,
+      "plan_provenance": "formula_extension_plan",
+      "plan_provenance_note": "the original search never fuses plain INPROCESS pipes; the cost is the original _calculate_cost_fused formula applied by the later materialized-fused-node pricing branch"
+    },
+    "L-F_w64": {
+      "config": "L-F",
+      "workers": 64,
+      "block_variant": "INPROCESS",
+      "member_costs_ms_per_sample": {
+        "B_blur": 1.5056913527428188,
+        "H_flip": 0.008917398969135988,
+        "J_jitter": 0.5581986025111759
+      },
+      "member_cost_sum_ms_per_sample": 2.072807354223131,
+      "fusion_discount_applied": true,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0.6909357847410437,
+      "full_plan_cost_ms_per_sample": 9.166219936103126,
+      "plan_is_fused": true,
+      "plan_provenance": "formula_extension_plan",
+      "plan_provenance_note": "the original search never fuses plain INPROCESS pipes; the cost is the original _calculate_cost_fused formula applied by the later materialized-fused-node pricing branch"
+    },
+    "R-U_w1": {
+      "config": "R-U",
+      "workers": 1,
+      "block_variant": "RAY",
+      "member_costs_ms_per_sample": {
+        "B_blur": 0,
+        "H_flip": 0,
+        "J_jitter": 0
+      },
+      "member_cost_sum_ms_per_sample": 0,
+      "fusion_discount_applied": false,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0,
+      "full_plan_cost_ms_per_sample": 8.475284151362082,
+      "plan_is_fused": false,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    },
+    "R-U_w64": {
+      "config": "R-U",
+      "workers": 64,
+      "block_variant": "RAY",
+      "member_costs_ms_per_sample": {
+        "B_blur": 0,
+        "H_flip": 0,
+        "J_jitter": 0
+      },
+      "member_cost_sum_ms_per_sample": 0,
+      "fusion_discount_applied": false,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0,
+      "full_plan_cost_ms_per_sample": 8.475284151362082,
+      "plan_is_fused": false,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    },
+    "R-F_w1": {
+      "config": "R-F",
+      "workers": 1,
+      "block_variant": "RAY",
+      "member_costs_ms_per_sample": {
+        "B_blur": 0,
+        "H_flip": 0,
+        "J_jitter": 0
+      },
+      "member_cost_sum_ms_per_sample": 0,
+      "fusion_discount_applied": true,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0.0,
+      "full_plan_cost_ms_per_sample": 8.475284151362082,
+      "plan_is_fused": true,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    },
+    "R-F_w64": {
+      "config": "R-F",
+      "workers": 64,
+      "block_variant": "RAY",
+      "member_costs_ms_per_sample": {
+        "B_blur": 0,
+        "H_flip": 0,
+        "J_jitter": 0
+      },
+      "member_cost_sum_ms_per_sample": 0,
+      "fusion_discount_applied": true,
+      "rho_io_ratio": 0.33333333333333337,
+      "fused_block_cost_ms_per_sample": 0.0,
+      "full_plan_cost_ms_per_sample": 8.475284151362082,
+      "plan_is_fused": true,
+      "plan_provenance": "native_search_plan",
+      "plan_provenance_note": "the original staged search evaluates exactly this plan shape"
+    }
+  }
+}
