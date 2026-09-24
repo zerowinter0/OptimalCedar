@@ -128,3 +128,6 @@ python -u tmp_analysis/export_affine_diagnosis.py         # 导出 CSV/JSON
 | `plan_scoring.json` | 计划级评分（含传播统计列） |
 | `blur_geometry.json` | Blur 的表示/几何受控对照（双 block、交错、p10） |
 | `figure_data.json` | 直接可画图的数据 |
+| `validation_runs.json` | v1/v2 各 3 次完整运行的逐轮 p10/中位/均值 |
+| `fresh_vs_reuse.json` | fresh-unpickle 与复用 payload 两种计时协议的对照 |
+| `design.md` | 把"元素数 + 表示类"接进 profiler/DP 的设计、变体接线与验收标准（未实现） |

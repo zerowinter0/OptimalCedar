@@ -4,8 +4,8 @@
  "files": {
   "README.md": {
    "path": "docs/mechanism_20260923/affine_reorder/README.md",
-   "bytes": 7926,
-   "sha256": "896a91b801fe4bf875be6478e82c2670f2e9eaf211b0eb53183f1375104208dc"
+   "bytes": 8217,
+   "sha256": "829fe6e0e4f096b7b1bb480f8bb01dd05d42465a830d83a2825cd5f2e747c151"
   },
   "audit.md": {
    "path": "docs/mechanism_20260923/affine_reorder/audit.md",
@@ -16,6 +16,11 @@
    "path": "docs/mechanism_20260923/affine_reorder/blur_geometry.json",
    "bytes": 2860,
    "sha256": "b017dcda7b8fd0189fc8203fa481c4e41d27854ae1c5dcf017ee9c494f8453f4"
+  },
+  "design.md": {
+   "path": "docs/mechanism_20260923/affine_reorder/design.md",
+   "bytes": 6239,
+   "sha256": "ba4f80750468afebcbd5daed2959edc5ebcd908170d3ee8302cfb99138e3f254"
   },
   "figure_data.json": {
    "path": "docs/mechanism_20260923/affine_reorder/figure_data.json",
