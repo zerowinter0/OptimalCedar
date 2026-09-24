@@ -1,0 +1,308 @@
+{
+ "payload_bytes": {
+  "pil_rgb_244": 178680,
+  "pil_L_244": 59597,
+  "tensor_f32_rgb_244": 714850,
+  "tensor_f32_L_244": 238560,
+  "tensor_u8_rgb_244": 179025,
+  "tensor_u8_L_244": 179025,
+  "tensor_f32_L_122": 59943,
+  "tensor_u8_L_122": 15290
+ },
+ "rows": [
+  {
+   "operator": "N_normalize",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 0.19789900397881866
+  },
+  {
+   "operator": "N_normalize",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.10215723887085915
+  },
+  {
+   "operator": "N_normalize",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.06823701551184058
+  },
+  {
+   "operator": "B_blur",
+   "representation": "pil_rgb_244",
+   "bytes": 178680,
+   "ms": 12.244086596183479
+  },
+  {
+   "operator": "B_blur",
+   "representation": "pil_L_244",
+   "bytes": 59597,
+   "ms": 12.191649118904024
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 9.825826913584024
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 8.662862586788833
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 10.322511079721153
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 4.297389124985784
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 1.4128393959254026
+  },
+  {
+   "operator": "B_blur",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 1.7860895604826512
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "pil_rgb_244",
+   "bytes": 178680,
+   "ms": 0.05166057962924242
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "pil_L_244",
+   "bytes": 59597,
+   "ms": 0.01059885835275054
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 0.16066909302026033
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.031449657399207354
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 0.19937852630391717
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 0.02322846557945013
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.017665501218289137
+  },
+  {
+   "operator": "G_grayscale",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 0.01538434298709035
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "pil_rgb_244",
+   "bytes": 178680,
+   "ms": 4.948714515194297
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "pil_L_244",
+   "bytes": 59597,
+   "ms": 0.3098465967923403
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 9.34950663940981
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.3454207326285541
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 9.70158790005371
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 0.42500486597418785
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.24240330094471574
+  },
+  {
+   "operator": "J_jitter",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 0.27609418611973524
+  },
+  {
+   "operator": "H_flip",
+   "representation": "pil_rgb_244",
+   "bytes": 178680,
+   "ms": 0.05158246494829654
+  },
+  {
+   "operator": "H_flip",
+   "representation": "pil_L_244",
+   "bytes": 59597,
+   "ms": 0.030757568310946226
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 0.06380310514941812
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.043704581912606955
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 0.03402435686439276
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 0.03853143425658345
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.02844963455572724
+  },
+  {
+   "operator": "H_flip",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 0.02931855851784348
+  },
+  {
+   "operator": "C_crop",
+   "representation": "pil_rgb_244",
+   "bytes": 178680,
+   "ms": 0.7752640522085129
+  },
+  {
+   "operator": "C_crop",
+   "representation": "pil_L_244",
+   "bytes": 59597,
+   "ms": 0.3907462814822793
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 1.5639436896890402
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.536443549208343
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 1.7563437577337024
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 0.607575464528054
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.5273364367894828
+  },
+  {
+   "operator": "C_crop",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 0.6096241413615644
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_f32_rgb_244",
+   "bytes": 714850,
+   "ms": 0.0019524013623595238
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_f32_L_244",
+   "bytes": 238560,
+   "ms": 0.0014200923033058643
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_u8_rgb_244",
+   "bytes": 179025,
+   "ms": 0.04318472929298878
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_u8_L_244",
+   "bytes": 179025,
+   "ms": 0.019659579265862703
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_f32_L_122",
+   "bytes": 59943,
+   "ms": 0.0012688105925917625
+  },
+  {
+   "operator": "F_to_float",
+   "representation": "tensor_u8_L_122",
+   "bytes": 15290,
+   "ms": 0.009203096851706505
+  }
+ ]
+}

@@ -62,5 +62,33 @@
   "no model parameter is fitted on a validation plan",
   "no operator or plan is dropped because the model does poorly on it",
   "if the reproducible (p10) estimator disagreed between the two interleaved blocks by more than 20%, the cell was to be re-measured; none exceeded 2% in the reported run"
- ]
+ ],
+ "run_20260924_repr_model": {
+  "question": "把计算模型从 serialized bytes 换成 elements + representation class，是否改进算子与计划成本预测、并影响优化器选择",
+  "pre_registration": {
+   "frozen_before_validation": [
+    "fit protocol: per (operator, representation class) two-stratum fit in ELEMENTS, spatial 0.5x/2.0x only",
+    "each point measured with a 5 s real-call budget inside one interleaved window per operator",
+    "single-threaded profiling and execution (limit_native_threadpools(1) + torch.set_num_threads(1))",
+    "models M1 proportional bytes, M2 byte affine, M3 element affine (declared class), M4 representation-aware proportional, M5 representation-aware affine",
+    "primary target: mean per-call operator self time inside complete runs (three complete runs per plan)",
+    "validation plans: the 11 captured plans (6 cast-position, 3 diagnosis, 2 held-out orders), none used for fitting",
+    "missing representation classes must be reported and never silently priced by the byte model",
+    "acceptance: DP must match brute force over all legal orders under the boundary-free objective"
+   ],
+   "exploratory": [
+    "the profile generation itself was re-run with the new section; the byte-affine part changed by ~30% because it is a fresh measurement",
+    "stage B uses 1 epoch (9,469 records) instead of the campaign's 20 epochs to keep the cell runnable"
+   ]
+  },
+  "semantic_scope": {
+   "finding": "no legal reorder of this feature is augmentation-equivalent: moving to_float changes how torchvision interprets the payload range (float images are clamped to [0,1])",
+   "consequence": "throughput differences between plans are reported as plan-choice effects, not as equivalent optimization gains"
+  },
+  "stop_rules": [
+   "no model parameter fitted on any validation plan",
+   "no plan or operator dropped because a model does poorly on it",
+   "if a decisive negative result appears (as with the semantic-equivalence check), the corresponding experiment line is stopped and reported"
+  ]
+ }
 }

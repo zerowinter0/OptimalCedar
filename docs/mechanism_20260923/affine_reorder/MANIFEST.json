@@ -1,16 +1,21 @@
 {
- "topic": "affine reorder diagnosis (2026-09-24)",
- "note": "小体积交付物与 outputs/affine_reorder_diagnosis_20260924/ 内容一致；逐计划真实 payload pickle（约 100 MB）留在 tmp_analysis/capture_*/，不入库。",
+ "topic": "PICO representation-aware compute model (2026-09-24)",
+ "note": "小型交付物与 outputs/affine_repr_model_20260924/ 内容一致；新 profile 在 outputs/affine_repr_profile_20260924/shared.yaml，阶段 B 结果在 outputs/stage_b_repr_20260924/。逐计划真实 payload pickle 留在 tmp_analysis/capture_*/，不入库。",
  "files": {
   "README.md": {
    "path": "docs/mechanism_20260923/affine_reorder/README.md",
    "bytes": 9080,
    "sha256": "250d94a74b6c386a61af56e8c6713203e6dfae29fa37909f103e5526f8db8292"
   },
+  "README_repr_model.md": {
+   "path": "docs/mechanism_20260923/affine_reorder/README_repr_model.md",
+   "bytes": 6110,
+   "sha256": "1283f67243a54803572735a1f2d1a476609e5a8e8bad5239a77acd479a99080b"
+  },
   "audit.md": {
    "path": "docs/mechanism_20260923/affine_reorder/audit.md",
-   "bytes": 8142,
-   "sha256": "b55f9b2c1a9033a0740e6334105fad3429b469c7c6b6765cc20adc027bb995f5"
+   "bytes": 12041,
+   "sha256": "c774e7dfecc2ad8fb74760565ee3f59ddca669390988983bbbcde0661722e3a1"
   },
   "blur_geometry.json": {
    "path": "docs/mechanism_20260923/affine_reorder/blur_geometry.json",
@@ -19,8 +24,8 @@
   },
   "design.md": {
    "path": "docs/mechanism_20260923/affine_reorder/design.md",
-   "bytes": 6239,
-   "sha256": "ba4f80750468afebcbd5daed2959edc5ebcd908170d3ee8302cfb99138e3f254"
+   "bytes": 5363,
+   "sha256": "e67dbe7f8fbb1d7368cd7fe20d11bbcd76767dcbbcd0fafd476be0265798faf1"
   },
   "figure_data.json": {
    "path": "docs/mechanism_20260923/affine_reorder/figure_data.json",
@@ -49,6 +54,12 @@
    "bytes": 33289,
    "sha256": "4f8fed9ce9c86a94a3dd2f1c72af77fc9d65ce2d5e210dceecd1bbdbeac4871a"
   },
+  "optimizer_overhead.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/optimizer_overhead.csv",
+   "bytes": 318,
+   "sha256": "70b6f56330a17a42c2d58e0eca552b5ed011afe6d2657a5a889b9127ae017d81",
+   "rows": 2
+  },
   "plan_scoring.json": {
    "path": "docs/mechanism_20260923/affine_reorder/plan_scoring.json",
    "bytes": 25882,
@@ -66,15 +77,44 @@
    "sha256": "39c757eae2d65e0e82d7b9b8963026ef8ac2bc8d4f18c98f29a754c99dd1a8cb",
    "rows": 294
   },
+  "profiling_overhead.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/profiling_overhead.csv",
+   "bytes": 262,
+   "sha256": "a6178b4614eee5b04fd6fe1d2cc91038968cd55f89c984a9a3bd609b449eb23d",
+   "rows": 2
+  },
   "protocol.json": {
    "path": "docs/mechanism_20260923/affine_reorder/protocol.json",
-   "bytes": 3630,
-   "sha256": "3f13c7c04eab7b63ea53e9d4c3b90f3fad1a39c12a63708b363878c9d8b740f5"
+   "bytes": 5689,
+   "sha256": "4f35d76fb29b4733be51fa94169cad9da9a27087fa546de52163d1529474b32a"
+  },
+  "semantic_scope.md": {
+   "path": "docs/mechanism_20260923/affine_reorder/semantic_scope.md",
+   "bytes": 5310,
+   "sha256": "0942d1fa86db1a5c981eb3126c4cb36a65744fe38c01c6ee30151c79d47356c6"
   },
   "validation_runs.json": {
    "path": "docs/mechanism_20260923/affine_reorder/validation_runs.json",
    "bytes": 7788,
    "sha256": "508491f41d02b21891b23fe6e2c55e7fdd050fe4f3cf2259884398f9d6ab4547"
+  }
+ },
+ "large_artifacts": {
+  "outputs/affine_repr_profile_20260924/shared.yaml": {
+   "bytes": 130042,
+   "sha256": "e60f96a9a22023cde978fa4d4d8f7d5800f1dd36c70c2c8c3d61d0e0b1889aaa"
+  },
+  "outputs/affine_repr_profile_20260924/profile_summary.json": {
+   "bytes": 890,
+   "sha256": "ef966f60bfdcc88df31ab7b5675548e5e31e485e0544d4acdbc873adb79d295a"
+  },
+  "outputs/affine_repr_profile_20260924/entry.py": {
+   "bytes": 1184,
+   "sha256": "d473626cb818af5623c3030d74f4d35959eec96524e2038252fb0be536a22541"
+  },
+  "outputs/stage_b_repr_20260924/results_cheap.json": {
+   "bytes": 1173969,
+   "sha256": "4e9a7bc3bda4841693ddb61fbf26028f3f59dda74cdf05addd6cd99fed86982c"
   }
  }
 }

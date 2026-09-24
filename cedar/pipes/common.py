@@ -19,6 +19,84 @@ from .context import PipeVariantType
 logger = logging.getLogger(__name__)
 
 
+def payload_compute_scale(value: Any) -> Optional[float]:
+    """Size of the work an operator performs on one payload.
+
+    The layered profile's byte volume answers "how much has to be moved"; it
+    answers "how much work is there" only when every representation stores one
+    byte per element.  Reordering a pipeline changes the representation (a
+    ``to_float`` stage can move after the image transforms), so the two
+    quantities diverge.  This helper returns the element count an operator
+    actually touches: ``C*H*W`` for an image tensor, ``W*H*bands`` for a PIL
+    image, the byte length for a text blob, and the recursive sum for
+    containers.
+    """
+    if value is None:
+        return None
+    if is_torch_tensor(value):
+        return float(value.numel())
+    if is_tensorflow_tensor(value):
+        tf = tensorflow()
+        if value.dtype == tf.string:
+            decoded = tf.io.decode_raw(value, tf.uint8)
+            return float(tf.size(decoded, out_type=tf.int32).numpy())
+        return float(tf.size(value).numpy())
+    if isinstance(value, PIL.Image.Image):
+        width, height = value.size
+        return float(width * height * len(value.getbands()))
+    if isinstance(value, (bytes, bytearray)):
+        return float(len(value))
+    if isinstance(value, str):
+        return float(len(value))
+    if isinstance(value, (list, tuple, set)):
+        scales = [payload_compute_scale(item) for item in value]
+        scales = [scale for scale in scales if scale is not None]
+        return float(sum(scales)) if scales else None
+    if isinstance(value, dict):
+        scales = []
+        for key, item in value.items():
+            for part in (key, item):
+                scale = payload_compute_scale(part)
+                if scale is not None:
+                    scales.append(scale)
+        return float(sum(scales)) if scales else None
+    return None
+
+
+def payload_representation_class(value: Any) -> Optional[str]:
+    """Planning-time identity of a payload's representation.
+
+    Only information a planner can already see is encoded: the element type,
+    the channel count, and the container.  Operators behave differently on
+    these (hue/saturation adjustments are no-ops on single-channel input, and
+    a uint8 tensor is converted internally by several kernels), so the fitted
+    compute curve is indexed by this class.
+    """
+    if value is None:
+        return None
+    if is_torch_tensor(value):
+        dtype = str(value.dtype).replace("torch.", "")
+        if value.dim() == 3:
+            return f"{dtype}:{int(value.shape[0])}ch"
+        if value.dim() == 2:
+            return f"{dtype}:2d"
+        return f"{dtype}:{value.dim()}d"
+    if is_tensorflow_tensor(value):
+        channels = int(value.shape[-1]) if value.shape else 1
+        return f"tf:{value.dtype.name}:{channels}ch"
+    if isinstance(value, PIL.Image.Image):
+        return f"PIL:{value.mode}"
+    if isinstance(value, (bytes, bytearray)):
+        return "bytes"
+    if isinstance(value, str):
+        return "path" if ("/" in value or value.endswith((".jpg", ".png"))) else "text"
+    if isinstance(value, (list, tuple)):
+        return type(value).__name__
+    if isinstance(value, dict):
+        return "dict"
+    return type(value).__name__
+
+
 class ProfileInputReservoir:
     """Bounded immutable snapshots of real intermediate pipe outputs."""
 

@@ -6,6 +6,8 @@ from cedar.pipes.common import (
     CedarPipeSpec,
     PipeExecutionResource,
     cedar_pipe,
+    payload_compute_scale,
+    payload_representation_class,
 )
 from cedar.pipes.io import (
     FileOpenerPipe,
@@ -81,6 +83,8 @@ __all__ = [
     "TFTensorDontCare",
     "WebReaderPipe",
     "cedar_pipe",
+    "payload_compute_scale",
+    "payload_representation_class",
 ]
 
 assert __all__ == sorted(__all__)

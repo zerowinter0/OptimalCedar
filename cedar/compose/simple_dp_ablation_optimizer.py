@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import logging
 import math
 import time
+from typing import Any, Dict, List, Optional, Tuple
 
 from cedar.pipes import PipeVariantType, PipeVariantContextFactory
 from .my_optimizer import MyOptimizer
@@ -243,6 +244,317 @@ class SimpleDpBoundaryOptimizer(
 
 class LayeredSimpleDpOptimizer(SimpleDpBoundaryOptimizer):
     """New-profile scalar DP without any stage-boundary charge."""
+
+    def _dp_regular_transition_cost(self, prev_mask, block):
+        return block.cost
+
+
+class _RepresentationComputeMixin:
+    """Price operator compute by elements inside a representation class.
+
+    ``physical_model.compute_model`` fits ``k_(operator, class) * elements + b``
+    on payloads the profiled pipeline really produced, including the
+    representations a *reordered* plan can hand an operator (a uint8 payload
+    when ``to_float`` moves behind the image transforms).  The DP therefore
+    propagates two features beside the byte volume it keeps for boundaries:
+
+      * ``element_prod[mask]`` -- the product of the per-operator element
+        ratios, i.e. how many elements reach a position;
+      * ``class_state[mask]`` -- the representation class after applying the
+        operators in the mask.
+
+    Both are functions of the *set* of preceding operators for the workloads
+    this model was fitted on (every transition is monotone: ``to_float`` sets
+    the element type, ``grayscale`` reduces channels).  The consistency check
+    in ``repr_state_is_order_independent`` fails loudly rather than silently
+    merging two different states if a future recipe breaks that property.
+    """
+
+    uses_representation_compute_model = True
+    # Same two parameters per curve as the byte model, but indexed by the
+    # representation class the plan will hand the operator.
+    repr_model_variant = "affine"
+
+    def _repr_model(self) -> dict:
+        section = (self.profiled_stats or {}).get("physical_model", {})
+        model = section.get("compute_model") if isinstance(section, dict) else None
+        if not isinstance(model, dict) or model.get("schema_version") != 1:
+            raise RuntimeError(
+                "The representation-aware compute model requires "
+                "physical_model.compute_model schema_version=1 in the shared "
+                "profile; regenerate the profile instead of falling back to "
+                "the byte model"
+            )
+        return model
+
+    def _repr_source_record(self) -> Tuple[str, float]:
+        model = self._repr_model()
+        klass = model.get("source_class")
+        elements = model.get("source_elements")
+        if klass is None or not elements:
+            raise RuntimeError(
+                "physical_model.compute_model has no source record features"
+            )
+        return str(klass), float(elements)
+
+    def _repr_tables(self) -> Tuple[List[float], List[str]]:
+        """Element multiplier and representation class per operator mask."""
+        cached = getattr(self, "_repr_tables_cache", None)
+        if cached is not None:
+            return cached
+        model = self._repr_model()
+        ratios = model.get("element_ratio") or {}
+        transitions = model.get("class_transition") or {}
+        inner = list(self._dp_inner_ops)
+        source_class, _ = self._repr_source_record()
+        n = len(inner)
+        full = 1 << n
+        element_prod = [1.0] * full
+        class_state = [source_class] * full
+        for mask in range(1, full):
+            # Apply the operators of a mask in the feature's declared order
+            # (increasing profile index), so the state is built along a valid
+            # chain: the reader must precede the image transforms, otherwise a
+            # transition table is queried with a class it never saw and the
+            # state silently stops updating.  Removing the highest index and
+            # applying it last keeps the subset recurrence linear in 2**n.
+            index = mask.bit_length() - 1
+            prev = mask ^ (1 << index)
+            p_id = inner[index]
+            ratio = ratios.get(str(p_id))
+            try:
+                ratio_value = float(ratio) if ratio is not None else 1.0
+            except (TypeError, ValueError):
+                ratio_value = 1.0
+            if not math.isfinite(ratio_value) or ratio_value <= 0.0:
+                ratio_value = 1.0
+            element_prod[mask] = element_prod[prev] * ratio_value
+            table = transitions.get(str(p_id)) or {}
+            previous = class_state[prev]
+            class_state[mask] = str(table.get(previous, previous))
+        self._repr_tables_cache = (element_prod, class_state)
+        return element_prod, class_state
+
+    def repr_state_is_order_independent(self) -> bool:
+        """Every order of the same operator set must agree on the class state."""
+        model = self._repr_model()
+        transitions = model.get("class_transition") or {}
+        source_class, _ = self._repr_source_record()
+        inner = [int(p_id) for p_id in self._dp_inner_ops]
+        states = {(): source_class}
+        for size in range(1, len(inner) + 1):
+            for prefix in [p for p in states if len(p) == size - 1]:
+                klass = states[prefix]
+                for p_id in inner:
+                    if p_id in prefix:
+                        continue
+                    table = transitions.get(str(p_id)) or {}
+                    nxt = str(table.get(klass, klass))
+                    key = tuple(sorted(prefix + (p_id,)))
+                    existing = states.get(key)
+                    if existing is not None and existing != nxt:
+                        return False
+                    states[key] = nxt
+        return True
+
+    def _repr_curves(self, p_id: int) -> dict:
+        model = self._repr_model()
+        operators = model.get("operators") or {}
+        entry = operators.get(str(p_id), operators.get(p_id))
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                f"compute_model has no curves for operator {p_id}; the profile "
+                "must be regenerated (a legal plan is not silently dropped)"
+            )
+        return entry.get("by_class") or {}
+
+    def _repr_compute_cost(self, p_id: int, elements: float, klass: str) -> float:
+        curves = self._repr_curves(p_id)
+        curve = curves.get(klass)
+        if curve is None:
+            # The DP prices masks that violate a dependency while it builds its
+            # tables, so a missing class cannot abort the search.  It becomes a
+            # prohibitive price *and* is recorded: a final plan that still
+            # contains an unmeasured class is rejected by
+            # ``assert_plan_covered`` instead of being silently mispriced by
+            # the byte model.
+            missing = getattr(self, "_repr_missing_classes", None)
+            if missing is None:
+                missing = set()
+                self._repr_missing_classes = missing
+            if (int(p_id), str(klass)) not in missing:
+                missing.add((int(p_id), str(klass)))
+                logger.warning(
+                    "representation-aware cost model has no curve for "
+                    "operator %s in class %s (measured %s); that candidate "
+                    "position is priced prohibitively and reported at the end",
+                    p_id,
+                    klass,
+                    sorted(curves),
+                )
+            return self._REPR_UNPRICED_PENALTY_MS
+        k = float(curve["k_ms_per_element"])
+        b = (
+            0.0
+            if self.repr_model_variant == "proportional"
+            else float(curve["b_ms"])
+        )
+        value = k * max(0.0, float(elements)) + b
+        return value if math.isfinite(value) else 0.0
+
+    def _repr_declared_features(self, p_id: int) -> Tuple[float, str]:
+        entry = (self._repr_model().get("operators") or {}).get(str(p_id)) or {}
+        elements = entry.get("own_elements")
+        klass = entry.get("own_class")
+        if elements is None or klass is None:
+            raise RuntimeError(
+                f"compute_model has no profiled input features for operator "
+                f"{p_id}; regenerate the profile"
+            )
+        return float(elements), str(klass)
+
+    def _dp_compute_work_prod(
+        self, mask: int, operator_idx: Optional[int] = None
+    ) -> float:
+        if operator_idx is None:
+            return self._dp_work_prod(mask)
+        element_prod, class_state = self._repr_tables()
+        p_id = self._dp_inner_ops[operator_idx]
+        _, source_elements = self._repr_source_record()
+        elements = source_elements * element_prod[mask]
+        per_record = self._repr_compute_cost(
+            p_id, elements, class_state[mask]
+        )
+        return self._dp_cardinality_prod[mask] * per_record
+
+    def _dp_compute_cost_denominator(
+        self,
+        operator_idx: int,
+        baseline_input_size: float,
+        source_size: float,
+    ) -> float:
+        p_id = self._dp_inner_ops[operator_idx]
+        elements, klass = self._repr_declared_features(p_id)
+        per_record = self._repr_compute_cost(p_id, elements, klass)
+        if per_record <= 0.0:
+            raise RuntimeError(
+                f"Operator {p_id} has no positive representation-aware cost at "
+                "its profiled position"
+            )
+        return source_size * per_record
+
+    def _calculate_pipe_cost(self, p_id, input_size, desc):
+        """Price one operator at its *profiled* representation.
+
+        Position-dependent pricing happens in ``_dp_compute_work_prod``; this
+        hook only anchors the per-operator constant the DP normalizes against,
+        so the byte ``input_size`` no longer drives compute.
+        """
+        elements, klass = self._repr_declared_features(p_id)
+        local = self._repr_compute_cost(p_id, elements, klass)
+        if desc is None or desc.variant_type in (
+            None,
+            PipeVariantType.INPROCESS,
+        ):
+            return max(local, 1e-12)
+        backend_entry = self._profile_entry(
+            self.profiled_stats.get("offloads", {}).get(
+                desc.variant_type.name, {}
+            ),
+            p_id,
+        )
+        direct = (
+            backend_entry.get("backend_compute")
+            if isinstance(backend_entry, dict)
+            else None
+        )
+        if isinstance(direct, dict):
+            try:
+                mean = float(direct["mean_ms_per_sample"])
+            except (KeyError, TypeError, ValueError):
+                mean = float("nan")
+            if math.isfinite(mean) and mean >= 0.0:
+                return max(min(mean, local), 1e-12)
+        return max(local, 1e-12)
+
+
+    _REPR_UNPRICED_PENALTY_MS = 1.0e6
+
+    def repr_unpriced_positions(self):
+        return sorted(getattr(self, "_repr_missing_classes", set()))
+
+    def assert_plan_covered(self, plan) -> None:
+        """Reject a returned plan that contains an unmeasured representation."""
+        element_prod, class_state = self._repr_tables()
+        index_of = {
+            int(p_id): index for index, p_id in enumerate(self._dp_inner_ops)
+        }
+        missing = []
+        mask = 0
+        graph = {int(k): v for k, v in plan.graph.items()}
+        children = {
+            int(child)
+            for value in graph.values()
+            for child in ([int(x) for x in value.split(",")] if value else [])
+        }
+        node = next(p for p in graph if p not in children)
+        while True:
+            if node in index_of:
+                index = index_of[node]
+                if index not in [
+                    i for i in range(len(self._dp_inner_ops)) if mask >> i & 1
+                ]:
+                    klass = class_state[mask]
+                    if klass not in self._repr_curves(node):
+                        missing.append((node, klass))
+                    mask |= 1 << index
+            value = graph.get(node)
+            nxt = [int(x) for x in value.split(",")] if value else []
+            if not nxt:
+                break
+            node = nxt[0]
+        if missing:
+            raise RuntimeError(
+                "the selected plan prices operators in representations the "
+                f"profile never measured: {missing}; regenerate the profile "
+                "with those classes measured instead of falling back to bytes"
+            )
+
+class SimpleDpBoundaryAffineElementsOptimizer(
+    _RepresentationComputeMixin, SimpleDpBoundaryOptimizer
+):
+    """M3: affine in elements, one curve per operator, no representation split."""
+
+    repr_model_variant = "affine"
+
+    def _repr_compute_cost(self, p_id: int, elements: float, klass: str) -> float:
+        """M3 ignores the position class and always uses the operator's own."""
+        _, declared_class = self._repr_declared_features(p_id)
+        return super()._repr_compute_cost(p_id, elements, declared_class)
+
+
+class SimpleDpBoundaryAffineReprProportionalOptimizer(
+    _RepresentationComputeMixin, SimpleDpBoundaryOptimizer
+):
+    """M4: representation-aware, through the origin (``b = 0``)."""
+
+    repr_model_variant = "proportional"
+
+
+class SimpleDpBoundaryAffineReprOptimizer(
+    _RepresentationComputeMixin, SimpleDpBoundaryOptimizer
+):
+    """M5: representation-aware affine ``k_(i,z) * elements + b_(i,z)``."""
+
+    repr_model_variant = "affine"
+
+
+class SimpleDpAffineReprOptimizer(SimpleDpBoundaryAffineReprOptimizer):
+    """M5 without a stage-boundary charge (the brute-force test's objective).
+
+    With no boundary terms the objective is exactly the sum of the per-operator
+    representation-aware costs, which is what the acceptance test enumerates.
+    """
 
     def _dp_regular_transition_cost(self, prev_mask, block):
         return block.cost
@@ -670,3 +982,10 @@ class UnoptimizedOptimizer(Optimizer):
             desc.variant_type = PipeVariantType.INPROCESS
             desc.variant_ctx = PipeVariantContextFactory.create_context(
                 variant_type=PipeVariantType.INPROCESS)
+
+class SimpleDpWorkersWidthBoundaryAffineReprOptimizer(
+    _RepresentationComputeMixin, SimpleDpWorkersWidthBoundaryOptimizer
+):
+    """PICO with the representation-aware compute model (M5)."""
+
+    repr_model_variant = "affine"

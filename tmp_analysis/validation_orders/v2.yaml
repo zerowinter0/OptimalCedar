@@ -1,0 +1,74 @@
+physical_plan:
+  graph:
+    '0': ''
+    '1': '0'
+    '2': '1'
+    '3': '6'
+    '4': '2'
+    '5': '4'
+    '6': '5'
+    '7': '3'
+    '8': '7'
+    '9': '8'
+  n_local_workers: 4
+  pipes:
+    0:
+      execution_resource: cpu
+      name: BatcherPipe(batch_size=4)
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    1:
+      execution_resource: cpu
+      name: MapperPipe_Normalize
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    2:
+      execution_resource: cpu
+      name: MapperPipe_GaussianBlur
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    3:
+      execution_resource: cpu
+      name: MapperPipe_Grayscale
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    4:
+      execution_resource: cpu
+      name: MapperPipe_ColorJitter
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    5:
+      execution_resource: cpu
+      name: MapperPipe_RandomHorizontalFlip
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    6:
+      execution_resource: cpu
+      name: MapperPipe_RandomResizedCrop
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    7:
+      execution_resource: cpu
+      name: MapperPipe_to_float
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    8:
+      execution_resource: cpu
+      name: ImageReaderPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS
+    9:
+      execution_resource: cpu
+      name: LocalFSListerPipe
+      variant: INPROCESS
+      variant_ctx:
+        variant_type: INPROCESS

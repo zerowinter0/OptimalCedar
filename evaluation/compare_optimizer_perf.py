@@ -51,6 +51,13 @@ OPTIMIZERS = {
     "simple_dp_workers_boundary": 25,
     "simple_dp_workers_width_boundary": 27,
     "old_dp_boundary": 28,
+    # Representation-aware compute model (PICO chapter 3): M3 elements only,
+    # M4 representation-aware through the origin, M5 representation-aware
+    # affine, and PICO (workers x width) with M5.
+    "simple_dp_repr_elements": 34,
+    "simple_dp_repr_proportional": 35,
+    "simple_dp_repr_affine": 36,
+    "simple_dp_workers_width_repr_affine": 37,
     # Cedar's staged search priced by the three PICO cost models (ablation:
     # same cost model as the matching DP variant, greedy staged search).
     "staged_boundary": 31,

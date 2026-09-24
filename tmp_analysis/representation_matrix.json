@@ -1,0 +1,251 @@
+{
+ "capture": "tmp_analysis/capture_declared",
+ "rows": [
+  {
+   "operator": "B blur",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 50.37743393331766
+  },
+  {
+   "operator": "B blur",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 33.82027158513665
+  },
+  {
+   "operator": "B blur",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 12.739059701561928
+  },
+  {
+   "operator": "B blur",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 10.33575483597815
+  },
+  {
+   "operator": "B blur",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 2.1736802998930216
+  },
+  {
+   "operator": "B blur",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 2.0136107224971056
+  },
+  {
+   "operator": "B blur",
+   "representation": "PIL L 244",
+   "bytes": 59597,
+   "ms": 11.416500620543957
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 0.6630080752074718
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 0.5273714195936918
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 0.019020773470401764
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 0.03088521771132946
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 0.015325751155614853
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 0.017309747636318207
+  },
+  {
+   "operator": "G grayscale",
+   "representation": "PIL L 244",
+   "bytes": 59597,
+   "ms": 0.01043323427438736
+  },
+  {
+   "operator": "J jitter",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 27.943287277594212
+  },
+  {
+   "operator": "J jitter",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 26.887084217742085
+  },
+  {
+   "operator": "J jitter",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 0.43755900114774704
+  },
+  {
+   "operator": "J jitter",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 0.3559162374585867
+  },
+  {
+   "operator": "J jitter",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 0.28437385335564613
+  },
+  {
+   "operator": "J jitter",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 0.24906140752136707
+  },
+  {
+   "operator": "J jitter",
+   "representation": "PIL L 244",
+   "bytes": 59597,
+   "ms": 0.34535471349954605
+  },
+  {
+   "operator": "H flip",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 0.06107669323682785
+  },
+  {
+   "operator": "H flip",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 0.17714225687086582
+  },
+  {
+   "operator": "H flip",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 0.03158235922455788
+  },
+  {
+   "operator": "H flip",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 0.03530620597302914
+  },
+  {
+   "operator": "H flip",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 0.027514761313796043
+  },
+  {
+   "operator": "H flip",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 0.03190068528056145
+  },
+  {
+   "operator": "H flip",
+   "representation": "PIL L 244",
+   "bytes": 59597,
+   "ms": 0.04440564662218094
+  },
+  {
+   "operator": "C crop",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 1.9650006666779518
+  },
+  {
+   "operator": "C crop",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 1.7767643090337515
+  },
+  {
+   "operator": "C crop",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 0.618737330660224
+  },
+  {
+   "operator": "C crop",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 0.5358943250030279
+  },
+  {
+   "operator": "C crop",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 0.6177238188683987
+  },
+  {
+   "operator": "C crop",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 0.5284813698381186
+  },
+  {
+   "operator": "C crop",
+   "representation": "PIL L 244",
+   "bytes": 59597,
+   "ms": 0.37587559781968594
+  },
+  {
+   "operator": "F to_float",
+   "representation": "u8 3ch 244 (full)",
+   "bytes": 562924,
+   "ms": 0.1265598926693201
+  },
+  {
+   "operator": "F to_float",
+   "representation": "f32 3ch 244 (full)",
+   "bytes": 2250425,
+   "ms": 0.002258317545056343
+  },
+  {
+   "operator": "F to_float",
+   "representation": "u8 1ch 244",
+   "bytes": 59944,
+   "ms": 0.018093595281243324
+  },
+  {
+   "operator": "F to_float",
+   "representation": "f32 1ch 244",
+   "bytes": 238562,
+   "ms": 0.001590978354215622
+  },
+  {
+   "operator": "F to_float",
+   "representation": "u8 1ch 122",
+   "bytes": 15292,
+   "ms": 0.009354762732982635
+  },
+  {
+   "operator": "F to_float",
+   "representation": "f32 1ch 122",
+   "bytes": 59945,
+   "ms": 0.0012470874935388565
+  }
+ ]
+}

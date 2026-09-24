@@ -1,0 +1,3 @@
+optimizer,compute_model,optimization_sec,throughput_samples_per_sec,num_repeats,n_local_workers,plan
+simple_dp_boundary,bytes,2.7,74.0,3,1,"fused=[[6, 3, 2, 4, 5, 7, 1]] stages=[]"
+simple_dp_repr_affine,elements+representation,26.14,1348.7,3,64,"fused=[[3, 6], [5, 7, 1, 4]] stages=['MapperPipe_GaussianBlur:RAY']"

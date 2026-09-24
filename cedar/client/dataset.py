@@ -37,6 +37,8 @@ from cedar.pipes import (
 )
 from cedar.pipes.common import (
     ProfileInputReservoir,
+    payload_compute_scale,
+    payload_representation_class,
     set_profile_input_reservoir,
 )
 from .profiler import FeatureProfiler
@@ -1005,9 +1007,24 @@ class DataSet:
             )[optimizer_selector - 31]
             for feature in self.features.values():
                 feature.set_optimizer(staged_cls())
+        elif optimizer_selector in (34, 35, 36, 37):
+            from cedar.compose.simple_dp_ablation_optimizer import (
+                SimpleDpBoundaryAffineElementsOptimizer,
+                SimpleDpBoundaryAffineReprOptimizer,
+                SimpleDpBoundaryAffineReprProportionalOptimizer,
+                SimpleDpWorkersWidthBoundaryAffineReprOptimizer,
+            )
+            repr_cls = (
+                SimpleDpBoundaryAffineElementsOptimizer,
+                SimpleDpBoundaryAffineReprProportionalOptimizer,
+                SimpleDpBoundaryAffineReprOptimizer,
+                SimpleDpWorkersWidthBoundaryAffineReprOptimizer,
+            )[optimizer_selector - 34]
+            for feature in self.features.values():
+                feature.set_optimizer(repr_cls())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be 0-29 or 31-33."
+                "OptimizerOptions.use_my_optimizer must be 0-29 or 31-37."
             )
 
         if len(self.features) == 0:
@@ -2909,6 +2926,357 @@ class DataSet:
 
         return fit_width_curve(measured)
 
+    def _time_operator_grid_mean_ms(
+        self,
+        fn,
+        grid: List[bytes],
+        budget_sec: float,
+        max_calls_per_point: int,
+    ) -> List[Optional[float]]:
+        """Interleaved mean milliseconds for every point of one operator.
+
+        The planning objective is the mean service time, and several kernels
+        switch into a slower mode only over multi-second windows.  Measuring
+        every point in a short burst therefore reports a biased (usually too
+        cheap) mean -- this was the defect that made the first version of this
+        model fit a slope three times too small.  All points of one operator
+        are consequently measured round-robin inside one window, so every point
+        sees the same slow-mode episodes, and each point keeps the raw mean of
+        all its calls.
+        """
+        if not grid:
+            return []
+        for snapshot in grid[:3]:
+            self._time_operator_fresh_snapshot(fn, snapshot)
+        durations: List[List[float]] = [[] for _ in grid]
+        invalid: List[bool] = [False] * len(grid)
+        gc_was_enabled = gc.isenabled()
+        gc.disable()
+        try:
+            while True:
+                for index, snapshot in enumerate(grid):
+                    if invalid[index]:
+                        continue
+                    if len(durations[index]) >= max_calls_per_point:
+                        continue
+                    try:
+                        durations[index].append(
+                            self._time_operator_fresh_snapshot(fn, snapshot)
+                        )
+                    except Exception:  # noqa: BLE001
+                        # A rescaled counterfactual the operator rejects (for
+                        # example a list container an image transform cannot
+                        # read) is not a legal input: drop that point only.
+                        invalid[index] = True
+                        logger.info(
+                            "Representation compute point rejected; skipped"
+                        )
+                # The budget is *per point*: bursts shorter than a few seconds
+                # miss the slow-mode episodes of kernels such as GaussianBlur
+                # and report a mean that is several times too cheap.
+                if all(
+                    invalid[index]
+                    or
+                    len(values) >= max_calls_per_point
+                    or sum(values) >= budget_sec
+                    for index, values in enumerate(durations)
+                ):
+                    break
+        finally:
+            if gc_was_enabled:
+                gc.enable()
+                gc.collect()
+        return [
+            1000.0 * statistics.fmean(values)
+            if values and not invalid[index]
+            else None
+            for index, values in enumerate(durations)
+        ]
+
+    @staticmethod
+    def _fit_compute_coefficients(
+        points: List[Tuple[float, float]]
+    ) -> Optional[Dict[str, float]]:
+        """Two-stratum least squares for ``k * elements + b``."""
+        if len(points) < 2:
+            return None
+        points = sorted(points)
+        (x_low, y_low), (x_high, y_high) = points[0], points[-1]
+        if x_high <= x_low:
+            return None
+        slope = max(0.0, (y_high - y_low) / (x_high - x_low))
+        intercept = max(0.0, y_low - slope * x_low)
+        return {
+            "k_ms_per_element": slope,
+            "b_ms": intercept,
+            "points_ms_per_element": [[x_low, y_low], [x_high, y_high]],
+        }
+
+    def _profile_operator_compute_model(
+        self,
+        profile: Dict[str, Any],
+        feature: Feature,
+        reservoir: ProfileInputReservoir,
+    ) -> None:
+        """Fit ``cost = k_(operator, representation) * elements + b``.
+
+        Reordering a pipeline can hand an operator the same record in a
+        different representation (moving ``to_float`` behind the image
+        transforms turns a float32 payload into a uint8 one).  A byte-shaped
+        curve cannot express that, so every operator is measured inside each
+        representation class it can legally receive, on payloads the pipeline
+        itself materialises, and only the spatial extent is rescaled to obtain
+        the two strata.  Boundaries and transport keep using bytes.
+        """
+        enabled = os.environ.get("CEDAR_PROFILE_COMPUTE_MODEL", "1")
+        if enabled.strip() not in ("1", "true", "True", "yes"):
+            return
+        budget_sec = float(
+            os.environ.get("CEDAR_PROFILE_COMPUTE_TARGET_SEC", "5.0")
+        )
+        max_calls_per_point = int(
+            os.environ.get("CEDAR_PROFILE_COMPUTE_MAX_CALLS", "400")
+        )
+        max_classes = int(
+            os.environ.get("CEDAR_PROFILE_COMPUTE_MAX_CLASSES", "6")
+        )
+        pool_per_pipe = int(
+            os.environ.get("CEDAR_PROFILE_COMPUTE_POOL_PER_PIPE", "2")
+        )
+        downscale = float(
+            os.environ.get("CEDAR_PROFILE_AFFINE_DOWNSCALE", "0.5")
+        )
+        upscale = float(os.environ.get("CEDAR_PROFILE_AFFINE_UPSCALE", "2.0"))
+
+        # 1) Candidate payloads: the pipeline's own intermediate values plus one
+        # application of every callable, so a representation the declared order
+        # never materialises (uint8 single channel, say) is still measured on a
+        # real record rather than invented.
+        callables: Dict[int, Any] = {}
+        records_per_call: Dict[int, int] = {}
+        for p_id, pipe in feature.logical_pipes.items():
+            fn, _, per_call = self._operator_affine_measurement(pipe)
+            if fn is not None:
+                callables[int(p_id)] = fn
+                records_per_call[int(p_id)] = max(1, int(per_call or 1))
+
+        def _is_single_record(value) -> bool:
+            """Batches are not per-record payloads; they have no fit curve."""
+            dim = getattr(value, "dim", None)
+            if callable(dim):
+                return int(dim()) <= 3
+            return True
+
+        pool: List[Any] = []
+        seen: set = set()
+        for p_id in sorted(reservoir.samples):
+            for raw in reservoir.values_for(p_id)[:pool_per_pipe]:
+                try:
+                    value = pickle.loads(raw)
+                except Exception:  # noqa: BLE001
+                    continue
+                if not _is_single_record(value):
+                    continue
+                klass = payload_representation_class(value)
+                scale = payload_compute_scale(value)
+                if klass is None or scale is None:
+                    continue
+                key = (klass, round(scale, 3))
+                if key in seen:
+                    continue
+                seen.add(key)
+                pool.append(value)
+        for p_id in sorted(callables):
+            fn = callables[p_id]
+            for value in list(pool):
+                try:
+                    produced = fn(value)
+                except Exception:  # noqa: BLE001
+                    continue
+                if not _is_single_record(produced):
+                    continue
+                klass = payload_representation_class(produced)
+                scale = payload_compute_scale(produced)
+                if klass is None or scale is None:
+                    continue
+                key = (klass, round(scale, 3))
+                if key in seen:
+                    continue
+                seen.add(key)
+                pool.append(produced)
+        if not pool:
+            logger.info("Compute-model profiling found no usable payloads")
+            return
+
+        operators: Dict[str, Dict[str, Any]] = {}
+        transitions: Dict[str, Dict[str, str]] = {}
+        element_ratios: Dict[str, float] = {}
+        coverage: Dict[str, Any] = {}
+        source_class = None
+        source_elements = None
+        for package_id, pipe in sorted(feature.logical_pipes.items(), key=lambda kv: int(kv[0])):
+            if pipe.input_pipes:
+                continue
+            for raw in reservoir.values_for(int(package_id)):
+                try:
+                    value = pickle.loads(raw)
+                except Exception:  # noqa: BLE001
+                    continue
+                source_class = payload_representation_class(value)
+                source_elements = payload_compute_scale(value)
+                break
+            if source_class is not None:
+                break
+        for p_id, fn in sorted(callables.items()):
+            per_call_divisor = records_per_call.get(p_id, 1)
+            pipe = feature.logical_pipes[p_id]
+            if len(pipe.input_pipes) != 1:
+                coverage[str(p_id)] = "not_a_single_input_stage"
+                continue
+            entry: Dict[str, Any] = {}
+            transition: Dict[str, str] = {}
+            own_input = None
+            own_inputs = reservoir.values_for(pipe.input_pipes[0].id)
+            for raw in own_inputs:
+                try:
+                    own_input = pickle.loads(raw)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+            by_class: Dict[str, List[Any]] = {}
+            for value in pool:
+                klass = payload_representation_class(value)
+                if klass is None:
+                    continue
+                try:
+                    produced = fn(value)
+                except Exception:  # noqa: BLE001
+                    continue
+                out_class = payload_representation_class(produced)
+                if out_class is not None and _is_single_record(produced):
+                    transition.setdefault(klass, out_class)
+                if len(by_class.get(klass, [])) < 4:
+                    by_class.setdefault(klass, []).append(value)
+            fits: Dict[str, Dict[str, float]] = {}
+            grid_specs: List[Tuple[str, float, bytes]] = []
+            for klass, values in sorted(by_class.items())[:max_classes]:
+                values.sort(
+                    key=lambda item: payload_compute_scale(item) or 0.0
+                )
+                base = values[len(values) // 2]
+                for factor in (downscale, upscale):
+                    scaled = self._affine_rescale_payload(base, factor)
+                    candidate = scaled if scaled is not None else base
+                    if scaled is not None:
+                        try:
+                            fn(candidate)
+                        except Exception:  # noqa: BLE001
+                            # The rescaled form is not a legal input for this
+                            # operator (a container it cannot read); only the
+                            # real payload is usable.
+                            candidate = base
+                    try:
+                        snapshot = pickle.dumps(
+                            candidate, protocol=pickle.HIGHEST_PROTOCOL
+                        )
+                    except Exception:  # noqa: BLE001
+                        continue
+                    scale = payload_compute_scale(candidate)
+                    if scale is None:
+                        continue
+                    if any(
+                        spec[0] == klass and abs(spec[1] - float(scale)) < 1e-6
+                        for spec in grid_specs
+                    ):
+                        # A payload that cannot be rescaled (a file path) has
+                        # no contrast; one point is enough for the k = 0 fit.
+                        continue
+                    grid_specs.append((klass, float(scale), snapshot))
+            if grid_specs:
+                means = self._time_operator_grid_mean_ms(
+                    fn,
+                    [spec[2] for spec in grid_specs],
+                    budget_sec,
+                    max_calls_per_point,
+                )
+                per_class: Dict[str, List[Tuple[float, float]]] = {}
+                for (klass, scale, _), cost in zip(grid_specs, means):
+                    if cost is None:
+                        continue
+                    per_class.setdefault(klass, []).append(
+                        (scale, cost / per_call_divisor)
+                    )
+                points_by_class = per_class
+            else:
+                points_by_class = {}
+            for klass, points in points_by_class.items():
+                fit = self._fit_compute_coefficients(points)
+                if fit is None and len(points) == 1:
+                    # A payload with no size contrast (a file path handed to a
+                    # reader) still costs something: it is the k = 0 member of
+                    # the same family, exactly like the byte model's constant
+                    # fallback, and it must not leave the operator unpriced.
+                    scale, cost = points[0]
+                    fit = {
+                        "k_ms_per_element": 0.0,
+                        "b_ms": float(cost),
+                        "points_ms_per_element": [[scale, cost], [scale, cost]],
+                    }
+                if fit is None:
+                    continue
+                fit["samples"] = len(by_class.get(klass, []))
+                fits[klass] = fit
+            if not fits:
+                coverage[str(p_id)] = "no_measured_representation"
+                continue
+            if own_input is not None:
+                own_class = payload_representation_class(own_input)
+                own_scale = payload_compute_scale(own_input)
+                entry["own_class"] = own_class
+                entry["own_elements"] = own_scale
+                try:
+                    produced = fn(own_input)
+                    out_scale = payload_compute_scale(produced)
+                    if own_scale and out_scale is not None:
+                        # ``records_per_call`` operators (a batcher) consume
+                        # several records in one call: their per-record compute
+                        # scale must not grow with the batch.
+                        element_ratios[str(p_id)] = float(out_scale) / (
+                            float(own_scale) * per_call_divisor
+                        )
+                except Exception:  # noqa: BLE001
+                    pass
+            entry["by_class"] = fits
+            operators[str(p_id)] = entry
+            transitions[str(p_id)] = transition
+            coverage[str(p_id)] = sorted(fits)
+        profile.setdefault("physical_model", {})["compute_model"] = {
+            "schema_version": 1,
+            "statistic": "mean_ms_per_callable_call",
+            "scale": "payload elements (C*H*W for images, bytes for text)",
+            "method": "per_representation_two_stratum_element_fit",
+            "note": (
+                "cost = k_(operator, representation_class) * elements + b; the "
+                "class comes from payload dtype/channels/container, which a "
+                "planner sees without running the plan. Byte volumes remain the "
+                "unit for boundaries and transport."
+            ),
+            "operators": operators,
+            "class_transition": transitions,
+            "element_ratio": element_ratios,
+            "measured_classes": coverage,
+            "source_class": source_class,
+            "source_elements": source_elements,
+        }
+        fitted = sum(
+            len(entry.get("by_class", {})) for entry in operators.values()
+        )
+        logger.info(
+            "Representation-aware compute model: %s operators, %s class curves",
+            len(operators),
+            fitted,
+        )
+
     def _profile_layered_backends(
         self,
         profile: Dict[str, Any],
@@ -2917,6 +3285,7 @@ class DataSet:
     ) -> None:
         """Collect isolated adaptive costs and targeted width calibration."""
         self._profile_operator_input_size_affine(profile, feature, reservoir)
+        self._profile_operator_compute_model(profile, feature, reservoir)
         affine_section = profile.get("physical_model", {}).get(
             "operator_affine"
         )

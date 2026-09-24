@@ -110,6 +110,60 @@
 
 ## C. 合法性与语义
 
+## D. 本轮（表示感知实现）新增的审计项
+
+### D1. Blur 的重尾：是真实 CPU 消耗，且**与测量窗口长度有关** —— 已确认
+
+- 同一 payload（pico 的 uint8 单通道 244×244）在单线程下：wall p50 = 2.61 ms，
+  wall mean = 14.59 ms，**process CPU mean = 14.60 ms**（CPU/wall = 1.00）→ 不是被抢占，
+  慢模式真的在 CPU 上执行（`wall_vs_cpu.json`）。
+- 连续 60 s 交错测量（`blur_mean_curve.json`）：u8 1ch 的 p50/mean 分别为
+  122²：0.905 / 2.347、187×250：2.089 / 7.235、244²：2.582 / 9.117、375×500：7.316 / 27.274
+  —— **两者都随元素数线性**，但斜率相差 3.7 倍（mean 1.42e-4 vs p50 3.85e-5 ms/元素）。
+- 短窗口会低估均值：早期 profiler 用 0.3 s/点测量，得到 47,000 元素处 1.2–1.6 ms，
+  而长窗口是 7.2–7.5 ms（`sustained_mean.json`）。**因此本轮的 profiler 把每个点的
+  实测时间预算提高到 5 s，并把同一算子的所有点放在同一交错窗口内**
+  （`Dataset._time_operator_grid_mean_ms`）。
+- 线程数是第二个陷阱：测试脚本若忘记 `limit_native_threadpools(1)`，
+  Blur 会被多线程测成 ~1.5 ms（`thread_probe.json`：32 线程 mean 1.60 ms vs 1 线程 9.94 ms）。
+  profiler 与 worker 都已是单线程；复现脚本必须显式设置。
+- 未解释的部分：慢模式的出现概率（~10% 调用、p90 ≈ 13× p50）机制未定位；
+  它同时出现在孤立测量与流水线测量中，且对同一 payload 在所有计划里一致，
+  因此按均值建模是可行的，但绝对预测仍带一个环境项。
+
+### D2. batcher 的 element_ratio 曾按批大小放大 —— 已修复（生成后已说明）
+
+- 首次生成 profile 时 `element_ratio["0"]`（BatcherPipe）= 4.0，因为
+  `NativeBatchCall` 一次消费 4 条记录、产出 4 倍元素。
+  该比例只在"batcher 之后还有算子"时才影响定价；本 feature 的 batcher 是 sink
+  （`BatcherPipe(...).fix()`），因此**该值在任何被定价的位置上都不会被使用**。
+- 代码已改为按 `records_per_call` 归一（`element_ratio = out/(in*records_per_call)`），
+  后续 profile 会得到 1.0；本轮交付的 profile 保留原值并在 `compute_model.patched` 中注明。
+
+### D3. DP 的类状态递推必须沿合法顺序 —— 已修复（实现期发现）
+
+- 第一版按"最低位算子最后应用"递推，遇到不含 reader 的掩码时转移表查不到、
+  状态静默停在 `path`，导致位置类全部算错（DP 目标与穷举不一致）。
+- 改为按**特征声明顺序**（最高位最后应用）递推后，DP 在 1260 个合法顺序上
+  与独立穷举实现取到同一个 argmin（`dp_optimality_test.json`，PASS）。
+
+### D4. 表示类缺失时的行为 —— 已实现为"显式"而非回退
+
+- DP 在构造候选时会枚举违反依赖的掩码（例如 Normalize 出现在 to_float 之前），
+  这类位置没有测过的曲线。实现对这些位置给**惩罚价**并记录，
+  搜索结束后由 `assert_plan_covered(plan)` 校验最终计划：若最终计划仍落在
+  未测表示类上则报错，绝不静默回退到字节模型（`design.md` §3）。
+
+### D5. 语义：移动 `to_float` 会改变增强结果 —— 已确认（见 semantic_scope.md）
+
+- `to_float` 不做 /255；torchvision 按 [0,1] 解释 float 图像，
+  因此声明顺序下 `ColorJitter` 的输出被 clamp 到 [0,1]，而 uint8 路径正常在 [0,255]。
+  32 条记录逐算子比较：jitter/grayscale/blur 的平均绝对差 ≈ 101–104（0..255 尺度），
+  crop/flip 只有 0.24（纯量化）。数据：`plan_output_differences.json`、
+  `dtype_semantics.json`。
+- 结论：本负载**没有语义等价的重排**；重排带来的成本差异可以用于验证成本模型，
+  **不能**作为等价优化收益写入论文。
+
 ### C1. 计划依赖 —— 已确认
 
 `evaluation/pipelines/target_pipeline/simclr/cedar_dataset.py` 只声明了四条约束：

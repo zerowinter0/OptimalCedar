@@ -1,102 +1,90 @@
-# 设计：把"元素数 + 表示类"接进 profiler 与 DP（未实现，待批准）
+# 设计：把"表示感知的计算模型"接进 profiler 与 DP（已实现）
 
-本文件只写依据、改法与验收标准，**不改现网模型**。当前正式模型
-（`physical_model.operator_affine` 的字节 `kx+b`）保持不变，改进作为**独立变体**实现。
+上一轮的 `design.md` 是方案；本轮按该方案完成实现，本文档记录**实现后的**接口、
+公式与状态，以及与原两参数 affine 的区别。
 
-## 1. 依据（来自本轮证据）
+## 1. 特征与公式
 
-1. `blur_geometry.json`：同样约 6 万字节，`u8 1ch 244×244` = 2.606 ms 而
-   `f32 1ch 122×122` = 0.850 ms（3.1×）；元素数相同而 dtype 不同时成本几乎相同。
-2. `operator_matrix.json`：在 4 个表示类 × 3 个空间尺度上，`k·元素数 + b` 的
-   留出点误差多数 < 8%（Jitter-3ch +30%、极小算子 +23% 是主要例外）。
-3. `plan_scoring.json`：以流水线内 p10 为目标，六个计划上
-   M4（元素 + 表示类）= 0.92–1.42×，M2（字节 affine）= 0.54–11.13×。
-4. `audit.md` A5：这些计划的**统计传播没有误差**，所以改进只需动"成本响应"，
-   不需要改选择率/尺寸传播。
-
-## 2. 模型变更
+对算子 `i`、位置 `p`：
 
 ```
-compute_price(op, payload) = k_(op, class(payload)) * elements(payload) + b_(op, class(payload))
-boundary_price(...)        = 保持字节口径不变（序列化/传输确实与字节相关）
+elements(p) = source_elements * Π_{j before p} element_ratio[j]        # 计算规模
+class(p)    = transition[last]( ... transition[first](source_class) )  # 表示类
+compute_i(p) = k_(i, class(p)) * elements(p) + b_(i, class(p))          # 单位: ms / 源记录
+bytes(p)     = source_bytes * Π_{j before p} byte_ratio[j]              # 只用于边界/传输
 ```
 
-- `elements(payload)`：tensor → `numel`；PIL → `W×H×bands`；bytes/str → `len`；
-  dict/list → 递归求和。**不引入新维度**，只是把既有 payload 的"工作量"度量换掉。
-- `class(payload)`：`{dtype}×{channels}`（tensor）、`PIL{mode}`、`text`、`path` 等，
-  由 payload 自身决定，**是规划时可获得的信息**。
-- 每个 (算子, 类) 仍是两参数仿射：`k`、`b`。总参数数从 `2×N_op` 增至
-  `2×Σ_op(#classes_op)`；本负载下 7 个算子共 4 类、实际可用类 2–4 个，
-  即每个算子 4–8 个额外参数。
+- 表示类由 payload 自身决定（`cedar/pipes/common.py:payload_representation_class`）：
+  `uint8:3ch`、`float32:1ch`、`PIL:L`、`path`、`text` 等；规划时即可获得。
+- 计算规模由 `payload_compute_scale` 给出：图像 `C*H*W`、PIL `W*H*bands`、
+  文本/路径 `len`、容器递归求和。
+- 传输/边界**完全不变**：仍用序列化字节量与既有的 boundary 模型。
 
-## 3. profiler 变更（`cedar/client/dataset.py`）
+## 2. profiler 实现
 
-1. 新增 `payload_elements(value)` 与 `payload_class(value)`（放在
-   `cedar/pipes/common.py`，供 profiler 与 DP 共用同一实现，避免两处分叉）。
-2. `_profile_operator_input_size_affine`：
-   - 保留现有的"自己的合法输入"两点拟合 → 写入新的
-     `k_ms_per_element` / `b_ms` / `x_reference_elements`（与旧字节字段**并存**，
-     旧字段继续给现网模型读）；
-   - 新增 `by_class`：对 reservoir 里**本特征其它管道**产出的 payload（同一批记录、
-     同一份内容），逐个用一次试调判断该算子是否接受，接受的按类分组；
-     每类用"最小/最大两个层"拟合 k、b（与本轮分析脚本同一规则）；
-   - 新增 `class_transition[p][in_class] = out_class` 与 `element_ratio[p]`
-     （对每类各测一次即可）。
-3. 额外剖析成本：每算子每类 2 次计时（每类 5 次 repeat，`target_sec` 不变），
-   本负载下约增加 8–16 次小测；相对整份 layered profile 可忽略，
-   但必须在 README 里报告（本轮 `protocol.json` 已要求）。
-4. 未测到的类**不允许回退**：如果候选计划要求一个没有系数的 (算子, 类)，
-   优化器应报错而不是退回字节模型（与 AGENTS.md 的"强制新版本正确"一致）。
+`Dataset._profile_operator_compute_model`（`cedar/client/dataset.py`）：
 
-## 4. DP 变更（`cedar/compose/my_optimizer.py`、`cedar/compose/dp_optimizer.py`）
+1. 候选 payload = 该次 profiling 流水线真实产出的中间值（reservoir）
+   ∪ 把这些值再经过本 feature 任一 callable 一次应用的结果。
+   后者用于覆盖"声明顺序从不物化、但合法重排会物化"的表示类
+   （例如 uint8 单通道：`Grayscale(uint8:3ch)`）。
+2. 对每个算子，用一次试调筛出它接受的 payload，按表示类分组；
+   每类取中位大小的 payload，做 0.5× / 2.0× **空间**缩放得到两个层
+   （只有空间缩放，绝不跨类套用）。
+3. 同一算子的所有 (类 × 层) 点在**同一个交错窗口**内测量，每点累计
+   `CEDAR_PROFILE_COMPUTE_TARGET_SEC`（默认 5 s）的实际调用时间，取逐调用平均。
+   这是本轮最重要的协议修正：更短的窗口会漏掉 GaussianBlur 的慢模式，
+   把均值低估 3–6 倍（见 `audit.md` B2 与 `blur_mean_curve.json`）。
+4. 两点线性拟合 `k`、`b`；没有尺寸对比的 payload（文件路径）按 `k = 0` 的同一族常数处理。
+5. 同时记录 `class_transition[p][class]` 与 `element_ratio[p]`（用该算子在声明位置的真实输入测得）。
 
-现在只有一张表：`_dp_r_prod[mask] = ∏_{i∈mask} byte_ratio[i]`。
-需要新增两张与它同构的表（同样的子集递推、同样的 lazy 路径
-`_LazyProductTable`，60+ 算子的负载同样适用）：
+落盘位置：`physical_model.compute_model`（schema_version=1），与旧的
+`physical_model.operator_affine` **并存**，旧模型与其历史结果不受影响。
 
-```
-_dp_element_prod[mask] = ∏ element_ratio[i]
-_dp_class_state[mask]  = class_transition[last_op]( class_state[mask ^ lsb] )
-```
+## 3. DP 实现
 
-- `class_state` 只需存一个小的离散 id（类数 ≤ 8），`2^n` 个 int8 足够；
-  超过子集上限时用与 `_LazyProductTable` 相同的惰性策略。
-- `_dp_compute_work_prod` 改为
-  `cardinality_prod[mask] * price(op, element_prod[mask], class_state[mask])`；
-  `_dp_work_prod`（字节）**保持不变**，继续给 boundary / cache / transport 用。
-- `_calculate_pipe_cost` 的本地分支与后端分支都改用元素价格；
-  后端测得的 `backend_compute.mean_ms_per_sample` 仍在**它被剖析的那个类**上，
-  换类时按该类系数缩放（本轮 M4 的做法）。
+`cedar/compose/simple_dp_ablation_optimizer.py:_RepresentationComputeMixin`：
 
-## 5. 变体与消融接线
+- 与 `_dp_r_prod` 同构地构建两张表：
+  `element_prod[mask] = Π element_ratio`、`class_state[mask]`（转移沿 mask 逐位应用）。
+  两张表都只依赖"已放入前缀的算子集合"，因为本负载的转移是单调的
+  （`to_float` 设置元素类型、`grayscale` 减少通道）；`repr_state_is_order_independent()`
+  会对整个算子集做穷举一致性检查，一旦未来 recipe 破坏该性质会报错而不是错误合并状态。
+- `_dp_compute_work_prod(mask, idx)` 用 `elements(mask)` 与 `class(mask)` 定价；
+  `_dp_work_prod`（字节）保持不变，boundary/cache/transport 仍走字节。
+- `_dp_compute_cost_denominator`、`_calculate_pipe_cost` 用算子在**声明位置**的特征做锚点，
+  保证"profile 位置处预测 = profile 值"，与旧实现的归一化口径一致。
+- 缺少 `(算子, 表示类)` 曲线时**显式报错**，不会静默回退到字节模型
+  （`RuntimeError: operator X has no compute curve for representation class Y`）。
 
-| selector | 模型 | 用途 |
+## 4. 变体
+
+| selector | 类 | 模型 |
 | --- | --- | --- |
-| 现网 21/27/29 | 字节 `kx+b` | 不变，正式基线与历史结果 |
-| 新 34 `SimpleDpBoundaryAffineElements` | 元素 `kx+b` | M3 消融（只换自变量） |
-| 新 35 `SimpleDpBoundaryAffineRepr` | 元素 + 每类系数 | M4（推荐候选） |
+| 21 / 27 / 29（现状） | `SimpleDpBoundaryOptimizer` 等 | 字节 `k·bytes+b`（基线，未改） |
+| 34 | `SimpleDpBoundaryAffineElementsOptimizer` | M3：元素 affine，不分类 |
+| 35 | `SimpleDpBoundaryAffineReprProportionalOptimizer` | M4：分类过原点 `k_(i,z)·e` |
+| 36 | `SimpleDpBoundaryAffineReprOptimizer` | M5：分类 affine `k_(i,z)·e+b_(i,z)` |
+| 37 | `SimpleDpWorkersWidthBoundaryAffineReprOptimizer` | PICO（W×width）配 M5 |
 
-两个新变体都复用同一份 layered profile（旧的字节字段仍在里面），
-保证"模型形式/额外剖析/统计修复"三者可分离。
+CLI 名（`evaluation/compare_optimizer_perf.py`）：
+`simple_dp_repr_elements` / `simple_dp_repr_proportional` /
+`simple_dp_repr_affine` / `simple_dp_workers_width_repr_affine`。
 
-## 6. 验收标准（事先固定）
+## 5. 与原两参数 affine 的差别（用于论文表述）
 
-1. **回归**：在同一份 profile 上，变体 34/35 对**声明计划**的预测必须与实测
-   （逐调用 p10）相差 < 20%——否则说明接线引入新错误。
-2. **计划级**：六个计划（§4.10.4 的四个 + v1/v2）上的预测倍率必须落在
-   分析脚本给出的区间附近（M4：0.92–1.42），并对**新构造**的两个顺序保持。
-3. **决策级**：对六个计划，比较"模型选择的计划"与"实测最优计划"的后悔值；
-   运行间不确定（v1 2.6%、v2 6.5%）以内的差异标记为并列。
-4. **不退化**：dp-boundary-affine（字节版）与 PICO 的行为与当前一致
-   （同 profile、同数据、同 W 下的计划与 cost 不变）。
-5. 若变体 34（只有元素、没有类）在多数计划上并不优于字节版，
-   则必须在论文中说明"改进来自**表示类**这一额外维度"，而不是自称仍是两参数 affine。
+| 维度 | 旧模型 | 新模型 |
+| --- | --- | --- |
+| 自变量 | 序列化字节 | 元素数（计算规模） |
+| 系数量 | 每算子 1 对 (k,b) | 每 (算子, 表示类) 1 对 (k,b) |
+| 重排影响 | 字节量变化即认为工作量变化 | 只有元素数/表示类变化才影响计算；字节只影响边界 |
+| 覆盖 | 任何算子 | 只覆盖**测过的**表示类，未覆盖即报错 |
 
-## 7. 已知风险
+## 6. 验收（已执行/待执行）
 
-- 类的数量会随负载增长（多模态、文本、视频），`class_transition` 的表会变大；
-  需要上限与显式的"未覆盖类"错误，而不是静默回退。
-- 元素数对文本类负载没有意义（`len(bytes)` 就是元素数），因此该改动对文本负载
-  等价于"字节但去掉 pickle 开销"，需要单独验证不产生回归。
-- 本轮只证明成本响应改善；**是否带来更好的计划选择与吞吐仍未验证**，
-  这正是验收标准 2/3 要回答的问题。
+- DP vs 穷举：`tmp_analysis/test_repr_dp_optimality.py`（关 fusion/offload/parallelism，
+  枚举全部合法顺序，用独立参考实现打分，DP 必须落在 argmin）。
+- 缺失类行为：`test_compute_model_profiler.py` + DP 报错路径。
+- 成本回放一致性：`tmp_analysis/score_m1_m5_plans.py` 在同一 profile 上重放逐算子预测。
+- 字节边界未变：新变体的 `_dp_work_prod` 未被覆盖，边界项仍由
+  `_layered_boundary_cost_ms` 计算（与 21/27 共用）。

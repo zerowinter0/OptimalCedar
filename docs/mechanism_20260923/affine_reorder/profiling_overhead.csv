@@ -1,0 +1,3 @@
+profile,workload,wall_time_min,representation_phase_min,source
+layered_20260919,simclrv2,11.0,0.0,outputs/six_workload_profile_v3_20260919/simclrv2/profiles/shared.yaml
+layered_repr_20260924,simclrv2,21.0,10.0,outputs/affine_repr_profile_20260924/shared.yaml
