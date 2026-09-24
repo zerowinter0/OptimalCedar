@@ -87,5 +87,46 @@
   "synthetic scalability n=4..16 not run",
   "stackexchange not included",
   "no training-quality comparison (per the final decision)"
- ]
+ ],
+ "fast_protocol_20260925": {
+  "driver": "scripts/pico_final_fast_20260925.sh",
+  "budget_hours": 7,
+  "estimated_hours": 3,
+  "relaxations": {
+   "data_volumes": {
+    "simclrv2": 75752,
+    "simclrv2_cache": 75752,
+    "commonvoice": 100000,
+    "coco": 20000,
+    "llava_pretrain": 10000
+   },
+   "rounds": {
+    "slow_baselines": 1,
+    "dp_pair": "1 + 1 extra repeat"
+   },
+   "dropped_optimizers": {
+    "all_workloads": [
+     "unopti"
+    ],
+    "commonvoice": [
+     "raydata_optimizer"
+    ],
+    "llava_pretrain": [
+     "optimizer"
+    ]
+   },
+   "llava_note": "Cedar's staged optimizer times out on LLaVA-Pretrain; only pico_final, plumber and raydata run there",
+   "shortened_profiles": [
+    "coco",
+    "llava_pretrain"
+   ],
+   "optimizer_time_limit_sec": 2400
+  },
+  "unchanged": [
+   "final identity (pico_final, selector 39; W-only, width fixed at 1)",
+   "compute model and boundary model",
+   "same profile per workload, remote Ray, 64 CPU budget, single-threaded operators",
+   "failed/timeout cells recorded as such, never reused as successes"
+  ]
+ }
 }

@@ -81,6 +81,21 @@
 
 ## 6. 复现
 
+## 5b. 7 小时预算下的协议放宽（用户批准，逐项记录）
+
+为了把总时长压进 7 小时，`scripts/pico_final_fast_20260925.sh` 相对冻结协议做了以下放宽，
+**每一项都改变了对"轮次/数据量"的主张强度，写作时必须按此措辞**：
+
+| 放宽 | 内容 | 影响 |
+| --- | --- | --- |
+| 数据量 | simclrv2 / simclrv2_cache 8 epochs = **75,752** 条（原 189,380）；commonvoice **100,000**（原 300,000）；coco **20,000**；llava_pretrain **10,000** | 稳态吞吐与数据量无关，仍可比；但"大数据规模"只能写"够稳态"，不能写原规模 |
+| 轮次 | 慢基线（plumber/raydata）**1 轮**；DP 对（pico_final/cedar）主 cell 1 轮 + 额外 repeat 1 次 | 只有 1–2 个样本，只能给点值；不做显著性声明 |
+| 去项 | 所有负载去掉 `unopti`；commonvoice 去掉 `raydata` | 与最弱基线的对比缺失，README 里标注 |
+| llava | **不跑 cedar**（稳定超时），只跑 pico_final / plumber / raydata，超时上限 1200 s | Cedar 在 llava 上的对比缺失，写明原因 |
+| profile | coco / llava 用缩短窗口（compute 曲线 1.5 s/点、adaptive 2–10 s） | 这两份 profile 的曲线精度低于其他负载，标注 |
+
+计划总时长 ≈ **3 小时**（预算 7 小时），此后自动组装；若中途某 cell 超时按原样记录。
+
 ```bash
 # 容器内，先 source env/bin/activate
 bash scripts/pico_final_all_20260924.sh          # profiles → smoke → campaign → W scaling → assembly

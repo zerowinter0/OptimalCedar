@@ -152,6 +152,34 @@ def collect_planning():
     return rows
 
 
+def collect_w_scaling():
+    """Fixed-structure W sweep cells (C3)."""
+    rows = []
+    for result in sorted(OUT.glob("*/w_scaling/results_W*.json")):
+        try:
+            data = json.loads(result.read_text())
+        except Exception:  # noqa: BLE001
+            continue
+        workers = result.stem.replace("results_W", "")
+        for run in data.get("runs", []):
+            for index, rep in enumerate(run.get("repeat_results") or [run]):
+                rows.append(
+                    {
+                        "workload": result.parts[-4],
+                        "n_local_workers": workers,
+                        "optimizer": run.get("optimizer"),
+                        "round": index + 1,
+                        "throughput_samples_per_sec": rep.get(
+                            "throughput_samples_per_sec"
+                        ),
+                        "perf_time_sec": rep.get("perf_time_sec"),
+                        "num_samples": rep.get("num_samples"),
+                        "source": str(result.relative_to(ROOT)),
+                    }
+                )
+    return rows
+
+
 def write_csv(path: Path, rows, fields=None):
     if not rows:
         path.write_text("")
@@ -242,6 +270,7 @@ def main() -> int:
     table, plan_rows, operator_rows = chapter3_tables()
     planning = collect_planning()
     write_csv(OUT / "planning.csv", planning)
+    write_csv(OUT / "w_scaling.csv", collect_w_scaling())
     write_csv(OUT / "operator_predictions.csv", operator_rows)
     write_csv(OUT / "plan_predictions.csv", plan_rows)
     write_csv(OUT / "ranking.csv", table)
