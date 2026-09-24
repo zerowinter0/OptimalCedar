@@ -4,8 +4,8 @@
  "files": {
   "README.md": {
    "path": "docs/mechanism_20260923/affine_reorder/README.md",
-   "bytes": 8217,
-   "sha256": "829fe6e0e4f096b7b1bb480f8bb01dd05d42465a830d83a2825cd5f2e747c151"
+   "bytes": 9080,
+   "sha256": "250d94a74b6c386a61af56e8c6713203e6dfae29fa37909f103e5526f8db8292"
   },
   "audit.md": {
    "path": "docs/mechanism_20260923/affine_reorder/audit.md",
