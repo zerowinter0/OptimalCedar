@@ -44,6 +44,7 @@ from .utils import flip_adj_list
 from .simple_dp_ablation_optimizer import (
     OldDpBoundaryOptimizer,
     SimpleDpBoundaryOptimizer,
+    SimpleDpWorkersBoundaryAffineReprOptimizer,
     SimpleDpWorkersBoundaryOptimizer,
 )
 
@@ -394,3 +395,17 @@ class StagedWorkersBoundaryAffineOptimizer(
             cost,
         )
         return workers
+
+
+class StagedWorkersBoundaryAffineReprOptimizer(
+    StagedWorkersBoundaryAffineOptimizer
+):
+    """C2: staged search priced by the *final* W-only PICO model.
+
+    Only the search organisation differs from ``pico_final`` (staged keeps its
+    intermediate decisions instead of searching them jointly); the compute
+    model, boundary model, backend/fusion support, W ladder and width rule are
+    the same oracle class the final optimizer uses.
+    """
+
+    dp_cost_optimizer_class = SimpleDpWorkersBoundaryAffineReprOptimizer

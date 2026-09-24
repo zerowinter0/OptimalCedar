@@ -1022,9 +1022,30 @@ class DataSet:
             )[optimizer_selector - 34]
             for feature in self.features.values():
                 feature.set_optimizer(repr_cls())
+        elif optimizer_selector in (38, 39, 40, 41):
+            from cedar.compose.simple_dp_ablation_optimizer import (
+                SimpleDpAffineReprOptimizer,
+                SimpleDpWorkersAffineReprOptimizer,
+                SimpleDpWorkersBoundaryAffineReprOptimizer,
+                SimpleDpWorkersByteProportionalOptimizer,
+            )
+            final_cls = (
+                SimpleDpAffineReprOptimizer,
+                SimpleDpWorkersBoundaryAffineReprOptimizer,
+                SimpleDpWorkersAffineReprOptimizer,
+                SimpleDpWorkersByteProportionalOptimizer,
+            )[optimizer_selector - 38]
+            for feature in self.features.values():
+                feature.set_optimizer(final_cls())
+        elif optimizer_selector == 42:
+            from cedar.compose.staged_ablation_optimizer import (
+                StagedWorkersBoundaryAffineReprOptimizer,
+            )
+            for feature in self.features.values():
+                feature.set_optimizer(StagedWorkersBoundaryAffineReprOptimizer())
         elif optimizer_selector != 0:
             raise ValueError(
-                "OptimizerOptions.use_my_optimizer must be 0-29 or 31-37."
+                "OptimizerOptions.use_my_optimizer must be 0-29, 31-42."
             )
 
         if len(self.features) == 0:

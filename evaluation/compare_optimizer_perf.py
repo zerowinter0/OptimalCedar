@@ -54,6 +54,13 @@ OPTIMIZERS = {
     # Representation-aware compute model (PICO chapter 3): M3 elements only,
     # M4 representation-aware through the origin, M5 representation-aware
     # affine, and PICO (workers x width) with M5.
+    # Final W-only configuration (2026-09-24): no stage-width search, stage
+    # width fixed at 1, W chosen by the W-conditioned DP.
+    "pico_final": 39,
+    "staged_final": 42,
+    "pico_final_no_boundary": 40,
+    "pico_byte_proportional": 41,
+    "simple_dp_workers_no_boundary": 40,
     "simple_dp_repr_elements": 34,
     "simple_dp_repr_proportional": 35,
     "simple_dp_repr_affine": 36,

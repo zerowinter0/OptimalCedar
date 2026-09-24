@@ -989,3 +989,65 @@ class SimpleDpWorkersWidthBoundaryAffineReprOptimizer(
     """PICO with the representation-aware compute model (M5)."""
 
     repr_model_variant = "affine"
+
+
+class _ProportionalByteComputeMixin:
+    """Price operator compute by byte volume with Cedar's proportional rule.
+
+    Same search, boundary model, backend support and W ladder as the final
+    W-only PICO; only the compute term is the historical
+    ``cost x bytes / profiled bytes`` rule anchored on the profile's per
+    operator baseline cost.  This is the byte-proportional arm of the model
+    ablation (``C1``), not a re-implementation of Cedar's staged search.
+    """
+
+    uses_affine_operator_cost = False
+
+    def _prop_byte_work_prod(
+        self, mask: int, operator_idx: Optional[int] = None
+    ) -> float:
+        if operator_idx is None:
+            return self._dp_work_prod(mask)
+        p_id = self._dp_inner_ops[operator_idx]
+        source_size = float(
+            self.profiled_stats["baseline"]["output_sizes"][
+                self._get_source_p_id()
+            ]
+        )
+        item_bytes = source_size * self._dp_r_prod[mask]
+        reference = float(self.profiled_stats["baseline"]["input_sizes"][p_id])
+        base = float(self._base_cost_map[p_id])
+        if reference <= 0.0:
+            return self._dp_cardinality_prod[mask] * base
+        return self._dp_cardinality_prod[mask] * base * (item_bytes / reference)
+
+    def _dp_compute_work_prod(self, mask: int, operator_idx: Optional[int] = None):
+        return self._prop_byte_work_prod(mask, operator_idx)
+
+    def _dp_compute_cost_denominator(
+        self, operator_idx: int, baseline_input_size: float, source_size: float
+    ) -> float:
+        p_id = self._dp_inner_ops[operator_idx]
+        return source_size * float(self._base_cost_map[p_id])
+
+
+class SimpleDpWorkersByteProportionalOptimizer(
+    _ProportionalByteComputeMixin, SimpleDpWorkersBoundaryOptimizer
+):
+    """C1 arm: byte-proportional compute, identical W-only search."""
+
+
+class SimpleDpWorkersBoundaryAffineReprOptimizer(
+    _RepresentationComputeMixin, SimpleDpWorkersBoundaryOptimizer
+):
+    """Final PICO: W-only search, representation-aware affine compute, boundary
+    and fusion/backend/cache search unchanged (per-stage width fixed at 1)."""
+
+    repr_model_variant = "affine"
+
+
+class SimpleDpWorkersAffineReprOptimizer(SimpleDpWorkersBoundaryAffineReprOptimizer):
+    """C1 arm: same W-only search and model, explicit boundary term removed."""
+
+    def _dp_regular_transition_cost(self, prev_mask, block):
+        return block.cost

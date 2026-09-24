@@ -1,0 +1,60 @@
+{
+ "frozen_at": "2026-09-24",
+ "git_commit": "9ade01d77c59aff2f3a7b90b05a3810757485106",
+ "final_pico": {
+  "name": "pico_final",
+  "selector": 39,
+  "class": "cedar.compose.simple_dp_ablation_optimizer.SimpleDpWorkersBoundaryAffineReprOptimizer",
+  "search": {
+   "order": "joint DP over operator order",
+   "fusion": "joint (INPROCESS fused blocks), Cedar fusion rules",
+   "backend": "joint (INPROCESS / SMP / RAY per block, resource-feasible)",
+   "stage_width": "NOT searched; every parallel stage fixed at width 1 (_dp_candidate_parallelisms -> (1,))",
+   "W": "searched by the W-conditioned DP; candidates = 1..min(cap, local_budget//(1+reserve), ray_budget); 64 CPU per host; infeasible slices skipped",
+   "cache": "Cedar cache placement rules, joint when the feature has a cache pipe",
+   "compute_model": "k_(operator, representation_class) * elements + b_(operator, representation_class); elements = C*H*W (image), W*H*bands (PIL), len (text)",
+   "boundary_model": "unchanged Cedar/layered stage-boundary cost (byte based)",
+   "objective": "DpObjectiveCost (score/W = serial compute/W + byte service), boundary transition cost added per transition",
+   "profile_schema": "physical_model.compute_model schema_version=1 + physical_model.operator_affine (legacy byte model kept for baselines)"
+  },
+  "aliases": [
+   "simple_dp_workers_boundary_affine_repr"
+  ],
+  "ablation_selectors": {
+   "pico_final_no_boundary": 40,
+   "pico_byte_proportional": 41,
+   "byte_affine_same_search": 25,
+   "elements_only_same_search": 34,
+   "representation_proportional_same_search": 35
+  },
+  "baselines": {
+   "cedar": {
+    "selector": 0,
+    "kind": "Cedar native staged optimizer (in-repo implementation)"
+   },
+   "plumber": {
+    "selector": 18,
+    "kind": "Plumber strategy implemented inside Cedar's optimizer interface"
+   },
+   "raydata": {
+    "selector": 19,
+    "kind": "Ray Data strategy implemented inside Cedar's optimizer interface"
+   },
+   "unoptimized": {
+    "selector": 24,
+    "kind": "declared plan executed as-is"
+   }
+  },
+  "profile": {
+   "path": "outputs/affine_repr_profile_20260924/shared.yaml",
+   "sha256": "e60f96a9a22023cde978fa4d4d8f7d5800f1dd36c70c2c8c3d61d0e0b1889aaa",
+   "generated_by": "scripts/run_repr_profile_20260924.sh",
+   "remote_ray": "172.23.166.105:6379 (cedar_remote placement resource)"
+  },
+  "commands": {
+   "profile": "bash scripts/pico_final_profiles_20260924.sh simclrv2 simclrv2_cache commonvoice coco llava_pretrain wikitext103",
+   "campaign": "bash scripts/pico_final_w_only_campaign.sh simclrv2 simclrv2_cache commonvoice coco llava_pretrain",
+   "assemble": "python -u tmp_analysis/assemble_final_delivery.py"
+  }
+ }
+}

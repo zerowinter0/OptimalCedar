@@ -1,0 +1,8 @@
+{
+ "mask_count": 71,
+ "mask_disagreements": [],
+ "mask_sufficient": true,
+ "payload_checks": 409,
+ "byte_feature_leaks": [],
+ "scope": "SimCLRv2 dependency DAG (reader + 7 mappers, edges crop->flip, to_float->normalize); 1260 legal orders; masks with up to 7 ops"
+}
