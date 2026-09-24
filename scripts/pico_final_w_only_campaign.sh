@@ -55,12 +55,12 @@ EPOCHS[commonvoice]=1 SAMPLES[commonvoice]=300000
 DATASET_FILE[coco]="$MODULES/evaluation/pipelines/coco/cedar_dataset.py"
 DATASET_KWARGS[coco]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/coco,split=train2017"
 EPOCHS[coco]=1 SAMPLES[coco]=50000
-DATASET_FILE[llava_pretrain]="$MODULES/evaluation/pipelines/multimodal_running_example/cedar_dataset.py"
+DATASET_FILE[llava_pretrain]="$MODULES/evaluation/pipelines/llava_pretrain/cedar_dataset.py"
 DATASET_KWARGS[llava_pretrain]="dataset_path=/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/inputs/llava_pretrain.jsonl,image_root=/workspace/OptimalCedar/evaluation/datasets/llava_pretrain"
 EPOCHS[llava_pretrain]=1 SAMPLES[llava_pretrain]=50000
 DATASET_FILE[wikitext103]="$MODULES/evaluation/pipelines/wikitext103/cedar_dataset.py"
-DATASET_KWARGS[wikitext103]="dataset_path=/workspace/OptimalCedar/datasets/wikitext103"
-EPOCHS[wikitext103]=1 SAMPLES[wikitext103]=0
+DATASET_KWARGS[wikitext103]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/wikitext103,max_samples=100000"
+EPOCHS[wikitext103]=1 SAMPLES[wikitext103]=100000
 
 run_cell() {
   local workload=$1 label=$2 optimizers=$3 repeats=$4

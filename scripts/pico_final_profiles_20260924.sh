@@ -80,12 +80,13 @@ for workload in "$@"; do
         "dataset_path=/workspace/OptimalCedar/evaluation/datasets/coco,split=train2017" \
         1 50000 1 ;;
     llava_pretrain)
-      profile_workload llava_pretrain evaluation/pipelines/multimodal_running_example/cedar_dataset.py \
+      profile_workload llava_pretrain evaluation/pipelines/llava_pretrain/cedar_dataset.py \
         "dataset_path=/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/inputs/llava_pretrain.jsonl,image_root=/workspace/OptimalCedar/evaluation/datasets/llava_pretrain" \
         1 50000 1 ;;
     wikitext103)
       profile_workload wikitext103 evaluation/pipelines/wikitext103/cedar_dataset.py \
-        "dataset_path=/workspace/OptimalCedar/datasets/wikitext103" 1 0 1 ;;
+        "dataset_path=/workspace/OptimalCedar/evaluation/datasets/wikitext103,max_samples=100000" \
+        1 100000 1 ;;
     *)
       echo "unknown workload $workload" ;;
   esac

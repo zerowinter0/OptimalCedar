@@ -2566,12 +2566,24 @@ class DataSet:
             if new_size == (height, width):
                 return None
             floating = moved.dtype.is_floating_point
-            resized = torch_functional.interpolate(
-                moved.unsqueeze(0).float(),
-                size=new_size,
-                mode="bilinear" if floating else "nearest",
-                align_corners=False if floating else None,
-            ).squeeze(0)
+            try:
+                resized = torch_functional.interpolate(
+                    moved.unsqueeze(0).float(),
+                    size=new_size,
+                    mode="bilinear" if floating else "nearest",
+                    align_corners=False if floating else None,
+                ).squeeze(0)
+            except Exception as exc:  # noqa: BLE001
+                # Payloads that are tensors but not images (bounding boxes,
+                # token ids, masks without spatial layout) have no spatial
+                # counterfactual: the caller keeps the measured constant cost
+                # instead of failing the whole profile.
+                logger.info(
+                    "Rescale counterfactual skipped for tensor shape %s: %s",
+                    tuple(value.shape),
+                    exc,
+                )
+                return None
             if not floating:
                 resized = resized.round().to(moved.dtype)
             if channel_last:
