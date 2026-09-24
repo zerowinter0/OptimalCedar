@@ -2100,6 +2100,38 @@ clamp，因此把 cast 后移会让 `ColorJitter` 从"被 clamp 到 [0,1]"变成
 - **尚未解决**：Blur 慢模式的机制；绝对时间预测仍有环境项；
   若要求"语义等价"，本负载上不存在可用重排，需要换负载或先定义可接受的质量协议。
 
+### 4.12 最终 W-only PICO：身份冻结、状态审计与长实验编排（2026-09-24）
+
+本节对应 `docs/final_w_only_20260924/`（README / identity.json / protocol.json /
+execution_plan.md / state_sufficiency.json）与 `outputs/pico_final_w_only_20260924/`。
+
+**最终身份**：`pico_final` = selector 39 = `SimpleDpWorkersBoundaryAffineReprOptimizer`。
+联合搜索顺序/融合/后端/缓存与 W；**不搜索 stage width**（每个并行 stage 固定 width=1）；
+计算项 = `k_(算子,表示类)·元素数 + b`；边界项沿用字节模型。
+对照身份：`pico_final_no_boundary`(40)、`pico_byte_proportional`(41)、
+`simple_dp_workers_boundary`(25，同 W-only 搜索 + 字节 affine)、`staged_final`(42，
+staged 搜索 + 同一最终模型)。
+
+**阶段 A 结果**：
+- smoke gate 通过（simclrv2，900 样本：pico_final 1128.5 samples/s，五个 optimizer 全部完成）；
+- 状态充分性：SimCLRv2 DAG 71 个可达 mask × 1260 个合法前缀，元素数与表示类均由算子集合唯一决定
+  （`state_sufficiency.json`，无冲突）；
+- 顺序×W 独立参考：1260 顺序全部枚举，DP 命中 argmin（目标 11.717960，4 个并列最优）；
+- 联合 oracle（顺序×融合×后端×W）**未完成**：plan-replay 入口对人工构造成员计划抛
+  `DP objective scoring requires one linear source`，原始错误与尝试路径记入 `oracle_results.json`。
+
+**长实验编排**（tmux session `pico_final`，`scripts/pico_final_all_20260924.sh`）：
+profile 重生成 → smoke → 主对比（6 负载 × 5 optimizer × 3 轮）→ 模型消融（同 W-only 搜索）
+→ staged vs joint → W∈{1,4,16,64} 曲线 → 自动组装。
+预计约 230 个执行 cell、30–70 小时；全部可续跑，结果文件存在即跳过；
+组装脚本可在任意时刻重建 `throughput.csv` / `ablation.csv` / `search_comparison.csv` /
+`w_scaling.csv` / `planning.csv` / `ranking.csv` / `README.md` / `claim_evidence.md` / `MANIFEST.json`。
+
+**必须在论文中保留的负结果**（详见交付 README §5）：
+语义上 `to_float` 是纯 cast，移动它会让 torchvision 把 float 图像 clamp 到 [0,1]，
+SimCLRv2 上不存在语义等价重排；完整 PICO 上字节 affine 与表示感知模型的吞吐在运行噪声内
+不可区分（2404 vs 2320 samples/s）；联合 oracle 与合成规模曲线未完成；StackExchange 未纳入。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射
