@@ -43,25 +43,29 @@ export CEDAR_MATCH_PROFILE_RESOURCES=1
 export CEDAR_PROFILE_MATCH_CPU_BUDGET=64
 export CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET=64
 
-declare -A DATASET_FILE DATASET_KWARGS EPOCHS SAMPLES
+declare -A DATASET_FILE DATASET_KWARGS EPOCHS SAMPLES BATCH
 DATASET_FILE[simclrv2]="$MODULES/evaluation/pipelines/simclrv2/cedar_dataset.py"
 DATASET_KWARGS[simclrv2]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/imagenette2/imagenette2/train"
-EPOCHS[simclrv2]=20 SAMPLES[simclrv2]=189380
+EPOCHS[simclrv2]=8 SAMPLES[simclrv2]=75752 BATCH[simclrv2]=4
 DATASET_FILE[simclrv2_cache]="$MODULES/evaluation/pipelines/simclrv2/cedar_cache_dataset.py"
 DATASET_KWARGS[simclrv2_cache]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/imagenette2/imagenette2/train"
-EPOCHS[simclrv2_cache]=20 SAMPLES[simclrv2_cache]=189380
+EPOCHS[simclrv2_cache]=8 SAMPLES[simclrv2_cache]=75752 BATCH[simclrv2_cache]=4
 DATASET_FILE[commonvoice]="$MODULES/evaluation/pipelines/commonvoice/cedar_dataset.py"
-DATASET_KWARGS[commonvoice]="dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips,max_samples=150000"
-EPOCHS[commonvoice]=1 SAMPLES[commonvoice]=150000
+DATASET_KWARGS[commonvoice]="dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips,max_samples=100000"
+EPOCHS[commonvoice]=1 SAMPLES[commonvoice]=100000 BATCH[commonvoice]=1
 DATASET_FILE[coco]="$MODULES/evaluation/pipelines/coco/cedar_dataset.py"
 DATASET_KWARGS[coco]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/coco,split=train2017"
-EPOCHS[coco]=1 SAMPLES[coco]=20000
+EPOCHS[coco]=1 SAMPLES[coco]=20000 BATCH[coco]=1
+DATASET_FILE[llava_pretrain]="$MODULES/evaluation/pipelines/llava_pretrain/cedar_dataset.py"
+DATASET_KWARGS[llava_pretrain]="dataset_path=/workspace/OptimalCedar/outputs/ultimate_eight_optimizers_fix_20260921/inputs/llava_pretrain.jsonl,image_root=/workspace/OptimalCedar/evaluation/datasets/llava_pretrain"
+EPOCHS[llava_pretrain]=1 SAMPLES[llava_pretrain]=10000 BATCH[llava_pretrain]=1
 DATASET_FILE[wikitext103]="$MODULES/evaluation/pipelines/wikitext103/cedar_dataset.py"
 DATASET_KWARGS[wikitext103]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/wikitext103,max_samples=20000"
-EPOCHS[wikitext103]=1 SAMPLES[wikitext103]=20000
+EPOCHS[wikitext103]=1 SAMPLES[wikitext103]=20000 BATCH[wikitext103]=1
 
 run_cell() {
   local workload=$1 label=$2 optimizers=$3 repeats=$4
+  local timeout=${5:-$PLAN_TIMEOUT}
   local work="$OUT/$workload"
   local result="$work/results/${label}.json"
   local log="$work/logs/${label}.log"
@@ -74,15 +78,15 @@ run_cell() {
   python -u "$OUT/entry.py" "$MODULES/evaluation/compare_optimizer_perf.py" \
     --dataset_file "${DATASET_FILE[$workload]}" \
     --dataset_kwargs "${DATASET_KWARGS[$workload]}" \
-    --batch_size 4 --num_epochs "${EPOCHS[$workload]}" \
+    --batch_size "${BATCH[$workload]}" --num_epochs "${EPOCHS[$workload]}" \
     --num_total_samples "${SAMPLES[$workload]}" \
     --use_ray --ray_ip "$RAY_IP" \
     --profiled_stats "$PROFILE_DIR/${workload}/shared.yaml" \
     --full_data_run --enable_local_parallelism --match_profile_resources \
     --cpu_budget 64 --ray_cpu_budget 64 \
     --optimizers ${optimizers//,/ } \
-    --optimizer_time_limit_sec "$PLAN_TIMEOUT" \
-    --cedar_reorder_timeout_sec "$PLAN_TIMEOUT" \
+    --optimizer_time_limit_sec "$timeout" \
+    --cedar_reorder_timeout_sec "$timeout" \
     --disable_cedar_runtime_timeout --num_repeats "$repeats" \
     --skip_pico_plan_cost --disable_caching \
     --results_path "$result" > "$log" 2>&1
@@ -124,6 +128,20 @@ run_cell commonvoice ablation_fast "pico_final,pico_byte_proportional" 1
 
 # COCO (detection; has non-spatial payloads): DP pair only.
 run_cell coco main_fast "pico_final,optimizer" 1
+
+# LLaVA-Pretrain: Cedar's staged optimizer reliably times out here, so the cell
+# runs the final PICO against the two native policies only (recorded as an
+# explicit deviation).  Its profile is generated with the shortened window.
+if [ ! -s "$PROFILE_DIR/llava_pretrain/shared.yaml" ]; then
+  echo "PROFILE llava_pretrain (fast budget) $(date -Is)"
+  OUT="$PROFILE_DIR" CEDAR_PROFILE_COMPUTE_TARGET_SEC=1.5 \
+    CEDAR_ADAPTIVE_PROFILE_MIN_SEC=2 CEDAR_ADAPTIVE_PROFILE_MAX_SEC=10 \
+    bash scripts/pico_final_profiles_20260924.sh llava_pretrain
+fi
+if [ -s "$PROFILE_DIR/llava_pretrain/shared.yaml" ]; then
+  run_cell llava_pretrain main_fast \
+    "pico_final,plumber_optimizer,raydata_optimizer" 1 1200
+fi
 
 echo "=== assembly $(date -Is) ==="
 python -u tmp_analysis/assemble_final_delivery.py || true
