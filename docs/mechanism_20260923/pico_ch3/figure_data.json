@@ -1,0 +1,736 @@
+{
+  "3_1_input_scaling_and_fusion_limits": {
+    "fixed_rho_rule": {
+      "rho_corrected": 0.3333333333333333,
+      "previous_hardcoded_rho": 0.5,
+      "cells": [
+        {
+          "level": 1,
+          "T_U_ms_per_record": 32.387719374305554,
+          "T_U_stdev": 0.05903799268075105,
+          "T_F_ms_per_record": 14.532964295833333,
+          "T_F_stdev": 0.37321987860994627,
+          "retention_T_F_over_T_U": 0.44871835919891606,
+          "rho_corrected": 0.3333333333333333,
+          "rule_T_F": 10.79590645810185,
+          "rule_error_pct": -25.71435366976656,
+          "member_share_U": 0.0,
+          "instrumented_T_U": 37.274172613194445,
+          "instrumented_T_F": 16.026943845138888,
+          "instrumented_retention": 0.42997450302801926,
+          "instrument_effect_U_pct": 15.087364387767005,
+          "instrument_effect_F_pct": 10.279936831152101
+        },
+        {
+          "level": 4,
+          "T_U_ms_per_record": 45.246191933333336,
+          "T_U_stdev": 0.41253770425734365,
+          "T_F_ms_per_record": 20.848392175694446,
+          "T_F_stdev": 0.9940831722916076,
+          "retention_T_F_over_T_U": 0.46077672583834,
+          "rho_corrected": 0.3333333333333333,
+          "rule_T_F": 15.082063977777779,
+          "rule_error_pct": -27.658383194840276,
+          "member_share_U": 0.0,
+          "instrumented_T_U": 53.77252178333333,
+          "instrumented_T_F": 22.744712568055558,
+          "instrumented_retention": 0.42298021022151927,
+          "instrument_effect_U_pct": 18.844303764972896,
+          "instrument_effect_F_pct": 9.095763243421176
+        },
+        {
+          "level": 16,
+          "T_U_ms_per_record": 71.21362904722223,
+          "T_U_stdev": 0.7146007222478447,
+          "T_F_ms_per_record": 46.41845150416666,
+          "T_F_stdev": 1.332565177302615,
+          "retention_T_F_over_T_U": 0.651819772776729,
+          "rho_corrected": 0.3333333333333333,
+          "rule_T_F": 23.737876349074075,
+          "rule_error_pct": -48.86111970593571,
+          "member_share_U": 0.0,
+          "instrumented_T_U": 84.62543449375,
+          "instrumented_T_F": 45.982289880555555,
+          "instrumented_retention": 0.5433625263566779,
+          "instrument_effect_U_pct": 18.833200366230912,
+          "instrument_effect_F_pct": -0.939629844334542
+        },
+        {
+          "level": 64,
+          "T_U_ms_per_record": 170.5966106909722,
+          "T_U_stdev": 17.065480604789425,
+          "T_F_ms_per_record": 163.51282553055555,
+          "T_F_stdev": 31.28738595457798,
+          "retention_T_F_over_T_U": 0.958476401543237,
+          "rho_corrected": 0.3333333333333333,
+          "rule_T_F": 56.86553689699073,
+          "rule_error_pct": -65.22258317506457,
+          "member_share_U": 0.0,
+          "instrumented_T_U": 187.99731895416664,
+          "instrumented_T_F": 170.58325233125,
+          "instrumented_retention": 0.907370665072292,
+          "instrument_effect_U_pct": 10.19991440200123,
+          "instrument_effect_F_pct": 4.324080865065363
+        }
+      ]
+    },
+    "instrument_comparison": {
+      "note": "uninstrumented main run vs instrumented run of the same cells; reported separately, never stacked",
+      "instrument_effect_U_pct": [
+        {
+          "K": 1,
+          "effect_pct": 15.087364387767005
+        },
+        {
+          "K": 4,
+          "effect_pct": 18.844303764972896
+        },
+        {
+          "K": 16,
+          "effect_pct": 18.833200366230912
+        },
+        {
+          "K": 64,
+          "effect_pct": 10.19991440200123
+        }
+      ],
+      "instrument_effect_F_pct": [
+        {
+          "K": 1,
+          "effect_pct": 10.279936831152101
+        },
+        {
+          "K": 4,
+          "effect_pct": 9.095763243421176
+        },
+        {
+          "K": 16,
+          "effect_pct": -0.939629844334542
+        },
+        {
+          "K": 64,
+          "effect_pct": 4.324080865065363
+        }
+      ]
+    }
+  },
+  "3_2_affine_vs_proportional": {
+    "reorder": {
+      "declared": {
+        "summary": {
+          "plan": "declared",
+          "operators": 9,
+          "measured_total_ms": 23.288268389287722,
+          "proportional_total_ms": 23.288268389287722,
+          "affine_total_ms": 23.288268389287722,
+          "pico_total_ms": 25.454285601290156,
+          "mape_proportional_all_pct": 0.0,
+          "mape_affine_all_pct": 0.0,
+          "mape_pico_all_pct": 29.33235916650195,
+          "mape_proportional_nontiny_pct": 0.0,
+          "mape_affine_nontiny_pct": 0.0,
+          "mape_pico_nontiny_pct": 24.672785646888332
+        },
+        "pico_plan_objective": 25.409049233512718,
+        "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/declared.yaml"
+      },
+      "PICO": {
+        "summary": {
+          "plan": "PICO",
+          "operators": 9,
+          "measured_total_ms": 13.994287654208893,
+          "proportional_total_ms": 6.082026082017139,
+          "affine_total_ms": 7.876231704928438,
+          "pico_total_ms": 8.190465514579344,
+          "mape_proportional_all_pct": 49.99066631855594,
+          "mape_affine_all_pct": 42.86414954726277,
+          "mape_pico_all_pct": 52.641029923883366,
+          "mape_proportional_nontiny_pct": 64.074646437699,
+          "mape_affine_nontiny_pct": 53.384871280759256,
+          "mape_pico_nontiny_pct": 64.8925010519194
+        },
+        "pico_plan_objective": 8.205709086026877,
+        "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/pico.yaml"
+      },
+      "Cedar": {
+        "summary": {
+          "plan": "Cedar",
+          "operators": 9,
+          "measured_total_ms": 14.057309722797015,
+          "proportional_total_ms": 6.011645386154314,
+          "affine_total_ms": 7.989394569427851,
+          "pico_total_ms": 8.229154984004925,
+          "mape_proportional_all_pct": 54.30244563669134,
+          "mape_affine_all_pct": 59.728380354854,
+          "mape_pico_all_pct": 58.35919732850315,
+          "mape_proportional_nontiny_pct": 62.313895534161674,
+          "mape_affine_nontiny_pct": 70.45279761140567,
+          "mape_pico_nontiny_pct": 77.02740644380789
+        },
+        "pico_plan_objective": 8.236463380692635,
+        "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/cedar.yaml"
+      },
+      "old-dp": {
+        "summary": {
+          "plan": "old-dp",
+          "operators": 9,
+          "measured_total_ms": 59.522567749502315,
+          "proportional_total_ms": 124.37579806679182,
+          "affine_total_ms": 120.79200441889269,
+          "pico_total_ms": 149.2259426827035,
+          "mape_proportional_all_pct": 118.55680996646032,
+          "mape_affine_all_pct": 111.15479463176747,
+          "mape_pico_all_pct": 131.43243667908996,
+          "mape_proportional_nontiny_pct": 147.5252498530497,
+          "mape_affine_nontiny_pct": 155.97782619176357,
+          "mape_pico_nontiny_pct": 181.15447639514096
+        },
+        "pico_plan_objective": 135.32283244430857,
+        "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/old-dp.yaml"
+      }
+    },
+    "summary_rows": [
+      {
+        "experiment": "D_reorder",
+        "cell": "declared",
+        "model": "proportional_anchored_rule",
+        "measured": 23.288268389287722,
+        "predicted": 23.288268389287722,
+        "error_pct": 0.0,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "declared",
+        "model": "affine_anchored_rule",
+        "measured": 23.288268389287722,
+        "predicted": 23.288268389287722,
+        "error_pct": 0.0,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "declared",
+        "model": "pico_affine_absolute",
+        "measured": 23.288268389287722,
+        "predicted": 25.454285601290156,
+        "error_pct": 9.300894234793219,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "PICO",
+        "model": "proportional_anchored_rule",
+        "measured": 13.994287654208893,
+        "predicted": 6.082026082017139,
+        "error_pct": -56.53922348674946,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "PICO",
+        "model": "affine_anchored_rule",
+        "measured": 13.994287654208893,
+        "predicted": 7.876231704928438,
+        "error_pct": -43.71823775853572,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "PICO",
+        "model": "pico_affine_absolute",
+        "measured": 13.994287654208893,
+        "predicted": 8.190465514579344,
+        "error_pct": -41.47279435037198,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "Cedar",
+        "model": "proportional_anchored_rule",
+        "measured": 14.057309722797015,
+        "predicted": 6.011645386154314,
+        "error_pct": -57.234737622625545,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "Cedar",
+        "model": "affine_anchored_rule",
+        "measured": 14.057309722797015,
+        "predicted": 7.989394569427851,
+        "error_pct": -43.16555068519766,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "Cedar",
+        "model": "pico_affine_absolute",
+        "measured": 14.057309722797015,
+        "predicted": 8.229154984004925,
+        "error_pct": -41.45995822614947,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "old-dp",
+        "model": "proportional_anchored_rule",
+        "measured": 59.522567749502315,
+        "predicted": 124.37579806679182,
+        "error_pct": 108.9556999459785,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "old-dp",
+        "model": "affine_anchored_rule",
+        "measured": 59.522567749502315,
+        "predicted": 120.79200441889269,
+        "error_pct": 102.93480101066821,
+        "metric": "sum of per-operator compute"
+      },
+      {
+        "experiment": "D_reorder",
+        "cell": "old-dp",
+        "model": "pico_affine_absolute",
+        "measured": 59.522567749502315,
+        "predicted": 149.2259426827035,
+        "error_pct": 150.7048138627239,
+        "metric": "sum of per-operator compute"
+      }
+    ]
+  },
+  "3_3_compute_vs_boundary": {
+    "synthetic_component_model": {
+      "1": {
+        "member_compute_ms_per_record": 0.5635298333333333,
+        "per_crossing_byte_ms": 5.035781711576725,
+        "per_crossing_fixed_ms": 7.826634735068602,
+        "U": {
+          "compute_total": 1.6905894999999997,
+          "boundary_total": 38.58724933993598,
+          "predicted_total": 40.27783883993598
+        },
+        "F": {
+          "compute_total": 1.6905894999999997,
+          "boundary_total": 12.862416446645327,
+          "predicted_total": 14.553005946645326
+        },
+        "P": {
+          "compute_total": 1.6905894999999997,
+          "boundary_total": 25.724832893290653,
+          "predicted_total": 27.415422393290655
+        }
+      },
+      "4": {
+        "member_compute_ms_per_record": 2.396775708333333,
+        "per_crossing_byte_ms": 5.035781711576725,
+        "per_crossing_fixed_ms": 7.826634735068602,
+        "U": {
+          "compute_total": 7.190327125,
+          "boundary_total": 38.58724933993598,
+          "predicted_total": 45.777576464935976
+        },
+        "F": {
+          "compute_total": 7.190327125,
+          "boundary_total": 12.862416446645327,
+          "predicted_total": 20.052743571645326
+        },
+        "P": {
+          "compute_total": 7.190327125,
+          "boundary_total": 25.724832893290653,
+          "predicted_total": 32.91516001829065
+        }
+      },
+      "16": {
+        "member_compute_ms_per_record": 8.485783723958333,
+        "per_crossing_byte_ms": 5.035781711576725,
+        "per_crossing_fixed_ms": 7.826634735068602,
+        "U": {
+          "compute_total": 25.457351171874997,
+          "boundary_total": 38.58724933993598,
+          "predicted_total": 64.04460051181098
+        },
+        "F": {
+          "compute_total": 25.457351171874997,
+          "boundary_total": 12.862416446645327,
+          "predicted_total": 38.31976761852032
+        },
+        "P": {
+          "compute_total": 25.457351171874997,
+          "boundary_total": 25.724832893290653,
+          "predicted_total": 51.18218406516565
+        }
+      },
+      "64": {
+        "member_compute_ms_per_record": 32.684269625,
+        "per_crossing_byte_ms": 5.035781711576725,
+        "per_crossing_fixed_ms": 7.826634735068602,
+        "U": {
+          "compute_total": 98.052808875,
+          "boundary_total": 38.58724933993598,
+          "predicted_total": 136.64005821493598
+        },
+        "F": {
+          "compute_total": 98.052808875,
+          "boundary_total": 12.862416446645327,
+          "predicted_total": 110.91522532164532
+        },
+        "P": {
+          "compute_total": 98.052808875,
+          "boundary_total": 25.724832893290653,
+          "predicted_total": 123.77764176829065
+        }
+      }
+    },
+    "real_block": {
+      "boundary": {
+        "fixed_latency_ms": 7.826634735068602,
+        "throughput_bytes_per_sec": 94580747.79235658,
+        "r_squared": 0.9959918320358959,
+        "method": "synchronous_round_trip_linear_fit"
+      },
+      "member_compute": {
+        "7": {
+          "anchor_ms_per_record": 0.4686774233333333,
+          "shape_factor": 1.0,
+          "co_run_factor": 1.0,
+          "compute_ms_per_record": 0.4686774233333333,
+          "k_ms_per_byte": 4.3539556297672596e-07,
+          "b_ms": 0.0,
+          "x_reference_bytes": 597552.3797468354
+        },
+        "6": {
+          "anchor_ms_per_record": 3.2876139433333345,
+          "shape_factor": 1.0,
+          "co_run_factor": 1.0,
+          "compute_ms_per_record": 3.2876139433333345,
+          "k_ms_per_byte": 1.48856932917509e-07,
+          "b_ms": 1.4017486366658358,
+          "x_reference_bytes": 2390209.518987342
+        },
+        "5": {
+          "anchor_ms_per_record": 0.14709500333333334,
+          "shape_factor": 1.0,
+          "co_run_factor": 1.0,
+          "compute_ms_per_record": 0.14709500333333334,
+          "k_ms_per_byte": 7.240176454554039e-08,
+          "b_ms": 0.027942775054603082,
+          "x_reference_bytes": 714432.0
+        }
+      },
+      "U": {
+        "boundaries": [
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 31.589535592312473,
+            "total_ms": 39.416170327381074
+          },
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 32.82530104121506,
+            "total_ms": 40.651935776283665
+          },
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 15.107345134730176,
+            "total_ms": 22.933979869798776
+          }
+        ],
+        "compute_total": 3.903386370000001,
+        "boundary_total": 103.00208597346352,
+        "predicted_total": 106.90547234346353
+      },
+      "P": {
+        "boundaries": [
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 13.871579685827582,
+            "total_ms": 21.698214420896186
+          },
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 15.107345134730176,
+            "total_ms": 22.933979869798776
+          }
+        ],
+        "compute_total": 3.903386370000001,
+        "boundary_total": 44.63219429069496,
+        "predicted_total": 48.53558066069496
+      },
+      "F": {
+        "boundaries": [
+          {
+            "fixed_ms": 7.826634735068602,
+            "byte_ms": 13.871579685827582,
+            "total_ms": 21.698214420896186
+          }
+        ],
+        "compute_total": 3.903386370000001,
+        "boundary_total": 21.698214420896186,
+        "predicted_total": 25.601600790896185
+      }
+    },
+    "real_block_measurements": [
+      {
+        "config": "U",
+        "level": "0",
+        "round": "1",
+        "order_index": "0",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "121.282458775",
+        "elapsed_ms_per_record_stdev": "107.30668479261057",
+        "compute_ms_per_record_mean": "6.637271829166666",
+        "other_ms_per_record_mean": "114.64518694583333",
+        "actors": "3",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "F",
+        "level": "0",
+        "round": "1",
+        "order_index": "1",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "28.404235504166664",
+        "elapsed_ms_per_record_stdev": "14.218970831183002",
+        "compute_ms_per_record_mean": "6.590858639583333",
+        "other_ms_per_record_mean": "21.813376864583333",
+        "actors": "1",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "P",
+        "level": "0",
+        "round": "1",
+        "order_index": "2",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "51.11032156458334",
+        "elapsed_ms_per_record_stdev": "14.120079612760593",
+        "compute_ms_per_record_mean": "6.397324083333333",
+        "other_ms_per_record_mean": "44.71299748125",
+        "actors": "2",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "F",
+        "level": "0",
+        "round": "2",
+        "order_index": "0",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "28.37513101875",
+        "elapsed_ms_per_record_stdev": "14.47110033119168",
+        "compute_ms_per_record_mean": "6.593539670833334",
+        "other_ms_per_record_mean": "21.781591347916667",
+        "actors": "1",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "P",
+        "level": "0",
+        "round": "2",
+        "order_index": "1",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "51.63066935833333",
+        "elapsed_ms_per_record_stdev": "14.608475471724027",
+        "compute_ms_per_record_mean": "6.704874014583334",
+        "other_ms_per_record_mean": "44.925795343749996",
+        "actors": "2",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "U",
+        "level": "0",
+        "round": "2",
+        "order_index": "2",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "121.56124449791668",
+        "elapsed_ms_per_record_stdev": "108.15898182093449",
+        "compute_ms_per_record_mean": "6.8867380375",
+        "other_ms_per_record_mean": "114.67450646041667",
+        "actors": "3",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "P",
+        "level": "0",
+        "round": "3",
+        "order_index": "0",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "51.93432522083333",
+        "elapsed_ms_per_record_stdev": "15.052381936212013",
+        "compute_ms_per_record_mean": "6.95849515625",
+        "other_ms_per_record_mean": "44.975830064583334",
+        "actors": "2",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "U",
+        "level": "0",
+        "round": "3",
+        "order_index": "1",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "121.77356345416666",
+        "elapsed_ms_per_record_stdev": "108.0147892182952",
+        "compute_ms_per_record_mean": "6.950483227083334",
+        "other_ms_per_record_mean": "114.82308022708334",
+        "actors": "3",
+        "gcs_disabled": "True"
+      },
+      {
+        "config": "F",
+        "level": "0",
+        "round": "3",
+        "order_index": "2",
+        "measured_batches": "120",
+        "elapsed_ms_per_record_mean": "28.162035060416667",
+        "elapsed_ms_per_record_stdev": "14.169855602492877",
+        "compute_ms_per_record_mean": "6.508634172916667",
+        "other_ms_per_record_mean": "21.653400887500002",
+        "actors": "1",
+        "gcs_disabled": "True"
+      }
+    ],
+    "a1_measurements": [
+      {
+        "level": 1,
+        "T_U_ms_per_record": 32.387719374305554,
+        "T_U_stdev": 0.05903799268075105,
+        "T_F_ms_per_record": 14.532964295833333,
+        "T_F_stdev": 0.37321987860994627,
+        "retention_T_F_over_T_U": 0.44871835919891606,
+        "rho_corrected": 0.3333333333333333,
+        "rule_T_F": 10.79590645810185,
+        "rule_error_pct": -25.71435366976656,
+        "member_share_U": 0.0,
+        "instrumented_T_U": 37.274172613194445,
+        "instrumented_T_F": 16.026943845138888,
+        "instrumented_retention": 0.42997450302801926,
+        "instrument_effect_U_pct": 15.087364387767005,
+        "instrument_effect_F_pct": 10.279936831152101
+      },
+      {
+        "level": 4,
+        "T_U_ms_per_record": 45.246191933333336,
+        "T_U_stdev": 0.41253770425734365,
+        "T_F_ms_per_record": 20.848392175694446,
+        "T_F_stdev": 0.9940831722916076,
+        "retention_T_F_over_T_U": 0.46077672583834,
+        "rho_corrected": 0.3333333333333333,
+        "rule_T_F": 15.082063977777779,
+        "rule_error_pct": -27.658383194840276,
+        "member_share_U": 0.0,
+        "instrumented_T_U": 53.77252178333333,
+        "instrumented_T_F": 22.744712568055558,
+        "instrumented_retention": 0.42298021022151927,
+        "instrument_effect_U_pct": 18.844303764972896,
+        "instrument_effect_F_pct": 9.095763243421176
+      },
+      {
+        "level": 16,
+        "T_U_ms_per_record": 71.21362904722223,
+        "T_U_stdev": 0.7146007222478447,
+        "T_F_ms_per_record": 46.41845150416666,
+        "T_F_stdev": 1.332565177302615,
+        "retention_T_F_over_T_U": 0.651819772776729,
+        "rho_corrected": 0.3333333333333333,
+        "rule_T_F": 23.737876349074075,
+        "rule_error_pct": -48.86111970593571,
+        "member_share_U": 0.0,
+        "instrumented_T_U": 84.62543449375,
+        "instrumented_T_F": 45.982289880555555,
+        "instrumented_retention": 0.5433625263566779,
+        "instrument_effect_U_pct": 18.833200366230912,
+        "instrument_effect_F_pct": -0.939629844334542
+      },
+      {
+        "level": 64,
+        "T_U_ms_per_record": 170.5966106909722,
+        "T_U_stdev": 17.065480604789425,
+        "T_F_ms_per_record": 163.51282553055555,
+        "T_F_stdev": 31.28738595457798,
+        "retention_T_F_over_T_U": 0.958476401543237,
+        "rho_corrected": 0.3333333333333333,
+        "rule_T_F": 56.86553689699073,
+        "rule_error_pct": -65.22258317506457,
+        "member_share_U": 0.0,
+        "instrumented_T_U": 187.99731895416664,
+        "instrumented_T_F": 170.58325233125,
+        "instrumented_retention": 0.907370665072292,
+        "instrument_effect_U_pct": 10.19991440200123,
+        "instrument_effect_F_pct": 4.324080865065363
+      }
+    ]
+  },
+  "3_4_pipeline": {
+    "plans": [
+      {
+        "plan": "U",
+        "workers": 1,
+        "pico_objective": 130.21713311499335,
+        "pico_system_cost_ms_per_record": 130.21713311499335,
+        "cedar_cost_ms_per_record": 47.11590177492121,
+        "cedar_block_cost_ms_per_record": 26.027261797535495,
+        "cedar_block_external_ms_per_record": 21.088639977385718,
+        "measured_throughput_mean": 17.347658260981014,
+        "measured_throughput_stdev": 0.46749665984987093,
+        "measured_repeats": 3,
+        "pico_predicted_speedup_vs_U": 1.0,
+        "cedar_predicted_speedup_vs_U": 1.0,
+        "measured_speedup_vs_U": 1.0,
+        "pico_speedup_error_pct": 0.0,
+        "cedar_speedup_error_pct": 0.0
+      },
+      {
+        "plan": "P",
+        "workers": 1,
+        "pico_objective": 71.8472414322248,
+        "pico_system_cost_ms_per_record": 71.8472414322248,
+        "cedar_cost_ms_per_record": 26.69354802182359,
+        "cedar_block_cost_ms_per_record": 5.604908044437869,
+        "cedar_block_external_ms_per_record": 21.088639977385718,
+        "measured_throughput_mean": 46.988321357705125,
+        "measured_throughput_stdev": 1.143296497675833,
+        "measured_repeats": 3,
+        "pico_predicted_speedup_vs_U": 1.812416601099852,
+        "cedar_predicted_speedup_vs_U": 1.7650670392860892,
+        "measured_speedup_vs_U": 2.70862618174771,
+        "pico_speedup_error_pct": -33.08723760727991,
+        "cedar_speedup_error_pct": -34.835340100449
+      },
+      {
+        "plan": "F",
+        "workers": 1,
+        "pico_objective": 48.913261562426015,
+        "pico_system_cost_ms_per_record": 48.913261562426015,
+        "cedar_cost_ms_per_record": 25.62874725312099,
+        "cedar_block_cost_ms_per_record": 4.540107275735272,
+        "cedar_block_external_ms_per_record": 21.088639977385718,
+        "measured_throughput_mean": 52.63577214968924,
+        "measured_throughput_stdev": 1.8900617076319233,
+        "measured_repeats": 3,
+        "pico_predicted_speedup_vs_U": 2.6622050739512124,
+        "cedar_predicted_speedup_vs_U": 1.8384005004061827,
+        "measured_speedup_vs_U": 3.0341716073621035,
+        "pico_speedup_error_pct": -12.259245077251158,
+        "cedar_speedup_error_pct": -39.41013435280015
+      }
+    ],
+    "rankings": {
+      "measured": [
+        "F",
+        "P",
+        "U"
+      ],
+      "pico": [
+        "F",
+        "P",
+        "U"
+      ],
+      "cedar": [
+        "F",
+        "P",
+        "U"
+      ]
+    }
+  }
+}

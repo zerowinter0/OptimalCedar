@@ -1,0 +1,74 @@
+{
+  "declared": {
+    "summary": {
+      "plan": "declared",
+      "operators": 9,
+      "measured_total_ms": 23.288268389287722,
+      "proportional_total_ms": 23.288268389287722,
+      "affine_total_ms": 23.288268389287722,
+      "pico_total_ms": 25.454285601290156,
+      "mape_proportional_all_pct": 0.0,
+      "mape_affine_all_pct": 0.0,
+      "mape_pico_all_pct": 29.33235916650195,
+      "mape_proportional_nontiny_pct": 0.0,
+      "mape_affine_nontiny_pct": 0.0,
+      "mape_pico_nontiny_pct": 24.672785646888332
+    },
+    "pico_plan_objective": 25.409049233512718,
+    "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/declared.yaml"
+  },
+  "PICO": {
+    "summary": {
+      "plan": "PICO",
+      "operators": 9,
+      "measured_total_ms": 13.994287654208893,
+      "proportional_total_ms": 6.082026082017139,
+      "affine_total_ms": 7.876231704928438,
+      "pico_total_ms": 8.190465514579344,
+      "mape_proportional_all_pct": 49.99066631855594,
+      "mape_affine_all_pct": 42.86414954726277,
+      "mape_pico_all_pct": 52.641029923883366,
+      "mape_proportional_nontiny_pct": 64.074646437699,
+      "mape_affine_nontiny_pct": 53.384871280759256,
+      "mape_pico_nontiny_pct": 64.8925010519194
+    },
+    "pico_plan_objective": 8.205709086026877,
+    "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/pico.yaml"
+  },
+  "Cedar": {
+    "summary": {
+      "plan": "Cedar",
+      "operators": 9,
+      "measured_total_ms": 14.057309722797015,
+      "proportional_total_ms": 6.011645386154314,
+      "affine_total_ms": 7.989394569427851,
+      "pico_total_ms": 8.229154984004925,
+      "mape_proportional_all_pct": 54.30244563669134,
+      "mape_affine_all_pct": 59.728380354854,
+      "mape_pico_all_pct": 58.35919732850315,
+      "mape_proportional_nontiny_pct": 62.313895534161674,
+      "mape_affine_nontiny_pct": 70.45279761140567,
+      "mape_pico_nontiny_pct": 77.02740644380789
+    },
+    "pico_plan_objective": 8.236463380692635,
+    "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/cedar.yaml"
+  },
+  "old-dp": {
+    "summary": {
+      "plan": "old-dp",
+      "operators": 9,
+      "measured_total_ms": 59.522567749502315,
+      "proportional_total_ms": 124.37579806679182,
+      "affine_total_ms": 120.79200441889269,
+      "pico_total_ms": 149.2259426827035,
+      "mape_proportional_all_pct": 118.55680996646032,
+      "mape_affine_all_pct": 111.15479463176747,
+      "mape_pico_all_pct": 131.43243667908996,
+      "mape_proportional_nontiny_pct": 147.5252498530497,
+      "mape_affine_nontiny_pct": 155.97782619176357,
+      "mape_pico_nontiny_pct": 181.15447639514096
+    },
+    "pico_plan_objective": 135.32283244430857,
+    "plan_path": "outputs/unopt_order_transfer_repeats_traceall_20260921/plans/old-dp.yaml"
+  }
+}

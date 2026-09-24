@@ -1,0 +1,30 @@
+experiment,cell,model,prediction,unit,anchor,rho,source
+A1_fusion_discount,K=1,cedar_fixed_rho_rule,10.79590645810185,ms per source record (serial),measured T_U of the same K (rule check only),0.3333333333333333,audit.json discount recomputation
+A_component,K=1,component_model,14.553005946645326,ms per source record (serial),isolated per-K compute anchor + frozen boundary,,component_predictions.json synthetic_block
+A1_fusion_discount,K=4,cedar_fixed_rho_rule,15.082063977777779,ms per source record (serial),measured T_U of the same K (rule check only),0.3333333333333333,audit.json discount recomputation
+A_component,K=4,component_model,20.052743571645326,ms per source record (serial),isolated per-K compute anchor + frozen boundary,,component_predictions.json synthetic_block
+A1_fusion_discount,K=16,cedar_fixed_rho_rule,23.737876349074075,ms per source record (serial),measured T_U of the same K (rule check only),0.3333333333333333,audit.json discount recomputation
+A_component,K=16,component_model,38.31976761852032,ms per source record (serial),isolated per-K compute anchor + frozen boundary,,component_predictions.json synthetic_block
+A1_fusion_discount,K=64,cedar_fixed_rho_rule,56.86553689699073,ms per source record (serial),measured T_U of the same K (rule check only),0.3333333333333333,audit.json discount recomputation
+A_component,K=64,component_model,110.91522532164532,ms per source record (serial),isolated per-K compute anchor + frozen boundary,,component_predictions.json synthetic_block
+B_real_block,U,component_model,106.90547234346353,ms per source record (serial),frozen profile compute anchors + boundary,,component_predictions.json real_block
+B_real_block,P,component_model,48.53558066069496,ms per source record (serial),frozen profile compute anchors + boundary,,component_predictions.json real_block
+B_real_block,F,component_model,25.601600790896185,ms per source record (serial),frozen profile compute anchors + boundary,0.17443660847047582,component_predictions.json real_block
+C_pipeline,U,pico_optimizer_objective_per_W,130.21713311499335,ms per source record (system cost; ranking-oriented),frozen profile,,pipeline_scoring.json
+C_pipeline,U,cedar_calculate_cost,47.11590177492121,ms per source record (single worker),frozen legacy profile entries,,fusion_discount_20260923/cedar_costs.json
+C_pipeline,P,pico_optimizer_objective_per_W,71.8472414322248,ms per source record (system cost; ranking-oriented),frozen profile,,pipeline_scoring.json
+C_pipeline,P,cedar_calculate_cost,26.69354802182359,ms per source record (single worker),frozen legacy profile entries,,fusion_discount_20260923/cedar_costs.json
+C_pipeline,F,pico_optimizer_objective_per_W,48.913261562426015,ms per source record (system cost; ranking-oriented),frozen profile,,pipeline_scoring.json
+C_pipeline,F,cedar_calculate_cost,25.62874725312099,ms per source record (single worker),frozen legacy profile entries,,fusion_discount_20260923/cedar_costs.json
+D_reorder,declared,pico_affine_absolute,25.454285601290156,ms per source record (sum over operators),frozen profile affine coefficients,,reorder_analysis.json
+D_reorder,declared,affine_anchored_rule,23.288268389287722,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,declared,proportional_anchored_rule,23.288268389287722,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,PICO,pico_affine_absolute,8.190465514579344,ms per source record (sum over operators),frozen profile affine coefficients,,reorder_analysis.json
+D_reorder,PICO,affine_anchored_rule,7.876231704928438,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,PICO,proportional_anchored_rule,6.082026082017139,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,Cedar,pico_affine_absolute,8.229154984004925,ms per source record (sum over operators),frozen profile affine coefficients,,reorder_analysis.json
+D_reorder,Cedar,affine_anchored_rule,7.989394569427851,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,Cedar,proportional_anchored_rule,6.011645386154314,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,old-dp,pico_affine_absolute,149.2259426827035,ms per source record (sum over operators),frozen profile affine coefficients,,reorder_analysis.json
+D_reorder,old-dp,affine_anchored_rule,120.79200441889269,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json
+D_reorder,old-dp,proportional_anchored_rule,124.37579806679182,ms per source record (sum over operators),declared-order measured anchor,,reorder_analysis.json

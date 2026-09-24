@@ -1,0 +1,71 @@
+{
+  "plans": [
+    {
+      "plan": "U",
+      "workers": 1,
+      "pico_objective": 130.21713311499335,
+      "pico_system_cost_ms_per_record": 130.21713311499335,
+      "cedar_cost_ms_per_record": 47.11590177492121,
+      "cedar_block_cost_ms_per_record": 26.027261797535495,
+      "cedar_block_external_ms_per_record": 21.088639977385718,
+      "measured_throughput_mean": 17.347658260981014,
+      "measured_throughput_stdev": 0.46749665984987093,
+      "measured_repeats": 3,
+      "pico_predicted_speedup_vs_U": 1.0,
+      "cedar_predicted_speedup_vs_U": 1.0,
+      "measured_speedup_vs_U": 1.0,
+      "pico_speedup_error_pct": 0.0,
+      "cedar_speedup_error_pct": 0.0
+    },
+    {
+      "plan": "P",
+      "workers": 1,
+      "pico_objective": 71.8472414322248,
+      "pico_system_cost_ms_per_record": 71.8472414322248,
+      "cedar_cost_ms_per_record": 26.69354802182359,
+      "cedar_block_cost_ms_per_record": 5.604908044437869,
+      "cedar_block_external_ms_per_record": 21.088639977385718,
+      "measured_throughput_mean": 46.988321357705125,
+      "measured_throughput_stdev": 1.143296497675833,
+      "measured_repeats": 3,
+      "pico_predicted_speedup_vs_U": 1.812416601099852,
+      "cedar_predicted_speedup_vs_U": 1.7650670392860892,
+      "measured_speedup_vs_U": 2.70862618174771,
+      "pico_speedup_error_pct": -33.08723760727991,
+      "cedar_speedup_error_pct": -34.835340100449
+    },
+    {
+      "plan": "F",
+      "workers": 1,
+      "pico_objective": 48.913261562426015,
+      "pico_system_cost_ms_per_record": 48.913261562426015,
+      "cedar_cost_ms_per_record": 25.62874725312099,
+      "cedar_block_cost_ms_per_record": 4.540107275735272,
+      "cedar_block_external_ms_per_record": 21.088639977385718,
+      "measured_throughput_mean": 52.63577214968924,
+      "measured_throughput_stdev": 1.8900617076319233,
+      "measured_repeats": 3,
+      "pico_predicted_speedup_vs_U": 2.6622050739512124,
+      "cedar_predicted_speedup_vs_U": 1.8384005004061827,
+      "measured_speedup_vs_U": 3.0341716073621035,
+      "pico_speedup_error_pct": -12.259245077251158,
+      "cedar_speedup_error_pct": -39.41013435280015
+    }
+  ],
+  "note": "PICO objective is the optimizer's additive score; the system cost is objective / W. Cedar cost comes from the native calculate_cost walk. Predicted speedups are ratios of model costs and are ranking-oriented, not wall-clock throughput predictions.",
+  "measured_ranking": [
+    "F",
+    "P",
+    "U"
+  ],
+  "pico_ranking": [
+    "F",
+    "P",
+    "U"
+  ],
+  "cedar_ranking": [
+    "F",
+    "P",
+    "U"
+  ]
+}

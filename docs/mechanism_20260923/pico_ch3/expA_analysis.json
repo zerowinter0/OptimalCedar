@@ -1,0 +1,190 @@
+{
+  "rho_corrected": 0.3333333333333333,
+  "rho_partial_corrected": 0.5,
+  "previous_hardcoded_rho": 0.5,
+  "source_of_rho": "recomputed from Cedar's _calculate_cost_fused byte accounting on the real tensors (equal in/out size s): IO_U = 6s, IO_F = 2s",
+  "cells": [
+    {
+      "level": 1,
+      "T_U_ms_per_record": 32.387719374305554,
+      "T_U_stdev": 0.05903799268075105,
+      "T_F_ms_per_record": 14.532964295833333,
+      "T_F_stdev": 0.37321987860994627,
+      "retention_T_F_over_T_U": 0.44871835919891606,
+      "rho_corrected": 0.3333333333333333,
+      "rule_T_F": 10.79590645810185,
+      "rule_error_pct": -25.71435366976656,
+      "member_share_U": 0.0,
+      "instrumented_T_U": 37.274172613194445,
+      "instrumented_T_F": 16.026943845138888,
+      "instrumented_retention": 0.42997450302801926,
+      "instrument_effect_U_pct": 15.087364387767005,
+      "instrument_effect_F_pct": 10.279936831152101
+    },
+    {
+      "level": 4,
+      "T_U_ms_per_record": 45.246191933333336,
+      "T_U_stdev": 0.41253770425734365,
+      "T_F_ms_per_record": 20.848392175694446,
+      "T_F_stdev": 0.9940831722916076,
+      "retention_T_F_over_T_U": 0.46077672583834,
+      "rho_corrected": 0.3333333333333333,
+      "rule_T_F": 15.082063977777779,
+      "rule_error_pct": -27.658383194840276,
+      "member_share_U": 0.0,
+      "instrumented_T_U": 53.77252178333333,
+      "instrumented_T_F": 22.744712568055558,
+      "instrumented_retention": 0.42298021022151927,
+      "instrument_effect_U_pct": 18.844303764972896,
+      "instrument_effect_F_pct": 9.095763243421176
+    },
+    {
+      "level": 16,
+      "T_U_ms_per_record": 71.21362904722223,
+      "T_U_stdev": 0.7146007222478447,
+      "T_F_ms_per_record": 46.41845150416666,
+      "T_F_stdev": 1.332565177302615,
+      "retention_T_F_over_T_U": 0.651819772776729,
+      "rho_corrected": 0.3333333333333333,
+      "rule_T_F": 23.737876349074075,
+      "rule_error_pct": -48.86111970593571,
+      "member_share_U": 0.0,
+      "instrumented_T_U": 84.62543449375,
+      "instrumented_T_F": 45.982289880555555,
+      "instrumented_retention": 0.5433625263566779,
+      "instrument_effect_U_pct": 18.833200366230912,
+      "instrument_effect_F_pct": -0.939629844334542
+    },
+    {
+      "level": 64,
+      "T_U_ms_per_record": 170.5966106909722,
+      "T_U_stdev": 17.065480604789425,
+      "T_F_ms_per_record": 163.51282553055555,
+      "T_F_stdev": 31.28738595457798,
+      "retention_T_F_over_T_U": 0.958476401543237,
+      "rho_corrected": 0.3333333333333333,
+      "rule_T_F": 56.86553689699073,
+      "rule_error_pct": -65.22258317506457,
+      "member_share_U": 0.0,
+      "instrumented_T_U": 187.99731895416664,
+      "instrumented_T_F": 170.58325233125,
+      "instrumented_retention": 0.907370665072292,
+      "instrument_effect_U_pct": 10.19991440200123,
+      "instrument_effect_F_pct": 4.324080865065363
+    }
+  ],
+  "instrumented_cells": {
+    "U@1": {
+      "rounds": 3,
+      "elapsed_mean": 37.274172613194445,
+      "elapsed_stdev": 3.3305445411722565,
+      "compute_mean": 6.250815529166666,
+      "other_mean": 31.02335708402778
+    },
+    "U@4": {
+      "rounds": 3,
+      "elapsed_mean": 53.77252178333333,
+      "elapsed_stdev": 4.7451737071762174,
+      "compute_mean": 19.420035012499998,
+      "other_mean": 34.35248677083333
+    },
+    "U@16": {
+      "rounds": 3,
+      "elapsed_mean": 84.62543449375,
+      "elapsed_stdev": 5.265545612493684,
+      "compute_mean": 51.08322475416667,
+      "other_mean": 33.542209739583335
+    },
+    "U@64": {
+      "rounds": 3,
+      "elapsed_mean": 187.99731895416664,
+      "elapsed_stdev": 31.12124337627512,
+      "compute_mean": 151.31927905069446,
+      "other_mean": 36.67803990347222
+    },
+    "F@1": {
+      "rounds": 3,
+      "elapsed_mean": 16.026943845138888,
+      "elapsed_stdev": 2.00249839090968,
+      "compute_mean": 5.656216841666667,
+      "other_mean": 10.370727003472224
+    },
+    "F@4": {
+      "rounds": 3,
+      "elapsed_mean": 22.744712568055558,
+      "elapsed_stdev": 1.993782931914837,
+      "compute_mean": 12.832533033333334,
+      "other_mean": 9.912179534722222
+    },
+    "F@16": {
+      "rounds": 3,
+      "elapsed_mean": 45.982289880555555,
+      "elapsed_stdev": 6.392972219405639,
+      "compute_mean": 36.999803478472224,
+      "other_mean": 8.982486402083333
+    },
+    "F@64": {
+      "rounds": 3,
+      "elapsed_mean": 170.58325233125,
+      "elapsed_stdev": 8.211075808687122,
+      "compute_mean": 159.62742128958334,
+      "other_mean": 10.955831041666665
+    },
+    "P@16": {
+      "rounds": 3,
+      "elapsed_mean": 62.92205474583333,
+      "elapsed_stdev": 10.026296866256953,
+      "compute_mean": 42.082221393055555,
+      "other_mean": 20.839833352777777
+    }
+  },
+  "instrument_off_single_round": {
+    "U@1": {
+      "rounds": 1,
+      "elapsed_mean": 37.68337960208333,
+      "elapsed_stdev": 0.0,
+      "compute_mean": 0.0,
+      "other_mean": 37.68337960208333
+    },
+    "U@64": {
+      "rounds": 1,
+      "elapsed_mean": 190.33875493541666,
+      "elapsed_stdev": 0.0,
+      "compute_mean": 0.0,
+      "other_mean": 190.33875493541666
+    },
+    "F@1": {
+      "rounds": 1,
+      "elapsed_mean": 16.8432250875,
+      "elapsed_stdev": 0.0,
+      "compute_mean": 0.0,
+      "other_mean": 16.8432250875
+    },
+    "F@64": {
+      "rounds": 1,
+      "elapsed_mean": 141.93025833958333,
+      "elapsed_stdev": 0.0,
+      "compute_mean": 0.0,
+      "other_mean": 141.93025833958333
+    },
+    "P@64": {
+      "rounds": 1,
+      "elapsed_mean": 162.54815192083333,
+      "elapsed_stdev": 0.0,
+      "compute_mean": 0.0,
+      "other_mean": 162.54815192083333
+    }
+  },
+  "partial_fusion": {
+    "measured_instrumented": {
+      "rounds": 3,
+      "elapsed_mean": 62.92205474583333,
+      "elapsed_stdev": 10.026296866256953,
+      "compute_mean": 42.082221393055555,
+      "other_mean": 20.839833352777777
+    },
+    "rho_partial": 0.5,
+    "note": "Cedar applies the discount per fused group. Anchoring the partial plan on the measured U time requires splitting the handoff cost by stage; the measured stage scaling (other_P / other_U) is reported instead of inventing one.",
+    "other_ratio_P_over_U": 0.6213017423292951
+  }
+}

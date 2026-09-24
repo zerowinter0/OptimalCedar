@@ -1,0 +1,30 @@
+{
+  "run_dir": "/workspace/OptimalCedar/outputs/pico_ch3_20260924",
+  "copied_files": [
+    "README.md",
+    "audit.json",
+    "protocol.json",
+    "predictions.csv",
+    "measurements.csv",
+    "boundary_results.csv",
+    "summary.csv",
+    "figure_data.json",
+    "component_predictions.json",
+    "operator_results.csv",
+    "reorder_summary.csv",
+    "reorder_analysis.json",
+    "pipeline_scoring.csv",
+    "pipeline_scoring.json",
+    "expA_corrected.csv",
+    "expA_analysis.json",
+    "profile/synthetic_anchor.json",
+    "expA1_main/expA1_summary.csv",
+    "expA1_main/expA1_config.json",
+    "expA1_main/expA1_run_order.json",
+    "expA1_main/expA1_verification.json",
+    "expA1_main/expA1_raw.csv",
+    "expA1_main.log"
+  ],
+  "large_artifacts_kept_in_outputs": [],
+  "notes": "Large per-batch/per-event measurement files stay under outputs/; the manifest records path, size, rows and sha256."
+}

@@ -1,0 +1,25 @@
+experiment,cell,organisation,value,stdev_across_rounds,rounds,unit,source
+A1_fusion_discount,K=1,U,32.387719374305554,0.05903799268075105,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=1,F,14.532964295833333,0.37321987860994627,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=4,U,45.246191933333336,0.41253770425734365,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=4,F,20.848392175694446,0.9940831722916076,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=16,U,71.21362904722223,0.7146007222478447,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=16,F,46.41845150416666,1.332565177302615,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=64,U,170.5966106909722,17.065480604789425,3,ms per source record,expA1_main (member timing off)
+A1_fusion_discount,K=64,F,163.51282553055555,31.28738595457798,3,ms per source record,expA1_main (member timing off)
+B_real_block,to_float-crop-flip,U,121.282458775,107.30668479261057,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,F,28.404235504166664,14.218970831183002,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,P,51.11032156458334,14.120079612760593,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,F,28.37513101875,14.47110033119168,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,P,51.63066935833333,14.608475471724027,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,U,121.56124449791668,108.15898182093449,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,P,51.93432522083333,15.052381936212013,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,U,121.77356345416666,108.0147892182952,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+B_real_block,to_float-crop-flip,F,28.162035060416667,14.169855602492877,3,ms per source record,outputs/fusion_discount_20260923/expB/expB_summary.csv
+C_pipeline,U,U,17.347658260981014,0.46749665984987093,3,records per second (steady state),outputs/fusion_discount_20260923/expC/throughput
+C_pipeline,P,P,46.988321357705125,1.143296497675833,3,records per second (steady state),outputs/fusion_discount_20260923/expC/throughput
+C_pipeline,F,F,52.63577214968924,1.8900617076319233,3,records per second (steady state),outputs/fusion_discount_20260923/expC/throughput
+D_reorder,declared,declared,23.288268389287722,,1,ms per source record (sum over operators),unopt_order_transfer_repeats_traceall_20260921
+D_reorder,PICO,PICO,13.994287654208893,,1,ms per source record (sum over operators),unopt_order_transfer_repeats_traceall_20260921
+D_reorder,Cedar,Cedar,14.057309722797015,,1,ms per source record (sum over operators),unopt_order_transfer_repeats_traceall_20260921
+D_reorder,old-dp,old-dp,59.522567749502315,,1,ms per source record (sum over operators),unopt_order_transfer_repeats_traceall_20260921

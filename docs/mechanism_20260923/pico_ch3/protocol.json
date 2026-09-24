@@ -1,0 +1,70 @@
+{
+  "frozen_before_execution": true,
+  "principle": "Every model is profiled and frozen before the plans it predicts are executed; no target-plan timing is used to calibrate its own prediction. Reused experiments keep their original protocols.",
+  "profile": {
+    "path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+    "sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+    "affine_operators": "physical_model.operator_affine.operators",
+    "backend_anchors": "offloads.<BACKEND>.<pipe>.backend_compute",
+    "boundary": "physical_model.boundary.<BACKEND>"
+  },
+  "experiment_A1_main": {
+    "purpose": "fixed-rho vs measured fusion retention, uninstrumented",
+    "cells": "U and F at K in {1,4,16,64}",
+    "rounds": 3,
+    "round_order": "rotated (recorded in expA1_main/expA1_run_order.json)",
+    "batches_per_cell_per_round": 120,
+    "batch_size": 4,
+    "warmup_batches": 40,
+    "instrumentation": "member timing disabled (end-to-end clock only)",
+    "pins": "driver CPU 12, all remote actors CPU 8, one thread each",
+    "stop_rule": "fixed at three rounds; no extra rounds added for results"
+  },
+  "experiment_A_instrumented": {
+    "source": "outputs/fusion_discount_20260923/expA",
+    "cells": "U and F at the same K, plus P at K=16",
+    "rounds": 3,
+    "instrumentation": "per-member wall and CPU timing enabled"
+  },
+  "synthetic_anchor_profile": {
+    "purpose": "independent isolated compute anchor per K",
+    "actor": "single remote Ray actor, CPU pin, one thread",
+    "records": 64,
+    "calls": 192,
+    "path": "profile/synthetic_anchor.json"
+  },
+  "real_block": {
+    "members": [
+      "to_float(7)",
+      "RandomResizedCrop(6)",
+      "RandomHorizontalFlip(5)"
+    ],
+    "order": "declared order, parameters unchanged",
+    "organisations": [
+      "U (3 Ray stages)",
+      "P (fuse 7+6)",
+      "F (fuse 7+6+5)"
+    ],
+    "measurement_source": "outputs/fusion_discount_20260923/expB",
+    "rounds": 3
+  },
+  "pipeline": {
+    "plans": "outputs/fusion_discount_20260923/expC/plans",
+    "workers": 1,
+    "num_samples_per_round": 4000,
+    "rounds": 3,
+    "prediction_source": "frozen profile, no target timing"
+  },
+  "reorder": {
+    "trace_run": "outputs/unopt_order_transfer_repeats_traceall_20260921",
+    "plans": [
+      "declared",
+      "pico",
+      "cedar",
+      "old-dp"
+    ],
+    "workers": 4,
+    "all_inprocess": true,
+    "per_record_tracing": true
+  }
+}

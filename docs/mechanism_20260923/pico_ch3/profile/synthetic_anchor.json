@@ -1,0 +1,42 @@
+{
+  "levels": {
+    "1": {
+      "mean_ms_per_record": 0.5635298333333333,
+      "median_ms_per_record": 0.563597,
+      "stdev_ms_per_record": 0.006535052789103546,
+      "calls": 192,
+      "actor": "isolated Ray actor, single thread, CPU pin",
+      "cpu_pin": 8
+    },
+    "4": {
+      "mean_ms_per_record": 2.396775708333333,
+      "median_ms_per_record": 2.0641220000000002,
+      "stdev_ms_per_record": 0.9004868146293117,
+      "calls": 192,
+      "actor": "isolated Ray actor, single thread, CPU pin",
+      "cpu_pin": 8
+    },
+    "16": {
+      "mean_ms_per_record": 8.485783723958333,
+      "median_ms_per_record": 7.9550564999999995,
+      "stdev_ms_per_record": 1.3806396924329734,
+      "calls": 192,
+      "actor": "isolated Ray actor, single thread, CPU pin",
+      "cpu_pin": 8
+    },
+    "64": {
+      "mean_ms_per_record": 32.684269625,
+      "median_ms_per_record": 31.369639499999998,
+      "stdev_ms_per_record": 2.1549723222522683,
+      "calls": 192,
+      "actor": "isolated Ray actor, single thread, CPU pin",
+      "cpu_pin": 8
+    }
+  },
+  "where": {
+    "node_ip": "172.23.166.105",
+    "cpu_count": 64
+  },
+  "inputs": "/workspace/OptimalCedar/outputs/simclrv2_fusion_offload_mechanism_20260923/inputs/block_inputs.pt",
+  "records": 64
+}

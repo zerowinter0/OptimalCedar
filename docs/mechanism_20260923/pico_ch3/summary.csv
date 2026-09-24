@@ -1,0 +1,31 @@
+experiment,cell,model,measured,predicted,error_pct,metric
+A1_fusion_discount,K=1,cedar_fixed_rho_rule,14.532964295833333,10.79590645810185,-25.71435366976656,serial service time (F)
+A1_fusion_discount,K=1,component_model,14.532964295833333,14.553005946645326,0.13790476880026217,serial service time (F)
+A1_fusion_discount,K=4,cedar_fixed_rho_rule,20.848392175694446,15.082063977777779,-27.658383194840276,serial service time (F)
+A1_fusion_discount,K=4,component_model,20.848392175694446,20.052743571645326,-3.8163547449798365,serial service time (F)
+A1_fusion_discount,K=16,cedar_fixed_rho_rule,46.41845150416666,23.737876349074075,-48.86111970593571,serial service time (F)
+A1_fusion_discount,K=16,component_model,46.41845150416666,38.31976761852032,-17.44712204567913,serial service time (F)
+A1_fusion_discount,K=64,cedar_fixed_rho_rule,163.51282553055555,56.86553689699073,-65.22258317506457,serial service time (F)
+A1_fusion_discount,K=64,component_model,163.51282553055555,110.91522532164532,-32.16726274421901,serial service time (F)
+B_real_block,to_float-crop-flip,component_model,121.282458775,106.90547234346353,-11.854135030530895,serial service time (U)
+B_real_block,to_float-crop-flip,component_model,51.11032156458334,48.53558066069496,-5.0376143703868435,serial service time (P)
+B_real_block,to_float-crop-flip,component_model,28.404235504166664,25.601600790896185,-9.866960555440246,serial service time (F)
+B_real_block,to_float-crop-flip,cedar_fixed_rho_rule,28.404235504166664,21.156100775671298,-25.517795497196623,"serial service time (F), anchored on measured U"
+C_pipeline,U,pico_optimizer,1.0,1.0,0.0,speedup vs U (measured throughput vs model cost)
+C_pipeline,U,cedar_calculate_cost,1.0,1.0,0.0,speedup vs U (measured throughput vs model cost)
+C_pipeline,P,pico_optimizer,2.70862618174771,1.812416601099852,-33.08723760727991,speedup vs U (measured throughput vs model cost)
+C_pipeline,P,cedar_calculate_cost,2.70862618174771,1.7650670392860892,-34.835340100449,speedup vs U (measured throughput vs model cost)
+C_pipeline,F,pico_optimizer,3.0341716073621035,2.6622050739512124,-12.259245077251158,speedup vs U (measured throughput vs model cost)
+C_pipeline,F,cedar_calculate_cost,3.0341716073621035,1.8384005004061827,-39.41013435280015,speedup vs U (measured throughput vs model cost)
+D_reorder,declared,proportional_anchored_rule,23.288268389287722,23.288268389287722,0.0,sum of per-operator compute
+D_reorder,declared,affine_anchored_rule,23.288268389287722,23.288268389287722,0.0,sum of per-operator compute
+D_reorder,declared,pico_affine_absolute,23.288268389287722,25.454285601290156,9.300894234793219,sum of per-operator compute
+D_reorder,PICO,proportional_anchored_rule,13.994287654208893,6.082026082017139,-56.53922348674946,sum of per-operator compute
+D_reorder,PICO,affine_anchored_rule,13.994287654208893,7.876231704928438,-43.71823775853572,sum of per-operator compute
+D_reorder,PICO,pico_affine_absolute,13.994287654208893,8.190465514579344,-41.47279435037198,sum of per-operator compute
+D_reorder,Cedar,proportional_anchored_rule,14.057309722797015,6.011645386154314,-57.234737622625545,sum of per-operator compute
+D_reorder,Cedar,affine_anchored_rule,14.057309722797015,7.989394569427851,-43.16555068519766,sum of per-operator compute
+D_reorder,Cedar,pico_affine_absolute,14.057309722797015,8.229154984004925,-41.45995822614947,sum of per-operator compute
+D_reorder,old-dp,proportional_anchored_rule,59.522567749502315,124.37579806679182,108.9556999459785,sum of per-operator compute
+D_reorder,old-dp,affine_anchored_rule,59.522567749502315,120.79200441889269,102.93480101066821,sum of per-operator compute
+D_reorder,old-dp,pico_affine_absolute,59.522567749502315,149.2259426827035,150.7048138627239,sum of per-operator compute

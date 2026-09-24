@@ -1,0 +1,176 @@
+{
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "anchor_path": "outputs/pico_ch3_20260924/profile/synthetic_anchor.json",
+  "synthetic_tensor_bytes": 238144,
+  "synthetic_block": {
+    "1": {
+      "member_compute_ms_per_record": 0.5635298333333333,
+      "per_crossing_byte_ms": 5.035781711576725,
+      "per_crossing_fixed_ms": 7.826634735068602,
+      "U": {
+        "compute_total": 1.6905894999999997,
+        "boundary_total": 38.58724933993598,
+        "predicted_total": 40.27783883993598
+      },
+      "F": {
+        "compute_total": 1.6905894999999997,
+        "boundary_total": 12.862416446645327,
+        "predicted_total": 14.553005946645326
+      },
+      "P": {
+        "compute_total": 1.6905894999999997,
+        "boundary_total": 25.724832893290653,
+        "predicted_total": 27.415422393290655
+      }
+    },
+    "4": {
+      "member_compute_ms_per_record": 2.396775708333333,
+      "per_crossing_byte_ms": 5.035781711576725,
+      "per_crossing_fixed_ms": 7.826634735068602,
+      "U": {
+        "compute_total": 7.190327125,
+        "boundary_total": 38.58724933993598,
+        "predicted_total": 45.777576464935976
+      },
+      "F": {
+        "compute_total": 7.190327125,
+        "boundary_total": 12.862416446645327,
+        "predicted_total": 20.052743571645326
+      },
+      "P": {
+        "compute_total": 7.190327125,
+        "boundary_total": 25.724832893290653,
+        "predicted_total": 32.91516001829065
+      }
+    },
+    "16": {
+      "member_compute_ms_per_record": 8.485783723958333,
+      "per_crossing_byte_ms": 5.035781711576725,
+      "per_crossing_fixed_ms": 7.826634735068602,
+      "U": {
+        "compute_total": 25.457351171874997,
+        "boundary_total": 38.58724933993598,
+        "predicted_total": 64.04460051181098
+      },
+      "F": {
+        "compute_total": 25.457351171874997,
+        "boundary_total": 12.862416446645327,
+        "predicted_total": 38.31976761852032
+      },
+      "P": {
+        "compute_total": 25.457351171874997,
+        "boundary_total": 25.724832893290653,
+        "predicted_total": 51.18218406516565
+      }
+    },
+    "64": {
+      "member_compute_ms_per_record": 32.684269625,
+      "per_crossing_byte_ms": 5.035781711576725,
+      "per_crossing_fixed_ms": 7.826634735068602,
+      "U": {
+        "compute_total": 98.052808875,
+        "boundary_total": 38.58724933993598,
+        "predicted_total": 136.64005821493598
+      },
+      "F": {
+        "compute_total": 98.052808875,
+        "boundary_total": 12.862416446645327,
+        "predicted_total": 110.91522532164532
+      },
+      "P": {
+        "compute_total": 98.052808875,
+        "boundary_total": 25.724832893290653,
+        "predicted_total": 123.77764176829065
+      }
+    }
+  },
+  "real_block": {
+    "boundary": {
+      "fixed_latency_ms": 7.826634735068602,
+      "throughput_bytes_per_sec": 94580747.79235658,
+      "r_squared": 0.9959918320358959,
+      "method": "synchronous_round_trip_linear_fit"
+    },
+    "member_compute": {
+      "7": {
+        "anchor_ms_per_record": 0.4686774233333333,
+        "shape_factor": 1.0,
+        "co_run_factor": 1.0,
+        "compute_ms_per_record": 0.4686774233333333,
+        "k_ms_per_byte": 4.3539556297672596e-07,
+        "b_ms": 0.0,
+        "x_reference_bytes": 597552.3797468354
+      },
+      "6": {
+        "anchor_ms_per_record": 3.2876139433333345,
+        "shape_factor": 1.0,
+        "co_run_factor": 1.0,
+        "compute_ms_per_record": 3.2876139433333345,
+        "k_ms_per_byte": 1.48856932917509e-07,
+        "b_ms": 1.4017486366658358,
+        "x_reference_bytes": 2390209.518987342
+      },
+      "5": {
+        "anchor_ms_per_record": 0.14709500333333334,
+        "shape_factor": 1.0,
+        "co_run_factor": 1.0,
+        "compute_ms_per_record": 0.14709500333333334,
+        "k_ms_per_byte": 7.240176454554039e-08,
+        "b_ms": 0.027942775054603082,
+        "x_reference_bytes": 714432.0
+      }
+    },
+    "U": {
+      "boundaries": [
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 31.589535592312473,
+          "total_ms": 39.416170327381074
+        },
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 32.82530104121506,
+          "total_ms": 40.651935776283665
+        },
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 15.107345134730176,
+          "total_ms": 22.933979869798776
+        }
+      ],
+      "compute_total": 3.903386370000001,
+      "boundary_total": 103.00208597346352,
+      "predicted_total": 106.90547234346353
+    },
+    "P": {
+      "boundaries": [
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 13.871579685827582,
+          "total_ms": 21.698214420896186
+        },
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 15.107345134730176,
+          "total_ms": 22.933979869798776
+        }
+      ],
+      "compute_total": 3.903386370000001,
+      "boundary_total": 44.63219429069496,
+      "predicted_total": 48.53558066069496
+    },
+    "F": {
+      "boundaries": [
+        {
+          "fixed_ms": 7.826634735068602,
+          "byte_ms": 13.871579685827582,
+          "total_ms": 21.698214420896186
+        }
+      ],
+      "compute_total": 3.903386370000001,
+      "boundary_total": 21.698214420896186,
+      "predicted_total": 25.601600790896185
+    }
+  },
+  "note": "Component model: compute anchors + fixed/byte boundary terms. It is a serial service-time diagnostic built from the frozen profile (real block) or from an isolated profiling pass (synthetic block); no target-plan timing is used."
+}

@@ -1,0 +1,175 @@
+{
+  "profile_path": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml",
+  "profile_sha256": "d40bc97df52582766d50530338ba078c7e5f54475c861abe30ce90d5b8932375",
+  "dictionary": {},
+  "discount": {
+    "synthetic_block": {
+      "tensor_bytes": 238144,
+      "U_and_F_three_members": {
+        "io_base_bytes": 1428864,
+        "io_fused_bytes": 476288,
+        "rho": 0.3333333333333333
+      },
+      "P_first_two_fused": {
+        "io_base_bytes": 952576,
+        "io_fused_bytes": 476288,
+        "rho": 0.5
+      },
+      "previous_hardcoded_value": 0.5,
+      "correction_note": "The earlier fusion harness wrote 0.5 for the three-member block (4s in / 2s out). Cedar's formula charges 1 upload for the first member, 2x in/out for every inner member and 1 download for the last one: IO_U = s + 2s + 2s + s = 6s, IO_F = 2s, so rho = 1/3. The measurement values are unchanged; only derived quantities and their errors are recomputed."
+    },
+    "real_block_to_float_crop_flip": {
+      "io_base_bytes": 7521267.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.17443660847047582,
+      "member_input_bytes": {
+        "to_float": 597552.3797468354,
+        "crop": 2390209.518987342,
+        "flip": 714432.0
+      },
+      "member_output_bytes": {
+        "to_float": 2390209.518987342,
+        "crop": 714432.0,
+        "flip": 714432.0
+      }
+    },
+    "real_block_to_float_crop": {
+      "io_base_bytes": 6092403.417721519,
+      "io_fused_bytes": 1311984.3797468354,
+      "rho": 0.21534758777308624,
+      "member_input_bytes": {
+        "to_float": 597552.3797468354,
+        "crop": 2390209.518987342
+      },
+      "member_output_bytes": {
+        "to_float": 2390209.518987342,
+        "crop": 714432.0
+      }
+    }
+  },
+  "model_identity": {
+    "definition": "PICO in this chapter is SimpleDpWorkersWidthBoundaryOptimizer (selector 27, method name simple_dp_workers_width_boundary): the joint DP that prices every operator as an isolated-measurement anchor rescaled by the fitted affine shape, adds a per-boundary fixed + byte/throughput term, searches W (replica count) and the stage width inside each W's CPU slice, and scores plans additively.",
+    "components": {
+      "class": {
+        "name": "SimpleDpWorkersWidthBoundaryOptimizer",
+        "selector": 27,
+        "method_name": "simple_dp_workers_width_boundary",
+        "local_label": "simple-dp-boundary-affine-W-width",
+        "function": "SimpleDpWorkersWidthBoundaryOptimizer",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 518,
+        "lines": 63
+      },
+      "local_compute_anchor": {
+        "function": "MyOptimizer._dp_affine_value",
+        "file": "/workspace/OptimalCedar/cedar/compose/my_optimizer.py",
+        "line": 1512,
+        "lines": 4
+      },
+      "co_run_correction": {
+        "function": "MyOptimizer._dp_co_run_factor",
+        "file": "/workspace/OptimalCedar/cedar/compose/my_optimizer.py",
+        "line": 1517,
+        "lines": 18
+      },
+      "backend_compute_anchor": {
+        "function": "_LayeredProfileCostMixin._calculate_pipe_cost",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 170,
+        "lines": 36
+      },
+      "backend_shape_rescale": {
+        "function": "MyOptimizer._dp_affine_worker_cost",
+        "file": "/workspace/OptimalCedar/cedar/compose/my_optimizer.py",
+        "line": 1536,
+        "lines": 22
+      },
+      "width_scaling": {
+        "function": "MyOptimizer._dp_pipe_cost_at_parallelism",
+        "file": "/workspace/OptimalCedar/cedar/compose/my_optimizer.py",
+        "line": 838,
+        "lines": 81
+      },
+      "candidate_widths": {
+        "function": "DpOptimizer._dp_candidate_parallelisms",
+        "file": "/workspace/OptimalCedar/cedar/compose/dp_optimizer.py",
+        "line": 4650,
+        "lines": 43
+      },
+      "byte_boundary_plus_fixed": {
+        "function": "SimpleDpWorkersBoundaryOptimizer._unscaled_boundary_transfer_ms",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 347,
+        "lines": 18
+      },
+      "bundary_throughput_lookup": {
+        "function": "MyOptimizer._dp_boundary_throughput",
+        "file": "/workspace/OptimalCedar/cedar/compose/my_optimizer.py",
+        "line": 1142,
+        "lines": 18
+      },
+      "worker_slices_and_W": {
+        "function": "SimpleDpWorkersBoundaryOptimizer._worker_resource_groups",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 298,
+        "lines": 24
+      },
+      "additive_objective": {
+        "function": "SimpleDpWorkersBoundaryOptimizer._dp_accumulate_objective_cost",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 366,
+        "lines": 19
+      },
+      "plan_replay_entry": {
+        "function": "SimpleDpWorkersBoundaryOptimizer.calculate_dp_objective_cost",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 327,
+        "lines": 19
+      },
+      "layer_pricing_entry": {
+        "function": "_LayeredProfileCostMixin._layered_boundary_cost_ms",
+        "file": "/workspace/OptimalCedar/cedar/compose/simple_dp_ablation_optimizer.py",
+        "line": 207,
+        "lines": 24
+      }
+    },
+    "explicitly_not_included": [
+      "max-lane / max(Ray, SMP, local) objectives from PICO-Profilers style models",
+      "overlap or non-overlap corrections",
+      "GPU-specific lanes (LLaVA-style models)",
+      "Cedar's Amdahl block clipping for operators inside an offloaded block (PICO prices compute anchors directly)"
+    ],
+    "score_units": "objective = local_serial + ray_serial where ray_serial = W * sum(byte service per record); the system cost reported is objective / W (ms per source record). It is an additive estimate for ranking, not a wall-clock service-time prediction.",
+    "cedar_native_vs_extension": {
+      "native": [
+        "_calculate_pipe_cost (Amdahl inversion + clip)",
+        "_calculate_cost_fused (I/O discount, backend agnostic)",
+        "_offload_and_fuse / _local_fusion / _enumerate_fusions (backend enumeration; never INPROCESS fusion)"
+      ],
+      "extension": [
+        "calculate_cost materialized-fused-node branch and multi-group fused_pipes (later additions)",
+        "_calculate_pipe_cost INPROCESS early return (later addition)",
+        "_is_optimizer_pipe plan argument (later addition)"
+      ],
+      "policy": "INPROCESS fusion plans are only ever priced through the extension path and are never presented as original Cedar behaviour."
+    }
+  },
+  "measurement_windows": {
+    "definitions": {
+      "elapsed": "caller monotonic clock, from before the first submit of a batch until the last stage's result is materialised; one batch in flight",
+      "member_compute": "wall time measured directly around each member callable inside the process that runs it (local process or Ray actor)",
+      "other_overhead": "batch elapsed minus the batch's summed member wall time; contains handoff, serialisation, scheduling and framework effects; it is NOT network time",
+      "normalisation": "batch-level sums first, then divide by the actual record count once; compute + other_overhead == elapsed is asserted for every batch",
+      "non_additive": [
+        "Ray client get_ms_per_sample contains actor compute, so it is never added to the member compute",
+        "instrumented and uninstrumented runs are reported separately and never stacked into one bar"
+      ]
+    },
+    "verification_coverage": {
+      "fusion_harness_experiment_A": "one batch (batch_size records) per cell at each compute level; the run reports max_abs_diff for F and P against U",
+      "mechanism_harness_R_U_R_F": "one batch (4 records) per configuration",
+      "reorder_transfer_experiment": "no bit-wise output comparison; it compares per-operator wall times and cost predictions only",
+      "statement": "Output equality is spot-checked per cell, not verified over the full run. This limits any claim that per-record values are identical beyond the checked batch."
+    }
+  }
+}
