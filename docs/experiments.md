@@ -2036,24 +2036,29 @@ bytes(p)     仍用于 boundary / cache / transport（未改动）
 - **成本选择**（同一批 11 个计划，按实测均值）：M5 与 M1 都选中实测最优的 cedar（后悔 0%），
   M2/M3/M4 选中 pico（后悔 +6.2%）。
 
-#### 4.11.5 端到端消融（阶段 B，1 epoch / 9,469 条，同 profile、同资源、round-robin）
+#### 4.11.5 端到端消融（阶段 B，1 epoch / 9,469 条，同 profile、同资源、round-robin，每格 3 次）
 
-| optimizer | 计算模型 | 选择的计划 | W | 实测吞吐 | 优化时间 | 备注 |
-| --- | --- | --- | ---: | ---: | ---: | --- |
-| `simple_dp_boundary` | 字节 affine（现状） | 单条 INPROCESS FusedPipe{6,3,2,4,5,7,1} | 1 | **74.0 /s** | 2.7 s | 三次重复 73.7–74.3 |
-| `simple_dp_repr_affine` | M5 表示感知 | FusedPipe + **RAY** GaussianBlur + FusedPipe | 64 | **1348.7 /s** | 26.1 s | 三次重复 1340.6–1353.7 |
+| optimizer | 计算模型 | 选择的计划 | W | 实测吞吐（均值，min–max） | 优化时间 |
+| --- | --- | --- | ---: | ---: | ---: |
+| `simple_dp_boundary` | 字节 affine（现状） | 单条 INPROCESS FusedPipe{6,3,2,4,5,7,1} | 1 | 74.0 /s（73.7–74.3） | 2.7 s |
+| `simple_dp_repr_affine` | M5 表示感知 | FusedPipe{3,6} + **RAY** blur + FusedPipe{5,7,1,4} | 64 | 1348.7 /s（1340.6–1353.7） | 26.1 s |
+| `simple_dp_workers_width_boundary`（PICO 现状） | 字节 affine | 单条 INPROCESS FusedPipe{6,3,2,4,5,7,1} | 64 | 2404.0 /s（2355.3–2468.3） | 275.5 s |
+| `simple_dp_workers_width_repr_affine`（新 PICO） | M5 表示感知 | 单条 INPROCESS FusedPipe{3,6,2,5,7,1,4} | 64 | 2319.9 /s（2260.4–2371.7） | 288.8 s |
+| `simple_dp_workers_width_boundary`（旧 profile 对照） | 字节 affine | — | — | — | — |
 
-同一份 profile、同一数据、同一 CPU 预算、同一 harness，**只替换计算模型**：
-选择的计划从"1 worker 全 INPROCESS 融合"变为"64 workers + Ray blur 阶段"，
-吞吐相差 18.2×，优化时间从 2.7 s 增到 26.1 s。
-（完整 PICO（W×width）对照见 `outputs/stage_b_repr_20260924/results_pico.json`。）
+**结论必须分开写**：
 
-**必须同时声明的三点**：
-1. 该差异主要由**模型诱导的 W 决策**（1 → 64）加一个 Ray 阶段造成，
-   不是算子级微调；论文应把它写成"计算模型影响计划选择"，而不是"算子变快了"；
-2. 语义范围（4.11.6）说明这些重排并不等价于声明计划的增强语义，
-   因此 **18.2× 不能作为"等价优化收益"**；
-3. 本轮数据量是 campaign 的 1/20（9,469 vs 189,380），不能与 §2.1 的吞吐直接比较。
+1. **粗搜索的变体上差异巨大**：`simple_dp_boundary` 用字节模型时选 W=1（74 /s），
+   换成表示感知后选 W=64 + Ray blur（1349 /s）；这是**模型诱导的 W 决策**，
+   不是算子执行变快，也不是"等价优化收益"（见第 3 点）。
+2. **完整 PICO（W×width 搜索）上两者不可区分**：2404 vs 2320 /s，
+   两次重复区间（2355–2468 与 2260–2372）重叠；两者都选 W=64、单条 INPROCESS FusedPipe，
+   只是内部顺序不同（{6,3,2,4,5,7,1} vs {3,6,2,5,7,1,4}）。
+   → **本轮没有证明新计算模型能在完整 PICO 上带来吞吐提升**；
+   它证明的是成本估计更准（4.11.3）与计划选择在固定物理配置下更接近实测最优（4.11.4）。
+3. 语义范围（4.11.6）说明这些重排并不等价于声明计划的增强语义，
+   因此两处吞吐差都不能写成"训练等价的优化收益"；
+   且数据量是 campaign 的 1/20（9,469 vs 189,380），不能与 §2.1 直接比较。
 
 #### 4.11.6 语义范围的负面结论（阻止"重排=免费加速"）
 

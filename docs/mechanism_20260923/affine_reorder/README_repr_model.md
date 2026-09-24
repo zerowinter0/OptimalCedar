@@ -87,6 +87,22 @@ bytes(p)     仍用于 boundary / cache / transport（未改动）
 | 其中表示感知阶段 | ≈10 min | 9 个算子 / 33 条类曲线，默认 5 s/点；`CEDAR_PROFILE_COMPUTE_TARGET_SEC` 可调 |
 | 规划（DP） | 见阶段 B | 表规模：`element_prod`/`class_state` 各 2^n（本负载 n=9） |
 
+## 5b. 端到端消融（阶段 B，1 epoch / 9,469 条，同 profile/资源，round-robin，每格 3 次）
+
+| optimizer | 计算模型 | 选择的计划 | W | 吞吐（均值，min–max） | 优化时间 |
+| --- | --- | --- | ---: | ---: | ---: |
+| `simple_dp_boundary` | 字节 affine | 单条 INPROCESS FusedPipe{6,3,2,4,5,7,1} | 1 | 74.0 /s（73.7–74.3） | 2.7 s |
+| `simple_dp_repr_affine` | M5 | FusedPipe{3,6} + RAY blur + FusedPipe{5,7,1,4} | 64 | 1348.7 /s（1340.6–1353.7） | 26.1 s |
+| `simple_dp_workers_width_boundary`（PICO 现状） | 字节 affine | 单条 FusedPipe{6,3,2,4,5,7,1} | 64 | 2404.0 /s（2355.3–2468.3） | 275.5 s |
+| `simple_dp_workers_width_repr_affine`（新 PICO） | M5 | 单条 FusedPipe{3,6,2,5,7,1,4} | 64 | 2319.9 /s（2260.4–2371.7） | 288.8 s |
+
+- 粗搜索变体（`simple_dp_boundary`）：字节模型选 W=1（74 /s），表示感知选 W=64 + Ray 阶段（1349 /s）——
+  差异来自**模型诱导的 W 决策**，不是算子变快。
+- 完整 PICO（W×width）：两者都选 W=64、单条 INPROCESS 融合，吞吐 2404 vs 2320 /s，
+  **区间重叠 → 不可区分**。因此本轮**没有**证明新模型在完整 PICO 上带来吞吐提升；
+  它证明的是成本估计更准与固定物理配置下的选择更接近实测最优。
+- 两种吞吐差都**不是**等价优化收益（见 §6 与 `semantic_scope.md`），数据量也只有 campaign 的 1/20。
+
 ## 6. 语义范围（本轮的重要负面结论）
 
 `to_float` 是 `x.to(torch.float32)`，不归一化到 [0,1]；torchvision 对 float 图像按 [0,1]

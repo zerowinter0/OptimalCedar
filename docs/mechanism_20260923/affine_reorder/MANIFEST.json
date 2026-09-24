@@ -1,6 +1,6 @@
 {
  "topic": "PICO representation-aware compute model (2026-09-24)",
- "note": "小型交付物与 outputs/affine_repr_model_20260924/ 内容一致；新 profile 在 outputs/affine_repr_profile_20260924/shared.yaml，阶段 B 结果在 outputs/stage_b_repr_20260924/。逐计划真实 payload pickle 留在 tmp_analysis/capture_*/，不入库。",
+ "note": "小型交付物与 outputs/affine_repr_model_20260924/ 内容一致；新 profile: outputs/affine_repr_profile_20260924/shared.yaml；阶段 B: outputs/stage_b_repr_20260924/results_{cheap,pico}.json。逐计划真实 payload pickle 留在 tmp_analysis/capture_*/，不入库。",
  "files": {
   "README.md": {
    "path": "docs/mechanism_20260923/affine_reorder/README.md",
@@ -9,8 +9,8 @@
   },
   "README_repr_model.md": {
    "path": "docs/mechanism_20260923/affine_reorder/README_repr_model.md",
-   "bytes": 6110,
-   "sha256": "1283f67243a54803572735a1f2d1a476609e5a8e8bad5239a77acd479a99080b"
+   "bytes": 7549,
+   "sha256": "4b719c8538a61a767215680f7412a16e4e140b678b5c203293b6581aadded16c"
   },
   "audit.md": {
    "path": "docs/mechanism_20260923/affine_reorder/audit.md",
@@ -56,9 +56,9 @@
   },
   "optimizer_overhead.csv": {
    "path": "docs/mechanism_20260923/affine_reorder/optimizer_overhead.csv",
-   "bytes": 318,
-   "sha256": "70b6f56330a17a42c2d58e0eca552b5ed011afe6d2657a5a889b9127ae017d81",
-   "rows": 2
+   "bytes": 634,
+   "sha256": "dc34be6982e2bb42679a10b09989d5cfc5ca585600896461aee38edf5e499794",
+   "rows": 4
   },
   "plan_scoring.json": {
    "path": "docs/mechanism_20260923/affine_reorder/plan_scoring.json",
@@ -115,6 +115,42 @@
   "outputs/stage_b_repr_20260924/results_cheap.json": {
    "bytes": 1173969,
    "sha256": "4e9a7bc3bda4841693ddb61fbf26028f3f59dda74cdf05addd6cd99fed86982c"
+  },
+  "outputs/stage_b_repr_20260924/results_pico.json": {
+   "bytes": 2010223,
+   "sha256": "75750c4d1ec816589e47d8b1a3df9384bf1d95559427296685856f5dff16a32a"
+  },
+  "outputs/affine_repr_model_20260924/predictions.csv": {
+   "bytes": 18997,
+   "sha256": "39c757eae2d65e0e82d7b9b8963026ef8ac2bc8d4f18c98f29a754c99dd1a8cb"
+  },
+  "outputs/affine_repr_model_20260924/plan_summary.csv": {
+   "bytes": 1475,
+   "sha256": "bc474db12a4179ad53ee7c95caa24604d561c7eb680e0a4d277dd0d47d80cc77"
+  },
+  "outputs/affine_repr_model_20260924/operator_results.csv": {
+   "bytes": 13177,
+   "sha256": "6cbb8f2a1f15c7dc0eddc8e4136fb9d966558e8cf685979a2deaf589dd3bc8d1"
+  },
+  "outputs/affine_repr_model_20260924/input_metadata.csv": {
+   "bytes": 4313,
+   "sha256": "f24da241174da3ac860498ed49097b3cc9158fed82c54f07f30316fd8062fbff"
+  },
+  "outputs/affine_repr_model_20260924/optimizer_overhead.csv": {
+   "bytes": 634,
+   "sha256": "dc34be6982e2bb42679a10b09989d5cfc5ca585600896461aee38edf5e499794"
+  },
+  "outputs/affine_repr_model_20260924/measurements.csv": {
+   "bytes": 2328,
+   "sha256": "31807b9dba72b08d27596de903c4f3a7cdbde36b7261cb244d7adb54a3afbf9f"
+  },
+  "outputs/affine_repr_model_20260924/profiling_overhead.csv": {
+   "bytes": 262,
+   "sha256": "a6178b4614eee5b04fd6fe1d2cc91038968cd55f89c984a9a3bd609b449eb23d"
+  },
+  "outputs/affine_repr_model_20260924/operator_diagnostics.csv": {
+   "bytes": 9241,
+   "sha256": "f3bdf039a3f37596cada300d6e4198ed7169b994c0727803ab04a631adf2bc2c"
   }
  }
 }
