@@ -195,3 +195,8 @@ cython_debug/
 /evaluation/chapter6_experiments/formal_results/*
 !/evaluation/chapter6_experiments/formal_results/paper_artifacts/
 !/evaluation/chapter6_experiments/formal_results/paper_artifacts/**
+
+# Diagnostic captures of real operator payloads (large pickles) from the
+# affine-on-reordered-plans study; scripts and summaries are tracked instead.
+/tmp_analysis/capture_*/
+/tmp_analysis/focus_blur.json

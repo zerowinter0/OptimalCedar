@@ -1,0 +1,27 @@
+[
+ {
+  "payload": "B_blur(2)  u8 1ch 244 (pico)",
+  "fresh_p10_ms": 2.555749068657557,
+  "reuse_p10_ms": 2.5605368427932262
+ },
+ {
+  "payload": "B_blur(2)  f32 1ch 244 (decl)",
+  "fresh_p10_ms": 2.44076115389665,
+  "reuse_p10_ms": 2.490640307466189
+ },
+ {
+  "payload": "G_grayscale(3) u8 3ch (pico)",
+  "fresh_p10_ms": 0.22306665778160095,
+  "reuse_p10_ms": 0.17786414052049318
+ },
+ {
+  "payload": "J_jitter(4) u8 1ch 244 (pico)",
+  "fresh_p10_ms": 0.43712292487422627,
+  "reuse_p10_ms": 0.40039684002598125
+ },
+ {
+  "payload": "C_crop(6)  f32 3ch (decl)",
+  "fresh_p10_ms": 1.6319844871759415,
+  "reuse_p10_ms": 1.5719854272902012
+ }
+]

@@ -1,0 +1,66 @@
+{
+ "run": "affine_reorder_diagnosis_20260924",
+ "workload": "simclrv2 (imagenette2 train, 9,469 records; captures use 600-900 records per plan)",
+ "question": "affine kx+b 在真实重排计划上的迁移误差来自哪里，能否用有依据的剖析/建模修复",
+ "pre_registration": {
+  "frozen_before_validation": [
+   "fit protocol: two-stratum (smallest/largest) linear fit, k and b by least squares through the two points",
+   "size features compared: serialized bytes (M2) vs elements C*H*W (M3), plus per-representation-class coefficients (M4)",
+   "representation classes: {uint8,float32} x {1ch,3ch}",
+   "the middle spatial scale (244) is never used for fitting; it is the held-out point",
+   "validation plans v1, v2 are linear extensions of the feature DAG that the diagnosis never used",
+   "per-cell estimator: p10 over interleaved rounds inside one process; means are reported but not used as the correctness target",
+   "stopping rule: one capture run per plan (600-900 records, 4 local workers) plus 21 interleaved rounds for the operator matrix"
+  ],
+  "exploratory_before_freeze": [
+   "the four diagnosis plans (declared, pico, cedar, old-dp) and all per-operator error tables",
+   "the discovery of the heavy-tailed in-pipeline per-call distribution and of the instrumentation pitfall of thread settings"
+  ],
+  "honesty_note": "协议是在诊断阶段之后、v1/v2 验证之前冻结的。诊断数据用于提出问题与设计模型，v1/v2 只用于验证，未参与任何拟合。"
+ },
+ "models": {
+  "M1_proportional_bytes": "cost = t_declared * bytes / bytes_declared (Cedar native)",
+  "M2_affine_bytes": "cost = k_bytes * bytes + b_bytes; k,b from physical_model.operator_affine of the shared layered profile",
+  "M3_affine_elements": "cost = k_el * elements + b_el; one pair per operator, fitted on the declared plan's own payload",
+  "M4_affine_representation": "cost = k_(op,class) * elements + b_(op,class); class = {uint8,float32} x {1ch,3ch}"
+ },
+ "targets": {
+  "primary": "in-pipeline per-call p10 summed over the priced operators (reproducible service time)",
+  "secondary": "in-pipeline per-call median and mean (mean contains an unexplained heavy tail; reported but not used for model validation)"
+ },
+ "plans": {
+  "diagnosis": {
+   "declared": "9 8 7 6 5 4 3 2 1 0",
+   "pico": "9 8 6 3 4 5 2 7 1 0",
+   "cedar": "9 8 5 6 3 4 2 7 1 0",
+   "old-dp": "9 7 6 5 4 3 2 1 0"
+  },
+  "validation": {
+   "v1": "9 8 6 5 4 3 2 7 1 0",
+   "v2": "9 8 7 3 6 5 4 2 1 0"
+  },
+  "pipe_ids": "0 batcher, 1 normalize, 2 blur, 3 grayscale, 4 jitter, 5 flip, 6 crop, 7 to_float, 8 image reader, 9 lister"
+ },
+ "legality": {
+  "constraints": [
+   "reader first (fix)",
+   "RandomHorizontalFlip depends_on crop",
+   "Normalize depends_on to_float",
+   "BatcherPipe is the sink (fix)"
+  ],
+  "caveat": "legal plans are not augmentation-equivalent: ColorJitter loses its saturation/hue work on 1-channel input, and Grayscale before crop changes what is resized and blurred"
+ },
+ "environment": {
+  "container": "optimalcedar-torch201-dev",
+  "torch": "2.0.1+cu118",
+  "torchvision": "0.15.2+cu118",
+  "threads": "limit_native_threadpools(1) + torch.set_num_threads(1)",
+  "workers": 4,
+  "profile": "outputs/ultimate_eight_optimizers_fix_20260921/simclrv2/profiles/shared.yaml"
+ },
+ "stop_rules": [
+  "no model parameter is fitted on a validation plan",
+  "no operator or plan is dropped because the model does poorly on it",
+  "if the reproducible (p10) estimator disagreed between the two interleaved blocks by more than 20%, the cell was to be re-measured; none exceeded 2% in the reported run"
+ ]
+}

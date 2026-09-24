@@ -295,6 +295,13 @@ def multiprocess_worker_loop(
             available_scale=available_scale,
         )
 
+    # Diagnostic operator capture: record the representation and the direct
+    # callable time of every operator of the executing plan.  Disabled unless
+    # CEDAR_OP_CAPTURE_DIR is set.
+    from .op_capture import maybe_attach_operator_capture
+
+    operator_capture = maybe_attach_operator_capture(feature, idx)
+
     # Report only active physical stages. Fused-away logical pipe descriptors
     # intentionally remain in the plan so FusedPipe can recover their
     # callables, but they must not count as runtime Ray operators.
@@ -362,6 +369,8 @@ def multiprocess_worker_loop(
             _dump_reconcile_profile(
                 reconcile_profiler, idx, reconcile_dir, feature
             )
+        if operator_capture is not None:
+            operator_capture.dump()
         logger.info(f"MP worker {idx} finished epoch.")
         queue.put(Sentinel(idx))
 

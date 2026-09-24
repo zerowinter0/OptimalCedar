@@ -1,0 +1,75 @@
+{
+ "topic": "affine reorder diagnosis (2026-09-24)",
+ "note": "小体积交付物与 outputs/affine_reorder_diagnosis_20260924/ 内容一致；逐计划真实 payload pickle（约 100 MB）留在 tmp_analysis/capture_*/，不入库。",
+ "files": {
+  "README.md": {
+   "path": "docs/mechanism_20260923/affine_reorder/README.md",
+   "bytes": 7926,
+   "sha256": "896a91b801fe4bf875be6478e82c2670f2e9eaf211b0eb53183f1375104208dc"
+  },
+  "audit.md": {
+   "path": "docs/mechanism_20260923/affine_reorder/audit.md",
+   "bytes": 8142,
+   "sha256": "b55f9b2c1a9033a0740e6334105fad3429b469c7c6b6765cc20adc027bb995f5"
+  },
+  "blur_geometry.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/blur_geometry.json",
+   "bytes": 2860,
+   "sha256": "b017dcda7b8fd0189fc8203fa481c4e41d27854ae1c5dcf017ee9c494f8453f4"
+  },
+  "figure_data.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/figure_data.json",
+   "bytes": 63626,
+   "sha256": "6163f25a4ff979a6393a75926c97f1ae40d92a550a332854624e844b1e1084cb"
+  },
+  "fresh_vs_reuse.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/fresh_vs_reuse.json",
+   "bytes": 636,
+   "sha256": "79de2d5ba86342f8d13d434dd51815d92a9f1197247a9451b27f94b9ecdc92e0"
+  },
+  "input_metadata.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/input_metadata.csv",
+   "bytes": 4313,
+   "sha256": "f24da241174da3ac860498ed49097b3cc9158fed82c54f07f30316fd8062fbff",
+   "rows": 42
+  },
+  "operator_diagnostics.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/operator_diagnostics.csv",
+   "bytes": 9241,
+   "sha256": "f3bdf039a3f37596cada300d6e4198ed7169b994c0727803ab04a631adf2bc2c",
+   "rows": 42
+  },
+  "operator_matrix.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/operator_matrix.json",
+   "bytes": 33289,
+   "sha256": "4f8fed9ce9c86a94a3dd2f1c72af77fc9d65ce2d5e210dceecd1bbdbeac4871a"
+  },
+  "plan_scoring.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/plan_scoring.json",
+   "bytes": 25882,
+   "sha256": "f36ab8ea66dbc638b1a510942b60b14663856dab193be60f518cf5d879ab3509"
+  },
+  "plan_summary.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/plan_summary.csv",
+   "bytes": 1475,
+   "sha256": "bc474db12a4179ad53ee7c95caa24604d561c7eb680e0a4d277dd0d47d80cc77",
+   "rows": 6
+  },
+  "predictions.csv": {
+   "path": "docs/mechanism_20260923/affine_reorder/predictions.csv",
+   "bytes": 18997,
+   "sha256": "39c757eae2d65e0e82d7b9b8963026ef8ac2bc8d4f18c98f29a754c99dd1a8cb",
+   "rows": 294
+  },
+  "protocol.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/protocol.json",
+   "bytes": 3630,
+   "sha256": "3f13c7c04eab7b63ea53e9d4c3b90f3fad1a39c12a63708b363878c9d8b740f5"
+  },
+  "validation_runs.json": {
+   "path": "docs/mechanism_20260923/affine_reorder/validation_runs.json",
+   "bytes": 7788,
+   "sha256": "508491f41d02b21891b23fe6e2c55e7fdd050fe4f3cf2259884398f9d6ab4547"
+  }
+ }
+}
