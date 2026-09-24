@@ -1,0 +1,91 @@
+{
+ "frozen_at": "2026-09-24",
+ "commit": "38086e3",
+ "final_identity": "pico_final (selector 39): W-only search + representation-aware affine compute",
+ "decisions": {
+  "width": "not searched; every parallel stage fixed at width 1",
+  "compute_model": "k_(operator, representation_class)*elements + b_(operator, representation_class)",
+  "boundary_model": "unchanged byte-based Cedar/layered boundary",
+  "objective": "DpObjectiveCost (serial compute/W + byte service) plus per-transition boundary cost",
+  "cache": "Cedar cache placement, joint where applicable",
+  "profile": "offline; not amortised into throughput; planning time reported separately"
+ },
+ "workloads": {
+  "simclrv2": {
+   "records": 189380,
+   "epochs": 20
+  },
+  "simclrv2_cache": {
+   "records": 189380,
+   "epochs": 20
+  },
+  "commonvoice": {
+   "records": 300000,
+   "epochs": 1
+  },
+  "coco": {
+   "records": 50000,
+   "split": "train2017"
+  },
+  "llava_pretrain": {
+   "input_records": 50000,
+   "unit": "source records; images listed separately"
+  },
+  "wikitext103": {
+   "records": "campaign default (input/output units reported per cell)"
+  }
+ },
+ "comparison": {
+  "main": [
+   "pico_final",
+   "optimizer",
+   "plumber_optimizer",
+   "raydata_optimizer",
+   "unopti"
+  ],
+  "model_ablation": [
+   "pico_final",
+   "pico_final_no_boundary",
+   "pico_byte_proportional",
+   "simple_dp_workers_boundary"
+  ],
+  "search_ablation": [
+   "pico_final",
+   "staged_final",
+   "staged_workers_boundary_affine"
+  ],
+  "w_scaling": [
+   1,
+   4,
+   16,
+   64
+  ]
+ },
+ "repeats": {
+  "rounds": 3,
+  "order": "round-robin",
+  "aggregation": "per round + mean/stdev/range"
+ },
+ "limits": {
+  "planning_sec_per_cell": 3600,
+  "execution_sec_per_cell": 7200,
+  "smoke_samples": 200
+ },
+ "stop_rules": [
+  "smoke gate must pass before the long campaign starts",
+  "failed cells are recorded and never reused as successes",
+  "no model parameter is fitted on a target plan; profiling is offline and frozen by hash",
+  "throughput differences inside the run-to-run range are reported as indistinguishable",
+  "no plan, workload or operator is dropped because a model does poorly on it"
+ ],
+ "profile": {
+  "path": "outputs/affine_repr_profile_20260924/<workload>/shared.yaml",
+  "sha256_simclrv2": "e60f96a9a22023cde978fa4d4d8f7d5800f1dd36c70c2c8c3d61d0e0b1889aaa"
+ },
+ "known_gaps": [
+  "joint oracle (order x fusion x backend x W) blocked by the plan-replay entry point",
+  "synthetic scalability n=4..16 not run",
+  "stackexchange not included",
+  "no training-quality comparison (per the final decision)"
+ ]
+}
