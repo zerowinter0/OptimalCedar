@@ -471,13 +471,16 @@ def _make_spec(
         num_epochs=args.num_epochs,
         config=getattr(args, "master_feature_config", None),
         kwargs=_parse_dataset_kwargs(args.dataset_kwargs),
+        # A materialised plan is executed as-is: running an optimizer on top of
+        # it (the default for every other cell) re-plans the pipeline and the
+        # fixed-plan cells would silently measure a different plan.
+        disable_optimizer=bool(getattr(args, "master_feature_config", None)),
         use_ray=args.use_ray,
         ray_ip=args.ray_ip,
         ray_runtime_env=None,
         iteration_time=args.iteration_time,
         profiled_stats=args.profiled_stats,
         run_profiling=False,
-        disable_optimizer=False,
         disable_controller=not args.enable_controller,
         disable_prefetch=False,
         disable_offload=args.disable_offload,
@@ -689,9 +692,29 @@ def _calculate_pico_plan_costs(
 def _collect_plan_evidence(
     dataset: Any, profiled_stats: Optional[str], skip_pico: bool = False
 ) -> Dict[str, Any]:
-    own_costs = _calculate_plan_costs(dataset, profiled_stats)
-    cedar_costs = _calculate_cedar_plan_costs(dataset, profiled_stats)
-    pico_costs = {} if skip_pico else _calculate_pico_plan_costs(dataset, profiled_stats)
+    def _safe(fn, label):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            # A fixed-plan cell runs a plan produced by another optimizer, and a
+            # scorer may have no logical counterpart for a fused node.  The cell
+            # measures execution, so record the cost as unavailable instead of
+            # aborting it.
+            logger.warning("%s cost unavailable (%s); the cell still runs.", label, exc)
+            plans = getattr(dataset, "feature_plans", {}) or {}
+            return {name: float("inf") for name in plans}
+
+    own_costs = _safe(lambda: _calculate_plan_costs(dataset, profiled_stats), "plan")
+    cedar_costs = _safe(
+        lambda: _calculate_cedar_plan_costs(dataset, profiled_stats), "Cedar plan"
+    )
+    pico_costs = (
+        {}
+        if skip_pico
+        else _safe(
+            lambda: _calculate_pico_plan_costs(dataset, profiled_stats), "PICO plan"
+        )
+    )
     return {
         "plan_cost": sum(own_costs.values()),
         "plan_costs_by_feature": own_costs,

@@ -2158,7 +2158,13 @@ class Optimizer:
         pipe_desc = plan.pipe_descs
         cache_p_id = None
         for p_id, adj in graph.items():
-            if pipe_desc[p_id].name == "ObjectDiskCachePipe":
+            desc = pipe_desc.get(p_id)
+            if desc is None:
+                # A plan whose graph names a node without a descriptor cannot be
+                # executed, but cost reporting must not crash on it: the node is
+                # simply not a cache pipe.
+                continue
+            if desc.name == "ObjectDiskCachePipe":
                 if cache_p_id is not None:
                     raise RuntimeError("Found multiple cache pipes.")
                 cache_p_id = p_id

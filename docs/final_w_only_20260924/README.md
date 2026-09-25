@@ -1,6 +1,6 @@
 # Final W-only PICO：交付与完成矩阵
 
-commit: `b182e58fee560112459bf24acaad369b0d3eed1c`
+commit: `7762bed2d111cfbfa7915840e8c2cb7c6082b692`
 
 ## 身份
 
@@ -13,7 +13,7 @@ commit: `b182e58fee560112459bf24acaad369b0d3eed1c`
 | 负载 | cells | optimizers |
 | --- | ---: | --- |
 | llava_pretrain | main_fast | pico_final, plumber_optimizer, raydata_optimizer |
-| simclrv2 | ablation_fast, dp_repeat, main_fast, staged_fast | optimizer, pico_byte_proportional, pico_final, pico_final_no_boundary, plumber_optimizer, raydata_optimizer, simple_dp_workers_boundary, staged_final |
+| simclrv2 | ablation_fast, dp_repeat, main_fast, staged_fast, w_cell_W1, w_cell_W16, w_cell_W4, w_cell_W64 | optimizer, pico_byte_proportional, pico_final, pico_final_no_boundary, plumber_optimizer, raydata_optimizer, simple_dp_workers_boundary, staged_final |
 | simclrv2_cache | ablation_fast, main_fast | optimizer, pico_byte_proportional, pico_final, pico_final_no_boundary, plumber_optimizer, raydata_optimizer, simple_dp_workers_boundary |
 
 ## 吞吐（均值 ± 范围，samples/s）
@@ -35,6 +35,10 @@ commit: `b182e58fee560112459bf24acaad369b0d3eed1c`
 | simclrv2 | main_fast | raydata_optimizer | 1 | 49.8 | 49.8–49.8 |
 | simclrv2 | staged_fast | pico_final | 1 | 2444.4 | 2444.4–2444.4 |
 | simclrv2 | staged_fast | staged_final | 1 | 2475.0 | 2475.0–2475.0 |
+| simclrv2 | w_cell_W1 | pico_final | 1 | 91.2 | 91.2–91.2 |
+| simclrv2 | w_cell_W16 | pico_final | 1 | 1145.1 | 1145.1–1145.1 |
+| simclrv2 | w_cell_W4 | pico_final | 1 | 342.2 | 342.2–342.2 |
+| simclrv2 | w_cell_W64 | pico_final | 1 | 2272.2 | 2272.2–2272.2 |
 | simclrv2_cache | ablation_fast | pico_byte_proportional | 1 | 2433.9 | 2433.9–2433.9 |
 | simclrv2_cache | ablation_fast | pico_final | 1 | 2430.6 | 2430.6–2430.6 |
 | simclrv2_cache | ablation_fast | pico_final_no_boundary | 1 | 2364.9 | 2364.9–2364.9 |
@@ -58,9 +62,13 @@ commit: `b182e58fee560112459bf24acaad369b0d3eed1c`
 
 | 负载 | W | optimizer | 吞吐 /s | 来源 |
 | --- | ---: | --- | ---: | --- |
-| simclrv2 | 1 | simple_dp_boundary | 74.0 | outputs/stage_b_repr_20260924/results_cheap.json |
-| simclrv2 | 64 | simple_dp_repr_affine | 1348.7 | outputs/stage_b_repr_20260924/results_cheap.json |
-| simclrv2 | 64 | simple_dp_workers_width_boundary | 2404.0 | outputs/stage_b_repr_20260924/results_pico.json |
+| simclrv2 | 1 | pico_final | 91.2 | final PICO restricted to this single W candidate (structure re-optimised at that W); one complete run |
+| simclrv2 | 16 | pico_final | 1145.1 | final PICO restricted to this single W candidate (structure re-optimised at that W); one complete run |
+| simclrv2 | 4 | pico_final | 342.2 | final PICO restricted to this single W candidate (structure re-optimised at that W); one complete run |
+| simclrv2 | 64 | pico_final | 2272.2 | final PICO restricted to this single W candidate (structure re-optimised at that W); one complete run |
+| simclrv2 | 1 | simple_dp_boundary | 74.0 | complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep) |
+| simclrv2 | 64 | simple_dp_repr_affine | 1348.7 | complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep) |
+| simclrv2 | 64 | simple_dp_workers_width_boundary | 2404.0 | complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep) |
 
 局限：W=1 与 W=64 两组来自**不同计划结构**的完整运行（stage B），不是固定结构 W 扫描；固定结构扫描脚本已修好但本轮未跑成，写作时按上表标注。
 
@@ -74,6 +82,10 @@ commit: `b182e58fee560112459bf24acaad369b0d3eed1c`
 | simclrv2 | main_fast | 9 | 18 | 369 | 2.3 |
 | simclrv2 | main_mean | 9 | 18 | 369 | 2.3 |
 | simclrv2 | staged_fast | 9 | 18 | 369 | 2.4 |
+| simclrv2 | w_cell_W1 | 9 | 18 | 369 | 1.6 |
+| simclrv2 | w_cell_W16 | 9 | 18 | 338 | 1.7 |
+| simclrv2 | w_cell_W4 | 9 | 18 | 369 | 1.5 |
+| simclrv2 | w_cell_W64 | 9 | 18 | 39 | 1.2 |
 | simclrv2_cache | ablation_fast | 9 | 18 | 1489 | 2.6 |
 | simclrv2_cache | main_fast | 9 | 18 | 497 | 2.3 |
 

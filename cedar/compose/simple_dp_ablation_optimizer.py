@@ -6,6 +6,7 @@ the otherwise identical Cedar whole-pipeline/Amdahl cost path as a control.
 """
 from dataclasses import dataclass
 import logging
+import os
 import math
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -624,13 +625,27 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
         )
         # Costs now depend on W, including measured width curves. Do not
         # collapse workers with identical CPU slices or reuse another W's plan.
-        return [
+        groups = [
             (workers, DpResourceUsage(
                 ray_cpus=max(0, ray_budget // workers - ray_reserve),
                 smp_cpus=max(0, local_budget // workers - 1 - local_reserve),
             ))
             for workers in range(max_workers, 0, -1)
         ]
+        # ``CEDAR_WORKER_SEARCH_SET`` restricts the candidate set.  The W
+        # scaling experiment uses it to hold the worker count at one value so
+        # every point is the optimizer's own best plan at that W; unset, the
+        # full ladder is kept and behaviour is unchanged.
+        raw = os.environ.get("CEDAR_WORKER_SEARCH_SET")
+        if raw:
+            allowed = set()
+            for token in str(raw).split(","):
+                token = token.strip()
+                if token.isdigit():
+                    allowed.add(int(token))
+            if allowed:
+                groups = [group for group in groups if group[0] in allowed]
+        return groups
 
     def _dp_initial_objective_cost(self):
         return _SharedCommunicationObjective(local_serial=float(

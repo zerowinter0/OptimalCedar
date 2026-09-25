@@ -3,17 +3,17 @@
   "MANIFEST.json": {
    "path": "outputs/pico_final_w_only_20260924/MANIFEST.json",
    "bytes": 4430,
-   "sha256": "189100d80c86e926bc0b0b656f6248505274e8ba7fdddb2dae5e0dd170575e71"
+   "sha256": "4e976d71e38cdd279b149d7c6c62a5f0d29d6c1fd7becf06ce67bceec532dd73"
   },
   "README.md": {
    "path": "outputs/pico_final_w_only_20260924/README.md",
-   "bytes": 5535,
-   "sha256": "07f70ca823421b69bb077a16800111f802b8af6f4a84a60020de7d6d8d167b67"
+   "bytes": 6799,
+   "sha256": "36c5b8adae4b5d1087fbd7ac7c714a3c8b3731622a4f8e4125146b8d52f7cbc8"
   },
   "ablation.csv": {
    "path": "outputs/pico_final_w_only_20260924/ablation.csv",
    "bytes": 3232,
-   "sha256": "55058cf08232529062b9e6f8b4ed92c70bb3e2be609033e7ef9f6a7c9a8a1a2e",
+   "sha256": "90532d35c81697008ad093996bb4b2babd65f9f92b1ebd331cee1d9e6731fe48",
    "rows": 10
   },
   "claim_evidence.md": {
@@ -28,8 +28,8 @@
   },
   "figure_data.json": {
    "path": "outputs/pico_final_w_only_20260924/figure_data.json",
-   "bytes": 54992,
-   "sha256": "60d386a0d850f68aab40e5ffe8b9245885fc61e34a3943143ad9d55a4ca586e6"
+   "bytes": 57695,
+   "sha256": "754125bcb7ca52be111f5d6fec8ad891f3ec9ab19e11d0257d08adebd5759e91"
   },
   "fusion_components.csv": {
    "path": "outputs/pico_final_w_only_20260924/fusion_components.csv",
@@ -61,9 +61,9 @@
   },
   "planning.csv": {
    "path": "outputs/pico_final_w_only_20260924/planning.csv",
-   "bytes": 1271,
-   "sha256": "3db920496ab1338db19bb4c0e92d990b5084c471801ad69b1f1e289ca390ddd3",
-   "rows": 8
+   "bytes": 1842,
+   "sha256": "04b102d43ef372bb682b8753367d187ede7a3c4b5ce9f9e1a744e89e53d47691",
+   "rows": 12
   },
   "ranking.csv": {
    "path": "outputs/pico_final_w_only_20260924/ranking.csv",
@@ -74,7 +74,7 @@
   "search_comparison.csv": {
    "path": "outputs/pico_final_w_only_20260924/search_comparison.csv",
    "bytes": 717,
-   "sha256": "9eab3a217dd24ce2648c269e63561d8688267f91e85489fd6b91ecfccfbe6b34",
+   "sha256": "98e62a0cbb2038fa15a6c3350c520adb8227e14a417e53179985274e0567900e",
    "rows": 2
   },
   "state_sufficiency.json": {
@@ -84,15 +84,15 @@
   },
   "throughput.csv": {
    "path": "outputs/pico_final_w_only_20260924/throughput.csv",
-   "bytes": 8383,
-   "sha256": "ec427133e084752d0057b2277d6edeca749e2d799a2cda614413079b4c8f8ca2",
-   "rows": 25
+   "bytes": 9854,
+   "sha256": "fbafc2649df66481431f15bb2c96ba553134465f29aca6e4ab094d8f2c46486f",
+   "rows": 29
   },
   "w_scaling.csv": {
    "path": "outputs/pico_final_w_only_20260924/w_scaling.csv",
-   "bytes": 872,
-   "sha256": "c66b5d9d7b3a3d302f1589cc97f51149326375625f66522a2b69ee5bf92bfe59",
-   "rows": 3
+   "bytes": 1850,
+   "sha256": "433832a17406439e1688e3632f14792ac5933d0f0d60271a72d02deec98081db",
+   "rows": 7
   }
  },
  "large_artifacts": {

@@ -156,6 +156,38 @@ def collect_w_scaling():
     """W evidence: fixed-structure sweep cells when present, plus the two
     complete stage-B runs that measured the same workload at W=1 and W=64."""
     rows = []
+    # Preferred source: the W cells that restricted the final optimizer to one
+    # W candidate (deployable arm, measured end to end by the normal harness).
+    for result in sorted(OUT.glob("*/results/w_cell_W*.json")):
+        requested = result.stem.replace("w_cell_W", "")
+        try:
+            data = json.loads(result.read_text())
+        except Exception:  # noqa: BLE001
+            continue
+        for run in data.get("runs", []):
+            plans = run.get("physical_plans_by_feature") or {}
+            key = "feature" if "feature" in plans else (sorted(plans)[0] if plans else None)
+            plan = plans.get(key, {}) if key else {}
+            for index, rep in enumerate(run.get("repeat_results") or [run]):
+                rows.append(
+                    {
+                        "workload": result.parts[-3],
+                        "requested_workers": requested,
+                        "n_local_workers": plan.get("n_local_workers"),
+                        "optimizer": run.get("optimizer"),
+                        "round": index + 1,
+                        "throughput_samples_per_sec": rep.get(
+                            "throughput_samples_per_sec"
+                        ),
+                        "perf_time_sec": rep.get("perf_time_sec"),
+                        "num_samples": rep.get("num_samples"),
+                        "provenance": (
+                            "final PICO restricted to this single W candidate "
+                            "(structure re-optimised at that W); one complete run"
+                        ),
+                        "source": str(result.relative_to(ROOT)),
+                    }
+                )
     stage_b = {
         "cheap": {
             "W1": ("simple_dp_boundary", "outputs/stage_b_repr_20260924/results_cheap.json"),
@@ -436,10 +468,11 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
         "| --- | ---: | --- | ---: | --- |",
     ]
     for entry in w_rows:
+        requested = entry.get("requested_workers", entry.get("n_local_workers"))
         lines.append(
-            f"| {entry['workload']} | {entry['n_local_workers']} | "
+            f"| {entry['workload']} | {requested} | "
             f"{entry['optimizer']} | {float(entry['throughput_samples_per_sec']):.1f} | "
-            f"{entry.get('source', 'fixed-structure sweep')} |"
+            f"{entry.get('provenance', entry.get('source', ''))} |"
         )
     if not w_rows:
         lines.append("| （无） | — | — | — | — |")
