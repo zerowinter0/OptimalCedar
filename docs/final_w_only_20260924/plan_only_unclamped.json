@@ -1,0 +1,200 @@
+{
+ "workload": "simclrv2",
+ "tag": "unclamped",
+ "workers": 1,
+ "objective": 12.729728346697634,
+ "objective_per_worker": 12.729728346697634,
+ "fused": [
+  [
+   10,
+   [
+    3,
+    6
+   ]
+  ],
+  [
+   11,
+   [
+    2,
+    4
+   ]
+  ],
+  [
+   12,
+   [
+    5,
+    7,
+    1
+   ]
+  ]
+ ],
+ "parallel_stages": [
+  [
+   "MapperPipe_GaussianBlur",
+   "SMP"
+  ],
+  [
+   "MapperPipe_ColorJitter",
+   "SMP"
+  ],
+  [
+   "FusedPipe",
+   "SMP"
+  ]
+ ],
+ "unpriced_backends": [],
+ "plan": {
+  "pipes": {
+   "0": {
+    "name": "BatcherPipe(batch_size=4)",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "1": {
+    "name": "MapperPipe_Normalize",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "2": {
+    "name": "MapperPipe_GaussianBlur",
+    "variant": "SMP",
+    "variant_ctx": {
+     "variant_type": "SMP",
+     "n_procs": 1,
+     "max_inflight": 10,
+     "max_prefetch": 10,
+     "use_threads": true,
+     "disable_torch_parallelism": true
+    },
+    "execution_resource": "cpu"
+   },
+   "3": {
+    "name": "MapperPipe_Grayscale",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "4": {
+    "name": "MapperPipe_ColorJitter",
+    "variant": "SMP",
+    "variant_ctx": {
+     "variant_type": "SMP",
+     "n_procs": 1,
+     "max_inflight": 10,
+     "max_prefetch": 10,
+     "use_threads": true,
+     "disable_torch_parallelism": true
+    },
+    "execution_resource": "cpu"
+   },
+   "5": {
+    "name": "MapperPipe_RandomHorizontalFlip",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "6": {
+    "name": "MapperPipe_RandomResizedCrop",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "7": {
+    "name": "MapperPipe_to_float",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "8": {
+    "name": "ImageReaderPipe",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "9": {
+    "name": "LocalFSListerPipe",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   },
+   "10": {
+    "name": "FusedPipe",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "fused_pipes": [
+     3,
+     6
+    ],
+    "execution_resource": "cpu"
+   },
+   "11": {
+    "name": "FusedPipe",
+    "variant": "SMP",
+    "variant_ctx": {
+     "variant_type": "SMP",
+     "n_procs": 1,
+     "max_inflight": 10,
+     "max_prefetch": 10,
+     "use_threads": true,
+     "disable_torch_parallelism": true
+    },
+    "fused_pipes": [
+     2,
+     4
+    ],
+    "execution_resource": "cpu"
+   },
+   "12": {
+    "name": "FusedPipe",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "fused_pipes": [
+     5,
+     7,
+     1
+    ],
+    "execution_resource": "cpu"
+   },
+   "13": {
+    "name": "PrefetcherPipe",
+    "variant": "INPROCESS",
+    "variant_ctx": {
+     "variant_type": "INPROCESS"
+    },
+    "execution_resource": "cpu"
+   }
+  },
+  "graph": {
+   "0": "13",
+   "8": "10",
+   "9": "8",
+   "10": "11",
+   "11": "12",
+   "12": "0",
+   "13": ""
+  },
+  "n_local_workers": 1
+ }
+}

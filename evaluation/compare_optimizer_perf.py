@@ -1084,7 +1084,30 @@ def _run_one(
                 optimizer_name,
                 setup_time_sec,
             )
-            return _summarize_setup_only(optimizer_name, setup_time_sec, "plan_only")
+            # Plan-only cells still export the plan they built, so a planning
+            # comparison (for example before/after a cost-model change) has the
+            # materialised plan and its score, not just a wall-clock time.
+            plan_only_cost = None
+            plan_only_by_feature = None
+            if plan_evidence is None and dataset is not None:
+                try:
+                    plan_evidence = _collect_plan_evidence(
+                        dataset, args.profiled_stats, args.skip_pico_plan_cost
+                    )
+                    plan_only_cost = plan_evidence.get("plan_cost")
+                    plan_only_by_feature = plan_evidence.get(
+                        "plan_costs_by_feature"
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Plan-only plan export failed: %s", exc)
+            return _summarize_setup_only(
+                optimizer_name,
+                setup_time_sec,
+                "plan_only",
+                plan_only_cost,
+                plan_only_by_feature,
+                plan_evidence,
+            )
 
         if not workload_runner:
             raise RuntimeError(f"Could not create workload runner for {optimizer_name}.")

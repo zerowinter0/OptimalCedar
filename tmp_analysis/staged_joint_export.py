@@ -109,9 +109,28 @@ def main() -> int:
     log = OUT / WORKLOAD / "logs" / f"{CELL}.log"
     if log.exists():
         text = log.read_text(errors="replace")
-        selected = re.search(r"selected W=(\d+), cost=([\d.eE+-]+)", text)
-        evidence = re.search(r"worker search evidence=(\[.*\])\s*$", text, re.M)
-        stats = re.findall(r"Exact search stats: (\{.*\})\s*$", text, re.M)
+        # Attribute every record to the optimizer that produced it: the cell
+        # log interleaves the joint DP and the staged search, and the previous
+        # version mixed the joint DP's search statistics into the staged
+        # record.
+        staged_lines = [
+            line
+            for line in text.splitlines()
+            if "StagedWorkersBoundaryAffineReprOptimizer" in line
+        ]
+        staged_text = "\n".join(staged_lines)
+        selected = re.search(
+            r"selected W=(\d+), cost=([\d.eE+-]+)", staged_text
+        )
+        evidence = re.search(
+            r"worker search evidence=(\[.*\])\s*$", staged_text, re.M
+        )
+        stats = re.findall(
+            r"Exact search stats: (\{.*\})\s*$", staged_text, re.M
+        )
+        dp_stats = re.findall(
+            r"Exact search stats: (\{.*\})\s*$", text, re.M
+        )
         summary["staged_stages"] = {
             "selected": (
                 {"workers": int(selected.group(1)), "cost_ms_per_record": float(selected.group(2))}
@@ -121,7 +140,10 @@ def main() -> int:
             "worker_search_evidence": (
                 ast.literal_eval(evidence.group(1)) if evidence else None
             ),
-            "dp_search_stats": [ast.literal_eval(item) for item in stats[:3]],
+            "dp_search_stats": [ast.literal_eval(item) for item in dp_stats[:3]],
+            "staged_search_stats": [
+                ast.literal_eval(item) for item in stats[:3]
+            ],
             "log": str(log.relative_to(ROOT)),
         }
     target = OUT / "staged_joint.json"

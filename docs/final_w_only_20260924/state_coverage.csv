@@ -1,0 +1,5 @@
+case,detected,detail
+state_conflict_counterexample,True,"representation state is not a function of the operator set: operators [3, 7] disagree on class 'float32:3ch': float32:3ch vs uint8:3ch"
+missing_curve_counterexample,True,"the materialized plan prices operators in representations the profile never measured: [{'pipe': 3, 'class': 'uint8:3ch'}] (trace: [{'pipe': 8, 'class': 'path', "
+workload:simclrv2,True,positions=9 
+workload:simclrv2_cache,True,positions=9 

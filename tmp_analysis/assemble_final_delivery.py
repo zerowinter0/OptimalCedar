@@ -344,6 +344,8 @@ def main() -> int:
     write_csv(OUT / "planning.csv", planning)
     write_csv(OUT / "staged_joint.csv", collect_staged_joint())
     write_csv(OUT / "oracle_results.csv", collect_oracle())
+    write_csv(OUT / "state_coverage.csv", collect_state_coverage())
+    write_csv(OUT / "backend_rule.csv", collect_backend_rule())
     write_csv(OUT / "w_scaling.csv", collect_w_scaling())
     write_csv(OUT / "operator_predictions.csv", operator_rows)
     write_csv(OUT / "plan_predictions.csv", plan_rows)
@@ -427,6 +429,56 @@ def collect_staged_joint():
     return rows
 
 
+def collect_state_coverage():
+    path = OUT / "repr_state_coverage.json"
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text())
+    rows = []
+    for label, entry in (
+        ("state_conflict_counterexample", data.get("conflict_case")),
+        ("missing_curve_counterexample", data.get("missing_curve_case")),
+    ):
+        rows.append(
+            {
+                "case": label,
+                "detected": entry.get("detected"),
+                "detail": (entry.get("error") or "")[:160],
+            }
+        )
+    for workload, entry in (data.get("workloads") or {}).items():
+        rows.append(
+            {
+                "case": f"workload:{workload}",
+                "detected": entry.get("passed"),
+                "detail": f"positions={entry.get('positions')} "
+                f"{(entry.get('error') or '')[:120]}",
+            }
+        )
+    return rows
+
+
+def collect_backend_rule():
+    path = OUT / "backend_rule_compare.json"
+    if not path.exists():
+        return []
+    rows = []
+    for entry in json.loads(path.read_text()):
+        rows.append(
+            {
+                "workload": entry.get("workload"),
+                "pairs_previously_clamped": entry.get("pairs_previously_clamped"),
+                "pairs_checked": entry.get("pairs_checked"),
+                "worst_clamped_ratio": entry.get("worst_ratio"),
+                "stored_plan_rescored": entry.get("stored_plan_rescored_objective"),
+                "new_plan_objective": entry.get("new_plan_objective"),
+                "objective_delta_pct": entry.get("objective_delta_pct"),
+                "plan_changed": entry.get("plan_changed"),
+            }
+        )
+    return rows
+
+
 def collect_oracle():
     path = OUT / "oracle_results.json"
     if not path.exists():
@@ -447,9 +499,12 @@ def collect_oracle():
                 "workers_enumerated": ",".join(
                     str(w) for w in (instance.get("workers") or [])
                 ),
-                "dp_score": dp.get("score"),
+                "dp_score": dp.get("normalized_score", dp.get("score")),
                 "dp_workers": dp.get("workers"),
-                "oracle_score": oracle.get("score"),
+                "oracle_score": oracle.get(
+                    "normalized_score", oracle.get("score")
+                ),
+                "objective_unit": entry.get("objective", ""),
                 "match": entry.get("match"),
                 "status": entry.get("status", ""),
             }

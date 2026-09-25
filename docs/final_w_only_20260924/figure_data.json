@@ -15,7 +15,7 @@
    "fused": "[[15, 14, 13, 12, 7, 6, 9], [1, 2, 3, 4, 8, 10, 5, 11, 0]]",
    "stages": "[\"FilterPipe_WordRepetitionFilter:RAY\", \"FilterPipe_SpecialCharactersFilter:RAY\", \"FilterPipe_FlaggedWordsFilter:RAY\", \"MapperPipe_PunctuationNormalizationMapper:RAY\", \"MapperPipe_FixUnicodeMapper:RAY\", \"MapperPipe_SetImageRootMapper:RAY\", \"MapperPipe_parse_json_line:RAY\", \"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/llava_pretrain/results/main_fast.json"
   },
   {
@@ -33,7 +33,7 @@
    "fused": "[]",
    "stages": "[\"FilterPipe_WordRepetitionFilter:SMP\", \"FilterPipe_PerplexityFilter:SMP\", \"FilterPipe_FlaggedWordsFilter:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/llava_pretrain/results/main_fast.json"
   },
   {
@@ -51,7 +51,7 @@
    "fused": "[[15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/llava_pretrain/results/main_fast.json"
   },
   {
@@ -69,7 +69,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/ablation_fast.json"
   },
   {
@@ -87,7 +87,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/ablation_fast.json"
   },
   {
@@ -105,7 +105,7 @@
    "fused": "[[3, 6, 2, 4, 5, 7, 1]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/ablation_fast.json"
   },
   {
@@ -123,7 +123,7 @@
    "fused": "[[6, 3, 2, 4, 5, 7, 1]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/ablation_fast.json"
   },
   {
@@ -141,7 +141,7 @@
    "fused": "[[4, 2, 5]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/dp_repeat.json"
   },
   {
@@ -159,7 +159,7 @@
    "fused": "[[4, 2, 5]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/dp_repeat.json"
   },
   {
@@ -177,7 +177,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/dp_repeat.json"
   },
   {
@@ -195,7 +195,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/dp_repeat.json"
   },
   {
@@ -213,7 +213,7 @@
    "fused": "[[4, 2, 5]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/main_fast.json"
   },
   {
@@ -231,7 +231,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/main_fast.json"
   },
   {
@@ -249,7 +249,7 @@
    "fused": "[]",
    "stages": "[\"MapperPipe_GaussianBlur:SMP\", \"MapperPipe_ColorJitter:SMP\", \"MapperPipe_RandomResizedCrop:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/main_fast.json"
   },
   {
@@ -267,7 +267,7 @@
    "fused": "[[7, 6, 5, 4, 3, 2, 1]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/main_fast.json"
   },
   {
@@ -285,7 +285,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/staged_fast.json"
   },
   {
@@ -303,7 +303,7 @@
    "fused": "[]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/staged_fast.json"
   },
   {
@@ -321,7 +321,7 @@
    "fused": "[[3, 6], [2, 4], [5, 7, 1]]",
    "stages": "[\"MapperPipe_GaussianBlur:SMP\", \"MapperPipe_ColorJitter:SMP\", \"FusedPipe:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/w_cell_W1.json"
   },
   {
@@ -339,7 +339,7 @@
    "fused": "[[3, 6], [2, 4], [5, 7, 1]]",
    "stages": "[\"MapperPipe_GaussianBlur:SMP\", \"MapperPipe_ColorJitter:SMP\", \"FusedPipe:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/w_cell_W16.json"
   },
   {
@@ -357,7 +357,7 @@
    "fused": "[[3, 6], [2, 4], [5, 7, 1]]",
    "stages": "[\"MapperPipe_GaussianBlur:SMP\", \"MapperPipe_ColorJitter:SMP\", \"FusedPipe:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/w_cell_W4.json"
   },
   {
@@ -375,7 +375,7 @@
    "fused": "[[3, 6, 2, 5, 7, 1, 4]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2/results/w_cell_W64.json"
   },
   {
@@ -393,7 +393,7 @@
    "fused": "[[3, 7, 6, 2, 1, 4, 5]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/ablation_fast.json"
   },
   {
@@ -411,7 +411,7 @@
    "fused": "[[3, 7, 6, 2, 1, 4, 5]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/ablation_fast.json"
   },
   {
@@ -429,7 +429,7 @@
    "fused": "[[3, 6, 2, 4, 5, 7, 1]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/ablation_fast.json"
   },
   {
@@ -447,7 +447,7 @@
    "fused": "[[6, 3, 2, 4, 5, 7, 1]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/ablation_fast.json"
   },
   {
@@ -465,7 +465,7 @@
    "fused": "[[5, 4, 2]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/main_fast.json"
   },
   {
@@ -483,7 +483,7 @@
    "fused": "[[3, 7, 6, 2, 1, 4, 5]]",
    "stages": "[]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/main_fast.json"
   },
   {
@@ -501,7 +501,7 @@
    "fused": "[]",
    "stages": "[\"MapperPipe_GaussianBlur:SMP\", \"MapperPipe_Grayscale:SMP\", \"MapperPipe_ColorJitter:SMP\", \"MapperPipe_RandomResizedCrop:SMP\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/main_fast.json"
   },
   {
@@ -519,7 +519,7 @@
    "fused": "[[7, 6, 5, 4, 3, 2, 1]]",
    "stages": "[\"FusedPipe:RAY\"]",
    "status": "completed",
-   "commit": "d858735f2f6a8b09e00b44820519cfecd2e8ff1c",
+   "commit": "e247b26c9191520c1ca7bb78e30ddac12b1b1942",
    "results_path": "outputs/pico_final_w_only_20260924/simclrv2_cache/results/main_fast.json"
   }
  ],

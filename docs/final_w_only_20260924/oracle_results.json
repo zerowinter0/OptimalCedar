@@ -91,7 +91,8 @@
     5
    ],
    "workers": 4,
-   "score": 13.909029171931246,
+   "raw_score": 13.909029171931246,
+   "normalized_score": 3.4772572929828116,
    "blocks": [
     [
      0
@@ -110,10 +111,100 @@
     "INPROCESS",
     "INPROCESS",
     "INPROCESS"
-   ]
+   ],
+   "plan": {
+    "pipes": {
+     "0": {
+      "name": "BatcherPipe(batch_size=4)",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "1": {
+      "name": "MapperPipe_to_float",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "2": {
+      "name": "MapperPipe_RandomResizedCrop",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "3": {
+      "name": "MapperPipe_GaussianBlur",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "4": {
+      "name": "MapperPipe_Grayscale",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "5": {
+      "name": "ImageReaderPipe",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "6": {
+      "name": "LocalFSListerPipe",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     },
+     "7": {
+      "name": "FusedPipe",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "fused_pipes": [
+       4,
+       2,
+       3,
+       1
+      ],
+      "execution_resource": "cpu"
+     },
+     "8": {
+      "name": "PrefetcherPipe",
+      "variant": "INPROCESS",
+      "variant_ctx": {
+       "variant_type": "INPROCESS"
+      },
+      "execution_resource": "cpu"
+     }
+    },
+    "graph": {
+     "0": "8",
+     "5": "7",
+     "6": "5",
+     "7": "0",
+     "8": ""
+    },
+    "n_local_workers": 4
+   }
   },
   "oracle": {
-   "score": 13.909029171931245,
+   "normalized_score": 3.477257292982811,
    "plan": {
     "order": [
      5,
@@ -145,8 +236,413 @@
      "INPROCESS",
      "INPROCESS"
     ],
-    "workers": 1
+    "workers": 4
    }
+  },
+  "objective": "score / W (the unit the DP search compares)",
+  "independent_formula_check": {
+   "checked": 576,
+   "max_abs_error": 0.04650380914185348,
+   "max_rel_error": 0.0033546419519401853,
+   "worst": {
+    "order": [
+     5,
+     3,
+     2,
+     1,
+     4,
+     0
+    ],
+    "blocks": [
+     [
+      5
+     ],
+     [
+      3,
+      2,
+      1
+     ],
+     [
+      4
+     ],
+     [
+      0
+     ]
+    ],
+    "workers": 1,
+    "deployed": 51.44437187391997,
+    "independent": 51.397868064778116,
+    "abs_error": 0.04650380914185348
+   }
+  },
+  "offload_cache_probe": [
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 3,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "CACHE",
+    "workers": 1,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "CACHE",
+    "workers": 2,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   },
+   {
+    "structure": "oracle_best",
+    "block": 2,
+    "backend": "CACHE",
+    "workers": 4,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 0,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 1,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 2,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "SMP",
+    "workers": 4,
+    "status": "ValueError: Variant SMP is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 1,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 2,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 2,
+    "backend": "RAY",
+    "workers": 4,
+    "status": "ValueError: Variant RAY is outside the DP search space."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "CACHE",
+    "workers": 1,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "CACHE",
+    "workers": 2,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   },
+   {
+    "structure": "dp_plan",
+    "block": 1,
+    "backend": "CACHE",
+    "workers": 4,
+    "status": "ValueError: Materialized cache placement is infeasible in DP search."
+   }
+  ],
+  "offload_enabled_probe": {
+   "dp_plan_normalized_score": 3.012485789493556,
+   "dp_plan_workers": 4,
+   "dp_plan_backends": [
+    "INPROCESS",
+    "INPROCESS",
+    "SMP",
+    "INPROCESS",
+    "INPROCESS"
+   ],
+   "dp_plan_blocks": [
+    [
+     0
+    ],
+    [
+     1,
+     3
+    ],
+    [
+     2
+    ],
+    [
+     4
+    ],
+    [
+     5
+    ]
+   ],
+   "enumerated_min_normalized": 3.477257292982811,
+   "unpriced_backends": []
   },
   "skipped_candidates": {},
   "first_errors": [],

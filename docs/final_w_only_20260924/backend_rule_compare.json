@@ -1,0 +1,98 @@
+[
+ {
+  "workload": "simclrv2",
+  "pairs_checked": 14,
+  "pairs_previously_clamped": 10,
+  "worst_ratio": 5.253206506593221,
+  "clamped_examples": [
+   {
+    "backend": "SMP",
+    "pipe": 5,
+    "mean": 0.386423749660787,
+    "local": 0.07355959625341062,
+    "ratio": 5.253206506593221
+   },
+   {
+    "backend": "SMP",
+    "pipe": 3,
+    "mean": 0.9510299316239317,
+    "local": 0.1934078783577952,
+    "ratio": 4.917224363862637
+   },
+   {
+    "backend": "SMP",
+    "pipe": 1,
+    "mean": 0.45803182857142855,
+    "local": 0.14145980958905002,
+    "ratio": 3.2378937162579313
+   },
+   {
+    "backend": "RAY",
+    "pipe": 3,
+    "mean": 0.6155056249999998,
+    "local": 0.1934078783577952,
+    "ratio": 3.1824227132120457
+   },
+   {
+    "backend": "SMP",
+    "pipe": 7,
+    "mean": 0.551800565340909,
+    "local": 0.24863659460273085,
+    "ratio": 2.2193055138265976
+   }
+  ],
+  "stored_plan_rescored_objective": 14.642767563458202,
+  "new_plan_objective": 14.642767563458202,
+  "new_plan_workers": 64,
+  "objective_delta_pct": 0.0,
+  "plan_changed": true
+ },
+ {
+  "workload": "simclrv2_cache",
+  "pairs_checked": 14,
+  "pairs_previously_clamped": 10,
+  "worst_ratio": 5.523851197476917,
+  "clamped_examples": [
+   {
+    "backend": "SMP",
+    "pipe": 5,
+    "mean": 0.4128384189189189,
+    "local": 0.07473742578501891,
+    "ratio": 5.523851197476917
+   },
+   {
+    "backend": "SMP",
+    "pipe": 3,
+    "mean": 1.0001749262510975,
+    "local": 0.19014693424305687,
+    "ratio": 5.260010792351855
+   },
+   {
+    "backend": "SMP",
+    "pipe": 1,
+    "mean": 0.44903715454545456,
+    "local": 0.12159826384802981,
+    "ratio": 3.692792481861821
+   },
+   {
+    "backend": "RAY",
+    "pipe": 3,
+    "mean": 0.5995192133333335,
+    "local": 0.19014693424305687,
+    "ratio": 3.152926002829965
+   },
+   {
+    "backend": "SMP",
+    "pipe": 7,
+    "mean": 0.664324995256917,
+    "local": 0.2600466285838519,
+    "ratio": 2.5546379850208507
+   }
+  ],
+  "stored_plan_rescored_objective": 16.46235450604698,
+  "new_plan_objective": 16.46235450604698,
+  "new_plan_workers": 64,
+  "objective_delta_pct": 0.0,
+  "plan_changed": true
+ }
+]

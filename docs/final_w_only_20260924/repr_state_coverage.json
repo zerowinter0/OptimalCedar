@@ -1,0 +1,73 @@
+{
+ "conflict_case": {
+  "detected": true,
+  "error": "representation state is not a function of the operator set: operators [3, 7] disagree on class 'float32:3ch': float32:3ch vs uint8:3ch"
+ },
+ "missing_curve_case": {
+  "detected": true,
+  "member": 3,
+  "removed_class": "uint8:3ch",
+  "error": "the materialized plan prices operators in representations the profile never measured: [{'pipe': 3, 'class': 'uint8:3ch'}] (trace: [{'pipe': 8, 'class': 'path', 'elements': 112.0, 'covered': True}, {'p"
+ },
+ "workloads": {
+  "simclrv2": {
+   "passed": true,
+   "positions": 9,
+   "state_report": {
+    "state_shareable": true,
+    "reachable_classes": [
+     "float32:1ch",
+     "float32:3ch",
+     "list",
+     "path",
+     "uint8:1ch",
+     "uint8:3ch"
+    ],
+    "operators_checked": [
+     8,
+     7,
+     6,
+     5,
+     4,
+     3,
+     2,
+     1,
+     0
+    ],
+    "conflicts": [],
+    "order_dependent_applicability": [],
+    "counterexample": null
+   }
+  },
+  "simclrv2_cache": {
+   "passed": true,
+   "positions": 9,
+   "state_report": {
+    "state_shareable": true,
+    "reachable_classes": [
+     "float32:1ch",
+     "float32:3ch",
+     "list",
+     "path",
+     "uint8:1ch",
+     "uint8:3ch"
+    ],
+    "operators_checked": [
+     8,
+     7,
+     6,
+     5,
+     4,
+     3,
+     2,
+     1,
+     0
+    ],
+    "conflicts": [],
+    "order_dependent_applicability": [],
+    "counterexample": null
+   }
+  }
+ },
+ "passed": true
+}

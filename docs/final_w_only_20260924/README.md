@@ -1,6 +1,6 @@
 # Final W-only PICO：交付与完成矩阵
 
-commit: `d858735f2f6a8b09e00b44820519cfecd2e8ff1c`
+commit: `e247b26c9191520c1ca7bb78e30ddac12b1b1942`
 
 ## 身份
 

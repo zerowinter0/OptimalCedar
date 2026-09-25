@@ -1,0 +1,24 @@
+{
+ "slower_backend": {
+  "factor": 3.0,
+  "local_ms": 12.26266187024132,
+  "measured_backend_ms": 36.787985610723965,
+  "priced_ms": 36.787985610723965,
+  "clamped": false
+ },
+ "faster_backend": {
+  "factor": 0.25,
+  "local_ms": 11.285711116606256,
+  "measured_backend_ms": 2.821427779151564,
+  "priced_ms": 2.821427779151564,
+  "clamped": false
+ },
+ "missing_backend_measurement": "operator 2 has no measured RAY compute time in this profile; the candidate is unpriceable instead of being charged the l",
+ "unpriced_backends": [
+  [
+   2,
+   "RAY"
+  ]
+ ],
+ "passed": true
+}

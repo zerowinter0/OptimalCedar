@@ -2207,6 +2207,39 @@ simclrv2_cache 最大 1489 状态 / 2.6 s；**llava_pretrain 16 算子 / 462 mas
 `compute_model has no profiled input features for operator 5`）、coco（profile 未产出）、
 固定结构 W 扫描、联合 oracle、合成规模曲线。
 
+### 4.13 正确性轮：联合 oracle、状态/覆盖检查、取消后端截断（2026-09-26）
+
+结果目录仍是 `outputs/pico_final_w_only_20260924/`，新增 `oracle_results.{json,csv}`、
+`repr_state_coverage.json`/`state_coverage.csv`、`backend_rule_compare.json`/`backend_rule.csv`、
+`backend_cost_rule.json`、`staged_joint.{json,csv}`；文档见 `docs/final_w_only_20260924/README.md` §7。
+
+**① 联合 oracle（归一化、同空间、含独立核对）**：比较单位改为 `score / W`；保存 DP 原始计划与两种目标；
+同候选空间 = 24 顺序 × 全部连续融合划分 × {INPROCESS} × W∈{1,2,4} × width 1 × 无 cache，**576 个候选全部枚举**，
+DP = oracle = **3.4772573**（match = true）。独立闭式 Σ(k·e+b)/W 对这 576 个候选核对：
+最大相对偏差 **0.34%**（固定/边界项残差，如实记录）。打开 offload 后 DP 找到含 SMP 的计划（**3.0125**），
+说明 offload 轴活跃且 INPROCESS 枚举是其子空间。早前 `orders_evaluated = 0` 的两条失败尝试保留。
+
+**② 表示状态与覆盖检查接入**：`repr_state_report()`（部分函数语义 + 两两交换性，不枚举排列）在构建
+`element_prod/class_state` 表之前强制运行；`assert_plan_covered()` 改为展开融合块成员后逐位置核对并接入
+`_physical_opt`。反例验收：状态冲突（[3,7] 在 `float32:3ch`）与融合成员缺曲线（pipe 3 @ `uint8:3ch`）都被检出；
+simclrv2 / simclrv2_cache 的已发布计划各 9 个位置通过（6 个可达类，无冲突）；LLaVA 因需要自己的 feature builder 记为未覆盖。
+
+**③ 取消后端计算成本截断**：`min(mean, local)` 删除，后端实测更慢就按更慢收费；缺测量 → unpriceable（抛错 + 记录）。
+simclrv2 profile 里 **10/14** 个 (算子, 后端) 对曾被截断，最差 **5.25×**（cache 上 5.52×）。
+冻结候选集对比：改动前生成的计划用新评分器重打与改动后重新规划得到**同一目标**（simclrv2 14.6427676、
+cache 16.4623545，Δ = 0.0%），即"预测变了、选择没变"。同时修掉两个一致性缺陷：
+SMP aggregate transport 曲线不覆盖 W 时显式降级（不给聚合优惠并记录）；非 W 条件路径的 W 与回放资源切片不一致
+（搜索按 W=1、物化按 W=64 计价）导致 search/replay 目标分歧。
+
+**④ 固定 W 的标量保留未实现**：改动点已定位（`ExtensibleDpSearch` 标签保留，需保留资源切片/缓存状态区分），
+验收标准即本轮修好的 oracle；推迟理由是同一区域刚暴露 W×SMP 一致性问题，需独立一轮改动。
+
+**⑤ 导出修复与 C3 复核**：`staged_joint_export.py` 按优化器归属解析日志（staged 只取自己的行：selected W=64、
+cost 0.286 ms/record、64 点 W 证据；DP 统计单独列出）。C3：每个 W cell 是该 W 下重新联合优化的**部署口径**
+（非固定结构，已标注）；单位一致（每源记录，perf 窗口排除规划/启动）；模型 vs 实测 ms/record：
+W=1 18.31 vs 10.97、W=4 4.58 vs 2.92、W=16 1.14 vs 0.873、W=64 0.286 vs 0.440 →
+低/中 W 悲观、仅 W=64 略乐观（35%），**无高 W 系统性高估**，因此不引入 driver/队列/max-lane 新模型。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射

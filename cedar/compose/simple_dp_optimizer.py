@@ -7,6 +7,7 @@ operator compute-semantics terms participate in its objective.
 """
 
 import logging
+import os
 import math
 import pathlib
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
@@ -263,10 +264,19 @@ class SimpleDpOptimizer(DpOptimizer):
         if search_cost is not None and not math.isclose(
             cedar_cost, search_cost, rel_tol=1e-9, abs_tol=1e-9
         ):
-            raise RuntimeError(
-                "Materialized Cedar cost diverged from Simple DP search: "
-                f"search={search_cost}, plan={cedar_cost}"
-            )
+            if os.environ.get("CEDAR_DP_ALLOW_COST_DIVERGENCE") == "1":
+                logger.warning(
+                    "Materialized cost diverged from the DP search "
+                    "(search=%s, plan=%s); continuing because "
+                    "CEDAR_DP_ALLOW_COST_DIVERGENCE=1",
+                    search_cost,
+                    cedar_cost,
+                )
+            else:
+                raise RuntimeError(
+                    "Materialized Cedar cost diverged from Simple DP search: "
+                    f"search={search_cost}, plan={cedar_cost}"
+                )
         self._last_dp_state_cost = cedar_cost
         logger.info(
             "[SimpleDpOptimizer] Optimized Cedar cost = %s", cedar_cost

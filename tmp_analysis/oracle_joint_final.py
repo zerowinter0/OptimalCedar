@@ -199,12 +199,21 @@ def main() -> int:
     )
     os.environ["CEDAR_WORKER_SEARCH_SET"] = ",".join(str(w) for w in WORKER_SET)
     os.environ["CEDAR_DP_WORKER_LADDER"] = "0"
+    # Resource matching must be on, otherwise the optimizer never runs its
+    # W-conditioned search and the DP would sit at a single arbitrary W while
+    # the oracle enumerates the whole ladder.
+    os.environ["CEDAR_MATCH_PROFILE_RESOURCES"] = "1"
+    os.environ["CEDAR_PROFILE_MATCH_CPU_BUDGET"] = "64"
+    os.environ["CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET"] = "64"
     plan = optimizer.run(remapped, options)
     ops = list(optimizer._dp_inner_ops)
     specs_of = optimizer._dp_blocks_from_physical_plan(plan, ops)
     optimizer._dp_scoring_required_widths = {}
-    optimizer._dp_selected_workers = max(1, int(plan.n_local_workers or 1))
-    dp_score = optimizer._replay_dp_objective(specs_of, ops).score
+    dp_workers = max(1, int(plan.n_local_workers or 1))
+    optimizer._dp_selected_workers = dp_workers
+    dp_raw = float(optimizer._replay_dp_objective(specs_of, ops).score)
+    # The DP compares score / W, so the oracle must normalise the same way.
+    dp_score = dp_raw / dp_workers
 
     # The subset declares no ``depends_on`` edges, so the DP may reorder the
     # four mappers freely; the reader stays first and the batcher last (the
@@ -236,6 +245,42 @@ def main() -> int:
     evaluated = 0
     skipped: Dict[str, int] = {}
     first_errors: List[str] = []
+    independent = {
+        "checked": 0,
+        "max_abs_error": 0.0,
+        "max_rel_error": 0.0,
+        "worst": None,
+    }
+    model = optimizer._repr_model()
+    ratios = model["element_ratio"]
+    transitions = model["class_transition"]
+    curves = model["operators"]
+    source_class = str(model["source_class"])
+    source_elements = float(model["source_elements"])
+
+    def independent_normalized(order, workers):
+        """Sum of k_(i,z)*e + b over the order, divided by W.
+
+        Written here from the frozen coefficients only; it shares no code with
+        the DP's cost accumulation, so it cross-checks the compute term, the
+        element/class propagation and the W normalisation.
+        """
+        elements = source_elements
+        klass = source_class
+        total = 0.0
+        for p_id in order:
+            entry = curves.get(str(p_id)) or curves.get(p_id)
+            curve = (entry or {}).get("by_class", {}).get(klass)
+            if curve is None:
+                return None
+            total += curve["k_ms_per_element"] * elements + curve["b_ms"]
+            elements *= float(ratios.get(str(p_id), 1.0))
+            klass = str(
+                (transitions.get(str(p_id)) or {}).get(klass, klass)
+            )
+        return total / workers
+
+    probe_order = None
     for order in orders:
         for blocks in fusion_partitions(order):
             # Fusion is only a legal candidate for runs whose members are all
@@ -246,6 +291,10 @@ def main() -> int:
             ):
                 continue
             variant_choices = [list(BACKENDS) for _ in blocks]
+            # A few offload and cache candidates beside the INPROCESS space:
+            # first block on SMP, first block on RAY, and one cache placement
+            # after the middle block.  They are only kept when the scorer can
+            # actually price them.
             for variants in itertools.product(*variant_choices):
                 for workers in WORKER_SET:
                     # ``_replay_dp_objective`` works in *inner-op index* space:
@@ -259,11 +308,13 @@ def main() -> int:
                             False,
                             1,
                         )
-                        for block, variant in zip(blocks, variants)
+                    for block, variant in zip(blocks, variants)
                     ]
+                    wants_cache_list = [False] * len(blocks)
                     try:
                         optimizer._dp_selected_workers = workers
-                        score = optimizer._replay_dp_objective(specs_try, ops).score
+                        optimizer._dp_scoring_required_widths = {}
+                        score = optimizer._replay_dp_objective(specs_try, ops).score / workers
                     except Exception as exc:  # noqa: BLE001
                         key = f"{type(exc).__name__}: {exc}"[:120]
                         skipped[key] = skipped.get(key, 0) + 1
@@ -276,12 +327,220 @@ def main() -> int:
                     evaluated += 1
                     if best is None or score < best:
                         best = score
+                        probe_order = order
                         best_plan = {
                             "order": [int(p) for p in order],
                             "blocks": [list(block) for block in blocks],
                             "backends": list(variants),
                             "workers": workers,
                         }
+            # Independent cross-check on the INPROCESS, no-cache candidates.
+            for workers in WORKER_SET:
+                reference = independent_normalized(order, workers)
+                if reference is None:
+                    continue
+                specs_plain = [
+                    (
+                        tuple(index_of[int(p)] for p in block),
+                        PipeVariantType["INPROCESS"],
+                        False,
+                        1,
+                    )
+                    for block in blocks
+                ]
+                try:
+                    optimizer._dp_selected_workers = workers
+                    optimizer._dp_scoring_required_widths = {}
+                    deployed = (
+                        optimizer._replay_dp_objective(specs_plain, ops).score
+                        / workers
+                    )
+                except Exception:  # noqa: BLE001
+                    continue
+                independent["checked"] += 1
+                error = abs(deployed - reference)
+                independent["max_abs_error"] = max(
+                    independent["max_abs_error"], error
+                )
+                if reference:
+                    independent["max_rel_error"] = max(
+                        independent["max_rel_error"], error / reference
+                    )
+                if independent["worst"] is None or error > independent["worst"][
+                    "abs_error"
+                ]:
+                    independent["worst"] = {
+                        "order": [int(p) for p in order],
+                        "blocks": [list(block) for block in blocks],
+                        "workers": workers,
+                        "deployed": deployed,
+                        "independent": reference,
+                        "abs_error": error,
+                    }
+    # Focused offload/cache probe: the DP's own structure and the enumerated
+    # INPROCESS optimum, each with one SMP and one RAY block and one cache
+    # placement, at every enumerated W.  The full cross product with every
+    # order is thousands of replays and adds no coverage the main enumeration
+    # does not already provide.
+    from cedar.compose.optimizer import PipeVariantType
+
+    probe_rows = []
+    probe_structures = []
+    if best_plan:
+        probe_structures.append(
+            ("oracle_best", best_plan["order"], best_plan["blocks"], best_plan["backends"])
+        )
+    dp_order_ids = [int(pid) for block in specs_of for pid in block[0]]
+    probe_structures.append(
+        (
+            "dp_plan",
+            [ops[i] for i in dp_order_ids],
+            [[ops[i] for i in block[0]] for block in specs_of],
+            [block[1].name for block in specs_of],
+        )
+    )
+    for label, order_ids, blocks, backends in probe_structures:
+        for index in range(len(blocks)):
+            for backend in ("SMP", "RAY"):
+                variants = list(backends)
+                variants[index] = backend
+                for workers in WORKER_SET:
+                    specs_try = [
+                        (
+                            tuple(index_of[int(p)] for p in block),
+                            PipeVariantType[variants[i]],
+                            False,
+                            1,
+                        )
+                        for i, block in enumerate(blocks)
+                    ]
+                    try:
+                        optimizer._dp_selected_workers = workers
+                        optimizer._dp_scoring_required_widths = {}
+                        score = (
+                            optimizer._replay_dp_objective(specs_try, ops).score
+                            / workers
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        probe_rows.append(
+                            {
+                                "structure": label,
+                                "block": index,
+                                "backend": backend,
+                                "workers": workers,
+                                "status": f"{type(exc).__name__}: {str(exc)[:80]}",
+                            }
+                        )
+                        continue
+                    probe_rows.append(
+                        {
+                            "structure": label,
+                            "block": index,
+                            "backend": backend,
+                            "workers": workers,
+                            "normalized_score": score,
+                            "status": "evaluated",
+                        }
+                    )
+                    evaluated += 1
+                    if score < best:
+                        best = score
+                        best_plan = {
+                            "order": [int(p) for p in order_ids],
+                            "blocks": [list(b) for b in blocks],
+                            "backends": variants,
+                            "workers": workers,
+                            "probe": f"{label}:{index}:{backend}",
+                        }
+        # cache placement after the middle block
+        if len(blocks) > 1:
+            middle = len(blocks) // 2
+            for workers in WORKER_SET:
+                specs_cache = [
+                    (
+                        tuple(index_of[int(p)] for p in block),
+                        PipeVariantType["INPROCESS"],
+                        i == middle,
+                        1,
+                    )
+                    for i, block in enumerate(blocks)
+                ]
+                try:
+                    optimizer._dp_selected_workers = workers
+                    optimizer._dp_scoring_required_widths = {}
+                    score = (
+                        optimizer._replay_dp_objective(specs_cache, ops).score
+                        / workers
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    probe_rows.append(
+                        {
+                            "structure": label,
+                            "block": middle,
+                            "backend": "CACHE",
+                            "workers": workers,
+                            "status": f"{type(exc).__name__}: {str(exc)[:80]}",
+                        }
+                    )
+                    continue
+                probe_rows.append(
+                    {
+                        "structure": label,
+                        "block": middle,
+                        "backend": "CACHE",
+                        "workers": workers,
+                        "normalized_score": score,
+                        "status": "evaluated",
+                    }
+                )
+                evaluated += 1
+                if score < best:
+                    best = score
+                    best_plan = {
+                        "order": [int(p) for p in order_ids],
+                        "blocks": [list(b) for b in blocks],
+                        "backends": ["INPROCESS"] * len(blocks),
+                        "workers": workers,
+                        "cache_after_block": middle,
+                    }
+
+    # Secondary, partial space: with offload enabled the DP may legitimately
+    # beat the INPROCESS enumeration, so this is reported as a probe table, not
+    # as an optimality claim.
+    offload_optimizer = SimpleDpWorkersBoundaryAffineReprOptimizer()
+    instance.set_optimizer(offload_optimizer)
+    offload_options = OptimizerOptions(
+        enable_prefetch=True,
+        est_throughput=None,
+        available_local_cpus=64,
+        enable_offload=True,
+        enable_reorder=True,
+        enable_local_parallelism=True,
+        enable_fusion=True,
+        enable_caching=False,
+        num_samples=0,
+        use_my_optimizer=39,
+        reorder_timeout_sec=3600.0,
+    )
+    offload_plan = offload_optimizer.run(remapped, offload_options)
+    offload_specs = offload_optimizer._dp_blocks_from_physical_plan(
+        offload_plan, ops
+    )
+    offload_workers = max(1, int(offload_plan.n_local_workers or 1))
+    offload_optimizer._dp_selected_workers = offload_workers
+    offload_optimizer._dp_scoring_required_widths = {}
+    offload_raw = float(
+        offload_optimizer._replay_dp_objective(offload_specs, ops).score
+    )
+    offload_probe = {
+        "dp_plan_normalized_score": offload_raw / offload_workers,
+        "dp_plan_workers": offload_workers,
+        "dp_plan_backends": [block[1].name for block in offload_specs],
+        "dp_plan_blocks": [list(block[0]) for block in offload_specs],
+        "enumerated_min_normalized": best,
+        "unpriced_backends": offload_optimizer.repr_unpriced_backends(),
+    }
+
     result = {
         "instance": {
             "operators": ops,
@@ -294,12 +553,18 @@ def main() -> int:
         "orders_evaluated": evaluated,
         "dp": {
             "order": [int(pid) for block in specs_of for pid in block[0]],
-            "workers": optimizer._dp_selected_workers,
-            "score": float(dp_score),
+            "workers": dp_workers,
+            "raw_score": dp_raw,
+            "normalized_score": float(dp_score),
             "blocks": [list(block[0]) for block in specs_of],
             "backends": [block[1].name for block in specs_of],
+            "plan": plan.to_dict(),
         },
-        "oracle": {"score": best, "plan": best_plan},
+        "oracle": {"normalized_score": best, "plan": best_plan},
+        "objective": "score / W (the unit the DP search compares)",
+        "independent_formula_check": independent,
+        "offload_cache_probe": probe_rows,
+        "offload_enabled_probe": offload_probe,
         "skipped_candidates": skipped,
         "first_errors": first_errors,
         "match": best is not None

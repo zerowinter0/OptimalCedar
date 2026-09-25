@@ -303,6 +303,9 @@ class _RepresentationComputeMixin:
         cached = getattr(self, "_repr_tables_cache", None)
         if cached is not None:
             return cached
+        # A mask-keyed table is only sound if the state is shareable by every
+        # prefix of that mask; check that before building it.
+        self.repr_state_report()
         model = self._repr_model()
         ratios = model.get("element_ratio") or {}
         transitions = model.get("class_transition") or {}
@@ -336,27 +339,109 @@ class _RepresentationComputeMixin:
         self._repr_tables_cache = (element_prod, class_state)
         return element_prod, class_state
 
-    def repr_state_is_order_independent(self) -> bool:
-        """Every order of the same operator set must agree on the class state."""
+    def repr_state_report(self) -> Dict[str, Any]:
+        """Check that the class state can be shared by every prefix of a mask.
+
+        The DP stores one state per *set*, so two legal prefixes with the same
+        operator set must hand the next operator the same class.  The check is
+        cheap and reachability based instead of enumerating permutations:
+
+          * collect the classes reachable from the source class by repeatedly
+            applying the single-operator transitions;
+          * require every operator's transition to be defined on every reachable
+            class (an undefined entry silently keeps the previous class, which
+            is exactly how a state conflict would hide);
+          * require the transitions of every operator *pair* to commute on every
+            reachable class.
+
+        A violation raises with the concrete class and operator pair, so a
+        future recipe that breaks the property fails loudly instead of being
+        merged into one wrong state.
+        """
+        cached = getattr(self, "_repr_state_report_cache", None)
+        if cached is not None:
+            return cached
         model = self._repr_model()
         transitions = model.get("class_transition") or {}
         source_class, _ = self._repr_source_record()
         inner = [int(p_id) for p_id in self._dp_inner_ops]
-        states = {(): source_class}
-        for size in range(1, len(inner) + 1):
-            for prefix in [p for p in states if len(p) == size - 1]:
-                klass = states[prefix]
-                for p_id in inner:
-                    if p_id in prefix:
+
+        # The recorded transition table is a *partial* function: an operator
+        # only lists the classes its profiling payloads actually had.  A class
+        # an operator never saw is not "unchanged" -- it is a class that
+        # operator cannot be asked to price, which the materialized-plan
+        # coverage check reports.  Reachability therefore follows defined
+        # transitions only.
+        def apply_transition(p_id, klass):
+            return (transitions.get(str(p_id)) or {}).get(klass)
+
+        reachable = {source_class}
+        frontier = [source_class]
+        while frontier:
+            klass = frontier.pop()
+            for p_id in inner:
+                nxt = apply_transition(p_id, klass)
+                if nxt is None or nxt in reachable:
+                    continue
+                reachable.add(str(nxt))
+                frontier.append(str(nxt))
+
+        conflicts = []
+        asymmetric = []
+        for first in inner:
+            for second in inner:
+                if first >= second:
+                    continue
+                for klass in sorted(reachable):
+                    first_step = apply_transition(first, klass)
+                    second_step = apply_transition(second, klass)
+                    if first_step is None or second_step is None:
                         continue
-                    table = transitions.get(str(p_id)) or {}
-                    nxt = str(table.get(klass, klass))
-                    key = tuple(sorted(prefix + (p_id,)))
-                    existing = states.get(key)
-                    if existing is not None and existing != nxt:
-                        return False
-                    states[key] = nxt
-        return True
+                    left = apply_transition(second, first_step)
+                    right = apply_transition(first, second_step)
+                    if left is None and right is None:
+                        continue
+                    if left is None or right is None:
+                        asymmetric.append(
+                            {
+                                "pipes": [first, second],
+                                "class": klass,
+                                "first_then_second": left,
+                                "second_then_first": right,
+                            }
+                        )
+                        continue
+                    if left != right:
+                        conflicts.append(
+                            {
+                                "pipes": [first, second],
+                                "class": klass,
+                                "first_then_second": left,
+                                "second_then_first": right,
+                            }
+                        )
+        report = {
+            "state_shareable": not conflicts,
+            "reachable_classes": sorted(reachable),
+            "operators_checked": inner,
+            "conflicts": conflicts[:10],
+            "order_dependent_applicability": asymmetric[:10],
+            "counterexample": (
+                f"operators {conflicts[0]['pipes']} disagree on class "
+                f"{conflicts[0]['class']!r}: "
+                f"{conflicts[0]['first_then_second']} vs "
+                f"{conflicts[0]['second_then_first']}"
+                if conflicts
+                else None
+            ),
+        }
+        self._repr_state_report_cache = report
+        if conflicts:
+            raise RuntimeError(
+                "representation state is not a function of the operator set: "
+                + report["counterexample"]
+            )
+        return report
 
     def _repr_curves(self, p_id: int) -> dict:
         model = self._repr_model()
@@ -448,8 +533,16 @@ class _RepresentationComputeMixin:
         """Price one operator at its *profiled* representation.
 
         Position-dependent pricing happens in ``_dp_compute_work_prod``; this
-        hook only anchors the per-operator constant the DP normalizes against,
-        so the byte ``input_size`` no longer drives compute.
+        hook anchors the per-operator constant the DP normalizes against, so
+        the byte ``input_size`` no longer drives compute.
+
+        The backend arm uses the *measured* backend compute time as it is: a
+        backend that is slower than the local pipeline must be priced as
+        slower.  Clamping it to the local cost (the previous
+        ``min(mean, local)``) silently deleted exactly the difference the
+        split compute/boundary design exists to express.  When the backend
+        measurement is missing the operator is reported as unpriceable for
+        that backend instead of silently reusing the local anchor.
         """
         elements, klass = self._repr_declared_features(p_id)
         local = self._repr_compute_cost(p_id, elements, klass)
@@ -475,8 +568,23 @@ class _RepresentationComputeMixin:
             except (KeyError, TypeError, ValueError):
                 mean = float("nan")
             if math.isfinite(mean) and mean >= 0.0:
-                return max(min(mean, local), 1e-12)
-        return max(local, 1e-12)
+                # Representation response is transferred by the same kx+b shape
+                # the local arm uses; at the profiled position the shape is 1.
+                return max(mean, 1e-12)
+        missing = getattr(self, "_repr_unpriced_backends", None)
+        if missing is None:
+            missing = set()
+            self._repr_unpriced_backends = missing
+        missing.add((int(p_id), str(desc.variant_type.name)))
+        raise RuntimeError(
+            f"operator {p_id} has no measured {desc.variant_type.name} "
+            "compute time in this profile; the candidate is unpriceable "
+            "instead of being charged the local cost"
+        )
+
+    def repr_unpriced_backends(self):
+        """Backend/operator pairs the profile could not price."""
+        return sorted(getattr(self, "_repr_unpriced_backends", set()))
 
 
     _REPR_UNPRICED_PENALTY_MS = 1.0e6
@@ -485,41 +593,86 @@ class _RepresentationComputeMixin:
         return sorted(getattr(self, "_repr_missing_classes", set()))
 
     def assert_plan_covered(self, plan) -> None:
-        """Reject a returned plan that contains an unmeasured representation."""
+        """Verify every priced position of a materialized plan.
+
+        Fused nodes are expanded to their members, so an operator that is
+        fused into a block is still checked at the position it actually runs.
+        Returns the per-position trace; raises with the offending positions
+        when a curve is missing, instead of letting a search-time penalty
+        stand in for coverage.
+        """
         element_prod, class_state = self._repr_tables()
         index_of = {
             int(p_id): index for index, p_id in enumerate(self._dp_inner_ops)
         }
-        missing = []
-        mask = 0
-        graph = {int(k): v for k, v in plan.graph.items()}
-        children = {
-            int(child)
-            for value in graph.values()
-            for child in ([int(x) for x in value.split(",")] if value else [])
-        }
-        node = next(p for p in graph if p not in children)
+        graph_raw = {int(k): v for k, v in plan.graph.items()}
+
+        def successors(value):
+            if isinstance(value, str):
+                return [int(x) for x in value.split(",") if x.strip()]
+            return [int(x) for x in (value or [])]
+
+        children = {c for value in graph_raw.values() for c in successors(value)}
+        node = next(p for p in graph_raw if p not in children)
+        # Walk the plan once, expanding fused nodes into their members in the
+        # order the fused callable applies them.
+        pipeline: List[int] = []
         while True:
-            if node in index_of:
-                index = index_of[node]
-                if index not in [
-                    i for i in range(len(self._dp_inner_ops)) if mask >> i & 1
-                ]:
-                    klass = class_state[mask]
-                    if klass not in self._repr_curves(node):
-                        missing.append((node, klass))
-                    mask |= 1 << index
-            value = graph.get(node)
-            nxt = [int(x) for x in value.split(",")] if value else []
+            desc = plan.pipe_descs.get(node)
+            members = getattr(desc, "fused_pipes", None) if desc is not None else None
+            if members:
+                pipeline.extend(int(p) for p in members)
+            pipeline.append(int(node))
+            nxt = successors(graph_raw.get(node))
             if not nxt:
                 break
             node = nxt[0]
+
+        trace = []
+        missing = []
+        mask = 0
+        for p_id in pipeline:
+            if p_id not in index_of:
+                continue
+            index = index_of[p_id]
+            if mask >> index & 1:
+                continue
+            klass = class_state[mask]
+            _, source_elements = self._repr_source_record()
+            elements = source_elements * element_prod[mask]
+            covered = klass in self._repr_curves(p_id)
+            trace.append(
+                {
+                    "pipe": p_id,
+                    "class": klass,
+                    "elements": elements,
+                    "covered": covered,
+                }
+            )
+            if not covered:
+                missing.append({"pipe": p_id, "class": klass})
+            mask |= 1 << index
+        self._repr_coverage_trace = trace
         if missing:
             raise RuntimeError(
-                "the selected plan prices operators in representations the "
-                f"profile never measured: {missing}; regenerate the profile "
-                "with those classes measured instead of falling back to bytes"
+                "the materialized plan prices operators in representations the "
+                f"profile never measured: {missing} (trace: {trace}); "
+                "regenerate the profile with those classes measured instead "
+                "of falling back to bytes"
             )
+        return trace
+
+    def repr_coverage_trace(self):
+        """Per-position features of the last validated plan."""
+        return list(getattr(self, "_repr_coverage_trace", []))
+
+    def _physical_opt(self):
+        """Plan, then verify the materialized plan's representation coverage."""
+        result = super()._physical_opt()
+        plan = self.physical_plan
+        if plan is not None:
+            self.assert_plan_covered(plan)
+        return result
 
 class SimpleDpBoundaryAffineElementsOptimizer(
     _RepresentationComputeMixin, SimpleDpBoundaryOptimizer
@@ -699,12 +852,36 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
             from cedar.client.boundary_profiler import smp_aggregate_throughput
             model = self._dp_boundary_profile(PipeVariantType.SMP) or {}
             curve = model.get("aggregate_transport")
-            if curve is None:
-                raise ValueError("W-boundary planning requires a measured SMP aggregate_transport curve")
-            context = PipeVariantContextFactory.create_context(variant_type=PipeVariantType.SMP)
-            bandwidth = smp_aggregate_throughput(curve, workers, context.max_inflight)
-            aggregate_service = (byte_service *
-                self._dp_boundary_throughput(PipeVariantType.SMP) / bandwidth)
+            single_pair = self._dp_boundary_throughput(PipeVariantType.SMP)
+            bandwidth = None
+            if curve is not None:
+                context = PipeVariantContextFactory.create_context(
+                    variant_type=PipeVariantType.SMP
+                )
+                try:
+                    bandwidth = smp_aggregate_throughput(
+                        curve, workers, context.max_inflight
+                    )
+                except ValueError as exc:
+                    # The profile's aggregate transport curve stops at the
+                    # widths it measured.  Do not invent a bandwidth: charge the
+                    # stage without aggregation credit and record the gap, so
+                    # the candidate stays feasible but is not flattered.
+                    uncovered = getattr(self, "_smp_curve_uncovered", None)
+                    if uncovered is None:
+                        uncovered = set()
+                        self._smp_curve_uncovered = uncovered
+                    uncovered.add(int(workers))
+                    logger.warning(
+                        "SMP aggregate transport curve does not cover W=%s (%s); "
+                        "charging the boundary without aggregation credit",
+                        workers,
+                        exc,
+                    )
+            if bandwidth is not None and bandwidth > 0.0:
+                aggregate_service = byte_service * single_pair / bandwidth
+            else:
+                aggregate_service = byte_service
         return _SharedCommunicationObjective(
             local_serial=previous.local_serial + max(0.0, extra_cost - byte_service),
             ray_serial=previous.ray_serial + workers * aggregate_service,
@@ -720,6 +897,14 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
                 "[SimpleDpWorkersBoundaryOptimizer] Resource matching is "
                 "disabled; falling back to one boundary-aware DP search."
             )
+            # The materialized plan keeps the W the resource matcher already
+            # put on it, so the single search must price the boundary term with
+            # that same W.  Leaving the worker count unset priced every Ray/SMP
+            # boundary at W=1 and then diverged from the replay.
+            self._dp_selected_workers = max(
+                1, int(self.physical_plan.n_local_workers or 1)
+            )
+            self._dp_selected_limit = None
             return super()._dp_reorder_offload_cache_fusion(inner_ops)
 
         started = time.monotonic()
@@ -758,6 +943,11 @@ class SimpleDpWorkersBoundaryOptimizer(SimpleDpBoundaryOptimizer):
         score, _, workers, result, limit = best
         self._worker_search_evidence = evidence
         self._dp_selected_workers = workers
+        # Remember the resource slice the winner was searched under: the
+        # materialized plan is re-scored through the same slice, otherwise the
+        # replay sees a different stage-cpu feasibility set and reports a cost
+        # the search never compared against.
+        self._dp_selected_limit = limit
         self.physical_plan.set_local_workers(workers)
         logger.info("[%s] worker search evidence=%s", type(self).__name__, evidence)
         logger.info(
@@ -1059,6 +1249,84 @@ class SimpleDpWorkersBoundaryAffineReprOptimizer(
     and fusion/backend/cache search unchanged (per-stage width fixed at 1)."""
 
     repr_model_variant = "affine"
+
+    def _replay_dp_objective(self, block_specs, inner_ops):
+        """Score a materialized plan under the slice it was searched with.
+
+        ``DpOptimizer._replay_dp_objective`` scores without a resource slice;
+        for the W-conditioned optimizers that means a plan the search accepted
+        can be re-priced with a different stage-cpu feasibility set.  Passing
+        the winning slice keeps search and replay on one model.
+        """
+        limit = getattr(self, "_dp_selected_limit", None)
+        if limit is None:
+            return super()._replay_dp_objective(block_specs, inner_ops)
+        from cedar.compose.dp_optimizer import (
+            BlockCandidateProvider,
+            CacheTransitionPolicy,
+            ExtensibleDpSearch,
+        )
+
+        provider = BlockCandidateProvider(self, inner_ops)
+        provider.prepare()
+        cache_policy = CacheTransitionPolicy(self, inner_ops)
+        search = ExtensibleDpSearch(
+            optimizer=self,
+            inner_ops=inner_ops,
+            block_provider=provider,
+            cache_policy=cache_policy,
+            parallel_stage_cpu_limit=limit,
+        )
+        state = cache_policy.initial_state()
+        objective = search._initial_objective()
+        prev_mask = 0
+        for order, variant, wants_cache, parallelism in block_specs:
+            block = provider.candidate_for_order(
+                order, variant, prefix_mask=prev_mask, parallelism=parallelism
+            )
+            next_mask = prev_mask | block.mask
+            if search.parallel_stage_cpu_limit is None:
+                next_parallel_stage_cpus = None
+            else:
+                next_parallel_stage_cpus = (
+                    state.parallel_stage_cpus
+                    + self._dp_parallel_stage_cpu_cost(block)
+                )
+                if next_parallel_stage_cpus > search.parallel_stage_cpu_limit:
+                    raise ValueError(
+                        "Materialized plan exceeds the DP CPU budget."
+                    )
+            regular_cost = self._dp_regular_transition_cost(prev_mask, block)
+            choices = list(
+                cache_policy.transitions(
+                    prev_mask,
+                    next_mask,
+                    state,
+                    regular_cost,
+                    block,
+                    next_parallel_stage_cpus,
+                )
+            )
+            matching = [
+                choice
+                for choice in choices
+                if (choice.cache_after_idx is not None) == wants_cache
+            ]
+            if len(matching) != 1:
+                raise ValueError(
+                    "Materialized cache placement is infeasible in DP search."
+                )
+            choice = matching[0]
+            objective = search._accumulate_objective(
+                objective,
+                choice.extra_cost,
+                block,
+                choice.replaces_prefix_cost,
+                prev_mask,
+            )
+            state = choice.state
+            prev_mask = next_mask
+        return objective
 
 
 class SimpleDpWorkersAffineReprOptimizer(SimpleDpWorkersBoundaryAffineReprOptimizer):

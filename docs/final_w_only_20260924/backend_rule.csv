@@ -1,0 +1,3 @@
+workload,pairs_previously_clamped,pairs_checked,worst_clamped_ratio,stored_plan_rescored,new_plan_objective,objective_delta_pct,plan_changed
+simclrv2,10,14,5.253206506593221,14.642767563458202,14.642767563458202,0.0,True
+simclrv2_cache,10,14,5.523851197476917,16.46235450604698,16.46235450604698,0.0,True

@@ -1,4 +1,4 @@
-experiment,operators,candidates_evaluated,workers_enumerated,dp_score,dp_workers,oracle_score,match,status
-simclrv2_subset_n4,0,0,,,,,False,
-simclrv2_full_n7,0,0,,,,,False,
-joint_n4,6,576,"1,2,4",13.909029171931246,4,13.909029171931245,True,
+experiment,operators,candidates_evaluated,workers_enumerated,dp_score,dp_workers,oracle_score,objective_unit,match,status
+simclrv2_subset_n4,0,0,,,,,,False,
+simclrv2_full_n7,0,0,,,,,,False,
+joint_n4,6,576,"1,2,4",3.4772572929828116,4,3.477257292982811,score / W (the unit the DP search compares),True,
