@@ -2160,6 +2160,29 @@ SimCLRv2 上不存在语义等价重排；完整 PICO 上字节 affine 与表示
 **staged vs joint（同一最终模型，simclrv2）**：2475.0 vs 2444.4 samples/s（+1.3%，噪声内），
 但规划时间 **26.4 s vs 123.9 s**（staged 快 4.7 倍）。
 
+**联合 oracle（`oracle_results.csv`）——已修复并通过**：早先两次尝试（`simclrv2_full_n7`、`simclrv2_subset_n4`）都是
+`orders_evaluated = 0`、`oracle_score = null`，即枚举根本没有执行，不能用来判断 DP 对错。本轮重建后：
+实例 = SimCLRv2 的 4 算子子集（grayscale/blur/crop/to_float + reader + batcher，profile 按算子名重映射保持
+冻结参数），**DP 与枚举使用完全相同的候选空间**（24 个 mapper 顺序 × 每个顺序的所有连续融合划分 ×
+backend ∈ {INPROCESS}（与 DP 关闭 offload 后的候选集一致）× W ∈ {1,2,4}，stage width 固定 1，cache 关闭），
+两边都用部署的 plan-replay 目标评分：**枚举 576 个候选，oracle 最优 = 13.909029，DP = 13.909029 → match = true**
+（并列最优的结构不同：DP 选 W=4 + 融合块 {1,3,2,4}，枚举 argmin 是 W=1 + 融合块 {4,2,3}）。
+这也修正了上一轮"DP 选 W=64 而 oracle 只有 {1,2,4}"的候选空间不一致问题。
+
+**staged vs joint 的同评分器对照（`staged_joint.csv`）**：把两个已物化计划都用**同一个最终 PICO 评分器**重打分
+（此前 `plan_cost` 由各自 cell 的优化器给出，不可比）：
+
+| 计划 | 同评分器目标 | W | 融合 | 实测吞吐 | 规划时间 |
+| --- | ---: | ---: | --- | ---: | ---: |
+| `pico_final`（联合） | **14.643** | 64 | FusedPipe{3,6,2,5,7,1,4} | 2444.4 /s | 123.9 s |
+| `staged_final`（staged） | **18.212** | 64 | 无融合 | 2475.0 /s | 26.4 s |
+
+→ 联合搜索在**模型目标**上确实更好（−19.6%），差距来源是 staged 漏掉融合；但**实测吞吐只差 1.3% 且在噪声内**
+（staged 反而略高）。因此第四章不能写"joint 每例都赢"：该实例说明联合搜索能改进模型分数，
+而吞吐收益在噪声内；staged 用 1/4.7 的规划时间达到同一吞吐，是"规划成本 vs 目标质量"的取舍证据。
+staged 的阶段选择记录（selected W=64、cost 0.286 ms/record、64 点 worker 搜索证据）已存
+`outputs/pico_final_w_only_20260924/staged_joint.json`。
+
 **W 曲线（`w_scaling.csv`，C3 已完成）**：把最终 PICO 的 W 候选限制为单值（`CEDAR_WORKER_SEARCH_SET`），
 每个点都是优化器在该 W 下的最优计划、由同一 harness 端到端测量（9,469 条、1 轮）：
 

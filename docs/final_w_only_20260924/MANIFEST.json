@@ -2,18 +2,18 @@
  "small_files": {
   "MANIFEST.json": {
    "path": "outputs/pico_final_w_only_20260924/MANIFEST.json",
-   "bytes": 4430,
-   "sha256": "4e976d71e38cdd279b149d7c6c62a5f0d29d6c1fd7becf06ce67bceec532dd73"
+   "bytes": 4432,
+   "sha256": "77b6f2831b4c75809b0c8635f08ea0917a9d1bdb8409e62dcd2db08cbd3711a6"
   },
   "README.md": {
    "path": "outputs/pico_final_w_only_20260924/README.md",
    "bytes": 6799,
-   "sha256": "36c5b8adae4b5d1087fbd7ac7c714a3c8b3731622a4f8e4125146b8d52f7cbc8"
+   "sha256": "5b08edf499ca2a729353de2f94544fda0e8ca357166dab834e7226478612108f"
   },
   "ablation.csv": {
    "path": "outputs/pico_final_w_only_20260924/ablation.csv",
    "bytes": 3232,
-   "sha256": "90532d35c81697008ad093996bb4b2babd65f9f92b1ebd331cee1d9e6731fe48",
+   "sha256": "1aaea9fe86f6bb3656b22c6600866986e2aff9825bf141deb138c7d1ac5310dd",
    "rows": 10
   },
   "claim_evidence.md": {
@@ -29,7 +29,7 @@
   "figure_data.json": {
    "path": "outputs/pico_final_w_only_20260924/figure_data.json",
    "bytes": 57695,
-   "sha256": "754125bcb7ca52be111f5d6fec8ad891f3ec9ab19e11d0257d08adebd5759e91"
+   "sha256": "958b361822bb2bfc7a73b64d49962c8c123ea4ea6883d7fa7c466bbd9ab6bf7e"
   },
   "fusion_components.csv": {
    "path": "outputs/pico_final_w_only_20260924/fusion_components.csv",
@@ -48,10 +48,16 @@
    "sha256": "6cbb8f2a1f15c7dc0eddc8e4136fb9d966558e8cf685979a2deaf589dd3bc8d1",
    "rows": 77
   },
+  "oracle_results.csv": {
+   "path": "outputs/pico_final_w_only_20260924/oracle_results.csv",
+   "bytes": 246,
+   "sha256": "8a4a904788bb0ad0eea772d1ecf3540720f8fd7919876247aa9a3551777c68f5",
+   "rows": 3
+  },
   "oracle_results.json": {
    "path": "outputs/pico_final_w_only_20260924/oracle_results.json",
-   "bytes": 992,
-   "sha256": "848e4a4ec0a6b5eecf016d35d7386e9591b58c2842d907e2c8b45c855d69c52a"
+   "bytes": 2060,
+   "sha256": "fce54417e49ff5734ad9b631cc8612ab843b6c20e59e8d6a0cdd790415cec002"
   },
   "plan_predictions.csv": {
    "path": "outputs/pico_final_w_only_20260924/plan_predictions.csv",
@@ -74,8 +80,19 @@
   "search_comparison.csv": {
    "path": "outputs/pico_final_w_only_20260924/search_comparison.csv",
    "bytes": 717,
-   "sha256": "98e62a0cbb2038fa15a6c3350c520adb8227e14a417e53179985274e0567900e",
+   "sha256": "ef351b0b9078b873429ab52cc44210a0dd2d11bd8979ba905343f30f351425a0",
    "rows": 2
+  },
+  "staged_joint.csv": {
+   "path": "outputs/pico_final_w_only_20260924/staged_joint.csv",
+   "bytes": 558,
+   "sha256": "6e27bfb08b082cbaf3fe5742d2b9d151a6fa5b26cfa9e1b24540c9bc0b60d1fb",
+   "rows": 2
+  },
+  "staged_joint.json": {
+   "path": "outputs/pico_final_w_only_20260924/staged_joint.json",
+   "bytes": 30168,
+   "sha256": "b3f1e3c405c0ef24516de05b60cea98b045d909ea57ff70a1c2aac224eb36ff4"
   },
   "state_sufficiency.json": {
    "path": "outputs/pico_final_w_only_20260924/state_sufficiency.json",
@@ -85,7 +102,7 @@
   "throughput.csv": {
    "path": "outputs/pico_final_w_only_20260924/throughput.csv",
    "bytes": 9854,
-   "sha256": "fbafc2649df66481431f15bb2c96ba553134465f29aca6e4ab094d8f2c46486f",
+   "sha256": "76a967b60654016485e8d5d657f1cb25cd06b6b33d58ea04fc4d8d54a34e1ab3",
    "rows": 29
   },
   "w_scaling.csv": {

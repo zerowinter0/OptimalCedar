@@ -342,6 +342,8 @@ def main() -> int:
     table, plan_rows, operator_rows = chapter3_tables()
     planning = collect_planning()
     write_csv(OUT / "planning.csv", planning)
+    write_csv(OUT / "staged_joint.csv", collect_staged_joint())
+    write_csv(OUT / "oracle_results.csv", collect_oracle())
     write_csv(OUT / "w_scaling.csv", collect_w_scaling())
     write_csv(OUT / "operator_predictions.csv", operator_rows)
     write_csv(OUT / "plan_predictions.csv", plan_rows)
@@ -393,6 +395,66 @@ def throughput_summary(rows):
             }
         )
     return out
+
+
+def collect_staged_joint():
+    path = OUT / "staged_joint.json"
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text())
+    rows = []
+    for name, entry in (data.get("plans") or {}).items():
+        rows.append(
+            {
+                "plan": name,
+                "same_scorer_objective": entry.get("hammer_objective"),
+                "workers": entry.get("workers"),
+                "fused": json.dumps(entry.get("fused")),
+                "parallel_stages": json.dumps(entry.get("parallel_stages")),
+                "throughput_samples_per_sec": entry.get("throughput_samples_per_sec"),
+                "planning_sec": entry.get("setup_time_sec"),
+                "plan_file": entry.get("plan_file"),
+                "staged_selected_workers": (
+                    (data.get("staged_stages", {}).get("selected") or {}).get("workers")
+                ),
+                "staged_selected_cost_ms_per_record": (
+                    (data.get("staged_stages", {}).get("selected") or {}).get(
+                        "cost_ms_per_record"
+                    )
+                ),
+            }
+        )
+    return rows
+
+
+def collect_oracle():
+    path = OUT / "oracle_results.json"
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text())
+    rows = []
+    for key, entry in data.items():
+        if not isinstance(entry, dict):
+            continue
+        instance = entry.get("instance") if isinstance(entry.get("instance"), dict) else {}
+        dp = entry.get("dp") if isinstance(entry.get("dp"), dict) else {}
+        oracle = entry.get("oracle") if isinstance(entry.get("oracle"), dict) else {}
+        rows.append(
+            {
+                "experiment": key,
+                "operators": len(instance.get("operators", []) or []),
+                "candidates_evaluated": entry.get("orders_evaluated"),
+                "workers_enumerated": ",".join(
+                    str(w) for w in (instance.get("workers") or [])
+                ),
+                "dp_score": dp.get("score"),
+                "dp_workers": dp.get("workers"),
+                "oracle_score": oracle.get("score"),
+                "match": entry.get("match"),
+                "status": entry.get("status", ""),
+            }
+        )
+    return rows
 
 
 def write_reports(rows, table, plan_rows, operator_rows) -> None:

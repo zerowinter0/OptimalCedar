@@ -1,0 +1,3 @@
+plan,same_scorer_objective,workers,fused,parallel_stages,throughput_samples_per_sec,planning_sec,plan_file,staged_selected_workers,staged_selected_cost_ms_per_record
+pico_final,14.642767563458202,64,"[[""10"", [3, 6, 2, 5, 7, 1, 4]]]",[],2444.369599125709,123.85514425532892,outputs/pico_final_w_only_20260924/simclrv2/plans/pico_final_final_plan.yaml,64,0.28607338422730016
+staged_final,18.21248529202962,64,[],[],2475.0253379473656,26.363037704024464,outputs/pico_final_w_only_20260924/simclrv2/plans/staged_final_final_plan.yaml,64,0.28607338422730016

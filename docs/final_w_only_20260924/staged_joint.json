@@ -1,0 +1,1246 @@
+{
+ "workload": "simclrv2",
+ "cell": "staged_fast",
+ "plans": {
+  "pico_final": {
+   "plan_file": "outputs/pico_final_w_only_20260924/simclrv2/plans/pico_final_final_plan.yaml",
+   "hammer_objective": 14.642767563458202,
+   "workers": 64,
+   "fused": [
+    [
+     "10",
+     [
+      3,
+      6,
+      2,
+      5,
+      7,
+      1,
+      4
+     ]
+    ]
+   ],
+   "parallel_stages": [],
+   "throughput_samples_per_sec": 2444.369599125709,
+   "harness_plan_cost": 937.1371240613241,
+   "setup_time_sec": 123.85514425532892
+  },
+  "staged_final": {
+   "plan_file": "outputs/pico_final_w_only_20260924/simclrv2/plans/staged_final_final_plan.yaml",
+   "hammer_objective": 18.21248529202962,
+   "workers": 64,
+   "fused": [],
+   "parallel_stages": [],
+   "throughput_samples_per_sec": 2475.0253379473656,
+   "harness_plan_cost": 1165.5990586898972,
+   "setup_time_sec": 26.363037704024464
+  }
+ },
+ "staged_stages": {
+  "selected": {
+   "workers": 64,
+   "cost_ms_per_record": 0.28607338422730016
+  },
+  "worker_search_evidence": [
+   {
+    "workers": 64,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2287932431790344,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 63,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.232424881959654,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 62,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2361736703783581,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 61,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2400453698927574,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 60,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2440461260576367,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 59,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.24818250107556275,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 58,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2524615097147966,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 57,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.25689065900803865,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 56,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.26147799220461077,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 55,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.26623213751742186,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 54,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.271162362286263,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 53,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2762786332727963,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 52,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2815916839126577,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 51,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.2871130894795726,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 50,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.29285535126916407,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 49,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.29883199109098374,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 48,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.3050576575720459,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 47,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.3115482460310256,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 46,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.31832103398822176,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 45,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.3253948347435156,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 44,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.33279017189677734,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 43,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.34052947821995816,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 42,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.348637322939481,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 41,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.35714067227946833,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 40,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.366069189086455,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 39,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.37545557855021033,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 38,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.38533598851205797,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 37,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.3957504746880595,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 36,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.4067435434293945,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 35,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.4183647875273772,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 34,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.4306696342193589,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 33,
+    "limits": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 0
+    },
+    "plan_cost": 14.642767563458202,
+    "compute_and_fixed_ms_per_replica": 14.642767563458202,
+    "unscaled_boundary_ms_per_sample": 0.0,
+    "score": 0.4437202291957031,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 32,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.697661507704021,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003135979148305715,
+    "score": 0.39680192211575066,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 31,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.696830346225047,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003210328105380918,
+    "score": 0.4095751724588725,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 30,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.695958816716452,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003288288058607126,
+    "score": 0.42319862722388174,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 29,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.695043905078794,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003370128624846752,
+    "score": 0.43776013465788943,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 28,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.69408228948814,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.0034561469474964656,
+    "score": 0.4533600817674336,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 27,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.693070300096041,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.0035466713014000737,
+    "score": 0.4701137148183719,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 26,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.692003872225872,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003642065279524334,
+    "score": 0.48815399508561047,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 25,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.690878491807188,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.00374273267395797,
+    "score": 0.5076351396722876,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 24,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.689689131503627,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.0038491231893912105,
+    "score": 0.5287370471459845,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 23,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.688430175628355,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.003961739159570295,
+    "score": 0.5516708772012329,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 22,
+    "limits": {
+     "ray_cpus": 2,
+     "smp_cpus": 1
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.687095331481503,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004081143478330196,
+    "score": 0.5766861514309775,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 21,
+    "limits": {
+     "ray_cpus": 3,
+     "smp_cpus": 2
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.685677524155954,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004207969009415003,
+    "score": 0.6040798821026645,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 20,
+    "limits": {
+     "ray_cpus": 3,
+     "smp_cpus": 2
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.684168771099971,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004342929807086629,
+    "score": 0.6342084385549985,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 19,
+    "limits": {
+     "ray_cpus": 3,
+     "smp_cpus": 2
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.682560031741316,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004486834567530363,
+    "score": 0.6675031595653325,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 18,
+    "limits": {
+     "ray_cpus": 3,
+     "smp_cpus": 2
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.680841026190173,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004640602846218612,
+    "score": 0.7044911681216762,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 17,
+    "limits": {
+     "ray_cpus": 3,
+     "smp_cpus": 2
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.679000015339765,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.00480528472832513,
+    "score": 0.7458235303141039,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 16,
+    "limits": {
+     "ray_cpus": 4,
+     "smp_cpus": 3
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.6770235324226,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.004982084841522677,
+    "score": 0.7923139707764125,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 15,
+    "limits": {
+     "ray_cpus": 4,
+     "smp_cpus": 3
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.678518307521557,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.005413875504221306,
+    "score": 0.8452345538347704,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 14,
+    "limits": {
+     "ray_cpus": 4,
+     "smp_cpus": 3
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.680296769742798,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.005927613913182751,
+    "score": 0.905735483553057,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 13,
+    "limits": {
+     "ray_cpus": 4,
+     "smp_cpus": 3
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.682448145755702,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.0065490746767279265,
+    "score": 0.9755729342889001,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 12,
+    "limits": {
+     "ray_cpus": 5,
+     "smp_cpus": 4
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.685103463415953,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.0073161073714762305,
+    "score": 1.0570919552846627,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 11,
+    "limits": {
+     "ray_cpus": 5,
+     "smp_cpus": 4
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.688463278022683,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.008286645733131303,
+    "score": 1.1534966616384257,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 10,
+    "limits": {
+     "ray_cpus": 6,
+     "smp_cpus": 5
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.692850842531378,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.009554066757313956,
+    "score": 1.2692850842531378,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 9,
+    "limits": {
+     "ray_cpus": 7,
+     "smp_cpus": 6
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.698822881603535,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.011279189627255245,
+    "score": 1.4109803201781705,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 8,
+    "limits": {
+     "ray_cpus": 8,
+     "smp_cpus": 7
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.707426821307955,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.013764580793714676,
+    "score": 1.5884283526634944,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 7,
+    "limits": {
+     "ray_cpus": 9,
+     "smp_cpus": 8
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.710322342435916,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.016144595353953888,
+    "score": 1.8157603346337023,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 6,
+    "limits": {
+     "ray_cpus": 10,
+     "smp_cpus": 9
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.71442851705786,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.019519723683270165,
+    "score": 2.1190714195096434,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 5,
+    "limits": {
+     "ray_cpus": 12,
+     "smp_cpus": 11
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.720705317323755,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.024679028473103454,
+    "score": 2.544141063464751,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 4,
+    "limits": {
+     "ray_cpus": 16,
+     "smp_cpus": 15
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.731492282079556,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.03354552678032948,
+    "score": 3.182873070519889,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 3,
+    "limits": {
+     "ray_cpus": 21,
+     "smp_cpus": 20
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.73380005717697,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.04549662740624392,
+    "score": 4.24460001905899,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 2,
+    "limits": {
+     "ray_cpus": 32,
+     "smp_cpus": 31
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.738662237028088,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.07067603103492473,
+    "score": 6.369331118514044,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   },
+   {
+    "workers": 1,
+    "limits": {
+     "ray_cpus": 64,
+     "smp_cpus": 63
+    },
+    "plan_resource_usage": {
+     "ray_cpus": 0,
+     "smp_cpus": 1
+    },
+    "plan_cost": 12.729728346697634,
+    "compute_and_fixed_ms_per_replica": 12.597310174958238,
+    "unscaled_boundary_ms_per_sample": 0.13241817173939513,
+    "score": 12.729728346697634,
+    "source": "conditioned_search",
+    "status": "evaluated"
+   }
+  ],
+  "dp_search_stats": [
+   {
+    "objective": "max_of_additive_resource_family_sums",
+    "legal_prefix_masks": 74,
+    "retained_states": 152,
+    "maximum_frontier": 3,
+    "parallel_stage_cpu_limit": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "required_final_parallel_stage_cpus": null,
+    "final_resource_states": [
+     {
+      "ray_cpus": 0,
+      "smp_cpus": 0
+     },
+     {
+      "ray_cpus": 1,
+      "smp_cpus": 0
+     }
+    ],
+    "pareto_global_epsilon": 0.0,
+    "pareto_step_epsilon": 0.0,
+    "transition_pairs": 1045,
+    "upper_bound_score": null,
+    "upper_bound_pruned": 0,
+    "suffix_lower_bound_pruned": 0,
+    "cell_candidates": 0,
+    "cell_replacements": 0,
+    "frontier_cap": 0,
+    "frontier_cap_pruned": 0,
+    "final_local_serial": 14.642767563458202,
+    "final_ray_serial": 0.0,
+    "final_smp_serial": 0.0,
+    "final_parallel_bottleneck": 0.0,
+    "final_gpu_serial": 0.0
+   },
+   {
+    "objective": "max_of_additive_resource_family_sums",
+    "legal_prefix_masks": 74,
+    "retained_states": 152,
+    "maximum_frontier": 3,
+    "parallel_stage_cpu_limit": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "required_final_parallel_stage_cpus": null,
+    "final_resource_states": [
+     {
+      "ray_cpus": 0,
+      "smp_cpus": 0
+     },
+     {
+      "ray_cpus": 1,
+      "smp_cpus": 0
+     }
+    ],
+    "pareto_global_epsilon": 0.0,
+    "pareto_step_epsilon": 0.0,
+    "transition_pairs": 1045,
+    "upper_bound_score": null,
+    "upper_bound_pruned": 0,
+    "suffix_lower_bound_pruned": 0,
+    "cell_candidates": 0,
+    "cell_replacements": 0,
+    "frontier_cap": 0,
+    "frontier_cap_pruned": 0,
+    "final_local_serial": 14.642767563458202,
+    "final_ray_serial": 0.0,
+    "final_smp_serial": 0.0,
+    "final_parallel_bottleneck": 0.0,
+    "final_gpu_serial": 0.0
+   },
+   {
+    "objective": "max_of_additive_resource_family_sums",
+    "legal_prefix_masks": 74,
+    "retained_states": 152,
+    "maximum_frontier": 3,
+    "parallel_stage_cpu_limit": {
+     "ray_cpus": 1,
+     "smp_cpus": 0
+    },
+    "required_final_parallel_stage_cpus": null,
+    "final_resource_states": [
+     {
+      "ray_cpus": 0,
+      "smp_cpus": 0
+     },
+     {
+      "ray_cpus": 1,
+      "smp_cpus": 0
+     }
+    ],
+    "pareto_global_epsilon": 0.0,
+    "pareto_step_epsilon": 0.0,
+    "transition_pairs": 1045,
+    "upper_bound_score": null,
+    "upper_bound_pruned": 0,
+    "suffix_lower_bound_pruned": 0,
+    "cell_candidates": 0,
+    "cell_replacements": 0,
+    "frontier_cap": 0,
+    "frontier_cap_pruned": 0,
+    "final_local_serial": 14.642767563458202,
+    "final_ray_serial": 0.0,
+    "final_smp_serial": 0.0,
+    "final_parallel_bottleneck": 0.0,
+    "final_gpu_serial": 0.0
+   }
+  ],
+  "log": "outputs/pico_final_w_only_20260924/simclrv2/logs/staged_fast.log"
+ }
+}

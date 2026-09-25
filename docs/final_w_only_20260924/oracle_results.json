@@ -57,5 +57,99 @@
   "oracle_plan": null,
   "match": false,
   "scope": "all legal orders x W in the enumerated set; fusion, offload and caching disabled on both sides; per-stage width fixed at 1"
+ },
+ "joint_n4": {
+  "instance": {
+   "operators": [
+    5,
+    4,
+    3,
+    2,
+    1,
+    0
+   ],
+   "backends": [
+    "INPROCESS"
+   ],
+   "workers": [
+    1,
+    2,
+    4
+   ],
+   "stage_width": 1,
+   "caching": false,
+   "fusion": "every contiguous partition of every legal order"
+  },
+  "orders_evaluated": 576,
+  "dp": {
+   "order": [
+    0,
+    1,
+    3,
+    2,
+    4,
+    5
+   ],
+   "workers": 4,
+   "score": 13.909029171931246,
+   "blocks": [
+    [
+     0
+    ],
+    [
+     1,
+     3,
+     2,
+     4
+    ],
+    [
+     5
+    ]
+   ],
+   "backends": [
+    "INPROCESS",
+    "INPROCESS",
+    "INPROCESS"
+   ]
+  },
+  "oracle": {
+   "score": 13.909029171931245,
+   "plan": {
+    "order": [
+     5,
+     4,
+     2,
+     3,
+     1,
+     0
+    ],
+    "blocks": [
+     [
+      5
+     ],
+     [
+      4,
+      2,
+      3
+     ],
+     [
+      1
+     ],
+     [
+      0
+     ]
+    ],
+    "backends": [
+     "INPROCESS",
+     "INPROCESS",
+     "INPROCESS",
+     "INPROCESS"
+    ],
+    "workers": 1
+   }
+  },
+  "skipped_candidates": {},
+  "first_errors": [],
+  "match": true
  }
 }
