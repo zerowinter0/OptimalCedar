@@ -13,14 +13,15 @@ ENTRY=outputs/ultimate_eight_optimizers_fix_20260921/entry.py
 RAY_IP=172.23.166.105:6379
 mkdir -p "$OUT"
 cp -f "$ENTRY" "$OUT/entry.py"
-if [ ! -d "$OUT/modules" ]; then
-  mkdir -p "$OUT/modules"
-  cp -r cedar "$OUT/modules"/cedar
-  mkdir -p "$OUT/modules/evaluation"
-  find evaluation -maxdepth 1 -type f -name '*.py' -exec cp {} "$OUT/modules/evaluation/" \;
-  cp -r evaluation/pipelines "$OUT/modules/evaluation/pipelines"
-  find "$OUT/modules" -name '__pycache__' -type d -prune -exec rm -rf {} +
-fi
+# Always refresh the shipped snapshot: a stale copy silently profiles with old
+# code (the first COCO attempt died inside an already-fixed guard because the
+# snapshot predated the fix).
+rm -rf "$OUT/modules"
+mkdir -p "$OUT/modules/evaluation"
+cp -r cedar "$OUT/modules"/cedar
+find evaluation -maxdepth 1 -type f -name '*.py' -exec cp {} "$OUT/modules/evaluation/" \;
+cp -r evaluation/pipelines "$OUT/modules/evaluation/pipelines"
+find "$OUT/modules" -name '__pycache__' -type d -prune -exec rm -rf {} +
 
 export CEDAR_RAY_PLACEMENT_RESOURCE=cedar_remote CEDAR_RAY_REQUIRE_REMOTE=1
 export CEDAR_PROFILE_RAY_ACTORS=1 CEDAR_PROFILE_SMP_PROCS=1

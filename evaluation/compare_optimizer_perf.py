@@ -469,7 +469,7 @@ def _make_spec(
         batch_size=args.batch_size,
         num_total_samples=data_num_total_samples,
         num_epochs=args.num_epochs,
-        config=None,
+        config=getattr(args, "master_feature_config", None),
         kwargs=_parse_dataset_kwargs(args.dataset_kwargs),
         use_ray=args.use_ray,
         ray_ip=args.ray_ip,
@@ -1375,6 +1375,15 @@ def main() -> None:
             "Only construct the optimized plan and skip workload execution. "
             "By default, the script uses --profiled_stats to optimize and then "
             "executes the workload to measure runtime performance."
+        ),
+    )
+    parser.add_argument(
+        "--master_feature_config",
+        type=str,
+        default=None,
+        help=(
+            "Execute this materialised plan instead of running the optimizer; "
+            "used for fixed-plan cells such as the W sweep."
         ),
     )
     parser.add_argument("--skip_pico_plan_cost", action="store_true",

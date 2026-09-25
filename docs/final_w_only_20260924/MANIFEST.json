@@ -1,0 +1,117 @@
+{
+ "small_files": {
+  "MANIFEST.json": {
+   "path": "outputs/pico_final_w_only_20260924/MANIFEST.json",
+   "bytes": 4430,
+   "sha256": "189100d80c86e926bc0b0b656f6248505274e8ba7fdddb2dae5e0dd170575e71"
+  },
+  "README.md": {
+   "path": "outputs/pico_final_w_only_20260924/README.md",
+   "bytes": 5535,
+   "sha256": "07f70ca823421b69bb077a16800111f802b8af6f4a84a60020de7d6d8d167b67"
+  },
+  "ablation.csv": {
+   "path": "outputs/pico_final_w_only_20260924/ablation.csv",
+   "bytes": 3232,
+   "sha256": "55058cf08232529062b9e6f8b4ed92c70bb3e2be609033e7ef9f6a7c9a8a1a2e",
+   "rows": 10
+  },
+  "claim_evidence.md": {
+   "path": "outputs/pico_final_w_only_20260924/claim_evidence.md",
+   "bytes": 1097,
+   "sha256": "f57b40838d192a15f485ed14cc9a84323296d375fd8a690decbb62ffd765966c"
+  },
+  "execution_plan.md": {
+   "path": "outputs/pico_final_w_only_20260924/execution_plan.md",
+   "bytes": 2753,
+   "sha256": "1d287b9c9eabf1a3cf91c69cf5ee11e17486dcc77a684c570fe6e1ae0423f25e"
+  },
+  "figure_data.json": {
+   "path": "outputs/pico_final_w_only_20260924/figure_data.json",
+   "bytes": 54992,
+   "sha256": "60d386a0d850f68aab40e5ffe8b9245885fc61e34a3943143ad9d55a4ca586e6"
+  },
+  "fusion_components.csv": {
+   "path": "outputs/pico_final_w_only_20260924/fusion_components.csv",
+   "bytes": 1971,
+   "sha256": "85cb213e394d12dda5de70a6536f43aeccabf3d7c57144c7232e6635e02c239d",
+   "rows": 9
+  },
+  "identity.json": {
+   "path": "outputs/pico_final_w_only_20260924/identity.json",
+   "bytes": 2683,
+   "sha256": "51c301c329a1f875ee90c06dba92a1a2a31d8b7c616c440ca700c166b1787b1d"
+  },
+  "operator_predictions.csv": {
+   "path": "outputs/pico_final_w_only_20260924/operator_predictions.csv",
+   "bytes": 13177,
+   "sha256": "6cbb8f2a1f15c7dc0eddc8e4136fb9d966558e8cf685979a2deaf589dd3bc8d1",
+   "rows": 77
+  },
+  "oracle_results.json": {
+   "path": "outputs/pico_final_w_only_20260924/oracle_results.json",
+   "bytes": 992,
+   "sha256": "848e4a4ec0a6b5eecf016d35d7386e9591b58c2842d907e2c8b45c855d69c52a"
+  },
+  "plan_predictions.csv": {
+   "path": "outputs/pico_final_w_only_20260924/plan_predictions.csv",
+   "bytes": 3313,
+   "sha256": "e950347e761cc1cc129b98c5631ac64ce56dcb1310c13c725928a9ab8b0d79b1",
+   "rows": 11
+  },
+  "planning.csv": {
+   "path": "outputs/pico_final_w_only_20260924/planning.csv",
+   "bytes": 1271,
+   "sha256": "3db920496ab1338db19bb4c0e92d990b5084c471801ad69b1f1e289ca390ddd3",
+   "rows": 8
+  },
+  "ranking.csv": {
+   "path": "outputs/pico_final_w_only_20260924/ranking.csv",
+   "bytes": 462,
+   "sha256": "a360f71e72af4a7ec8f1aab351b556240aa543d9a4e643a7ef536f228f6cbf3c",
+   "rows": 5
+  },
+  "search_comparison.csv": {
+   "path": "outputs/pico_final_w_only_20260924/search_comparison.csv",
+   "bytes": 717,
+   "sha256": "9eab3a217dd24ce2648c269e63561d8688267f91e85489fd6b91ecfccfbe6b34",
+   "rows": 2
+  },
+  "state_sufficiency.json": {
+   "path": "outputs/pico_final_w_only_20260924/state_sufficiency.json",
+   "bytes": 265,
+   "sha256": "e3542f37b6cb1c13a04de6e52843a8deda4ac0dbd2e7600f9947e42e2d515057"
+  },
+  "throughput.csv": {
+   "path": "outputs/pico_final_w_only_20260924/throughput.csv",
+   "bytes": 8383,
+   "sha256": "ec427133e084752d0057b2277d6edeca749e2d799a2cda614413079b4c8f8ca2",
+   "rows": 25
+  },
+  "w_scaling.csv": {
+   "path": "outputs/pico_final_w_only_20260924/w_scaling.csv",
+   "bytes": 872,
+   "sha256": "c66b5d9d7b3a3d302f1589cc97f51149326375625f66522a2b69ee5bf92bfe59",
+   "rows": 3
+  }
+ },
+ "large_artifacts": {
+  "outputs/affine_repr_profile_20260924/commonvoice/shared.yaml": {
+   "bytes": 112693,
+   "sha256": "743b0dd2a7aeeab655a6ebb3c2415032a47f990be1ef221256c9529930c38dfb"
+  },
+  "outputs/affine_repr_profile_20260924/llava_pretrain/shared.yaml": {
+   "bytes": 272729,
+   "sha256": "9745c9858a0b00da34365001d0919ab34e191694a98d376c2c6b5047fb1c0b62"
+  },
+  "outputs/affine_repr_profile_20260924/simclrv2/shared.yaml": {
+   "bytes": 130042,
+   "sha256": "e60f96a9a22023cde978fa4d4d8f7d5800f1dd36c70c2c8c3d61d0e0b1889aaa"
+  },
+  "outputs/affine_repr_profile_20260924/simclrv2_cache/shared.yaml": {
+   "bytes": 130846,
+   "sha256": "e95c999de50aa59376d123667e8c0f0d8454261f2be70aa75ede229f98ac7015"
+  }
+ },
+ "note": "\u5c0f\u6587\u4ef6\u540c\u65f6\u6284\u9001\u5230 docs/final_w_only_20260924/\uff1b\u9010 cell \u539f\u59cb\u65e5\u5fd7\u5728 outputs/pico_final_w_only_20260924/<workload>/logs/\uff0cprofile \u5728 outputs/affine_repr_profile_20260924/<workload>/shared.yaml\u3002"
+}

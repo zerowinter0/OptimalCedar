@@ -1,0 +1,10 @@
+kind,organisation,round,elapsed_ms_per_record_mean,compute_ms_per_record_mean,other_ms_per_record_mean,units,window,source
+serial_diagnostic_real_block,U,1,121.282458775,6.637271829166666,114.64518694583333,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,F,1,28.404235504166664,6.590858639583333,21.813376864583333,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,P,1,51.11032156458334,6.397324083333333,44.71299748125,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,F,2,28.37513101875,6.593539670833334,21.781591347916667,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,P,2,51.63066935833333,6.704874014583334,44.925795343749996,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,U,2,121.56124449791668,6.8867380375,114.67450646041667,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,P,3,51.93432522083333,6.95849515625,44.975830064583334,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,U,3,121.77356345416666,6.950483227083334,114.82308022708334,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv
+serial_diagnostic_real_block,F,3,28.162035060416667,6.508634172916667,21.653400887500002,ms per source record,"serial service, no overlap, 120 batches",outputs/fusion_discount_20260923/expB/expB_summary.csv

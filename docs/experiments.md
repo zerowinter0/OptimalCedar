@@ -2132,6 +2132,46 @@ profile 重生成 → smoke → 主对比（6 负载 × 5 optimizer × 3 轮）�
 SimCLRv2 上不存在语义等价重排；完整 PICO 上字节 affine 与表示感知模型的吞吐在运行噪声内
 不可区分（2404 vs 2320 samples/s）；联合 oracle 与合成规模曲线未完成；StackExchange 未纳入。
 
+#### 4.12.1 7 小时预算下的最终结果（2026-09-25，`pico_fast`）
+
+协议放宽（数据量降到稳态所需、慢基线 1 轮、去掉 unopti、commonvoice 去 raydata、llava 不跑 cedar）
+见 `docs/final_w_only_20260924/README.md` §5b 与 `protocol.json` 的 `fast_protocol_20260925`。
+
+**主对比（稳态吞吐，samples/s；setup 为优化+启动）**
+
+| 负载 | PICO(final) | Cedar | Plumber | Ray Data | 数据量 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| simclrv2 | **2424.0**（126.7 s） | 713.2（24.8 s） | 160.4（2.2 s） | 49.8（20.9 s） | 75,752 |
+| simclrv2_cache | **2450.7**（125.5 s） | 671.8（24.6 s） | 140.2（2.3 s） | 101.9（11.8 s） | 75,752 |
+| llava_pretrain | 17.2（660.6 s） | —（稳定超时，按约定不跑） | 17.6（2.4 s） | 15.8（5.3 s） | 10,000 |
+
+重复性：simclrv2 的 PICO 三次完整运行 2424.0 / 2422.0 / 2436.7（极差 0.6%），Cedar 713.2 / 782.2 / 590.3（极差 25%）。
+
+**模型消融（同一 W-only 搜索，只换计算项）**
+
+| 负载 | pico_final | no-boundary | byte-proportional | byte affine（现状） |
+| --- | ---: | ---: | ---: | ---: |
+| simclrv2 | 2432.9 | 2420.3 | 2408.6 | 2447.5 |
+| simclrv2_cache | 2430.6 | 2364.9 | 2433.9 | 2508.7 |
+
+四个变体的吞吐落在 **1.6%（simclrv2）/ 5.4%（cache）** 之内 → 在这些数据量下，**计算模型的差别不体现在吞吐上**；
+它与 §4.11.3 的"成本估计更准"是两回事，必须分开陈述。
+
+**staged vs joint（同一最终模型，simclrv2）**：2475.0 vs 2444.4 samples/s（+1.3%，噪声内），
+但规划时间 **26.4 s vs 123.9 s**（staged 快 4.7 倍）。
+
+**W 证据（`w_scaling.csv`）**：本轮固定结构 W 扫描未跑成（plumbing 三处失败后停止），
+现有实测点为 W=1 → 74.0 /s、W=64 → 1348.7 /s（不同计划结构的完整运行，含结构混淆）；
+规划器在 simclrv2/simclrv2_cache 上选择 W=64。写作时只能按"含混淆的 W 证据"表述。
+
+**规划成本与 DP 状态（`planning.csv`）**：simclrv2 9 算子 / 18 可达 mask / 最大 369 状态 / DP 2.3 s；
+simclrv2_cache 最大 1489 状态 / 2.6 s；**llava_pretrain 16 算子 / 462 mask / 182,488 状态 / 653.4 s**
+（这就是 llava 计划时间 660 s 的来源，也是"搜索成本随算子数爆炸"的直接证据）。
+
+**未完成（原样保留）**：commonvoice（profile 只为 1 个算子拟合出表示曲线 → 最终 PICO 报
+`compute_model has no profiled input features for operator 5`）、coco（profile 未产出）、
+固定结构 W 扫描、联合 oracle、合成规模曲线。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射

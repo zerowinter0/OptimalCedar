@@ -3177,13 +3177,20 @@ class DataSet:
                 except Exception:  # noqa: BLE001
                     continue
             by_class: Dict[str, List[Any]] = {}
+            rejections: Dict[str, str] = {}
             for value in pool:
                 klass = payload_representation_class(value)
                 if klass is None:
                     continue
                 try:
                     produced = fn(value)
-                except Exception:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001
+                    # Keep the first failure per class so a profile that cannot
+                    # cover a representation says why instead of only "no
+                    # measured representation".
+                    rejections.setdefault(
+                        klass, f"{type(exc).__name__}: {exc}"[:200]
+                    )
                     continue
                 out_class = payload_representation_class(produced)
                 if out_class is not None and _is_single_record(produced):
@@ -3260,7 +3267,32 @@ class DataSet:
                 fit["samples"] = len(by_class.get(klass, []))
                 fits[klass] = fit
             if not fits:
-                coverage[str(p_id)] = "no_measured_representation"
+                coverage[str(p_id)] = {
+                    "status": "no_measured_representation",
+                    "pool": len(pool),
+                    "classes_seen": sorted(rejections)
+                    or sorted(
+                        {
+                            str(payload_representation_class(value))
+                            for value in pool
+                        }
+                    ),
+                    "rejections": rejections,
+                }
+                logger.info(
+                    "Compute model: operator %s has no measurable "
+                    "representation (pool=%s, classes=%s, first rejections=%s)",
+                    p_id,
+                    len(pool),
+                    sorted(rejections)
+                    or sorted(
+                        {
+                            str(payload_representation_class(value))
+                            for value in pool
+                        }
+                    ),
+                    rejections,
+                )
                 continue
             if own_input is not None:
                 own_class = payload_representation_class(own_input)

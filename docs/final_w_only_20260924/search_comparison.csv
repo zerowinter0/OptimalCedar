@@ -1,0 +1,3 @@
+workload,cell,optimizer,identity,round,throughput_samples_per_sec,perf_time_sec,setup_time_sec,num_samples,n_local_workers,stage_widths,fused,stages,status,commit,results_path
+simclrv2,staged_fast,pico_final,"final PICO (W-only, representation-aware compute)",1,2444.369599125709,30.990403426345438,123.85514425532892,75752,64,,"[[3, 6, 2, 5, 7, 1, 4]]",[],completed,b182e58fee560112459bf24acaad369b0d3eed1c,outputs/pico_final_w_only_20260924/simclrv2/results/staged_fast.json
+simclrv2,staged_fast,staged_final,unknown,1,2475.0253379473656,30.606555350590497,26.363037704024464,75752,64,,[],[],completed,b182e58fee560112459bf24acaad369b0d3eed1c,outputs/pico_final_w_only_20260924/simclrv2/results/staged_fast.json

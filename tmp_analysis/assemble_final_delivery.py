@@ -119,10 +119,10 @@ def collect_planning():
 
     pattern = re.compile(
         r"Exact layer (\d+)/(\d+) masks=(\d+) states=(\d+) "
-        r"max_frontier=(\d+) layer_sec=([\d.]+) total_sec=([\d.]+)"
+        r"max_frontier=(\d+) layer_sec=([\d.eE+-]+) total_sec=([\d.eE+-]+)"
     )
     rows = []
-    for log in sorted(OUT.glob("*/*/logs/*.log")):
+    for log in sorted(OUT.glob("*/logs/*.log")):
         workload = log.parts[-3]
         cell = log.stem
         masks = states = 0
@@ -153,8 +153,48 @@ def collect_planning():
 
 
 def collect_w_scaling():
-    """Fixed-structure W sweep cells (C3)."""
+    """W evidence: fixed-structure sweep cells when present, plus the two
+    complete stage-B runs that measured the same workload at W=1 and W=64."""
     rows = []
+    stage_b = {
+        "cheap": {
+            "W1": ("simple_dp_boundary", "outputs/stage_b_repr_20260924/results_cheap.json"),
+            "W64": ("simple_dp_repr_affine", "outputs/stage_b_repr_20260924/results_cheap.json"),
+        },
+        "pico": {
+            "W64": ("simple_dp_workers_width_boundary", "outputs/stage_b_repr_20260924/results_pico.json"),
+        },
+    }
+    for label, entries in stage_b.items():
+        for w_label, (optimizer, path) in entries.items():
+            result = ROOT / path
+            if not result.exists():
+                continue
+            data = json.loads(result.read_text())
+            run = next(
+                (r for r in data.get("runs", []) if r["optimizer"] == optimizer), None
+            )
+            if run is None:
+                continue
+            rows.append(
+                {
+                    "workload": "simclrv2",
+                    "n_local_workers": w_label.replace("W", ""),
+                    "optimizer": optimizer,
+                    "round": "mean_of_3",
+                    "throughput_samples_per_sec": run.get(
+                        "throughput_samples_per_sec"
+                    ),
+                    "perf_time_sec": run.get("perf_time_sec"),
+                    "num_samples": run.get("num_samples"),
+                    "provenance": (
+                        "complete run of the same plan family at this W "
+                        "(confounded with the plan structure; not a "
+                        "fixed-structure sweep)"
+                    ),
+                    "source": path,
+                }
+            )
     for result in sorted(OUT.glob("*/w_scaling/results_W*.json")):
         try:
             data = json.loads(result.read_text())
@@ -262,10 +302,10 @@ def main() -> int:
         ablations = [
             row
             for row in rows
-            if row["cell"].startswith(("ablation_model", "staged_joint"))
+            if "ablation" in row["cell"] or "staged" in row["cell"]
         ]
         write_csv(OUT / "ablation.csv", ablations)
-        staging = [row for row in rows if row["cell"].startswith("staged_joint")]
+        staging = [row for row in rows if "staged" in row["cell"]]
         write_csv(OUT / "search_comparison.csv", staging)
     table, plan_rows, operator_rows = chapter3_tables()
     planning = collect_planning()
@@ -386,10 +426,46 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
                 f"{entry['max_ratio']:.2f} | {entry['mape'] * 100:.1f}% | "
                 f"{entry['rmse'] * 100:.1f}% |"
             )
+    w_rows = collect_w_scaling()
+    planning_rows = collect_planning()
+    lines += [
+        "",
+        "## W 证据（`w_scaling.csv`，含来源与局限）",
+        "",
+        "| 负载 | W | optimizer | 吞吐 /s | 来源 |",
+        "| --- | ---: | --- | ---: | --- |",
+    ]
+    for entry in w_rows:
+        lines.append(
+            f"| {entry['workload']} | {entry['n_local_workers']} | "
+            f"{entry['optimizer']} | {float(entry['throughput_samples_per_sec']):.1f} | "
+            f"{entry.get('source', 'fixed-structure sweep')} |"
+        )
+    if not w_rows:
+        lines.append("| （无） | — | — | — | — |")
+    lines += [
+        "",
+        "局限：W=1 与 W=64 两组来自**不同计划结构**的完整运行（stage B），"
+        "不是固定结构 W 扫描；固定结构扫描脚本已修好但本轮未跑成，写作时按上表标注。",
+        "",
+        "## 规划成本与 DP 状态数（`planning.csv`）",
+        "",
+        "| 负载 | cell | 算子数 | mask 数 | 最大状态数 | DP 秒 |",
+        "| --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+    for entry in planning_rows:
+        lines.append(
+            f"| {entry['workload']} | {entry['cell']} | {entry['operators']} | "
+            f"{entry['masks']} | {entry['dp_states_max']} | {entry['dp_total_sec']:.1f} |"
+        )
+    if not planning_rows:
+        lines.append("| （无） | — | — | — | — | — |")
     lines += [
         "",
         "## 失败与负结果（必须保留）",
         "",
+        "- 未完成 cell（原样保留，不冒充成功）："
+        + ("、".join(sorted(p.name for p in OUT.glob("*/results/*.failed.json"))) or "无"),
         "- 语义：移动 `to_float` 会改变 torchvision 的值域解释（float 图像 clamp 到 [0,1]），",
         "  SimCLRv2 上不存在语义等价重排；重排吞吐差不得写成等价优化收益（`semantic_scope.md`）。",
         "- 完整 PICO 上字节 affine 与表示感知模型的吞吐在运行噪声内不可区分",

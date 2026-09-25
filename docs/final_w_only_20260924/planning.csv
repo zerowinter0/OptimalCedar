@@ -1,0 +1,9 @@
+workload,cell,operators,masks,dp_states_max,dp_total_sec,unit,source
+llava_pretrain,main_fast,16,462,182488,653.355,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/llava_pretrain/logs/main_fast.log
+simclrv2,ablation_fast,9,18,1342,2.623,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/ablation_fast.log
+simclrv2,dp_repeat,9,18,369,2.462,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/dp_repeat.log
+simclrv2,main_fast,9,18,369,2.307,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/main_fast.log
+simclrv2,main_mean,9,18,369,2.293,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/main_mean.log
+simclrv2,staged_fast,9,18,369,2.444,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/staged_fast.log
+simclrv2_cache,ablation_fast,9,18,1489,2.646,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2_cache/logs/ablation_fast.log
+simclrv2_cache,main_fast,9,18,497,2.313,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2_cache/logs/main_fast.log

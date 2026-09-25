@@ -1,0 +1,4 @@
+workload,n_local_workers,optimizer,round,throughput_samples_per_sec,perf_time_sec,num_samples,provenance,source
+simclrv2,1,simple_dp_boundary,mean_of_3,73.99901222213839,128.0029988028109,9472.0,complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep),outputs/stage_b_repr_20260924/results_cheap.json
+simclrv2,64,simple_dp_repr_affine,mean_of_3,1348.7229499125144,7.0230703400447965,9472.0,complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep),outputs/stage_b_repr_20260924/results_cheap.json
+simclrv2,64,simple_dp_workers_width_boundary,mean_of_3,2403.963099282008,3.9416812628818056,9472.0,complete run of the same plan family at this W (confounded with the plan structure; not a fixed-structure sweep),outputs/stage_b_repr_20260924/results_pico.json

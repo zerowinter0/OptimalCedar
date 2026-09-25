@@ -1,0 +1,61 @@
+{
+ "simclrv2_subset_n4": {
+  "instance": "simclrv2_subset_n4",
+  "operators": [
+   3,
+   2,
+   6,
+   7
+  ],
+  "workers_enumerated": [
+   1,
+   2,
+   4
+  ],
+  "orders_evaluated": 0,
+  "dp_order": [
+   3,
+   6,
+   2,
+   7
+  ],
+  "dp_workers": 64,
+  "dp_score": 14.642767563458204,
+  "oracle_score": null,
+  "oracle_plan": null,
+  "match": false,
+  "scope": "all legal orders x W in the enumerated set; fusion, offload and caching disabled on both sides; per-stage width fixed at 1"
+ },
+ "simclrv2_full_n7": {
+  "instance": "simclrv2_full_n7",
+  "operators": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "workers_enumerated": [
+   1,
+   4
+  ],
+  "orders_evaluated": 0,
+  "dp_order": [
+   3,
+   6,
+   5,
+   2,
+   7,
+   4,
+   1
+  ],
+  "dp_workers": 64,
+  "dp_score": 14.642767563458204,
+  "oracle_score": null,
+  "oracle_plan": null,
+  "match": false,
+  "scope": "all legal orders x W in the enumerated set; fusion, offload and caching disabled on both sides; per-stage width fixed at 1"
+ }
+}

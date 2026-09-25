@@ -36,13 +36,19 @@ for w in ${LADDER//,/ }; do
   plan_w="$work/plans/${WORKLOAD}_W${w}.yaml"
   python - "$PLAN" "$plan_w" "$w" <<'PY'
 import sys
+from pathlib import Path
+
 import yaml
 
 source, target, workers = sys.argv[1], sys.argv[2], int(sys.argv[3])
-data = yaml.safe_load(open(source).read_text())
+data = yaml.safe_load(Path(source).read_text())
 plan = data.get("physical_plan", data)
 payload = plan.get("feature_r0", plan)
 payload["n_local_workers"] = workers
+# PhysicalPlan.from_dict keeps graph keys as given; the feature's logical pipe
+# ids are ints, and a string-keyed graph fails the coverage check with
+# "Not all pipes specified in physical plan."
+payload["graph"] = {int(key): value for key, value in payload["graph"].items()}
 open(target, "w").write(yaml.safe_dump({"physical_plan": payload}))
 PY
   result="$work/results_W${w}.json"
@@ -60,6 +66,7 @@ PY
     --full_data_run --enable_local_parallelism --match_profile_resources \
     --cpu_budget 64 --ray_cpu_budget 64 \
     --master_feature_config "$plan_w" \
+    --optimizer_time_limit_sec 600 \
     --num_repeats "$ROUNDS" --skip_pico_plan_cost --disable_caching \
     --results_path "$result" > "$work/logs/W${w}.log" 2>&1
   echo "W-CELL-DONE $WORKLOAD W=$w exit=$? $(date -Is)"
