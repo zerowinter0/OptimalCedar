@@ -1,4 +1,7 @@
 workload,cell,operators,masks,dp_states_max,dp_total_sec,unit,source
+coco,main_fast,6,2,100,0.026,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/coco/logs/main_fast.log
+commonvoice,ablation_fast,7,1,120,0.026,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/commonvoice/logs/ablation_fast.log
+commonvoice,main_fast,7,1,101,0.022,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/commonvoice/logs/main_fast.log
 llava_pretrain,main_fast,16,462,182488,653.355,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/llava_pretrain/logs/main_fast.log
 simclrv2,ablation_fast,9,18,1342,2.623,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/ablation_fast.log
 simclrv2,dp_repeat,9,18,369,2.462,seconds / maximum states in the exact layer,outputs/pico_final_w_only_20260924/simclrv2/logs/dp_repeat.log

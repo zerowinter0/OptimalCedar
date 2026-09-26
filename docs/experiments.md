@@ -2240,6 +2240,56 @@ cost 0.286 ms/record、64 点 W 证据；DP 统计单独列出）。C3：每个 
 W=1 18.31 vs 10.97、W=4 4.58 vs 2.92、W=16 1.14 vs 0.873、W=64 0.286 vs 0.440 →
 低/中 W 悲观、仅 W=64 略乐观（35%），**无高 W 系统性高估**，因此不引入 driver/队列/max-lane 新模型。
 
+### 4.14 补测：CommonVoice 与 COCO 跑通（2026-09-27）
+
+§4.12.1 结尾记录的"commonvoice / coco 未完成"在本轮定位到三个独立根因并修复，重跑后两个负载都拿到了
+可用数据；`wikitext103` 仍被 profile 覆盖率挡住，原因如实记录在最后。
+
+**根因与修复**
+
+| # | 现象 | 根因 | 修复 |
+| --- | --- | --- | --- |
+| 1 | CommonVoice profile 只拟合出 1 条曲线，最终 PICO 报 `compute_model has no profiled input features for operator 5` | `payload_compute_scale` / `payload_representation_class` 只认 torch/TF/PIL/path/tuple，**没有 ndarray 分支**，音频波形（CommonVoice）和检测框（COCO）这类 payload 无法分类，也算不出元素数 | 增加 `np:<dtype>:<ndim>d` 表示类与 `value.size` 规模（`cedar/pipes/common.py`） |
+| 2 | COCO 的表示拟合阶段长时间卡住后中断，profile 无产出 | 反事实放大把全分辨率 COCO 图放大到 2.4e9 元素再送进算子 | 新增 `CEDAR_PROFILE_COMPUTE_MAX_ELEMENTS`（本轮 2e6），超限反事实跳过并打日志，回落到真实 payload（`cedar/client/dataset.py`） |
+| 3 | CommonVoice 用错数据集 | 本轮脚本把 `dataset_path` 写成 `cv-corpus-15.0-delta-2023-09-08/en/clips`（**40,571 个 delta 片段，与标准 300k 训练集片段名零重叠**），项目标准协议（`run_ultimate_experiment_20260920.sh`）用的是 `datasets/commonvoice/cv15_en_train_300000` | 脚本改为标准数据集；错误数据集下的产物归档到 `outputs/pico_final_w_only_20260924/commonvoice/archive_wrong_dataset_20260927/`（含说明，不参与论文数据） |
+
+profile 快照在每次运行时强制刷新（`scripts/pico_final_profiles_20260924.sh` 会 `rm -rf modules` 后重新拷贝），
+避免旧快照用旧代码默默产出过期 profile。
+
+**结果（1 轮完整运行，快速协议：数据量降到稳态所需、不跑 unopti）**
+
+| 负载 | optimizer | 数据量 | 稳态吞吐 (rec/s) | 优化+启动 (s) | 稳态窗口 (s) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| commonvoice | **pico_final** | 100,000 | **709.2** | 22.3 | 141.0 |
+| commonvoice | optimizer（Cedar staged） | 100,000 | 194.6 | 21.6 | 513.9 |
+| commonvoice | plumber_optimizer | 100,000 | 145.5 | 2.4 | 687.5 |
+| coco | **pico_final** | 20,000 | **220.2** | 10.4 | 90.8 |
+| coco | optimizer（Cedar staged） | 20,000 | 30.5 | 18.9 | 655.8 |
+
+CommonVoice 上另有同模型消融 cell：`pico_final` 714.3 vs `pico_byte_proportional` 714.4 rec/s
+（两者选中同一计划，符合 §4.12.1 "模型差异不体现在吞吐"的结论）；同负载两个 cell 的 `pico_final`
+复现差 **0.7%**，远小于与基线的 **3.6×（vs Cedar）/ 4.9×（vs Plumber）** 差距，
+因此这两个负载上的排序不依赖单轮噪声。COCO 上是 **7.2×（vs Cedar）**。
+COCO 的早期低吞吐是 64 个 worker 的启动瞬态（前 ~5 min 内从 8 爬到 32 rec/s 以上），
+`perf_time_sec` 只统计稳态段，不把启动算进去。
+
+**仍然失败：wikitext103。** 最终 PICO 在规划阶段直接抛
+`RuntimeError: compute_model has no profiled input features for operator 5`。核查 profile：
+9 个算子只有 5 个拟合成功，**算子 2/3/4/5（torchtext 的 Truncate/AddToken 系列）对探针的所有表示
+（`float32:2d`、`int64:1d`、`list`、`text`）都返回 `TypeError: Input type not supported`**，
+即 profiler 无法构造这些变换能接受的输入。按 AGENTS.md 的约定，模型对没有拟合系数的算子**必须报错**，
+而不是回退字节比例，所以这是覆盖率的限制而不是静默降级；论文里文本负载的结论仍然只能引用历史反例
+（§5.1.6、§4.12 的旧 PICO 数据），不能写成"最终 PICO 在文本上更差"。
+
+**产物与复现**
+
+- 脚本：`scripts/pico_final_missing_cells_20260927.sh`（resume 安全，逐 cell 日志）；
+- 原始结果：`outputs/pico_final_w_only_20260924/{commonvoice,coco}/results/*.json` 与同名 `logs/`；
+- profile：`outputs/affine_repr_profile_20260924/{commonvoice,coco,wikitext103}/shared.yaml`，
+  可用 `python -m tmp_analysis.inspect_profile_compute <workload>` 直接查看表示类与 k/b；
+- 汇总：`outputs/pico_final_w_only_20260924/README.md` 的"2026-09-27 补测"节与 `throughput.csv`；
+- commit：`315d51c`（ndarray 表示类 + 元素上限 + 补测脚本）。
+
 ## 5. 论文图件与底层数据
 
 ### 5.0 命名映射
@@ -2316,6 +2366,10 @@ W=1 18.31 vs 10.97、W=4 4.58 vs 2.92、W=16 1.14 vs 0.873、W=64 0.286 vs 0.440
 
 #### 5.1.3 commonvoice
 
+> 2026-09-27 更新：下表是 300k、旧字节 affine PICO 的历史正式结果。最终 W-only + 表示感知 PICO
+> 的补测（标准 `cv15_en_train_300000`、100k、1 轮）见 §4.14：PICO 709.2 / Cedar 194.6 / Plumber 145.5 rec/s。
+> 两套数据的 optimizer 集合不同，不要混在同一张表里。
+
 | optimizer | 数据量(条) | 稳态时间(s) | 稳态吞吐(rec/s) | 优化时间(s) | 总时长(s) | 状态 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | unopt | — | — | — | — | — | timeout |
@@ -2328,6 +2382,10 @@ W=1 18.31 vs 10.97、W=4 4.58 vs 2.92、W=16 1.14 vs 0.873、W=64 0.286 vs 0.440
 | PICO | 300,000 | 403.64 | 743.2 | 24.9 | 440.8 | completed |
 
 #### 5.1.4 coco
+
+> 2026-09-27 更新：下表是 50k、旧字节 affine PICO 的历史正式结果。最终 W-only + 表示感知 PICO
+> 的补测（20k、1 轮）见 §4.14：PICO 220.2 / Cedar 30.5 rec/s。注意 COCO 的 PICO 计划会把
+> 融合块卸载到 Ray，早期 ~5 min 是 worker 启动瞬态，稳态段才计入吞吐。
 
 | optimizer | 数据量(条) | 稳态时间(s) | 稳态吞吐(rec/s) | 优化时间(s) | 总时长(s) | 状态 |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |

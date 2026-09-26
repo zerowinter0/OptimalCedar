@@ -2,19 +2,19 @@
  "small_files": {
   "MANIFEST.json": {
    "path": "outputs/pico_final_w_only_20260924/MANIFEST.json",
-   "bytes": 6484,
-   "sha256": "164079669f7ac5161938bff888bd7c1526fa5ca1f2c6ed6ff62b634cc1a27c9b"
+   "bytes": 7679,
+   "sha256": "36813e6d5398930dd659cc1438c4703a952f7c47b2278e0353eaf4cc18074c9c"
   },
   "README.md": {
    "path": "outputs/pico_final_w_only_20260924/README.md",
-   "bytes": 6799,
-   "sha256": "29a69a6afc43d3f5adf78b68b9f66b60f4556410d31b91cbbb52fc50baba2404"
+   "bytes": 10363,
+   "sha256": "948b809d6a5fd7b20a4900146be0ebd0543a6834c2edd019b35549716f874d21"
   },
   "ablation.csv": {
    "path": "outputs/pico_final_w_only_20260924/ablation.csv",
-   "bytes": 3232,
-   "sha256": "afb343de9e87f5363d3fbe806b6894c2a04191c3ac59becdfebb0b7f48f119f9",
-   "rows": 10
+   "bytes": 3864,
+   "sha256": "69bdd7b4e73280dee62f640801c55e34f9e9e641ee95707755230b4d1418ffe4",
+   "rows": 12
   },
   "backend_cost_rule.json": {
    "path": "outputs/pico_final_w_only_20260924/backend_cost_rule.json",
@@ -44,8 +44,8 @@
   },
   "figure_data.json": {
    "path": "outputs/pico_final_w_only_20260924/figure_data.json",
-   "bytes": 57695,
-   "sha256": "dfcd34fdb40dbb54662a19753dd026ad09cc6ae7824f714a2a27430a7270a64f"
+   "bytes": 62193,
+   "sha256": "5f7bf1bf28e48db45dac59106ee3ee0bd1695a91ecb48e77a4196ee9bc199e83"
   },
   "fusion_components.csv": {
    "path": "outputs/pico_final_w_only_20260924/fusion_components.csv",
@@ -98,9 +98,9 @@
   },
   "planning.csv": {
    "path": "outputs/pico_final_w_only_20260924/planning.csv",
-   "bytes": 1842,
-   "sha256": "04b102d43ef372bb682b8753367d187ede7a3c4b5ce9f9e1a744e89e53d47691",
-   "rows": 12
+   "bytes": 2277,
+   "sha256": "3be2d5ea6fc461aa26569334f2adbac77e387149a12fb20104faf700cd7d283c",
+   "rows": 15
   },
   "ranking.csv": {
    "path": "outputs/pico_final_w_only_20260924/ranking.csv",
@@ -116,7 +116,7 @@
   "search_comparison.csv": {
    "path": "outputs/pico_final_w_only_20260924/search_comparison.csv",
    "bytes": 717,
-   "sha256": "c9899a4155e2e7d35668c90208601b309cfd1a16bc58e2a2fd212668c33d6346",
+   "sha256": "b9194513d505737401faaf803fe7082db4f8ace6ca36fce846d924a3ff55c07d",
    "rows": 2
   },
   "staged_joint.csv": {
@@ -143,9 +143,9 @@
   },
   "throughput.csv": {
    "path": "outputs/pico_final_w_only_20260924/throughput.csv",
-   "bytes": 9854,
-   "sha256": "a01885d872c4045e4d33009f3b83f310c72e50e7db7f64cb8853da8339d16abb",
-   "rows": 29
+   "bytes": 12179,
+   "sha256": "39a9659eb820fabfd248dd0e2bc1983aa86033497ea4b052691d7c53c390b636",
+   "rows": 36
   },
   "w_scaling.csv": {
    "path": "outputs/pico_final_w_only_20260924/w_scaling.csv",
@@ -155,9 +155,25 @@
   }
  },
  "large_artifacts": {
+  "outputs/pico_final_w_only_20260924/commonvoice/archive_wrong_dataset_20260927/results/ablation_fast.failed.json": {
+   "bytes": 29,
+   "sha256": "19170fd1d3a429eea36fe58c1e08573734f4f9eb85fdce4383b2be3ce3139708"
+  },
+  "outputs/pico_final_w_only_20260924/commonvoice/archive_wrong_dataset_20260927/results/main_fast.json": {
+   "bytes": 727362,
+   "sha256": "f927ce5ca9f17335fd1db4e297ec2a4fefe188964f9a4a42a063b3736eb9e437"
+  },
+  "outputs/affine_repr_profile_20260924/coco/shared.yaml": {
+   "bytes": 101833,
+   "sha256": "c4315b580d08ce10ef26daa7d940b161d4205754e473c90ad5d9a310fef37840"
+  },
   "outputs/affine_repr_profile_20260924/commonvoice/shared.yaml": {
-   "bytes": 112693,
-   "sha256": "743b0dd2a7aeeab655a6ebb3c2415032a47f990be1ef221256c9529930c38dfb"
+   "bytes": 117998,
+   "sha256": "a822eabf212d911c980bd21f22e999c8e233c0b7b51ecc774bdb31b42db941f4"
+  },
+  "outputs/affine_repr_profile_20260924/commonvoice_delta_clips_20260927/shared.yaml": {
+   "bytes": 117666,
+   "sha256": "887c3cc2276189e80f79e62539a2e10edfede44713df949298a627c065b60a65"
   },
   "outputs/affine_repr_profile_20260924/llava_pretrain/shared.yaml": {
    "bytes": 272729,
@@ -170,6 +186,10 @@
   "outputs/affine_repr_profile_20260924/simclrv2_cache/shared.yaml": {
    "bytes": 130846,
    "sha256": "e95c999de50aa59376d123667e8c0f0d8454261f2be70aa75ede229f98ac7015"
+  },
+  "outputs/affine_repr_profile_20260924/wikitext103/shared.yaml": {
+   "bytes": 131833,
+   "sha256": "b6ed954123112a1e755f56d2a7b6aaa913f45b34d35495ad1ea010834d36b513"
   }
  },
  "note": "\u5c0f\u6587\u4ef6\u540c\u65f6\u6284\u9001\u5230 docs/final_w_only_20260924/\uff1b\u9010 cell \u539f\u59cb\u65e5\u5fd7\u5728 outputs/pico_final_w_only_20260924/<workload>/logs/\uff0cprofile \u5728 outputs/affine_repr_profile_20260924/<workload>/shared.yaml\u3002"

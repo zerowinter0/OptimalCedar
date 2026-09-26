@@ -35,7 +35,7 @@ export CEDAR_PROFILE_MATCH_RAY_CPU_BUDGET=64
 
 declare -A DATASET_FILE DATASET_KWARGS EPOCHS SAMPLES BATCH
 DATASET_FILE[commonvoice]="$MODULES/evaluation/pipelines/commonvoice/cedar_dataset.py"
-DATASET_KWARGS[commonvoice]="dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips,max_samples=100000"
+DATASET_KWARGS[commonvoice]="dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv15_en_train_300000,max_samples=100000"
 EPOCHS[commonvoice]=1 SAMPLES[commonvoice]=100000 BATCH[commonvoice]=1
 DATASET_FILE[coco]="$MODULES/evaluation/pipelines/coco/cedar_dataset.py"
 DATASET_KWARGS[coco]="dataset_path=/workspace/OptimalCedar/evaluation/datasets/coco,split=train2017"

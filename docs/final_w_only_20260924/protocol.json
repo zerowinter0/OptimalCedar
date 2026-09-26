@@ -122,11 +122,45 @@
    ],
    "optimizer_time_limit_sec": 2400
   },
-  "unchanged": [
+ "unchanged": [
    "final identity (pico_final, selector 39; W-only, width fixed at 1)",
    "compute model and boundary model",
    "same profile per workload, remote Ray, 64 CPU budget, single-threaded operators",
    "failed/timeout cells recorded as such, never reused as successes"
   ]
+ },
+ "completion_20260927": {
+  "commit": "315d51c",
+  "driver": "scripts/pico_final_missing_cells_20260927.sh",
+  "reason": "commonvoice/coco 在此前所有轮次都没有可用数据；本轮定位并修复三处根因后补跑",
+  "fixes": {
+   "ndarray_representation_class": "payload_compute_scale / payload_representation_class 支持 numpy（np:<dtype>:<ndim>d + size），否则音频与检测框无法拟合任何表示曲线",
+   "profile_element_cap": "新增 CEDAR_PROFILE_COMPUTE_MAX_ELEMENTS（本轮 2e6）限制反事实上采样，超限跳过并打日志",
+   "commonvoice_dataset": "dataset_path 由 cv-corpus-15.0-delta-2023-09-08/en/clips（40,571 delta 片段）改为标准 cv15_en_train_300000"
+  },
+  "profile_refresh": "scripts/pico_final_profiles_20260924.sh 每次运行都 rm -rf modules 后重拷贝，避免旧快照用旧代码产出过期 profile",
+  "cells": {
+   "commonvoice": [
+    "main_fast (pico_final, optimizer, plumber_optimizer)",
+    "ablation_fast (pico_final, pico_byte_proportional)"
+   ],
+   "coco": [
+    "main_fast (pico_final, optimizer)"
+   ],
+   "wikitext103": [
+    "main_fast 失败：profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 对探针全部 TypeError: Input type not supported），优化器按设计报错而非回退"
+   ]
+  },
+  "relaxations_inherited": "fast_protocol_20260925（1 轮、数据量降到稳态所需、不跑 unopti）",
+  "results_rec_per_sec": {
+   "commonvoice_pico_final": 709.2,
+   "commonvoice_optimizer": 194.6,
+   "commonvoice_plumber": 145.5,
+   "commonvoice_ablation_pico_final": 714.3,
+   "commonvoice_ablation_byte_proportional": 714.4,
+   "coco_pico_final": 220.2,
+   "coco_optimizer": 30.5
+  },
+  "archive": "outputs/pico_final_w_only_20260924/commonvoice/archive_wrong_dataset_20260927/（错误数据集下的产物，不参与论文数据）"
  }
 }

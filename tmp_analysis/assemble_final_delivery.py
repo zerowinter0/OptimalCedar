@@ -610,18 +610,75 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
         )
     if not planning_rows:
         lines.append("| （无） | — | — | — | — | — |")
+    supplement = [
+        row
+        for row in rows
+        if row["workload"] in ("commonvoice", "coco")
+    ]
+    if supplement:
+        lines += [
+            "",
+            "## 2026-09-27 补测：CommonVoice 与 COCO（`scripts/pico_final_missing_cells_20260927.sh`）",
+            "",
+            "这两个负载在此前所有轮次里都没跑出可用数据（CommonVoice 的 profile 只拟合出 1 条曲线、",
+            "COCO 的 profile 直接没产出）。根因与修复：",
+            "",
+            "1. `payload_compute_scale` / `payload_representation_class` 没有 ndarray 分支，"
+            "CommonVoice 的音频和 COCO 的框这两类 payload 无法拟合任何表示曲线"
+            "（修复后分别得到 `np:<dtype>:<ndim>d` 类）；",
+            "2. COCO 的反事实上采样会在全分辨率图上爆内存/超时，新增"
+            "`CEDAR_PROFILE_COMPUTE_MAX_ELEMENTS`（本轮 2e6）跳过超限反事实并记录；",
+            "3. CommonVoice 的脚本把数据集指向了 `cv-corpus-15.0-delta-2023-09-08/en/clips`"
+            "（40,571 个 delta 片段，与标准 300k 训练集片段名零重叠），"
+            "而项目标准协议用 `datasets/commonvoice/cv15_en_train_300000`；已改为标准数据集重跑，"
+            "错误数据集下的产物归档在 `commonvoice/archive_wrong_dataset_20260927/`。",
+            "",
+            "| 负载 | cell | optimizer | 数据量 | 稳态吞吐 (rec/s) | 优化+启动 (s) |",
+            "| --- | --- | --- | ---: | ---: | ---: |",
+        ]
+        for row in supplement:
+            lines.append(
+                f"| {row['workload']} | {row['cell']} | {row['optimizer']} | "
+                f"{row['num_samples']} | {float(row['throughput_samples_per_sec']):.1f} | "
+                f"{float(row['setup_time_sec']):.1f} |"
+            )
+        lines += [
+            "",
+            "结论（1 轮，属快速协议）：CommonVoice 上最终 PICO 709.2 / 714.3 rec/s，"
+            "Cedar 194.6、Plumber 145.5；COCO 上最终 PICO 220.2、Cedar 30.5。",
+            "同负载内两个 cell 的 PICO 复现差 0.7%（CommonVoice），"
+            "远小于与基线的 3.6–7.2 倍差距，因此这两个负载上的排序不依赖单轮噪声。",
+            "COCO 的早期低吞吐是 64 个 worker 的启动瞬态，稳态段才计入 `perf_time_sec`。",
+        ]
     lines += [
         "",
         "## 失败与负结果（必须保留）",
         "",
-        "- 未完成 cell（原样保留，不冒充成功）："
-        + ("、".join(sorted(p.name for p in OUT.glob("*/results/*.failed.json"))) or "无"),
+        "- 失败/未完成 cell（原样保留，不冒充成功）："
+        + (
+            "、".join(
+                sorted(
+                    str(p.parent.parent.name) + "/" + p.name
+                    for p in OUT.glob("*/results/*.failed.json")
+                )
+            )
+            or "无"
+        ),
+        "- `wikitext103`：最终 PICO 无法估价——profile 只覆盖 9 个算子中的 5 个"
+        "（算子 2/3/4/5 被 torchtext 变换以 `TypeError: Input type not supported` 拒绝，"
+        "池内含 float32:2d/int64:1d/list/text 四种表示仍不可测），"
+        "优化器按设计直接报错而不是回退到字节模型。文本负载结论仍只能引用历史反例。",
+        "- `llava_pretrain`：计划覆盖校验未接入（需要该负载自己的 feature builder），"
+        "只能报告吞吐，不能报告全覆盖验证。",
         "- 语义：移动 `to_float` 会改变 torchvision 的值域解释（float 图像 clamp 到 [0,1]），",
         "  SimCLRv2 上不存在语义等价重排；重排吞吐差不得写成等价优化收益（`semantic_scope.md`）。",
-        "- 完整 PICO 上字节 affine 与表示感知模型的吞吐在运行噪声内不可区分",
-        "  （2404 vs 2320 samples/s，区间重叠）→ 本轮不宣称吞吐提升。",
-        "- 联合 oracle（顺序×融合×后端×W 的独立枚举）只完成顺序×W 轴与",
-        "  `state_sufficiency`；plan-replay 入口的联合枚举被阻塞，原因记录在 `oracle_results.json`。",
+        "- 完整 PICO 上字节 affine 与表示感知模型的吞吐落在同一范围的运行噪声内"
+        "（simclrv2 2447.5 vs 2432.9 samples/s，极差 1.6%；cache 5.4%）→ 不宣称吞吐提升，",
+        "  只主张计划成本估计更准（第三章 MAPE 41.2% → 13.5%）。",
+        "- 联合 oracle 的覆盖范围：顺序×融合×W 轴在 INPROCESS 子空间全枚举"
+        "（576 候选，DP = 枚举 = 3.4772573，`oracle_results.csv`）；",
+        "  含 offload 的联合枚举仍只是探针（DP 找到 SMP 计划 3.0125），不宣称全空间最优。",
+        "- 固定结构的 W 扫描仍缺：`w_scaling.csv` 是每个 W 重新联合优化的部署口径曲线。",
         "",
         "## 复现",
         "",

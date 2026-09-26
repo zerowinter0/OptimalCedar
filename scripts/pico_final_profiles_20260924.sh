@@ -74,8 +74,8 @@ for workload in "$@"; do
         20 189380 4 ;;
     commonvoice)
       profile_workload commonvoice evaluation/pipelines/commonvoice/cedar_dataset.py \
-        "dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv-corpus-15.0-delta-2023-09-08/en/clips,max_samples=300000" \
-        1 300000 1 ;;
+        "dataset_path=/workspace/OptimalCedar/datasets/commonvoice/cv15_en_train_300000,max_samples=100000" \
+        1 100000 1 ;;
     coco)
       profile_workload coco evaluation/pipelines/coco/cedar_dataset.py \
         "dataset_path=/workspace/OptimalCedar/evaluation/datasets/coco,split=train2017" \
