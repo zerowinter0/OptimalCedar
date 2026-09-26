@@ -3204,8 +3204,30 @@ class DataSet:
                     key=lambda item: payload_compute_scale(item) or 0.0
                 )
                 base = values[len(values) // 2]
+                max_elements = float(
+                    os.environ.get(
+                        "CEDAR_PROFILE_COMPUTE_MAX_ELEMENTS", str(4_000_000)
+                    )
+                )
                 for factor in (downscale, upscale):
                     scaled = self._affine_rescale_payload(base, factor)
+                    if scaled is not None:
+                        scaled_elements = payload_compute_scale(scaled)
+                        if (
+                            scaled_elements is not None
+                            and scaled_elements > max_elements
+                        ):
+                            # Upscaling a full-resolution image costs more than
+                            # the fit is worth and can exhaust memory; keep the
+                            # real payload instead (the operator then gets the
+                            # k = 0 / single-point treatment).
+                            logger.info(
+                                "Representation counterfactual skipped: "
+                                "%s elements exceeds the cap %s",
+                                scaled_elements,
+                                max_elements,
+                            )
+                            scaled = None
                     candidate = scaled if scaled is not None else base
                     if scaled is not None:
                         try:

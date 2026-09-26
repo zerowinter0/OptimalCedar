@@ -5,6 +5,7 @@ import pickle
 import threading
 import time
 import PIL
+import numpy as _np
 from pympler import asizeof
 
 from cedar.utils.frameworks import (
@@ -33,6 +34,11 @@ def payload_compute_scale(value: Any) -> Optional[float]:
     """
     if value is None:
         return None
+    # NumPy payloads (audio waveforms, spectrograms, detection boxes) are a
+    # first-class record type in several recipes; without this branch the
+    # profiler cannot fit any representation curve for those operators.
+    if isinstance(value, _np.ndarray):
+        return float(value.size)
     if is_torch_tensor(value):
         return float(value.numel())
     if is_tensorflow_tensor(value):
@@ -74,6 +80,8 @@ def payload_representation_class(value: Any) -> Optional[str]:
     """
     if value is None:
         return None
+    if isinstance(value, _np.ndarray):
+        return f"np:{value.dtype}:{value.ndim}d"
     if is_torch_tensor(value):
         dtype = str(value.dtype).replace("torch.", "")
         if value.dim() == 3:
