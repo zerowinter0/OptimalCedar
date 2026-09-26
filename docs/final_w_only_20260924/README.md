@@ -1,6 +1,6 @@
 # Final W-only PICO：交付与完成矩阵
 
-commit: `315d51c3cc4eddd5edd556a746cfe8e72d371994`
+commit: `66a6b4cd545db942ac0a3c72ea4aac516765606e`
 
 ## 身份
 
@@ -17,6 +17,7 @@ commit: `315d51c3cc4eddd5edd556a746cfe8e72d371994`
 | llava_pretrain | main_fast | pico_final, plumber_optimizer, raydata_optimizer |
 | simclrv2 | ablation_fast, dp_repeat, main_fast, staged_fast, w_cell_W1, w_cell_W16, w_cell_W4, w_cell_W64 | optimizer, pico_byte_proportional, pico_final, pico_final_no_boundary, plumber_optimizer, raydata_optimizer, simple_dp_workers_boundary, staged_final |
 | simclrv2_cache | ablation_fast, main_fast | optimizer, pico_byte_proportional, pico_final, pico_final_no_boundary, plumber_optimizer, raydata_optimizer, simple_dp_workers_boundary |
+| wikitext103 | baselines_fast, bytemodel_fast | optimizer, pico_byte_proportional, plumber_optimizer |
 
 ## 吞吐（均值 ± 范围，samples/s）
 
@@ -56,6 +57,9 @@ commit: `315d51c3cc4eddd5edd556a746cfe8e72d371994`
 | simclrv2_cache | main_fast | pico_final | 1 | 2450.7 | 2450.7–2450.7 |
 | simclrv2_cache | main_fast | plumber_optimizer | 1 | 140.2 | 140.2–140.2 |
 | simclrv2_cache | main_fast | raydata_optimizer | 1 | 101.9 | 101.9–101.9 |
+| wikitext103 | baselines_fast | optimizer | 1 | 5402.2 | 5402.2–5402.2 |
+| wikitext103 | baselines_fast | plumber_optimizer | 1 | 317.4 | 317.4–317.4 |
+| wikitext103 | bytemodel_fast | pico_byte_proportional | 1 | 1460.7 | 1460.7–1460.7 |
 
 ## 计算模型（第三章，来自 `outputs/affine_repr_model_20260924`）
 
@@ -100,6 +104,7 @@ commit: `315d51c3cc4eddd5edd556a746cfe8e72d371994`
 | simclrv2 | w_cell_W64 | 9 | 18 | 39 | 1.2 |
 | simclrv2_cache | ablation_fast | 9 | 18 | 1489 | 2.6 |
 | simclrv2_cache | main_fast | 9 | 18 | 497 | 2.3 |
+| wikitext103 | bytemodel_fast | 9 | 3 | 382 | 0.5 |
 
 ## 2026-09-27 补测：CommonVoice 与 COCO（`scripts/pico_final_missing_cells_20260927.sh`）
 
@@ -110,6 +115,8 @@ COCO 的 profile 直接没产出）。根因与修复：
 2. COCO 的反事实上采样会在全分辨率图上爆内存/超时，新增`CEDAR_PROFILE_COMPUTE_MAX_ELEMENTS`（本轮 2e6）跳过超限反事实并记录；
 3. CommonVoice 的脚本把数据集指向了 `cv-corpus-15.0-delta-2023-09-08/en/clips`（40,571 个 delta 片段，与标准 300k 训练集片段名零重叠），而项目标准协议用 `datasets/commonvoice/cv15_en_train_300000`；已改为标准数据集重跑，错误数据集下的产物归档在 `commonvoice/archive_wrong_dataset_20260927/`。
 
+`wikitext103` 上最终 PICO 仍然跑不了：profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 是 torchtext 的 Truncate/AddToken 系列，对探针的 float32:2d、int64:1d、list、text 四种表示全部 `TypeError: Input type not supported`）。按约定优化器直接报错而不回退，因此文本负载只能给出基线与字节模型臂：
+
 | 负载 | cell | optimizer | 数据量 | 稳态吞吐 (rec/s) | 优化+启动 (s) |
 | --- | --- | --- | ---: | ---: | ---: |
 | coco | main_fast | optimizer | 20000 | 30.5 | 18.9 |
@@ -119,15 +126,20 @@ COCO 的 profile 直接没产出）。根因与修复：
 | commonvoice | main_fast | optimizer | 100000 | 194.6 | 21.6 |
 | commonvoice | main_fast | pico_final | 100000 | 709.2 | 22.3 |
 | commonvoice | main_fast | plumber_optimizer | 100000 | 145.5 | 2.4 |
+| wikitext103 | baselines_fast | optimizer | 100000 | 5402.2 | 13.8 |
+| wikitext103 | baselines_fast | plumber_optimizer | 100000 | 317.4 | 4.3 |
+| wikitext103 | bytemodel_fast | pico_byte_proportional | 100000 | 1460.7 | 75.2 |
 
 结论（1 轮，属快速协议）：CommonVoice 上最终 PICO 709.2 / 714.3 rec/s，Cedar 194.6、Plumber 145.5；COCO 上最终 PICO 220.2、Cedar 30.5。
 同负载内两个 cell 的 PICO 复现差 0.7%（CommonVoice），远小于与基线的 3.6–7.2 倍差距，因此这两个负载上的排序不依赖单轮噪声。
 COCO 的早期低吞吐是 64 个 worker 的启动瞬态，稳态段才计入 `perf_time_sec`。
 
+wikitext103（10 万条 token，1 轮）：Cedar 5402.2、Plumber 317.4、`pico_byte_proportional` 1460.7 rec/s。即**即使换成不需要表示曲线的字节模型臂，同一个 W-only 搜索在文本上仍比 Cedar 慢 3.7×**；这与历史文本反例同向，说明文本上的差距来自搜索/边界模型对该负载的适配，而不是表示感知计算项本身。
+
 ## 失败与负结果（必须保留）
 
 - 失败/未完成 cell（原样保留，不冒充成功）：wikitext103/main_fast.failed.json
-- `wikitext103`：最终 PICO 无法估价——profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 被 torchtext 变换以 `TypeError: Input type not supported` 拒绝，池内含 float32:2d/int64:1d/list/text 四种表示仍不可测），优化器按设计直接报错而不是回退到字节模型。文本负载结论仍只能引用历史反例。
+- `wikitext103`：最终 PICO 无法估价（`main_fast.failed.json`）——profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 被 torchtext 变换以 `TypeError: Input type not supported` 拒绝，池内含 float32:2d/int64:1d/list/text 四种表示仍不可测），优化器按设计直接报错而不是回退到字节模型。文本负载结论仍只能引用历史反例。
 - `llava_pretrain`：计划覆盖校验未接入（需要该负载自己的 feature builder），只能报告吞吐，不能报告全覆盖验证。
 - 语义：移动 `to_float` 会改变 torchvision 的值域解释（float 图像 clamp 到 [0,1]），
   SimCLRv2 上不存在语义等价重排；重排吞吐差不得写成等价优化收益（`semantic_scope.md`）。

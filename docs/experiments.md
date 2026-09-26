@@ -2273,13 +2273,25 @@ CommonVoice 上另有同模型消融 cell：`pico_final` 714.3 vs `pico_byte_pro
 COCO 的早期低吞吐是 64 个 worker 的启动瞬态（前 ~5 min 内从 8 爬到 32 rec/s 以上），
 `perf_time_sec` 只统计稳态段，不把启动算进去。
 
-**仍然失败：wikitext103。** 最终 PICO 在规划阶段直接抛
+**wikitext103：最终 PICO 无法估价，但补出了基线与字节模型臂。** 最终 PICO 在规划阶段直接抛
 `RuntimeError: compute_model has no profiled input features for operator 5`。核查 profile：
 9 个算子只有 5 个拟合成功，**算子 2/3/4/5（torchtext 的 Truncate/AddToken 系列）对探针的所有表示
 （`float32:2d`、`int64:1d`、`list`、`text`）都返回 `TypeError: Input type not supported`**，
 即 profiler 无法构造这些变换能接受的输入。按 AGENTS.md 的约定，模型对没有拟合系数的算子**必须报错**，
-而不是回退字节比例，所以这是覆盖率的限制而不是静默降级；论文里文本负载的结论仍然只能引用历史反例
-（§5.1.6、§4.12 的旧 PICO 数据），不能写成"最终 PICO 在文本上更差"。
+而不是回退字节比例，所以这是覆盖率的限制而不是静默降级。
+
+能跑的两块（10 万条 token、1 轮）：
+
+| optimizer | 数据量 | 稳态吞吐 (rec/s) | 优化+启动 (s) |
+| --- | ---: | ---: | ---: |
+| optimizer（Cedar staged） | 100,000 | 5402.2 | 13.8 |
+| plumber_optimizer | 100,000 | 317.4 | 4.3 |
+| pico_byte_proportional（同一 W-only 搜索、字节比例计算项） | 100,000 | 1460.7 | 75.2 |
+
+即**即使换成不需要表示曲线的字节模型臂，同一个 W-only 搜索在文本上仍比 Cedar 慢 3.7×**，
+与历史文本反例同向（§5.1.6 旧 PICO 1148.0 vs Cedar 5466.5）。这说明文本上的差距来自
+搜索/边界模型对该负载的适配（每源记录要跨 driver↔worker 搬运 token 张量），
+**不是**表示感知计算项造成的；表示感知 PICO 在该负载上属于"未覆盖"，不能写成"更差"。
 
 **产物与复现**
 

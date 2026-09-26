@@ -613,7 +613,7 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
     supplement = [
         row
         for row in rows
-        if row["workload"] in ("commonvoice", "coco")
+        if row["workload"] in ("commonvoice", "coco", "wikitext103")
     ]
     if supplement:
         lines += [
@@ -633,6 +633,11 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
             "而项目标准协议用 `datasets/commonvoice/cv15_en_train_300000`；已改为标准数据集重跑，"
             "错误数据集下的产物归档在 `commonvoice/archive_wrong_dataset_20260927/`。",
             "",
+            "`wikitext103` 上最终 PICO 仍然跑不了：profile 只覆盖 9 个算子中的 5 个"
+            "（算子 2/3/4/5 是 torchtext 的 Truncate/AddToken 系列，对探针的 float32:2d、"
+            "int64:1d、list、text 四种表示全部 `TypeError: Input type not supported`）。"
+            "按约定优化器直接报错而不回退，因此文本负载只能给出基线与字节模型臂：",
+            "",
             "| 负载 | cell | optimizer | 数据量 | 稳态吞吐 (rec/s) | 优化+启动 (s) |",
             "| --- | --- | --- | ---: | ---: | ---: |",
         ]
@@ -649,6 +654,11 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
             "同负载内两个 cell 的 PICO 复现差 0.7%（CommonVoice），"
             "远小于与基线的 3.6–7.2 倍差距，因此这两个负载上的排序不依赖单轮噪声。",
             "COCO 的早期低吞吐是 64 个 worker 的启动瞬态，稳态段才计入 `perf_time_sec`。",
+            "",
+            "wikitext103（10 万条 token，1 轮）：Cedar 5402.2、Plumber 317.4、"
+            "`pico_byte_proportional` 1460.7 rec/s。即**即使换成不需要表示曲线的字节模型臂，"
+            "同一个 W-only 搜索在文本上仍比 Cedar 慢 3.7×**；这与历史文本反例同向，"
+            "说明文本上的差距来自搜索/边界模型对该负载的适配，而不是表示感知计算项本身。",
         ]
     lines += [
         "",
@@ -664,7 +674,7 @@ def write_reports(rows, table, plan_rows, operator_rows) -> None:
             )
             or "无"
         ),
-        "- `wikitext103`：最终 PICO 无法估价——profile 只覆盖 9 个算子中的 5 个"
+        "- `wikitext103`：最终 PICO 无法估价（`main_fast.failed.json`）——profile 只覆盖 9 个算子中的 5 个"
         "（算子 2/3/4/5 被 torchtext 变换以 `TypeError: Input type not supported` 拒绝，"
         "池内含 float32:2d/int64:1d/list/text 四种表示仍不可测），"
         "优化器按设计直接报错而不是回退到字节模型。文本负载结论仍只能引用历史反例。",

@@ -99,7 +99,14 @@ for workload in "$@"; do
       run_cell coco main_fast "pico_final,optimizer" 1
       ;;
     wikitext103)
-      run_cell wikitext103 main_fast "pico_final,optimizer,plumber_optimizer" 1
+      # ``main_fast`` (pico_final,optimizer,plumber_optimizer) already ran and
+      # failed by design: the final PICO cannot price 4 of the 9 operators
+      # because torchtext transforms reject every probe representation.
+      # These two cells recover what the profile *does* support: the Cedar and
+      # Plumber baselines, plus the byte-proportional compute arm of the same
+      # W-only search (which does not need representation curves).
+      run_cell wikitext103 baselines_fast "optimizer,plumber_optimizer" 1
+      run_cell wikitext103 bytemodel_fast "pico_byte_proportional" 1
       ;;
     *)
       echo "unknown workload $workload"

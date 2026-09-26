@@ -148,7 +148,8 @@
     "main_fast (pico_final, optimizer)"
    ],
    "wikitext103": [
-    "main_fast 失败：profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 对探针全部 TypeError: Input type not supported），优化器按设计报错而非回退"
+    "main_fast 失败：profile 只覆盖 9 个算子中的 5 个（算子 2/3/4/5 对探针全部 TypeError: Input type not supported），优化器按设计报错而非回退",
+    "baselines_fast (optimizer, plumber_optimizer) 与 bytemodel_fast (pico_byte_proportional) 成功"
    ]
   },
   "relaxations_inherited": "fast_protocol_20260925（1 轮、数据量降到稳态所需、不跑 unopti）",
@@ -159,7 +160,10 @@
    "commonvoice_ablation_pico_final": 714.3,
    "commonvoice_ablation_byte_proportional": 714.4,
    "coco_pico_final": 220.2,
-   "coco_optimizer": 30.5
+   "coco_optimizer": 30.5,
+   "wikitext103_optimizer": 5402.2,
+   "wikitext103_plumber": 317.4,
+   "wikitext103_pico_byte_proportional": 1460.7
   },
   "archive": "outputs/pico_final_w_only_20260924/commonvoice/archive_wrong_dataset_20260927/（错误数据集下的产物，不参与论文数据）"
  }
