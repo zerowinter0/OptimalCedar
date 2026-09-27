@@ -3663,6 +3663,121 @@ class DataSet:
                 ),
                 "operators": values_by_pipe,
             }
+            if variant_type == PipeVariantType.RAY and values_by_pipe:
+                # Paired block-boundary probes: submit the block's real first
+                # input batch, receive its real last output batch, with no
+                # operator compute.  This is the only measurement that needs
+                # neither a symmetry nor an additivity assumption, and the DP
+                # reads it through ``my_optimizer.stage_handoff_ms``.
+                from cedar.client.boundary_profiler import (
+                    profile_paired_handoff,
+                )
+                from cedar.pipes.ray_variant import get_ray_actor_options
+
+                ordered = [
+                    p_id
+                    for p_id in feature.logical_pipes
+                    if p_id in values_by_pipe
+                ]
+                ordered.sort()
+                median_request = {
+                    p_id: statistics.median(
+                        len(value)
+                        for value in reservoir.values_for(
+                            values_by_pipe[p_id]["input_pipe_id"]
+                        )
+                    )
+                    for p_id in ordered
+                    if reservoir.values_for(
+                        values_by_pipe[p_id]["input_pipe_id"]
+                    )
+                }
+                candidates = [
+                    p_id
+                    for p_id in ordered
+                    if median_request.get(p_id, 0) >= 4096
+                ]
+                max_pairs = int(
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_PAIRS", "24")
+                )
+                max_span = int(
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_SPAN", "3")
+                )
+                pair_budget = int(
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_PAIR_BUDGET", "16")
+                )
+                probe_warmup = int(
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_WARMUP", "2")
+                )
+                probe_batches = int(
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_BATCHES", "10")
+                )
+                pairs: List[Tuple[int, int]] = []
+                for index, first_id in enumerate(candidates):
+                    for last_id in candidates[index:]:
+                        if ordered.index(last_id) - ordered.index(first_id) > max_span:
+                            continue
+                        pairs.append((first_id, last_id))
+                pairs = pairs[:max_pairs]
+                staged_handoff: Dict[str, Any] = {}
+                response_pools: Dict[int, List[Any]] = {}
+                for first_id, last_id in pairs:
+                    request_snapshots = reservoir.values_for(
+                        values_by_pipe[first_id]["input_pipe_id"]
+                    )
+                    if last_id not in response_pools:
+                        pool = []
+                        for raw in reservoir.values_for(last_id):
+                            try:
+                                pool.append(pickle.loads(raw))
+                            except Exception:  # noqa: BLE001
+                                continue
+                        response_pools[last_id] = pool
+                    responses = response_pools[last_id]
+                    if not request_snapshots or not responses:
+                        continue
+                    serialized_size = statistics.median(
+                        len(value) for value in request_snapshots
+                    )
+                    submit_batch_size = min(
+                        max(
+                            int(
+                                compose_constants.RAY_SUBMIT_BATCH_SCALING_FACTOR
+                                // max(2 * serialized_size, 1)
+                            ),
+                            1,
+                        ),
+                        500,
+                    )
+                    try:
+                        entry = profile_paired_handoff(
+                            request_snapshots,
+                            responses,
+                            submit_batch_size=submit_batch_size,
+                            warmup_batches=probe_warmup,
+                            measured_batches=probe_batches,
+                            actor_options=get_ray_actor_options(),
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Paired handoff probe failed for %s->%s: %s",
+                            first_id,
+                            last_id,
+                            exc,
+                        )
+                        continue
+                    entry["first_pipe_id"] = int(first_id)
+                    entry["last_pipe_id"] = int(last_id)
+                    staged_handoff[f"{int(first_id)}->{int(last_id)}"] = entry
+                    if len(staged_handoff) >= pair_budget:
+                        break
+                if staged_handoff:
+                    physical.setdefault("staged_handoff", {})[
+                        variant_type.name
+                    ] = staged_handoff
+                    object_boundaries[variant_type.name][
+                        "paired_pairs"
+                    ] = len(staged_handoff)
         scaling = physical.setdefault("scaling", {})
         top_k = int(os.environ.get("CEDAR_PROFILE_SCALING_TOP_K", "2"))
         raw_widths = os.environ.get("CEDAR_PROFILE_SCALING_WIDTHS")

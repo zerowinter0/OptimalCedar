@@ -21,7 +21,7 @@ import platform
 import statistics
 import tempfile
 import time
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import ray
@@ -105,6 +105,100 @@ def profile_object_marshalling(
         "deserialize_ms_per_sample": statistics.median(deserialize_ms),
         "serialized_bytes_per_sample": statistics.median(serialized_bytes),
     }
+
+
+@ray.remote(num_cpus=0)
+class _PairedHandoffActor:
+    """No-compute stage probe: real request batch in, canned real response out.
+
+    The response pool is a set of real objects produced by the *last* operator
+    of the candidate block, so the probe exercises exactly the request and
+    response payloads the deployed stage will use, with no operator compute.
+    """
+
+    def __init__(self, responses: Any) -> None:
+        self.responses = list(responses)
+        self.index = 0
+
+    def process(self, batch: Any) -> Any:
+        out = []
+        for _item in batch:
+            out.append(self.responses[self.index % len(self.responses)])
+            self.index += 1
+        return out
+
+    def location(self):
+        return {
+            "ip": ray.util.get_node_ip_address(),
+            "node_id": str(ray.get_runtime_context().get_node_id()),
+        }
+
+
+def profile_paired_handoff(
+    requests: Sequence[bytes],
+    responses: Sequence[Any],
+    *,
+    submit_batch_size: int,
+    warmup_batches: int = 3,
+    measured_batches: int = 20,
+    actor_options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Serial (one batch in flight) paired stage handoff on real payloads.
+
+    ``requests`` are immutable pickles of the block's first-operator inputs;
+    ``responses`` are the real objects produced by the block's last operator.
+    The actor performs no operator work, so the measured client-side service is
+    the handoff itself: submit(request batch) + receive(response batch).
+    """
+    if not requests or not responses:
+        raise ValueError("paired handoff probe needs real request/response payloads")
+    submit_batch_size = max(1, int(submit_batch_size))
+    actor = _PairedHandoffActor.options(**(actor_options or {})).remote(responses)
+    try:
+        location = ray.get(actor.location.remote())
+        if os.environ.get("CEDAR_RAY_REQUIRE_REMOTE") == "1":
+            if location["ip"] == ray.util.get_node_ip_address():
+                raise RuntimeError("paired handoff probe actor landed on driver")
+
+        def _run(batch_index: int) -> float:
+            batch = [
+                pickle.loads(requests[(batch_index * submit_batch_size + offset)
+                                      % len(requests)])
+                for offset in range(submit_batch_size)
+            ]
+            started = time.perf_counter()
+            future = actor.process.remote(batch)
+            result = ray.get(future)
+            elapsed = time.perf_counter() - started
+            if len(result) != len(batch):
+                raise RuntimeError("paired handoff probe returned wrong batch size")
+            return elapsed
+
+        for index in range(max(1, warmup_batches)):
+            _run(index)
+        samples = []
+        for index in range(max(1, measured_batches)):
+            samples.append(_run(index + warmup_batches))
+        per_sample_ms = [value * 1000.0 / submit_batch_size for value in samples]
+        return {
+            "method": "paired_real_payload_handoff_serial",
+            "submit_batch_size": submit_batch_size,
+            "measured_batches": len(samples),
+            "measured_input_records": len(samples) * submit_batch_size,
+            "paired_probe_ms_per_sample": statistics.fmean(per_sample_ms),
+            "paired_probe_stdev_ms_per_sample": (
+                statistics.pstdev(per_sample_ms) if len(per_sample_ms) > 1 else 0.0
+            ),
+            "paired_probe_median_ms_per_sample": statistics.median(per_sample_ms),
+            "request_records_unique": len(requests),
+            "response_records_unique": len(responses),
+            "actor_location": location,
+        }
+    finally:
+        try:
+            ray.kill(actor)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 @ray.remote
