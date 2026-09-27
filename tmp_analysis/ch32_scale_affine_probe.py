@@ -1147,6 +1147,18 @@ def _write_figure_data(cells, fits, predictions) -> None:
                 ),
             },
         }
+    # Optional normalized coordinates: element count and time divided by each
+    # operator's own reference point (the same anchor the byte model uses).
+    for operator, panel in panels["panels"].items():
+        reference_elements = panel["normalization"]["anchor_elements"]
+        reference_ms = panel["normalization"]["anchor_ms"]
+        if not reference_elements or not reference_ms:
+            continue
+        for cell in panels["cells"]:
+            if cell["operator"] != operator:
+                continue
+            cell["elements_norm"] = cell["elements"] / reference_elements
+            cell["ms_norm"] = cell["mean_ms"] / reference_ms
     panels["fits"] = fits
     panels["predictions"] = predictions
     panels["diagnostics"] = _diagnostic_contrasts(panels["cells"])
@@ -1399,6 +1411,10 @@ def _write_notes(cells, fits, predictions) -> None:
         "同一 call_index 在不同 cell 上使用同一随机路径 |",
         "| 源样本 | 4 张 imagenette2 训练图，按 call 轮转，均值覆盖 4 张图 |",
         "| 尺寸 | 每表示类 8 个训练尺寸 + 4 个独立验证尺寸；尺寸交错排列 |",
+        "| 输入来源 | **受控生成**：真实 imagenette2 训练图重采样到各尺寸；"
+        "uint8 载荷即 reader 的输出，float32 载荷保持 reader 的 0–255 值域"
+        "（与 `to_float` 的纯 cast 一致）。不使用真实流水线的中间张量，"
+        "因此两条协议不能直接换用数值 |",
         "",
         "**不要**把这些绝对时间与 §4.x 的历史图或 §4.11 的 M1–M5 表格混用：那些是",
         "不同数据量、不同归一口径（每源记录）与不同 profiler 采样下的数值。本轮的部署侧对照只写在 §7。",

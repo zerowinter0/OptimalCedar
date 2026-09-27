@@ -1,11 +1,11 @@
 {
- "commit": "5a0521d3e2a1966285e36c14cf9bf7c4e1c5f69a",
+ "commit": "2294befea731da4fa5099ed012cf0d6d6369910f",
  "result_dir": "outputs/ch32_scale_affine_20260927",
  "small_files": {
   "README.md": {
-   "sha256": "fe75b371cc22c69591002f09c0f8ba5f62fb0fae2de300bb532132eb3eb2996f",
-   "bytes": 11240,
-   "rows": 182
+   "sha256": "2ed56d6c933f1afe02e873863f8fa1a69ddc433a4ad15f6c3b6df6c515c7f8da",
+   "bytes": 11538,
+   "rows": 183
   },
   "env.json": {
    "sha256": "5caf6c55c733c102de7c02e098f24ea56424bd7b9cafefab24466f76cde2db9c",
@@ -28,9 +28,9 @@
    "rows": 2040
   },
   "figure_data.json": {
-   "sha256": "d141051d8f653549a3ecb8503978e26f8e1ae737fcd55837db5765bb2f06017f",
-   "bytes": 1307317,
-   "rows": 45382
+   "sha256": "050a65c4ab14820e9e9e9256ca7e72fef79064656e998ce9e49ed97b0579d6fa",
+   "bytes": 1322248,
+   "rows": 45798
   }
  },
  "large_files": {
@@ -74,7 +74,7 @@
   },
   "ch32_scale_affine_probe.py": {
    "path": "tmp_analysis/ch32_scale_affine_probe.py",
-   "sha256": "5bf0bcdb5202693c1b6095220556ee66b9a8be3a30aa3fc4091dea326b6d659d",
+   "sha256": "1acebb1b051483af5470083be6a63ca2220d5ff39c704d6d91b1acc3a6f47655",
    "note": "current working-tree version (fit/plot stages)"
   },
   "plot_ch32_scale_affine.py": {

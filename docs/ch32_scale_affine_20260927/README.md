@@ -1,6 +1,6 @@
 # §3.2 计算规模与仿射响应：受控测量与独立验证（2026-09-27）
 
-commit `5a0521d3e2a1966285e36c14cf9bf7c4e1c5f69a`；结果目录 `outputs/ch32_scale_affine_20260927/`，
+commit `2294befea731da4fa5099ed012cf0d6d6369910f`；结果目录 `outputs/ch32_scale_affine_20260927/`，
 小文件快照在 `docs/ch32_scale_affine_20260927/`。
 
 ## 1. 本轮唯一口径（图只能用这批数据）
@@ -18,6 +18,7 @@ commit `5a0521d3e2a1966285e36c14cf9bf7c4e1c5f69a`；结果目录 `outputs/ch32_s
 | 随机性 | `torch.manual_seed`/`random.seed(base_seed + 100000*block + call_index)`；同一 call_index 在不同 cell 上使用同一随机路径 |
 | 源样本 | 4 张 imagenette2 训练图，按 call 轮转，均值覆盖 4 张图 |
 | 尺寸 | 每表示类 8 个训练尺寸 + 4 个独立验证尺寸；尺寸交错排列 |
+| 输入来源 | **受控生成**：真实 imagenette2 训练图重采样到各尺寸；uint8 载荷即 reader 的输出，float32 载荷保持 reader 的 0–255 值域（与 `to_float` 的纯 cast 一致）。不使用真实流水线的中间张量，因此两条协议不能直接换用数值 |
 
 **不要**把这些绝对时间与 §4.x 的历史图或 §4.11 的 M1–M5 表格混用：那些是
 不同数据量、不同归一口径（每源记录）与不同 profiler 采样下的数值。本轮的部署侧对照只写在 §7。
