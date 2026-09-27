@@ -3679,7 +3679,37 @@ class DataSet:
                     for p_id in feature.logical_pipes
                     if p_id in values_by_pipe
                 ]
-                ordered.sort()
+                # Enumerate the *declared execution chain* (source -> sink), not
+                # ascending pipe id: the DP fuses contiguous spans of that chain,
+                # so the pairs it will price must be probed first.  Fall back to
+                # descending id (this feature's creation order) when the graph is
+                # not a simple chain.
+                children: Dict[int, List[int]] = {}
+                for child_id, child in feature.logical_pipes.items():
+                    for parent in getattr(child, "input_pipes", ()) or ():
+                        children.setdefault(parent.id, []).append(child_id)
+                sources = [
+                    p_id
+                    for p_id, pipe in feature.logical_pipes.items()
+                    if not getattr(pipe, "input_pipes", None)
+                ]
+                chain: List[int] = []
+                seen: set = set()
+                frontier = [p_id for p_id in sources if p_id in values_by_pipe]
+                while frontier:
+                    current = frontier.pop(0)
+                    if current in seen:
+                        continue
+                    seen.add(current)
+                    chain.append(current)
+                    frontier.extend(
+                        sorted(children.get(current, []))
+                    )
+                if set(ordered) - set(chain):
+                    chain.extend(
+                        sorted(set(ordered) - set(chain), reverse=True)
+                    )
+                ordered = [p_id for p_id in chain if p_id in values_by_pipe]
                 median_request = {
                     p_id: statistics.median(
                         len(value)
@@ -3698,13 +3728,13 @@ class DataSet:
                     if median_request.get(p_id, 0) >= 4096
                 ]
                 max_pairs = int(
-                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_PAIRS", "24")
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_PAIRS", "32")
                 )
                 max_span = int(
-                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_SPAN", "3")
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_MAX_SPAN", "4")
                 )
                 pair_budget = int(
-                    os.environ.get("CEDAR_PROFILE_HANDOFF_PAIR_BUDGET", "16")
+                    os.environ.get("CEDAR_PROFILE_HANDOFF_PAIR_BUDGET", "32")
                 )
                 probe_warmup = int(
                     os.environ.get("CEDAR_PROFILE_HANDOFF_WARMUP", "2")
@@ -3778,6 +3808,9 @@ class DataSet:
                     object_boundaries[variant_type.name][
                         "paired_pairs"
                     ] = len(staged_handoff)
+                    object_boundaries[variant_type.name][
+                        "handoff_model"
+                    ] = "paired_probe_v1"
         scaling = physical.setdefault("scaling", {})
         top_k = int(os.environ.get("CEDAR_PROFILE_SCALING_TOP_K", "2"))
         raw_widths = os.environ.get("CEDAR_PROFILE_SCALING_WIDTHS")
