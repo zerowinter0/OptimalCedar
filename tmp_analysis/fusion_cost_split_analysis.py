@@ -75,6 +75,33 @@ def _deployed_boundary() -> Dict[str, float]:
     }
 
 
+def _deployed_identity_model() -> Dict[str, Any]:
+    """The boundary term the deployed code actually uses for layered profiles.
+
+    ``MyOptimizer._dp_stage_boundary_components`` prefers
+    ``physical_model.object_boundary``: an identity stage measured on the real
+    legal objects of the block's first and last operator.  The charged cost is
+    ``0.5 * input_identity + 0.5 * output_identity`` per source record with the
+    parallel byte term set to zero.  Falls back to the byte rule only when
+    those entries are missing.
+    """
+    profile = yaml.safe_load(PROFILE.read_text())
+    operators = profile["physical_model"]["object_boundary"]["RAY"]["operators"]
+    values: Dict[int, Dict[str, float]] = {}
+    for p_id, entry in operators.items():
+        values[int(p_id)] = {
+            "input_identity_ms": float(
+                entry["input_identity_stage"]["mean_ms_per_sample"]
+            ),
+            "output_identity_ms": float(
+                entry["output_identity_stage"]["mean_ms_per_sample"]
+            ),
+            "input_bytes": float(entry["input_serialized_bytes_per_sample"]),
+            "output_bytes": float(entry["output_serialized_bytes_per_sample"]),
+        }
+    return {"operators": values, "method": "cedar_identity_stage_real_objects"}
+
+
 def cmd_predict(args) -> int:
     run_dir = Path(args.run_dir).resolve()
     stages = _stage_means(run_dir)
@@ -213,19 +240,48 @@ def cmd_predict(args) -> int:
         compute_sum + fabc["fit_total_ms_per_record"],
         {"compute": c, "boundaries": [fabc]})
 
-    # --- B (deployed): same structure, shipped boundary parameters ---------
+    # --- B (deployed, active path): identity stages on real legal objects --
+    identity = _deployed_identity_model()
+    ops = identity["operators"]
+
+    def identity_cost(first_p: int, last_p: int) -> Dict[str, float]:
+        term = 0.5 * ops[first_p]["input_identity_ms"] + 0.5 * ops[last_p][
+            "output_identity_ms"
+        ]
+        return {
+            "first_operator_pipe": first_p,
+            "last_operator_pipe": last_p,
+            "input_identity_ms": ops[first_p]["input_identity_ms"],
+            "output_identity_ms": ops[last_p]["output_identity_ms"],
+            "charged_ms_per_record": term,
+        }
+
+    u_id = [identity_cost(7, 7), identity_cost(6, 6), identity_cost(5, 5)]
+    add("U", "B_deployed_identity_stage", "deployed path: 0.5*in_id+0.5*out_id per block",
+        compute_sum + sum(item["charged_ms_per_record"] for item in u_id),
+        {"compute": c, "blocks": u_id, "model": identity["method"]})
+    p_id_terms = [identity_cost(7, 6), identity_cost(5, 5)]
+    add("P", "B_deployed_identity_stage", "deployed path: 0.5*in_id+0.5*out_id per block",
+        compute_sum + sum(item["charged_ms_per_record"] for item in p_id_terms),
+        {"compute": c, "blocks": p_id_terms, "model": identity["method"]})
+    f_id_terms = [identity_cost(7, 5)]
+    add("F", "B_deployed_identity_stage", "deployed path: 0.5*in_id+0.5*out_id per block",
+        compute_sum + sum(item["charged_ms_per_record"] for item in f_id_terms),
+        {"compute": c, "blocks": f_id_terms, "model": identity["method"]})
+
+    # --- B (fallback): shipped synthetic byte-boundary rule ----------------
     du = [deployed_cost(stages[name]["in_bytes_per_record"],
                         stages[name]["out_bytes_per_record"]) for name in STAGES]
-    add("U", "B_deployed_boundary", "sum C_i + deployed fixed+byte rule",
+    add("U", "B_fallback_byte_boundary", "fallback branch: fixed+byte rule",
         compute_sum + sum(item["fit_total_ms_per_record"] for item in du),
         {"compute": c, "boundaries": du, "deployed": deployed})
     d_ab = deployed_cost(in_a, out_b)
     d_c = deployed_cost(in_c, out_c)
-    add("P", "B_deployed_boundary", "sum C_i + deployed rule on AB and C",
+    add("P", "B_fallback_byte_boundary", "fallback branch: fixed+byte rule",
         compute_sum + d_ab["fit_total_ms_per_record"] + d_c["fit_total_ms_per_record"],
         {"compute": c, "boundaries": [d_ab, d_c], "deployed": deployed})
     d_abc = deployed_cost(in_a, out_c)
-    add("F", "B_deployed_boundary", "sum C_i + deployed rule on ABC",
+    add("F", "B_fallback_byte_boundary", "fallback branch: fixed+byte rule",
         compute_sum + d_abc["fit_total_ms_per_record"],
         {"compute": c, "boundaries": [d_abc], "deployed": deployed})
 
@@ -268,6 +324,7 @@ def cmd_predict(args) -> int:
             "rho_ABC": rho_abc,
         },
         "frozen_predictions": rows,
+        "deployed_identity_model": _deployed_identity_model(),
         "not_used": "measurements.csv (validation) is not read in this phase",
     }
     (run_dir / "frozen_predictions.json").write_text(json.dumps(frozen, indent=1))
@@ -433,11 +490,14 @@ def _write_readme(run_dir, rows, actual_off, actual_on, repeat_std) -> None:
         "## 4. 冻结预测 vs 独立验证",
         "",
         "实测为三轮交错、无成员插桩的完整服务均值（轮间标准差见 `summary.csv`）。",
-        "方法 A = Cedar 的整体 I/O 折扣 ρ 作用于基准 T_i；方法 B = ΣC_i + 独立探针边界；",
-        "方法 B(部署参数) = 同一结构但用仓库 profile 的边界参数（fixed 5.32 ms、110.2 MB/s）。",
+        "方法 A = Cedar 的整体 I/O 折扣 ρ 作用于基准 T_i；方法 B = ΣC_i + 独立探针边界。",
+        "**部署模型（实际生效路径）** = `MyOptimizer._dp_stage_boundary_components` 在 layered profile 下",
+        "优先走 `physical_model.object_boundary`：按块的第一个算子的 *输入对象* 与最后一个算子的",
+        "*输出对象* 的真实恒等阶段各取一半（0.5·in_id + 0.5·out_id），并把并行字节项置零。",
+        "另列出该分支缺数据时的回退字节规则（fixed 5.32 ms、110.2 MB/s）作为对照。",
         "",
-        "| 组织 | 实测 (ms/记录) | 方法 A | 误差 | 方法 B（探针实测） | 误差 | 方法 B（拟合拆分） | 误差 | 部署边界参数 | 误差 |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| 组织 | 实测 | 方法 A | 误差 | 方法 B（探针） | 误差 | 方法 B（拟合拆分） | 误差 | 部署恒等阶段模型 | 误差 | 回退字节规则 | 误差 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     by_org: Dict[str, Dict[str, Dict[str, Any]]] = {}
     for row in rows:
@@ -447,7 +507,8 @@ def _write_readme(run_dir, rows, actual_off, actual_on, repeat_std) -> None:
         a = methods.get("A_overall_discount")
         b = methods.get("B_compute_boundary")
         bf = methods.get("B_compute_boundary_fit")
-        d = methods.get("B_deployed_boundary")
+        d = methods.get("B_deployed_identity_stage")
+        fb = methods.get("B_fallback_byte_boundary")
 
         def cell(entry, key="rel_error"):
             if not entry:
@@ -458,9 +519,10 @@ def _write_readme(run_dir, rows, actual_off, actual_on, repeat_std) -> None:
         b_pred, b_err = cell(b)
         bf_pred, bf_err = cell(bf)
         d_pred, d_err = cell(d)
+        fb_pred, fb_err = cell(fb)
         lines.append(
             f"| {org} | {actual_off[org]:.1f} | {a_pred} | {a_err} | {b_pred} | {b_err} | "
-            f"{bf_pred} | {bf_err} | {d_pred} | {d_err} |"
+            f"{bf_pred} | {bf_err} | {d_pred} | {d_err} | {fb_pred} | {fb_err} |"
         )
     method_b = [by_org[org]["B_compute_boundary"] for org in ("P", "F")]
     method_a = [by_org[org]["A_overall_discount"] for org in ("P", "F")]
@@ -479,9 +541,14 @@ def _write_readme(run_dir, rows, actual_off, actual_on, repeat_std) -> None:
         + "、".join(
             f"{row['organisation']} {100*float(row['rel_error']):+.1f}%" for row in method_b
         )
-        + f"。部署边界参数在同一结构下为 "
+        + f"。部署恒等阶段模型为 "
         + "、".join(
-            f"{org} {100*float(by_org[org]['B_deployed_boundary']['rel_error']):+.1f}%"
+            f"{org} {100*float(by_org[org]['B_deployed_identity_stage']['rel_error']):+.1f}%"
+            for org in ("P", "F")
+        )
+        + "；回退字节规则为 "
+        + "、".join(
+            f"{org} {100*float(by_org[org]['B_fallback_byte_boundary']['rel_error']):+.1f}%"
             for org in ("P", "F")
         )
         + "。",
@@ -540,8 +607,13 @@ def _write_readme(run_dir, rows, actual_off, actual_on, repeat_std) -> None:
         "",
         "- 这是**串行服务时间**的比较，不是完整流水线吞吐预测；阶段之间没有重叠。",
         "- 分项模型的边界项来自本轮独立探针；成员计算沿用基准剖析（并被配对插桩验证为不变）。",
-        "- 部署边界参数的低估（约 −31%）说明历史 U 基准误差主要来自**边界参数迁移**，不是融合公式本身；",
-        "  这也意味着任何用旧边界参数评估新链路的计划都会系统性低估边界开销。",
+        "- **部署模型本身就有 ~27–31% 的系统性低估**：它不是用合成载荷，而是用真实对象的恒等阶段"
+        "（`cedar_identity_stage_real_objects`，submit_batch_size=4），但组合规则是"
+        "「首算子输入对象往返的一半 + 末算子输出对象往返的一半」并把并行字节项置零；"
+        "真实阶段付的是完整的一次 submit（输入批）加一次 receive（输出批），因此这个 "
+        "0.5+0.5 组合比实测阶段服务低约 25–28%。历史 U 基准误差（121.54 vs 106.91）属于同一机制。",
+        "- 反过来说：**profile 的恒等阶段测量本身是准的**——例如 crop 输入对象的恒等往返 46.79 ms/记录，"
+        "与本轮探针对同一对象的 50.10 ms/记录只差 7%；差的是把它折算成单阶段服务时的系数。",
         "- 前端对齐提醒：若基准、探针、验证使用不同的负载混合（本轮的 120 批 vs 40 批），",
         "  在重尾载荷分布下会产生 20–35% 的表观误差——这是口径问题，不是模型能力问题。",
         "- 记录：对齐前的预测（120 批基准 + 每 3 批抽样探针）为 A：U +7.0%、P −9.0%、F −21.7%；",
