@@ -197,6 +197,20 @@ class StageRunner:
 
         if self.actors:
             ray.get([actor.reset_events.remote() for actor in self.actors])
+        for variant in self.variants:
+            service = getattr(variant.variant_ctx, "service", None)
+            reset = getattr(service, "reset_path_timing_stats", None)
+            if reset is not None:
+                reset()
+
+    def path_stats(self):
+        """Per-stage client-side submit/ray.get split (ms per sample)."""
+        out = []
+        for variant in self.variants:
+            service = getattr(variant.variant_ctx, "service", None)
+            getter = getattr(service, "get_path_timing_stats", None)
+            out.append(getter() if getter is not None else None)
+        return out
 
     def set_instrument(self, enabled: bool) -> None:
         import ray

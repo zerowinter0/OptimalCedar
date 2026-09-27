@@ -558,6 +558,85 @@ def cmd_summarise(args) -> int:
     return 0
 
 
+def cmd_path_timing(args) -> int:
+    """Chain-context submit/fetch split on the *real* actors."""
+    os.environ["CEDAR_RAY_PATH_TIMING"] = "1"
+    ray, actor_classes, options = _setup(args)
+    run_dir = Path(args.run_dir)
+    pool = list(
+        torch.load(Path(args.inputs) / "inputs" / "block_inputs.pt")["records"]
+    )
+    callables = dict(_block_callables(args.batch_size))
+    physical = yaml.safe_load(Path(args.profile).read_text())["physical_model"]
+    runners: Dict[str, StageRunner] = {}
+    rows: List[Dict[str, Any]] = []
+    try:
+        for organisation in ORGANISATIONS:
+            runners[organisation] = StageRunner(
+                organisation, callables, args.batch_size, options, actor_classes,
+                args.remote_cpu, args.same_remote_cpu,
+                submit_batch_by_stage=_deployed_submit_batches(physical, organisation),
+            )
+        for runner in runners.values():
+            runner.set_instrument(False)
+            for index in range(args.warmup):
+                runner.run_batch(_batch_records(pool, index, args.batch_size))
+        for repeat in range(args.rounds):
+            order = list(args.order)
+            if repeat % 2 == 1:
+                order = list(reversed(order))
+            for organisation in order:
+                runner = runners[organisation]
+                for index in range(args.batches):
+                    records = _batch_records(pool, index, args.batch_size)
+                    runner.reset_events()
+                    result = runner.run_batch(records)
+                    stats = runner.path_stats()
+                    for stage_index, stat in enumerate(stats):
+                        rows.append(
+                            {
+                                "organisation": organisation,
+                                "repeat": repeat,
+                                "batch_id": index,
+                                "stage_index": stage_index,
+                                "stage_members": "+".join(runner.stages[stage_index]),
+                                "whole_T_ms_per_record": (
+                                    result["whole_time"] * 1000.0 / args.batch_size
+                                ),
+                                "stage_T_ms_per_record": (
+                                    result["stage_times"][stage_index]
+                                    * 1000.0 / args.batch_size
+                                ),
+                                "in_bytes_per_record": (
+                                    result["stage_bytes"][stage_index][0]
+                                    / args.batch_size
+                                ),
+                                "out_bytes_per_record": (
+                                    result["stage_bytes"][stage_index][1]
+                                    / args.batch_size
+                                ),
+                                "submit_ms_per_record": (
+                                    stat["submit_ms_per_sample"] if stat else None
+                                ),
+                                "get_ms_per_record": (
+                                    stat["get_ms_per_sample"] if stat else None
+                                ),
+                                "submit_batch_size": (
+                                    runner.submit_batch_by_stage[stage_index]
+                                    if stage_index < len(runner.submit_batch_by_stage)
+                                    else None
+                                ),
+                            }
+                        )
+                print(f"path-timing repeat={repeat} rows={len(rows)}", flush=True)
+    finally:
+        for runner in runners.values():
+            runner.shutdown()
+    _write_csv(run_dir / "path_timing.csv", rows)
+    print(f"path timing rows={len(rows)}", flush=True)
+    return 0
+
+
 def _pct(value: float) -> str:
     return f"{100.0 * value:+.1f}%"
 
@@ -823,6 +902,15 @@ def main() -> int:
     validate.add_argument("--instrument-rounds", type=int, default=1)
     validate.add_argument("--order", nargs="+", default=["U", "P", "F"])
     validate.set_defaults(func=cmd_validate)
+
+    path = sub.add_parser("path-timing")
+    common(path)
+    path.add_argument("--profile", required=True)
+    path.add_argument("--warmup", type=int, default=10)
+    path.add_argument("--batches", type=int, default=40)
+    path.add_argument("--rounds", type=int, default=3)
+    path.add_argument("--order", nargs="+", default=["U", "P", "F"])
+    path.set_defaults(func=cmd_path_timing)
 
     summarise = sub.add_parser("summarise")
     summarise.add_argument("--run-dir", required=True)
