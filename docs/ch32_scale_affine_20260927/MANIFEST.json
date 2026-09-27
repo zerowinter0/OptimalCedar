@@ -1,0 +1,86 @@
+{
+ "commit": "5a0521d3e2a1966285e36c14cf9bf7c4e1c5f69a",
+ "result_dir": "outputs/ch32_scale_affine_20260927",
+ "small_files": {
+  "README.md": {
+   "sha256": "fe75b371cc22c69591002f09c0f8ba5f62fb0fae2de300bb532132eb3eb2996f",
+   "bytes": 11240,
+   "rows": 182
+  },
+  "env.json": {
+   "sha256": "5caf6c55c733c102de7c02e098f24ea56424bd7b9cafefab24466f76cde2db9c",
+   "bytes": 7006,
+   "rows": 526
+  },
+  "measurements.csv": {
+   "sha256": "665f891bcc7d99e3cf6e3f7a25338adae76b41900b8f91bd87bfd83d12a46c07",
+   "bytes": 373449,
+   "rows": 624
+  },
+  "fits.csv": {
+   "sha256": "a4bf99ece1716988a38d3d4da27eff1c7c7e56a67885fab9259be1c0ed66e661",
+   "bytes": 39024,
+   "rows": 104
+  },
+  "predictions.csv": {
+   "sha256": "5e98ec614390de5fc3b5d284ed3b2853d283a107840363af7c5a36d79d71aa75",
+   "bytes": 398442,
+   "rows": 2040
+  },
+  "figure_data.json": {
+   "sha256": "d141051d8f653549a3ecb8503978e26f8e1ae737fcd55837db5765bb2f06017f",
+   "bytes": 1307317,
+   "rows": 45382
+  }
+ },
+ "large_files": {
+  "raw_calls.csv.gz": {
+   "sha256": "d2ed87957ca802f44cf89c04655bf70204ae981d8059ff17f992ac893d1a504b",
+   "bytes": 1445582,
+   "rows": 221767
+  },
+  "measure.log": {
+   "sha256": "06b33510ab5c59a852c5dd56897d3c082755928e935e7c0d187a4e4dabe9e3ae",
+   "bytes": 1154
+  }
+ },
+ "figures": {
+  "panel_blur_bytes_vs_elements.png": {
+   "sha256": "cace4fb742f0cf7f56efb8eb409957b1011c9679503ebb3b9560861a21df29a0",
+   "bytes": 61197
+  },
+  "panel_crop.png": {
+   "sha256": "44ecd77a28243d390e8396be69b06a675af0f5f96763a0f61ac25c02240966f3",
+   "bytes": 99987
+  },
+  "panel_flip_elements.png": {
+   "sha256": "fb0352c32665c200be3a9aa22f0fed83f946ed71e676d6e65e4ec60154ad132c",
+   "bytes": 45904
+  },
+  "panel_grayscale_elements.png": {
+   "sha256": "395751bb3d75496a21aa3e4b84a86f5a34c25ec2787813d591246e48c2a48e1a",
+   "bytes": 41981
+  },
+  "panel_jitter_elements.png": {
+   "sha256": "1beea6d39f508107911c0ca95e4ab63ab70e96673d184888771a8843c0869741",
+   "bytes": 47849
+  }
+ },
+ "provenance": {
+  "measurement_probe_snapshot": {
+   "path": "outputs/ch32_scale_affine_20260927/modules/tmp_analysis/ch32_scale_affine_probe.py",
+   "sha256": "faad1aa915b6fbaa5f6a8c9751f45d9696d97357ec524e03cf3a125c18a2bf91",
+   "note": "exact code the remote actor executed for this round's measurements"
+  },
+  "ch32_scale_affine_probe.py": {
+   "path": "tmp_analysis/ch32_scale_affine_probe.py",
+   "sha256": "5bf0bcdb5202693c1b6095220556ee66b9a8be3a30aa3fc4091dea326b6d659d",
+   "note": "current working-tree version (fit/plot stages)"
+  },
+  "plot_ch32_scale_affine.py": {
+   "path": "tmp_analysis/plot_ch32_scale_affine.py",
+   "sha256": "1e9dce1c84a1733f78a243aad8ffbf8de4f6a8804d12722a84aed277e6287e38",
+   "note": "current working-tree version (fit/plot stages)"
+  }
+ }
+}

@@ -47,6 +47,7 @@
 | §4.8 融合折扣实验原始产物 | `outputs/fusion_discount_20260923/`（README + figure_data.json/md/csv，§4.8）；小文件快照 `docs/mechanism_20260923/fusion_discount/`（含 `MANIFEST.json`） |
 | §4.9 第三章证据链原始产物 | `outputs/pico_ch3_20260924/`（README/protocol/audit/predictions/measurements/summary/figure_data，§4.9）；小文件快照 `docs/mechanism_20260923/pico_ch3/` |
 | §4.10 affine 重排诊断原始产物 | `outputs/affine_reorder_diagnosis_20260924/`（README/audit/protocol/input_metadata/operator_diagnostics/predictions/plan_summary/operator_matrix/plan_scoring/blur_geometry/figure_data，§4.10）；小文件快照 `docs/mechanism_20260923/affine_reorder/`（含 `MANIFEST.json`） |
+| §4.15 §3.2 计算规模/仿射响应受控测量 | `outputs/ch32_scale_affine_20260927/`（measurements/fits/predictions/figure_data/raw_calls/figures，§4.15）；小文件+草图快照 `docs/ch32_scale_affine_20260927/`（含 `MANIFEST.json`） |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -2292,6 +2293,94 @@ COCO 的早期低吞吐是 64 个 worker 的启动瞬态（前 ~5 min 内从 8 �
 与历史文本反例同向（§5.1.6 旧 PICO 1148.0 vs Cedar 5466.5）。这说明文本上的差距来自
 搜索/边界模型对该负载的适配（每源记录要跨 driver↔worker 搬运 token 张量），
 **不是**表示感知计算项造成的；表示感知 PICO 在该负载上属于"未覆盖"，不能写成"更差"。
+
+### 4.15 §3.2 计算规模与仿射响应的受控测量（2026-09-27）
+
+只为第三章第二张机制图采集数据：**不改优化器、不跑融合/卸载/吞吐**。
+结果目录 `outputs/ch32_scale_affine_20260927/`，小文件与草图快照 `docs/ch32_scale_affine_20260927/`，
+README 里有逐面板说明与全部数字。
+
+**协议（本轮唯一口径，不与历史图的绝对值混用）**
+
+- 对象：SimCLRv2 声明顺序里的真实 callable（`GaussianBlur(11)`、`ColorJitter(0.1×4)`、
+  `RandomResizedCrop((244,244))`、`Grayscale(1)`、`RandomHorizontalFlip()`），参数与流水线一致。
+- 窗口：只有 callable 调用；每次调用前 `pickle.loads` 取新 payload，`torch.manual_seed`/`random.seed`
+  都在窗口外（与部署 profiler 的 `_time_operator_fresh_snapshot` 同一约定）。
+- 交错与重复：同一算子的所有 cell 在一个 block 内轮转，block 间固定种子重排；**3 个独立 block**；
+  主指标为算术平均，median/p10/p90/std 只作诊断。
+- 每 cell 预算 Blur 2.5 s、Jitter/Crop 1.5 s、Grayscale/Flip 1.0 s，调用上限 400；
+  每表示类 8 个训练尺寸 + 4 个独立验证尺寸（尺寸交错）；4 张 imagenette2 源图按调用轮转。
+- 全部调用在远端 Ray actor（`cedar_remote`）内执行，线程池 = 1；actor IP 与代码 hash 记在 `env.json`。
+- 规模：**5 算子 × {float32,uint8} × {1ch,3ch} × 12 尺寸 + 4 个诊断配对 = 208 cells，624 行测量，22 万次调用**。
+
+**① 字节 vs 元素（Blur，验证 MAPE）**
+
+| 组 | M1 锚定字节比例 | M2 字节仿射 | M3 元素比例 | M4 元素仿射 | M5 表示类仿射 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| blur all | 66.5% | 146.3% | 35.5% | 66.3% | **6.9%** |
+| blur 1ch | 44.1% | 114.2% | 11.0% | 4.7% | **4.7%** |
+| blur 3ch | 43.8% | 120.8% | 9.3% | 9.3% | **9.1%** |
+
+直接对照（同一次测量里挑出的配对点）：
+
+- **同字节不同元素**：float32:1ch 96×96（37,270 B / 9,216 元素 / 1.57 ms）对
+  uint8:1ch 192×192（37,269 B / 36,864 元素 / 5.40 ms）→ **字节相同、元素 4×、时间 3.4×**。
+  1ch 与 3ch 各有 3 组这样的配对，比值 3.3–3.6×。
+- **同形同内容不同 dtype**：float32:1ch 224×224（6.97 ms）对 uint8:1ch 224×224（7.11 ms）
+  → 字节 4×、时间几乎相同（1.02×）→ 字节不是计算规模。
+
+**② 表示类是否必要（Jitter）**
+
+| 组 | M3 元素比例 | M4 元素仿射（跨 dtype 共享） | M5 表示类仿射 |
+| --- | ---: | ---: | ---: |
+| jitter all | 291.0% | 291.0% | **14.7%** |
+| jitter 3ch | 22.5% | 22.5% | 23.1% |
+
+- 同元素数、不同通道数的配对：12,288 元素下 1ch 128×96 = 0.297 ms vs 3ch 64×64 = 1.413 ms（**4.76×**）；
+  49,152 元素下 1ch 256×192 = 0.385 ms vs 3ch 128×128 = 2.959 ms（**7.69×**）。
+  → 元素模型对这两点只能给同一个预测，表示类不可省。
+- 诚实边界：jitter 3ch 的两个模型 MAPE 都在 22–23%，说明该尺寸跨度上 `kx+b` 本身表达不足，
+  这里"是否共享"不是主要矛盾。
+
+**③ 固定分量（Crop / Grayscale）**
+
+| 算子/组 | M3 过原点 | M4 含截距 | 拟合 k (ms/element) | 拟合 b (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| crop 1ch | 54.1% | **6.3%** | 1.05e-07 | 0.606 |
+| crop 3ch | 52.1% | **5.7%** | 5.33e-07 | 1.630 |
+| grayscale 3ch | 35.1% | **13.5%** | 1.05e-06 | 0.0676 |
+| jitter 1ch | 44.9% | **11.1%** | 4.43e-06 | 0.225 |
+
+Crop 是固定分量的最强证据：输入 96→448（元素 48×），float32:1ch 实测均值只从
+0.579 ms 变到 0.571 ms；按表示类分开后 M5 的验证 MAPE 是 1.8%（1ch）/0.9%（3ch）。
+
+**④ 重复性与波动**
+
+- 同一个 payload 被当作两个 cell 各测一遍（jitter float32:3ch 64×64）：1.413 vs 1.510 ms，差 6.4%。
+- Blur 存在慢模式：uint8:3ch 512×512 均值 49.53 ms、块间 std 15.81 ms（**32%**），
+  ≤256 尺寸内最大块间波动 12%。因此 **Blur 的 448/512 验证点只是弱证据**，
+  Blur 在本章的角色是"说明字节与计算规模的区别"，不是证明仿射精度。
+
+**⑤ 不被支持的说法（如实记录）**
+
+- "元素模型总比字节模型好"不成立：Flip 上跨类共享时字节仿射 10.1% 优于元素仿射 17.2%
+  （按类分开后元素仿射 7.9% 才反超）。Flip 的成本是拷贝/分配，本质更接近字节对照。
+- Blur **不需要**按 dtype 分开（同通道内 M4≈M5：1ch 4.7%→4.7%，3ch 9.3%→9.1%），
+  需要区分的只是通道数；这与部署 profile 把 `uint8:1ch`/`float32:1ch` 当两个类相比，
+  说明"表示类"的粒度可以更省。
+- Blur float32:3ch 的截距被非负约束压到 0 → 该点不能用来支持"截距有独立价值"。
+
+**⑥ 与部署 profile 的一致性**：把本轮 M5 系数与部署 profile
+（`outputs/affine_repr_profile_20260924/simclrv2/shared.yaml`，两点 0.5×/2× 拟合）逐类对比：
+**斜率比值中位数 1.13×**，17 个 (算子,类) 里 15 个落在 0.9–1.6×；最大 4.15× 出现在
+crop float32:1ch，但该配对两边斜率都接近 0（7.4e-8 vs 1.8e-8）、截距一致（0.55 vs 0.57），
+比值本身没有意义。crop 的截距几乎逐位相同（1.55/1.72 vs 1.63/1.71），
+差异最大的是部署侧被非负约束压到 b=0 的类（blur、jitter 3ch）。
+这是两个不同协议的**一致性检查**，不是同一份数据；论文图只用本轮数据。
+
+**⑦ 面板建议**：Blur 的 bytes/elements 双横轴（同 48 个点）、Jitter 的按类元素响应、
+Crop 的"锚定字节比例 vs 元素仿射 vs 独立验证点"、候选 Grayscale（同 Crop 结构）与 Flip（反例）。
+草图见 `docs/ch32_scale_affine_20260927/panel_*.png`；复现命令写在同目录 README 第 8 节。
 
 **产物与复现**
 
