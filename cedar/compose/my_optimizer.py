@@ -30,6 +30,169 @@ from cedar.pipes import (
 logger = logging.getLogger(__name__)
 
 
+def stage_handoff_ms(
+    physical_model: Dict[str, Any],
+    variant_name: str,
+    first_p_id: int,
+    last_p_id: int,
+    input_records: float,
+    output_records: float,
+    submit_batch: int,
+    transported_bytes_ms: float,
+    fixed_ms: float,
+    inflight_inflation: float,
+) -> Dict[str, Any]:
+    """Price one stage boundary exactly the way the DP does.
+
+    Single implementation shared by the search/replay path
+    (``MyOptimizer._dp_stage_boundary_components``) and the offline fusion-cost
+    validation, so an experiment cannot drift away from what the deployed
+    optimizer charges.
+
+    Preference order:
+
+    ``paired_probe_v1``
+        The profiler measured this exact block boundary as one no-compute
+        round trip on the block's real legal input/output objects (submit the
+        first operator's inputs, receive the last operator's outputs).  This
+        is the only composition that needs neither a symmetry nor an
+        additivity assumption.
+    ``identity_half_legacy``
+        Half of each measured *serial* identity round trip (input object of
+        the first operator, output object of the last).  Usable when the exact
+        pair was not probed; measured to sit 13-20% below the real serial
+        stage handoff, so it is flagged as an approximation.
+    ``marshalling`` / ``byte_rule``
+        Older fallbacks, unchanged.
+
+    The client-clock split (``submit_ms_per_sample`` / ``fetch_ms_per_sample``)
+    is recorded for diagnosis only: Ray's ``actor.method.remote()`` returns
+    after serialising the arguments, so that number is serialisation alone and
+    the two halves are not an additive decomposition of the round trip.
+    """
+    object_boundaries = (physical_model or {}).get("object_boundary", {}) or {}
+    backend = object_boundaries.get(variant_name) or {}
+    operators = backend.get("operators") or {}
+
+    def _entry(p_id: int) -> Optional[Dict[str, Any]]:
+        entry = operators.get(p_id, operators.get(str(p_id)))
+        return entry if isinstance(entry, dict) else None
+
+    input_entry = _entry(int(first_p_id))
+    output_entry = _entry(int(last_p_id))
+    terms: Dict[str, Any] = {
+        "first_p_id": int(first_p_id),
+        "last_p_id": int(last_p_id),
+        "input_records": float(input_records),
+        "output_records": float(output_records),
+        "submit_batch_size": int(submit_batch),
+        "profile_handoff_model": backend.get("handoff_model"),
+    }
+    staged = physical_model.get("staged_handoff") or {}
+    backend_pairs = staged.get(variant_name) or {}
+    pair_key = f"{int(first_p_id)}->{int(last_p_id)}"
+    pair_entry = backend_pairs.get(pair_key) or {}
+    try:
+        paired_ms = float(pair_entry["paired_probe_ms_per_sample"])
+    except (KeyError, TypeError, ValueError):
+        paired_ms = float("nan")
+    terms["paired_probe_ms_per_sample"] = paired_ms
+    if math.isfinite(paired_ms) and paired_ms >= 0.0:
+        return {
+            "model": "paired_probe_v1",
+            "local_ms": paired_ms * input_records,
+            "parallel_ms": 0.0,
+            "terms": terms,
+        }
+    if input_entry is not None and output_entry is not None:
+        try:
+            submit_ms = float(
+                input_entry["input_identity_stage"]["submit_ms_per_sample"]
+            )
+            fetch_ms = float(
+                output_entry["output_identity_stage"]["fetch_ms_per_sample"]
+            )
+        except (KeyError, TypeError, ValueError):
+            submit_ms = float("nan")
+            fetch_ms = float("nan")
+        terms["submit_ms_per_sample"] = submit_ms
+        terms["fetch_ms_per_sample"] = fetch_ms
+        terms["client_clock_split"] = "diagnostic_only"
+        try:
+            input_identity_ms = float(
+                input_entry["input_identity_stage"]["mean_ms_per_sample"]
+            )
+            output_identity_ms = float(
+                output_entry["output_identity_stage"]["mean_ms_per_sample"]
+            )
+        except (KeyError, TypeError, ValueError):
+            input_identity_ms = float("nan")
+            output_identity_ms = float("nan")
+        terms["input_identity_ms_per_sample"] = input_identity_ms
+        terms["output_identity_ms_per_sample"] = output_identity_ms
+        if (
+            math.isfinite(input_identity_ms)
+            and input_identity_ms >= 0.0
+            and math.isfinite(output_identity_ms)
+            and output_identity_ms >= 0.0
+        ):
+            return {
+                "model": "identity_half_serial",
+                "local_ms": 0.5 * input_identity_ms * input_records
+                + 0.5 * output_identity_ms * output_records,
+                "parallel_ms": 0.0,
+                "terms": terms,
+            }
+        try:
+            input_marshal_ms = float(
+                input_entry["input_serialize_ms_per_sample"]
+            )
+            output_marshal_ms = float(
+                output_entry["output_deserialize_ms_per_sample"]
+            )
+        except (KeyError, TypeError, ValueError):
+            input_marshal_ms = float("nan")
+            output_marshal_ms = float("nan")
+        terms["input_serialize_ms_per_sample"] = input_marshal_ms
+        terms["output_deserialize_ms_per_sample"] = output_marshal_ms
+        if (
+            math.isfinite(input_marshal_ms)
+            and input_marshal_ms >= 0.0
+            and math.isfinite(output_marshal_ms)
+            and output_marshal_ms >= 0.0
+        ):
+            local_ms = (
+                fixed_ms
+                + input_marshal_ms * input_records
+                + output_marshal_ms * output_records
+            )
+            if variant_name == PipeVariantType.SMP.name:
+                residuals = []
+                for entry in (input_entry, output_entry):
+                    try:
+                        residual = float(
+                            entry["shared_runtime_overhead_ms_per_sample"]
+                        )
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if math.isfinite(residual) and residual >= 0.0:
+                        residuals.append(residual)
+                if residuals:
+                    local_ms += max(residuals) * input_records
+            return {
+                "model": "marshalling",
+                "local_ms": local_ms,
+                "parallel_ms": transported_bytes_ms * inflight_inflation,
+                "terms": terms,
+            }
+    return {
+        "model": "byte_rule",
+        "local_ms": 0.0,
+        "parallel_ms": (transported_bytes_ms + fixed_ms) * inflight_inflation,
+        "terms": terms,
+    }
+
+
 def fit_width_curve(measured: Dict[int, float]) -> Optional[Dict[str, Any]]:
     """Fit ``cost(actors) = c / actors ** p`` on measured actor widths.
 
@@ -1320,84 +1483,35 @@ class MyOptimizer(Optimizer):
         inner_ops = getattr(self, "_dp_inner_ops", ())
         if not block_order or not inner_ops:
             return 0.0, (transported_bytes_ms + fixed_ms) * inflight_inflation
-        first_p_id = inner_ops[block_order[0]]
-        last_p_id = inner_ops[block_order[-1]]
-        input_entry = self._dp_object_boundary_operator(
-            block.variant, first_p_id
+        result = stage_handoff_ms(
+            self.profiled_stats.get("physical_model", {}) or {},
+            block.variant.name,
+            int(inner_ops[block_order[0]]),
+            int(inner_ops[block_order[-1]]),
+            float(input_records),
+            float(output_records),
+            int(submit_batch),
+            float(transported_bytes_ms),
+            float(fixed_ms),
+            float(inflight_inflation),
         )
-        output_entry = self._dp_object_boundary_operator(
-            block.variant, last_p_id
-        )
-        if input_entry is not None and output_entry is not None:
-            try:
-                input_identity_ms = float(
-                    input_entry["input_identity_stage"][
-                        "mean_ms_per_sample"
-                    ]
-                )
-                output_identity_ms = float(
-                    output_entry["output_identity_stage"][
-                        "mean_ms_per_sample"
-                    ]
-                )
-            except (KeyError, TypeError, ValueError):
-                input_identity_ms = float("nan")
-                output_identity_ms = float("nan")
-            if (
-                math.isfinite(input_identity_ms)
-                and input_identity_ms >= 0.0
-                and math.isfinite(output_identity_ms)
-                and output_identity_ms >= 0.0
-            ):
-                # Each identity measurement is a complete same-object stage
-                # round trip. Half of the first boundary plus half of the last
-                # approximates submit(input_type) + receive(output_type), while
-                # preserving one measured task/queue fixed cost. This is
-                # charged to the shared local runtime lane; block compute stays
-                # on its Ray/SMP parallel-stage coordinate.
-                identity_boundary_ms = (
-                    0.5 * input_identity_ms * input_records
-                    + 0.5 * output_identity_ms * output_records
-                )
-                return identity_boundary_ms, 0.0
-            try:
-                input_marshal_ms = float(
-                    input_entry["input_serialize_ms_per_sample"]
-                )
-                output_marshal_ms = float(
-                    output_entry["output_deserialize_ms_per_sample"]
-                )
-            except (KeyError, TypeError, ValueError):
-                input_marshal_ms = float("nan")
-                output_marshal_ms = float("nan")
-            if (
-                math.isfinite(input_marshal_ms)
-                and input_marshal_ms >= 0.0
-                and math.isfinite(output_marshal_ms)
-                and output_marshal_ms >= 0.0
-            ):
-                local_stage_ms = (
-                    fixed_ms
-                    + input_marshal_ms * input_records
-                    + output_marshal_ms * output_records
-                )
-                if block.variant == PipeVariantType.SMP:
-                    residuals = []
-                    for entry in (input_entry, output_entry):
-                        try:
-                            residual = float(
-                                entry[
-                                    "shared_runtime_overhead_ms_per_sample"
-                                ]
-                            )
-                        except (KeyError, TypeError, ValueError):
-                            continue
-                        if math.isfinite(residual) and residual >= 0.0:
-                            residuals.append(residual)
-                    if residuals:
-                        local_stage_ms += max(residuals) * input_records
-                return local_stage_ms, transported_bytes_ms * inflight_inflation
-        return 0.0, (transported_bytes_ms + fixed_ms) * inflight_inflation
+        self._dp_boundary_handoff_model = result["model"]
+        if (
+            os.environ.get("CEDAR_REQUIRE_VALIDATED_BOUNDARY") == "1"
+            and result["model"] != "paired_probe_v1"
+        ):
+            raise RuntimeError(
+                "CEDAR_REQUIRE_VALIDATED_BOUNDARY=1 but the profile only "
+                f"supports boundary model {result['model']!r}; regenerate the "
+                "profile with the paired block-boundary probe"
+            )
+        if result["model"] not in ("paired_probe_v1",):
+            logger.warning(
+                "Stage boundary priced with approximate model %s (profile lacks "
+                "the paired block-boundary probe)",
+                result["model"],
+            )
+        return float(result["local_ms"]), float(result["parallel_ms"])
 
     def _dp_inflight_inflation(
         self,

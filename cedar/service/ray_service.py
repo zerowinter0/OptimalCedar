@@ -15,14 +15,18 @@ from cedar.utils.threading import limit_native_threadpools
 
 logger = logging.getLogger(__name__)
 
-# Client-side Ray path timing: serialize+submit per batch, and ray.get per
-# batch.  Off by default so production runs are unaffected.
-_RAY_PATH_TIMING = os.environ.get("CEDAR_RAY_PATH_TIMING", "0") in (
-    "1",
-    "true",
-    "True",
-    "yes",
-)
+def path_timing_enabled() -> bool:
+    """Client-side Ray path timing: serialize+submit, and ray.get, per batch.
+
+    Read at call time (not import time) so the profiler can switch it on for
+    the handoff probes only; production runs leave it off.
+    """
+    return os.environ.get("CEDAR_RAY_PATH_TIMING", "0") in (
+        "1",
+        "true",
+        "True",
+        "yes",
+    )
 
 
 class RayActor:
@@ -101,7 +105,7 @@ class SampleBatch:
 
         self.profile_backend_compute = profile_backend_compute
         started = (
-            time.perf_counter_ns() if _RAY_PATH_TIMING else None
+            time.perf_counter_ns() if path_timing_enabled() else None
         )
         if profile_backend_compute:
             self.future = actor.process_profiled.remote(batch)
@@ -113,7 +117,7 @@ class SampleBatch:
     def next(self) -> Any:
         if not self.has_result:
             started = (
-                time.perf_counter_ns() if _RAY_PATH_TIMING else None
+                time.perf_counter_ns() if path_timing_enabled() else None
             )
             result = ray.get(self.future)
             if started is not None:
@@ -315,6 +319,13 @@ class RayService:
         self._path_timing_samples += samples
         self._path_submit_ns += submit_ns
         self._path_get_ns += get_ns
+
+    def reset_path_timing_stats(self):
+        """Drop accumulated submit/ray.get observations (probe scoping)."""
+        self._path_timing_batches = 0
+        self._path_timing_samples = 0
+        self._path_submit_ns = 0.0
+        self._path_get_ns = 0.0
 
     def get_path_timing_stats(self):
         """Per-sample client-side Ray path costs (ms), or None when disabled."""

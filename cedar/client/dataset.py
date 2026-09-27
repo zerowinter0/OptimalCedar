@@ -2175,6 +2175,8 @@ class DataSet:
         minimum_records_per_worker: Optional[int] = None,
         record_actor_locations: bool = False,
         snapshot_sequence: Optional[List[Tuple[str, List[bytes]]]] = None,
+        capture_path_timing: bool = False,
+        serial_inflight: bool = False,
     ) -> Dict[str, Any]:
         """Measure one backend with fixed inputs until confidence converges."""
         replay = _ProfileReplayPipeVariant(snapshots, 1)
@@ -2196,8 +2198,10 @@ class DataSet:
         if variant_type == PipeVariantType.RAY:
             variant_ctx = RayPipeVariantContext(
                 n_actors=width,
-                max_inflight=max(RAY_PROFILE_INFLIGHT, width * 5),
-                max_prefetch=RAY_PROFILE_PREFETCH,
+                max_inflight=1 if serial_inflight else max(
+                    RAY_PROFILE_INFLIGHT, width * 5
+                ),
+                max_prefetch=1 if serial_inflight else RAY_PROFILE_PREFETCH,
                 use_threads=True,
                 submit_batch_size=(
                     ray_submit_batch_size
@@ -2241,6 +2245,11 @@ class DataSet:
             raise RuntimeError(
                 f"{variant_type.name} variant exposes no profiling service"
             )
+        if capture_path_timing:
+            # The boundary handoff probes need the submit / ray.get split that
+            # ``RayService`` records when this flag is on.  It is read at call
+            # time, so it only affects this benchmark.
+            os.environ["CEDAR_RAY_PATH_TIMING"] = "1"
         try:
             actor_locations = None
             if record_actor_locations:
@@ -2295,6 +2304,9 @@ class DataSet:
                         f"{variant_type.name} service cannot reset timing stats"
                     )
                 reset_stats()
+                reset_path = getattr(service, "reset_path_timing_stats", None)
+                if capture_path_timing and reset_path is not None:
+                    reset_path()
 
                 # Aim for roughly half-second epochs, but a parallel epoch must
                 # actually exercise every worker. The old upper bound of 256
@@ -2356,6 +2368,17 @@ class DataSet:
                     "stop_reason": "confidence" if converged else "max_duration",
                 }
                 stats["trial_label"] = trial_label
+                if capture_path_timing:
+                    path_stats = None
+                    getter = getattr(service, "get_path_timing_stats", None)
+                    if getter is not None:
+                        path_stats = getter()
+                    if path_stats is None:
+                        raise RuntimeError(
+                            f"{variant_type.name} handoff probe produced no "
+                            "client-side submit/ray.get timing"
+                        )
+                    stats["path_timing"] = path_stats
                 results.append(stats)
             return results if snapshot_sequence is not None else results[0]
         finally:
@@ -3551,7 +3574,14 @@ class DataSet:
                     min(0.10, target_rse),
                     min_observations,
                     ray_submit_batch_size=submit_batch_size,
+                    capture_path_timing=(variant_type == PipeVariantType.RAY),
+                    # The handoff probe must reproduce the serial service the
+                    # DP's boundary term describes: one submitted batch in
+                    # flight, no prefetch.  Pipelined numbers would be a
+                    # throughput figure and are not comparable.
+                    serial_inflight=True,
                 )
+                path_timing = timing.get("path_timing") or {}
                 result = {
                     "method": "cedar_identity_stage_real_objects",
                     "mean_ms_per_sample": float(
@@ -3567,6 +3597,15 @@ class DataSet:
                         else 1
                     ),
                     "adaptive_profile": timing["adaptive_profile"],
+                    # One-way handoff split of the same probe: what the driver
+                    # pays to hand these objects to an actor, and what it pays
+                    # to fetch them back.  Composed additively by the DP so a
+                    # block charges submit(first input) + fetch(last output).
+                    "submit_ms_per_sample": path_timing.get(
+                        "submit_ms_per_sample"
+                    ),
+                    "fetch_ms_per_sample": path_timing.get("get_ms_per_sample"),
+                    "path_timing_method": path_timing.get("method"),
                 }
                 identity_cache[boundary_p_id] = result
                 return result
@@ -3615,8 +3654,13 @@ class DataSet:
                     "output_identity_stage": output_identity,
                 }
             object_boundaries[variant_type.name] = {
-                "schema_version": 2,
+                "schema_version": 3,
                 "method": "cedar_identity_stage_real_legal_objects",
+                "handoff_model": (
+                    "submit_fetch_v1"
+                    if variant_type == PipeVariantType.RAY
+                    else "full_round_trip_only"
+                ),
                 "operators": values_by_pipe,
             }
         scaling = physical.setdefault("scaling", {})
