@@ -1,0 +1,66 @@
+{
+ "fits": {
+  "F_ABC_fused": {
+   "slope_ms_per_byte": 1.4142632654028811e-05,
+   "throughput_bytes_per_sec": 70708193.0545039,
+   "fixed_ms": 14.987735988795539,
+   "r2": 0.7671712952200835,
+   "mae_ms": 8.774615683478393,
+   "mape": 0.09768407687649976,
+   "rows": 60,
+   "validation_mae_ms": 9.742547631125872,
+   "validation_mape": 0.10855872739768961,
+   "validation_rows": 60
+  },
+  "P_AB_fused": {
+   "slope_ms_per_byte": 1.5839870380983055e-05,
+   "throughput_bytes_per_sec": 63131829.7402594,
+   "fixed_ms": 7.642537210848466,
+   "r2": 0.7827205034999722,
+   "mae_ms": 9.622340036467227,
+   "mape": 0.10672519175913137,
+   "rows": 60,
+   "validation_mae_ms": 10.333108124072286,
+   "validation_mape": 0.10984921500900933,
+   "validation_rows": 60
+  },
+  "U_A_mapper": {
+   "slope_ms_per_byte": 2.8338682445362118e-06,
+   "throughput_bytes_per_sec": 352874556.5105336,
+   "fixed_ms": 152.35480249568414,
+   "r2": 0.6263259525940506,
+   "mae_ms": 12.813821730850641,
+   "mape": 0.0723256629693926,
+   "rows": 60,
+   "validation_mae_ms": 11.906012982230356,
+   "validation_mape": 0.06292736431107208,
+   "validation_rows": 60
+  },
+  "U_B_mapper": {
+   "slope_ms_per_byte": 1.2916138102303205e-05,
+   "throughput_bytes_per_sec": 77422523.05444768,
+   "fixed_ms": 29.01994231735922,
+   "r2": 0.8091316642638902,
+   "mae_ms": 25.576290810757943,
+   "mape": 0.13777705210251984,
+   "rows": 60,
+   "validation_mae_ms": 27.94725986262014,
+   "validation_mape": 0.13656045116177382,
+   "validation_rows": 60
+  },
+  "U_C_mapper": {
+   "slope_ms_per_byte": 1.6168283024271894e-05,
+   "throughput_bytes_per_sec": 61849486.33684825,
+   "fixed_ms": 0.0,
+   "r2": 0.0,
+   "mae_ms": 9.17660896355908,
+   "mape": 0.09687829242711876,
+   "rows": 60,
+   "validation_mae_ms": 9.251371095888324,
+   "validation_mape": 0.09594741308446623,
+   "validation_rows": 60
+  }
+ },
+ "protocol": "paired no-compute round trip on the real stage payloads; response buffers are preallocated real outputs",
+ "train_validation_split": "model fitted on even batch_index, validated on odd"
+}

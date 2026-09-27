@@ -49,6 +49,7 @@
 | §4.10 affine 重排诊断原始产物 | `outputs/affine_reorder_diagnosis_20260924/`（README/audit/protocol/input_metadata/operator_diagnostics/predictions/plan_summary/operator_matrix/plan_scoring/blur_geometry/figure_data，§4.10）；小文件快照 `docs/mechanism_20260923/affine_reorder/`（含 `MANIFEST.json`） |
 | §4.15 §3.2 计算规模/仿射响应受控测量 | `outputs/ch32_scale_affine_20260927/`（measurements/fits/predictions/figure_data/raw_calls/figures，§4.15）；小文件+草图快照 `docs/ch32_scale_affine_20260927/`（含 `MANIFEST.json`） |
 | §4.16 §3.2 补充轮：扩展范围与补齐表示类 | `outputs/ch32_scale_affine_ext_20260927/`（measurements/merged_measurements/fits/predictions/figure_data/coverage/consistency/verify/raw_calls/figures，§4.16）；快照 `docs/ch32_scale_affine_ext_20260927/`（含 `MANIFEST.json`） |
+| §4.17 §3.3 融合代价：整体折扣 vs 计算＋边界分项 | `outputs/fusion_cost_split_20260927/`（baseline_stage_profile/boundary_profile/boundary_params/predictions/frozen_predictions/measurements/summary/instrumentation_check/member_compute/comparison/figure_data，§4.17）；快照 `docs/fusion_cost_split_20260927/`（含 `MANIFEST.json`） |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -2443,6 +2444,65 @@ Crop 的"锚定字节比例 vs 元素仿射 vs 独立验证点"、候选 Graysca
 
 **⑥ 交付自检**：`verify.json` 从 `predictions.csv` 重新推导 132 个拟合 × 792 个指标并与 `fits.csv` 对账，
 **最大差异 0**；`figure_data.json` 的 208 个 cell 的 x/y 归一化与冻结参考点逐点核对通过。
+
+### 4.17 §3.3 融合代价：整体 I/O 折扣 vs 计算＋边界分项（2026-09-27）
+
+真实块 `to_float → RandomResizedCrop → RandomHorizontalFlip`，U（三个独立远端阶段）/P（融合
+to_float+crop）/F（三算子全融合），串行服务口径（同一时刻一个批次在飞），远端 Ray actor 同核绑核、
+单线程、每源记录归一化。**不改优化器、不跑 reorder/W/吞吐 campaign。**
+结果目录 `outputs/fusion_cost_split_20260927/`，快照 `docs/fusion_cost_split_20260927/`。
+
+**协议对齐（本轮最关键的一步）**：基准剖析、边界探针、独立验证三者必须使用**同一批批次**
+（本轮 = batch 0–39，同一输入池与批次映射）。首次基准用了 120 批、探针用了每 3 批抽样的载荷集合，
+在重尾载荷分布下其字节混合比验证集重 19–26%，分项预测因此系统性偏高（U +35%、P +21%、F +5%）——
+那是口径错配，不是模型能力问题。对齐后（120 批基准与载荷快照保留为 `*_120batches.*`）：
+
+**① 逐阶段基准（U，40 批）**
+
+| 阶段 | T (ms/记录) | C (ms/记录) | H = T−C | 请求字节/记录 | 响应字节/记录 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| to_float | 42.434 | 0.807 | 41.627 | 658,367 | 2,632,215 |
+| crop | 45.128 | 4.230 | 40.898 | 2,632,215 | 714,850 |
+| flip | 22.059 | 0.412 | 21.647 | 714,850 | 714,850 |
+
+ΣT_i = **109.622** ms/记录 vs 同批次整块 U = **116.421** ms/记录（+6.2%，客户端阶段间胶水）；
+独立验证轮（另一时刻、同 40 批）U = **120.38** ms/记录 → 同一配置跨会话漂移 **+9.8%**，
+与轮间标准差 4.85 ms 同量级。**任何预测都不应被期待比这个漂移更准。**
+
+**② 字节与 ρ（按实测载荷，不手写）**：IO_base = 8,067,348 B/记录；
+P 保留 1,373,218 B → **ρ_AB = 0.2069**；F 保留 1,373,218 B → **ρ_ABC = 0.1702**。
+
+**③ 独立边界探针**（回放真实请求/响应载荷、返回预分配真实响应对象、无算子计算；
+偶数批拟合、奇数批留出验证）：
+
+| 探针 | 吞吐 | 固定项 | 拟合 MAPE | 留出 MAPE |
+| --- | ---: | ---: | ---: | ---: |
+| U_A (to_float 边界) | 352.9 MB/s | 152.36 ms/批 | 7.2% | 6.3% |
+| U_B (crop 边界) | 77.4 MB/s | 29.02 ms/批 | 13.8% | 13.7% |
+| U_C (flip 边界) | 61.8 MB/s | 0.00 ms/批 | 9.7% | 9.6% |
+| P_AB 融合边界 | 63.1 MB/s | 7.64 ms/批 | 10.7% | 11.0% |
+| F_ABC 融合边界 | 70.7 MB/s | 14.99 ms/批 | 9.8% | 10.9% |
+
+请求/响应方向不对称（同样总字节下大请求比大响应慢），因此每条边界各自拟合；
+同一边界内字节范围窄，固定项/字节项的**拆分**弱可辨识，但操作点总预测误差 6–14%。
+
+**④ 冻结预测 vs 独立验证（三轮交错，无成员插桩）**
+
+| 组织 | 实测 | 方法 A 整体折扣 | 误差 | 方法 B 分项（本轮探针） | 误差 | 分项（拟合拆分） | 误差 | 部署边界参数 | 误差 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| U | 120.4 | 109.6 | −8.9% | 126.4 | **+5.0%** | 126.5 | +5.1% | 82.7 | −31.3% |
+| P | 51.4 | 40.2 | **−21.9%** | 51.4 | **−0.1%** | 52.2 | +1.5% | 33.5 | −34.8% |
+| F | 27.8 | 18.7 | **−32.9%** | 28.1 | **+1.1%** | 28.6 | +3.0% | 19.2 | −30.8% |
+
+- **整体 I/O 折扣在 P/F 上低估 22%/33%**，远超轮间波动（P 6.7%、F 6.5%）；
+  **分项模型在 P/F 上是 −0.1%/+1.1%**。
+- **部署边界参数**（仓库 profile：fixed 5.32 ms、110.2 MB/s）在同一分项结构下低估 31–35% →
+  历史"U 基准误差（121.5 实测 vs 106.9 分项预测）"主要来自**边界参数迁移**，不是融合公式本身。
+- 成员计算配对插桩（`member_compute.csv`）：crop 在 U/P/F 下为 4.669/4.754/4.706 ms/记录（差 2%），
+  to_float、flip 为亚毫秒（差异在噪声量级）→ **融合几乎不改变成员计算，省下的是交接/边界**。
+- 插桩影响：成员计时开启使 U/P/F 分别 +24.6%/+44.7%/+40.7%，因此主结果一律用无插桩数值。
+- 记录（对齐前，不隐藏）：A：U +7.0%、P −9.0%、F −21.7%；B：U +35.0%、P +20.8%、F +5.1%；
+  B_fit：U +30.7%、P +18.1%、F −3.3%；B_deployed：U −29.8%、P −33.9%、F −29.1%。
 
 **产物与复现**
 

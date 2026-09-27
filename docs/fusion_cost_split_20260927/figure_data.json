@@ -1,0 +1,455 @@
+{
+ "measured_ms_per_record": {
+  "U": 120.37731378610867,
+  "P": 51.44398074092654,
+  "F": 27.797247094955917
+ },
+ "measured_instrument_on_ms_per_record": {
+  "U": 150.01896193037587,
+  "P": 74.42740733289004,
+  "F": 39.10837523678007
+ },
+ "repeat_stdev_ms": {
+  "U": 4.8540953871131265,
+  "P": 3.456859314665094,
+  "F": 1.7935613358645703
+ },
+ "predictions": [
+  {
+   "organisation": "U",
+   "method": "A_overall_discount",
+   "model_identity": "Cedar rho applied to baseline T_i",
+   "predicted_ms_per_record": 109.62156896712258,
+   "measured_ms_per_record": 120.37731378610867,
+   "abs_error_ms": -10.755744818986088,
+   "rel_error": -0.08935026443684675,
+   "measured_repeat_stdev_ms": 4.8540953871131265,
+   "error_over_repeat_stdev": -2.2158082940728625,
+   "measured_instrument_on_ms": 150.01896193037587,
+   "instrument_effect_pct": 24.623948825553363,
+   "terms": "{\"T\": {\"to_float\": 42.43370923213661, \"crop\": 45.128491055220366, \"flip\": 22.059368679765612}, \"note\": \"U is the measured baseline itself\"}"
+  },
+  {
+   "organisation": "P",
+   "method": "A_overall_discount",
+   "model_identity": "rho_AB on (T_A+T_B) + T_C",
+   "predicted_ms_per_record": 40.174512716463965,
+   "measured_ms_per_record": 51.44398074092654,
+   "abs_error_ms": -11.269468024462576,
+   "rel_error": -0.21906290808279322,
+   "measured_repeat_stdev_ms": 3.456859314665094,
+   "error_over_repeat_stdev": -3.260030854207435,
+   "measured_instrument_on_ms": 74.42740733289004,
+   "instrument_effect_pct": 44.67660989865605,
+   "terms": "{\"rho_AB\": 0.20688315251614323, \"io_ab_fused\": 1373217.5125000002, \"io_ab_base\": 6637647.85, \"T\": {\"to_float\": 42.43370923213661, \"crop\": 45.128491055220366, \"flip\": 22.059368679765612}}"
+  },
+  {
+   "organisation": "F",
+   "method": "A_overall_discount",
+   "model_identity": "rho_ABC on sum(T_i)",
+   "predicted_ms_per_record": 18.659695427970675,
+   "measured_ms_per_record": 27.797247094955917,
+   "abs_error_ms": -9.137551666985242,
+   "rel_error": -0.32872146064576807,
+   "measured_repeat_stdev_ms": 1.7935613358645703,
+   "error_over_repeat_stdev": -5.094641306248145,
+   "measured_instrument_on_ms": 39.10837523678007,
+   "instrument_effect_pct": 40.691540796054824,
+   "terms": "{\"rho_ABC\": 0.17021919685866788, \"io_abc_fused\": 1373217.525, \"io_base\": 8067348.1625, \"T\": {\"to_float\": 42.43370923213661, \"crop\": 45.128491055220366, \"flip\": 22.059368679765612}}"
+  },
+  {
+   "organisation": "P",
+   "method": "A_reference_whole_block",
+   "model_identity": "measured U x IO_P/IO_U (reference)",
+   "predicted_ms_per_record": 38.08689590101905,
+   "measured_ms_per_record": 51.44398074092654,
+   "abs_error_ms": -13.357084839907493,
+   "rel_error": -0.25964329835154437,
+   "measured_repeat_stdev_ms": 3.456859314665094,
+   "error_over_repeat_stdev": -3.86393648802614,
+   "measured_instrument_on_ms": 74.42740733289004,
+   "instrument_effect_pct": 44.67660989865605,
+   "terms": "{\"note\": \"kept only as the naive whole-block variant of the discount\"}"
+  },
+  {
+   "organisation": "U",
+   "method": "B_compute_boundary",
+   "model_identity": "sum C_i + measured probe mean of 3 boundaries",
+   "predicted_ms_per_record": 126.44878088862365,
+   "measured_ms_per_record": 120.37731378610867,
+   "abs_error_ms": 6.071467102514973,
+   "rel_error": 0.05043697114975504,
+   "measured_repeat_stdev_ms": 4.8540953871131265,
+   "error_over_repeat_stdev": 1.2507927056056172,
+   "measured_instrument_on_ms": 150.01896193037587,
+   "instrument_effect_pct": 24.623948825553363,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"U_A_mapper\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 2632215.16875, \"total_bytes_per_batch\": 13162330.125, \"measured_mean_ms_per_record\": 47.677817963024914, \"fixed_ms_per_batch\": 152.35480249568414, \"bytes_ms_per_batch\": 37.30030936533985, \"fixed_ms_per_record\": 38.088700623921035, \"bytes_ms_per_record\": 9.325077341334962, \"fit_total_ms_per_record\": 47.413777965255996, \"fit_mape\": 0.0723256629693926, \"fit_validation_mape\": 0.06292736431107208}, {\"probe\": \"U_B_mapper\", \"in_bytes_per_record\": 2632215.16875, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 13388261.275, \"measured_mean_ms_per_record\": 50.09622982276293, \"fixed_ms_per_batch\": 29.01994231735922, \"bytes_ms_per_batch\": 172.924631577618, \"fixed_ms_per_record\": 7.254985579339805, \"bytes_ms_per_record\": 43.2311578944045, \"fit_total_ms_per_record\": 50.4861434737443, \"fit_mape\": 0.13777705210251984, \"fit_validation_mape\": 0.13656045116177382}, {\"probe\": \"U_C_mapper\", \"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"measured_mean_ms_per_record\": 23.22504614033581, \"fixed_ms_per_batch\": 0.0, \"bytes_ms_per_batch\": 92.46319716955989, \"fixed_ms_per_record\": 0.0, \"bytes_ms_per_record\": 23.115799292389973, \"fit_total_ms_per_record\": 23.115799292389973, \"fit_mape\": 0.09687829242711876, \"fit_validation_mape\": 0.09594741308446623}], \"boundary_term\": \"measured probe mean (no fitted split)\"}"
+  },
+  {
+   "organisation": "U",
+   "method": "B_compute_boundary_fit",
+   "model_identity": "sum C_i + fitted fixed+byte rule",
+   "predicted_ms_per_record": 126.46540769389027,
+   "measured_ms_per_record": 120.37731378610867,
+   "abs_error_ms": 6.088093907781598,
+   "rel_error": 0.050575093564549645,
+   "measured_repeat_stdev_ms": 4.8540953871131265,
+   "error_over_repeat_stdev": 1.254218020507909,
+   "measured_instrument_on_ms": 150.01896193037587,
+   "instrument_effect_pct": 24.623948825553363,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"U_A_mapper\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 2632215.16875, \"total_bytes_per_batch\": 13162330.125, \"measured_mean_ms_per_record\": 47.677817963024914, \"fixed_ms_per_batch\": 152.35480249568414, \"bytes_ms_per_batch\": 37.30030936533985, \"fixed_ms_per_record\": 38.088700623921035, \"bytes_ms_per_record\": 9.325077341334962, \"fit_total_ms_per_record\": 47.413777965255996, \"fit_mape\": 0.0723256629693926, \"fit_validation_mape\": 0.06292736431107208}, {\"probe\": \"U_B_mapper\", \"in_bytes_per_record\": 2632215.16875, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 13388261.275, \"measured_mean_ms_per_record\": 50.09622982276293, \"fixed_ms_per_batch\": 29.01994231735922, \"bytes_ms_per_batch\": 172.924631577618, \"fixed_ms_per_record\": 7.254985579339805, \"bytes_ms_per_record\": 43.2311578944045, \"fit_total_ms_per_record\": 50.4861434737443, \"fit_mape\": 0.13777705210251984, \"fit_validation_mape\": 0.13656045116177382}, {\"probe\": \"U_C_mapper\", \"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"measured_mean_ms_per_record\": 23.22504614033581, \"fixed_ms_per_batch\": 0.0, \"bytes_ms_per_batch\": 92.46319716955989, \"fixed_ms_per_record\": 0.0, \"bytes_ms_per_record\": 23.115799292389973, \"fit_total_ms_per_record\": 23.115799292389973, \"fit_mape\": 0.09687829242711876, \"fit_validation_mape\": 0.09594741308446623}]}"
+  },
+  {
+   "organisation": "P",
+   "method": "B_compute_boundary",
+   "model_identity": "sum C_i + measured probe mean (AB fused + C)",
+   "predicted_ms_per_record": 51.373899318248746,
+   "measured_ms_per_record": 51.44398074092654,
+   "abs_error_ms": -0.07008142267779505,
+   "rel_error": -0.001362286154151391,
+   "measured_repeat_stdev_ms": 3.456859314665094,
+   "error_over_repeat_stdev": -0.020273148629592015,
+   "measured_instrument_on_ms": 74.42740733289004,
+   "instrument_effect_pct": 44.67660989865605,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"P_AB_fused\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 5492870.050000001, \"measured_mean_ms_per_record\": 22.69916621541294, \"fixed_ms_per_batch\": 7.642537210848466, \"bytes_ms_per_batch\": 87.00634961158393, \"fixed_ms_per_record\": 1.9106343027121164, \"bytes_ms_per_record\": 21.751587402895982, \"fit_total_ms_per_record\": 23.662221705608097, \"fit_mape\": 0.10672519175913137, \"fit_validation_mape\": 0.10984921500900933}, {\"probe\": \"U_C_mapper\", \"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"measured_mean_ms_per_record\": 23.22504614033581, \"fixed_ms_per_batch\": 0.0, \"bytes_ms_per_batch\": 92.46319716955989, \"fixed_ms_per_record\": 0.0, \"bytes_ms_per_record\": 23.115799292389973, \"fit_total_ms_per_record\": 23.115799292389973, \"fit_mape\": 0.09687829242711876, \"fit_validation_mape\": 0.09594741308446623}], \"boundary_term\": \"measured probe mean (no fitted split)\"}"
+  },
+  {
+   "organisation": "P",
+   "method": "B_compute_boundary_fit",
+   "model_identity": "sum C_i + fitted fixed+byte rule",
+   "predicted_ms_per_record": 52.227707960498066,
+   "measured_ms_per_record": 51.44398074092654,
+   "abs_error_ms": 0.7837272195715244,
+   "rel_error": 0.01523457571291768,
+   "measured_repeat_stdev_ms": 3.456859314665094,
+   "error_over_repeat_stdev": 0.2267165505540549,
+   "measured_instrument_on_ms": 74.42740733289004,
+   "instrument_effect_pct": 44.67660989865605,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"P_AB_fused\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 5492870.050000001, \"measured_mean_ms_per_record\": 22.69916621541294, \"fixed_ms_per_batch\": 7.642537210848466, \"bytes_ms_per_batch\": 87.00634961158393, \"fixed_ms_per_record\": 1.9106343027121164, \"bytes_ms_per_record\": 21.751587402895982, \"fit_total_ms_per_record\": 23.662221705608097, \"fit_mape\": 0.10672519175913137, \"fit_validation_mape\": 0.10984921500900933}, {\"probe\": \"U_C_mapper\", \"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"measured_mean_ms_per_record\": 23.22504614033581, \"fixed_ms_per_batch\": 0.0, \"bytes_ms_per_batch\": 92.46319716955989, \"fixed_ms_per_record\": 0.0, \"bytes_ms_per_record\": 23.115799292389973, \"fit_total_ms_per_record\": 23.115799292389973, \"fit_mape\": 0.09687829242711876, \"fit_validation_mape\": 0.09594741308446623}]}"
+  },
+  {
+   "organisation": "F",
+   "method": "B_compute_boundary",
+   "model_identity": "sum C_i + measured probe mean (ABC fused)",
+   "predicted_ms_per_record": 28.098611140322966,
+   "measured_ms_per_record": 27.797247094955917,
+   "abs_error_ms": 0.3013640453670483,
+   "rel_error": 0.010841506870719358,
+   "measured_repeat_stdev_ms": 1.7935613358645703,
+   "error_over_repeat_stdev": 0.16802550285896883,
+   "measured_instrument_on_ms": 39.10837523678007,
+   "instrument_effect_pct": 40.691540796054824,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"F_ABC_fused\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5492870.1, \"measured_mean_ms_per_record\": 22.648924177822966, \"fixed_ms_per_batch\": 14.987735988795539, \"bytes_ms_per_batch\": 77.6836440405985, \"fixed_ms_per_record\": 3.7469339971988846, \"bytes_ms_per_record\": 19.420911010149624, \"fit_total_ms_per_record\": 23.167845007348507, \"fit_mape\": 0.09768407687649976, \"fit_validation_mape\": 0.10855872739768961}], \"boundary_term\": \"measured probe mean (no fitted split)\"}"
+  },
+  {
+   "organisation": "F",
+   "method": "B_compute_boundary_fit",
+   "model_identity": "sum C_i + fitted fixed+byte rule",
+   "predicted_ms_per_record": 28.617531969848507,
+   "measured_ms_per_record": 27.797247094955917,
+   "abs_error_ms": 0.8202848748925895,
+   "rel_error": 0.02950957237205832,
+   "measured_repeat_stdev_ms": 1.7935613358645703,
+   "error_over_repeat_stdev": 0.4573497758286468,
+   "measured_instrument_on_ms": 39.10837523678007,
+   "instrument_effect_pct": 40.691540796054824,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"probe\": \"F_ABC_fused\", \"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5492870.1, \"measured_mean_ms_per_record\": 22.648924177822966, \"fixed_ms_per_batch\": 14.987735988795539, \"bytes_ms_per_batch\": 77.6836440405985, \"fixed_ms_per_record\": 3.7469339971988846, \"bytes_ms_per_record\": 19.420911010149624, \"fit_total_ms_per_record\": 23.167845007348507, \"fit_mape\": 0.09768407687649976, \"fit_validation_mape\": 0.10855872739768961}]}"
+  },
+  {
+   "organisation": "U",
+   "method": "B_deployed_boundary",
+   "model_identity": "sum C_i + deployed fixed+byte rule",
+   "predicted_ms_per_record": 82.65731099125296,
+   "measured_ms_per_record": 120.37731378610867,
+   "abs_error_ms": -37.720002794855716,
+   "rel_error": -0.3133481019677691,
+   "measured_repeat_stdev_ms": 4.8540953871131265,
+   "error_over_repeat_stdev": -7.770758459958677,
+   "measured_instrument_on_ms": 150.01896193037587,
+   "instrument_effect_pct": 24.623948825553363,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 2632215.16875, \"total_bytes_per_batch\": 13162330.125, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 29.86405881253286, \"fit_total_ms_per_record\": 31.194552607832986}, {\"in_bytes_per_record\": 2632215.16875, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 13388261.275, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 30.376674822548274, \"fit_total_ms_per_record\": 31.7071686178484}, {\"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 12.975409007771443, \"fit_total_ms_per_record\": 14.30590280307157}], \"deployed\": {\"fixed_ms\": 5.321975181200505, \"throughput_bytes_per_sec\": 110185375.40078317, \"r_squared\": 0.998127814730275}}"
+  },
+  {
+   "organisation": "P",
+   "method": "B_deployed_boundary",
+   "model_identity": "sum C_i + deployed rule on AB and C",
+   "predicted_ms_per_record": 33.54887644518254,
+   "measured_ms_per_record": 51.44398074092654,
+   "abs_error_ms": -17.895104295743998,
+   "rel_error": -0.3478561347315693,
+   "measured_repeat_stdev_ms": 3.456859314665094,
+   "error_over_repeat_stdev": -5.1766944115507645,
+   "measured_instrument_on_ms": 74.42740733289004,
+   "instrument_effect_pct": 44.67660989865605,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.15, \"total_bytes_per_batch\": 5492870.050000001, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 12.46279288431085, \"fit_total_ms_per_record\": 13.793286679610977}, {\"in_bytes_per_record\": 714850.15, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5718801.25, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 12.975409007771443, \"fit_total_ms_per_record\": 14.30590280307157}], \"deployed\": {\"fixed_ms\": 5.321975181200505, \"throughput_bytes_per_sec\": 110185375.40078317, \"r_squared\": 0.998127814730275}}"
+  },
+  {
+   "organisation": "F",
+   "method": "B_deployed_boundary",
+   "model_identity": "sum C_i + deployed rule on ABC",
+   "predicted_ms_per_record": 19.242973755556157,
+   "measured_ms_per_record": 27.797247094955917,
+   "abs_error_ms": -8.55427333939976,
+   "rel_error": -0.307738147960415,
+   "measured_repeat_stdev_ms": 1.7935613358645703,
+   "error_over_repeat_stdev": -4.769434514641925,
+   "measured_instrument_on_ms": 39.10837523678007,
+   "instrument_effect_pct": 40.691540796054824,
+   "terms": "{\"compute\": {\"to_float\": 0.80702233125, \"crop\": 4.2303317625, \"flip\": 0.41233286874999997}, \"boundaries\": [{\"in_bytes_per_record\": 658367.3625, \"out_bytes_per_record\": 714850.1625, \"total_bytes_per_batch\": 5492870.1, \"fixed_ms_per_record\": 1.3304937953001263, \"bytes_ms_per_record\": 12.46279299775603, \"fit_total_ms_per_record\": 13.793286793056156}], \"deployed\": {\"fixed_ms\": 5.321975181200505, \"throughput_bytes_per_sec\": 110185375.40078317, \"r_squared\": 0.998127814730275}}"
+  }
+ ],
+ "prediction_identity": "{\n \"inputs\": {\n  \"baseline_stage_profile\": {\n   \"path\": \"outputs/fusion_cost_split_20260927/baseline_stage_profile.csv\",\n   \"sha256\": \"b461979eb9917a4b681fbf164e9bbe0108f599bc26014cb9dc834b8089c96aff\"\n  },\n  \"boundary_profile\": {\n   \"path\": \"outputs/fusion_cost_split_20260927/boundary_profile.csv\",\n   \"sha256\": \"fbf26ace7b6406b9e3a4a73fd645941d329789161165d9b1dcfd2c436cd7897c\"\n  },\n  \"deployed_profile\": {\n   \"path\": \"outputs/affine_repr_profile_20260924/simclrv2/shared.yaml\",\n   \"sha256\": \"e60f96a9a22023cde978fa4d4d8f7d5800f1dd36c70c2c8c3d61d0e0b1889aaa\"\n  }\n },\n \"baseline\": {\n  \"to_float\": {\n   \"T_ms_per_record\": 42.43370923213661,\n   \"C_ms_per_record\": 0.80702233125,\n   \"H_ms_per_record\": 41.62668690088661,\n   \"in_bytes_per_record\": 658367.3625,\n   \"out_bytes_per_record\": 2632215.16875\n  },\n  \"crop\": {\n   \"T_ms_per_record\": 45.128491055220366,\n   \"C_ms_per_record\": 4.2303317625,\n   \"H_ms_per_record\": 40.898159292720365,\n   \"in_bytes_per_record\": 2632215.16875,\n   \"out_bytes_per_record\": 714850.15\n  },\n  \"flip\": {\n   \"T_ms_per_record\": 22.059368679765612,\n   \"C_ms_per_record\": 0.41233286874999997,\n   \"H_ms_per_record\": 21.647035811015613,\n   \"in_bytes_per_record\": 714850.15,\n   \"out_bytes_per_record\": 714850.1625\n  },\n  \"_whole_block_U_ms_per_record\": {\n   \"value\": 116.42093623231631\n  }\n },\n \"byte_volumes\": {\n  \"in_bytes\": {\n   \"to_float\": 658367.3625,\n   \"crop\": 2632215.16875,\n   \"flip\": 714850.15\n  },\n  \"out_bytes\": {\n   \"to_float\": 2632215.16875,\n   \"crop\": 714850.15,\n   \"flip\": 714850.1625\n  },\n  \"io_base_per_record\": 8067348.1625,\n  \"io_ab_fused\": 1373217.5125000002,\n  \"io_abc_fused\": 1373217.525,\n  \"rho_AB\": 0.20688315251614323,\n  \"rho_ABC\": 0.17021919685866788\n },\n \"frozen_predictions\": [\n  {\n   \"organisation\": \"U\",\n   \"method\": \"A_overall_discount\",\n   \"model_identity\": \"Cedar rho applied to baseline T_i\",\n   \"predicted_ms_per_record\": 109.62156896712258,\n   \"terms\": \"{\\\"T\\\": {\\\"to_float\\\": 42.43370923213661, \\\"crop\\\": 45.128491055220366, \\\"flip\\\": 22.059368679765612}, \\\"note\\\": \\\"U is the measured baseline itself\\\"}\"\n  },\n  {\n   \"organisation\": \"P\",\n   \"method\": \"A_overall_discount\",\n   \"model_identity\": \"rho_AB on (T_A+T_B) + T_C\",\n   \"predicted_ms_per_record\": 40.174512716463965,\n   \"terms\": \"{\\\"rho_AB\\\": 0.20688315251614323, \\\"io_ab_fused\\\": 1373217.5125000002, \\\"io_ab_base\\\": 6637647.85, \\\"T\\\": {\\\"to_float\\\": 42.43370923213661, \\\"crop\\\": 45.128491055220366, \\\"flip\\\": 22.059368679765612}}\"\n  },\n  {\n   \"organisation\": \"F\",\n   \"method\": \"A_overall_discount\",\n   \"model_identity\": \"rho_ABC on sum(T_i)\",\n   \"predicted_ms_per_record\": 18.659695427970675,\n   \"terms\": \"{\\\"rho_ABC\\\": 0.17021919685866788, \\\"io_abc_fused\\\": 1373217.525, \\\"io_base\\\": 8067348.1625, \\\"T\\\": {\\\"to_float\\\": 42.43370923213661, \\\"crop\\\": 45.128491055220366, \\\"flip\\\": 22.059368679765612}}\"\n  },\n  {\n   \"organisation\": \"P\",\n   \"method\": \"A_reference_whole_block\",\n   \"model_identity\": \"measured U x IO_P/IO_U (reference)\",\n   \"predicted_ms_per_record\": 38.08689590101905,\n   \"terms\": \"{\\\"note\\\": \\\"kept only as the naive whole-block variant of the discount\\\"}\"\n  },\n  {\n   \"organisation\": \"U\",\n   \"method\": \"B_compute_boundary\",\n   \"model_identity\": \"sum C_i + measured probe mean of 3 boundaries\",\n   \"predicted_ms_per_record\": 126.44878088862365,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"U_A_mapper\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 2632215.16875, \\\"total_bytes_per_batch\\\": 13162330.125, \\\"measured_mean_ms_per_record\\\": 47.677817963024914, \\\"fixed_ms_per_batch\\\": 152.35480249568414, \\\"bytes_ms_per_batch\\\": 37.30030936533985, \\\"fixed_ms_per_record\\\": 38.088700623921035, \\\"bytes_ms_per_record\\\": 9.325077341334962, \\\"fit_total_ms_per_record\\\": 47.413777965255996, \\\"fit_mape\\\": 0.0723256629693926, \\\"fit_validation_mape\\\": 0.06292736431107208}, {\\\"probe\\\": \\\"U_B_mapper\\\", \\\"in_bytes_per_record\\\": 2632215.16875, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 13388261.275, \\\"measured_mean_ms_per_record\\\": 50.09622982276293, \\\"fixed_ms_per_batch\\\": 29.01994231735922, \\\"bytes_ms_per_batch\\\": 172.924631577618, \\\"fixed_ms_per_record\\\": 7.254985579339805, \\\"bytes_ms_per_record\\\": 43.2311578944045, \\\"fit_total_ms_per_record\\\": 50.4861434737443, \\\"fit_mape\\\": 0.13777705210251984, \\\"fit_validation_mape\\\": 0.13656045116177382}, {\\\"probe\\\": \\\"U_C_mapper\\\", \\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"measured_mean_ms_per_record\\\": 23.22504614033581, \\\"fixed_ms_per_batch\\\": 0.0, \\\"bytes_ms_per_batch\\\": 92.46319716955989, \\\"fixed_ms_per_record\\\": 0.0, \\\"bytes_ms_per_record\\\": 23.115799292389973, \\\"fit_total_ms_per_record\\\": 23.115799292389973, \\\"fit_mape\\\": 0.09687829242711876, \\\"fit_validation_mape\\\": 0.09594741308446623}], \\\"boundary_term\\\": \\\"measured probe mean (no fitted split)\\\"}\"\n  },\n  {\n   \"organisation\": \"U\",\n   \"method\": \"B_compute_boundary_fit\",\n   \"model_identity\": \"sum C_i + fitted fixed+byte rule\",\n   \"predicted_ms_per_record\": 126.46540769389027,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"U_A_mapper\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 2632215.16875, \\\"total_bytes_per_batch\\\": 13162330.125, \\\"measured_mean_ms_per_record\\\": 47.677817963024914, \\\"fixed_ms_per_batch\\\": 152.35480249568414, \\\"bytes_ms_per_batch\\\": 37.30030936533985, \\\"fixed_ms_per_record\\\": 38.088700623921035, \\\"bytes_ms_per_record\\\": 9.325077341334962, \\\"fit_total_ms_per_record\\\": 47.413777965255996, \\\"fit_mape\\\": 0.0723256629693926, \\\"fit_validation_mape\\\": 0.06292736431107208}, {\\\"probe\\\": \\\"U_B_mapper\\\", \\\"in_bytes_per_record\\\": 2632215.16875, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 13388261.275, \\\"measured_mean_ms_per_record\\\": 50.09622982276293, \\\"fixed_ms_per_batch\\\": 29.01994231735922, \\\"bytes_ms_per_batch\\\": 172.924631577618, \\\"fixed_ms_per_record\\\": 7.254985579339805, \\\"bytes_ms_per_record\\\": 43.2311578944045, \\\"fit_total_ms_per_record\\\": 50.4861434737443, \\\"fit_mape\\\": 0.13777705210251984, \\\"fit_validation_mape\\\": 0.13656045116177382}, {\\\"probe\\\": \\\"U_C_mapper\\\", \\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"measured_mean_ms_per_record\\\": 23.22504614033581, \\\"fixed_ms_per_batch\\\": 0.0, \\\"bytes_ms_per_batch\\\": 92.46319716955989, \\\"fixed_ms_per_record\\\": 0.0, \\\"bytes_ms_per_record\\\": 23.115799292389973, \\\"fit_total_ms_per_record\\\": 23.115799292389973, \\\"fit_mape\\\": 0.09687829242711876, \\\"fit_validation_mape\\\": 0.09594741308446623}]}\"\n  },\n  {\n   \"organisation\": \"P\",\n   \"method\": \"B_compute_boundary\",\n   \"model_identity\": \"sum C_i + measured probe mean (AB fused + C)\",\n   \"predicted_ms_per_record\": 51.373899318248746,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"P_AB_fused\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 5492870.050000001, \\\"measured_mean_ms_per_record\\\": 22.69916621541294, \\\"fixed_ms_per_batch\\\": 7.642537210848466, \\\"bytes_ms_per_batch\\\": 87.00634961158393, \\\"fixed_ms_per_record\\\": 1.9106343027121164, \\\"bytes_ms_per_record\\\": 21.751587402895982, \\\"fit_total_ms_per_record\\\": 23.662221705608097, \\\"fit_mape\\\": 0.10672519175913137, \\\"fit_validation_mape\\\": 0.10984921500900933}, {\\\"probe\\\": \\\"U_C_mapper\\\", \\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"measured_mean_ms_per_record\\\": 23.22504614033581, \\\"fixed_ms_per_batch\\\": 0.0, \\\"bytes_ms_per_batch\\\": 92.46319716955989, \\\"fixed_ms_per_record\\\": 0.0, \\\"bytes_ms_per_record\\\": 23.115799292389973, \\\"fit_total_ms_per_record\\\": 23.115799292389973, \\\"fit_mape\\\": 0.09687829242711876, \\\"fit_validation_mape\\\": 0.09594741308446623}], \\\"boundary_term\\\": \\\"measured probe mean (no fitted split)\\\"}\"\n  },\n  {\n   \"organisation\": \"P\",\n   \"method\": \"B_compute_boundary_fit\",\n   \"model_identity\": \"sum C_i + fitted fixed+byte rule\",\n   \"predicted_ms_per_record\": 52.227707960498066,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"P_AB_fused\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 5492870.050000001, \\\"measured_mean_ms_per_record\\\": 22.69916621541294, \\\"fixed_ms_per_batch\\\": 7.642537210848466, \\\"bytes_ms_per_batch\\\": 87.00634961158393, \\\"fixed_ms_per_record\\\": 1.9106343027121164, \\\"bytes_ms_per_record\\\": 21.751587402895982, \\\"fit_total_ms_per_record\\\": 23.662221705608097, \\\"fit_mape\\\": 0.10672519175913137, \\\"fit_validation_mape\\\": 0.10984921500900933}, {\\\"probe\\\": \\\"U_C_mapper\\\", \\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"measured_mean_ms_per_record\\\": 23.22504614033581, \\\"fixed_ms_per_batch\\\": 0.0, \\\"bytes_ms_per_batch\\\": 92.46319716955989, \\\"fixed_ms_per_record\\\": 0.0, \\\"bytes_ms_per_record\\\": 23.115799292389973, \\\"fit_total_ms_per_record\\\": 23.115799292389973, \\\"fit_mape\\\": 0.09687829242711876, \\\"fit_validation_mape\\\": 0.09594741308446623}]}\"\n  },\n  {\n   \"organisation\": \"F\",\n   \"method\": \"B_compute_boundary\",\n   \"model_identity\": \"sum C_i + measured probe mean (ABC fused)\",\n   \"predicted_ms_per_record\": 28.098611140322966,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"F_ABC_fused\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5492870.1, \\\"measured_mean_ms_per_record\\\": 22.648924177822966, \\\"fixed_ms_per_batch\\\": 14.987735988795539, \\\"bytes_ms_per_batch\\\": 77.6836440405985, \\\"fixed_ms_per_record\\\": 3.7469339971988846, \\\"bytes_ms_per_record\\\": 19.420911010149624, \\\"fit_total_ms_per_record\\\": 23.167845007348507, \\\"fit_mape\\\": 0.09768407687649976, \\\"fit_validation_mape\\\": 0.10855872739768961}], \\\"boundary_term\\\": \\\"measured probe mean (no fitted split)\\\"}\"\n  },\n  {\n   \"organisation\": \"F\",\n   \"method\": \"B_compute_boundary_fit\",\n   \"model_identity\": \"sum C_i + fitted fixed+byte rule\",\n   \"predicted_ms_per_record\": 28.617531969848507,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"probe\\\": \\\"F_ABC_fused\\\", \\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5492870.1, \\\"measured_mean_ms_per_record\\\": 22.648924177822966, \\\"fixed_ms_per_batch\\\": 14.987735988795539, \\\"bytes_ms_per_batch\\\": 77.6836440405985, \\\"fixed_ms_per_record\\\": 3.7469339971988846, \\\"bytes_ms_per_record\\\": 19.420911010149624, \\\"fit_total_ms_per_record\\\": 23.167845007348507, \\\"fit_mape\\\": 0.09768407687649976, \\\"fit_validation_mape\\\": 0.10855872739768961}]}\"\n  },\n  {\n   \"organisation\": \"U\",\n   \"method\": \"B_deployed_boundary\",\n   \"model_identity\": \"sum C_i + deployed fixed+byte rule\",\n   \"predicted_ms_per_record\": 82.65731099125296,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 2632215.16875, \\\"total_bytes_per_batch\\\": 13162330.125, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 29.86405881253286, \\\"fit_total_ms_per_record\\\": 31.194552607832986}, {\\\"in_bytes_per_record\\\": 2632215.16875, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 13388261.275, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 30.376674822548274, \\\"fit_total_ms_per_record\\\": 31.7071686178484}, {\\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 12.975409007771443, \\\"fit_total_ms_per_record\\\": 14.30590280307157}], \\\"deployed\\\": {\\\"fixed_ms\\\": 5.321975181200505, \\\"throughput_bytes_per_sec\\\": 110185375.40078317, \\\"r_squared\\\": 0.998127814730275}}\"\n  },\n  {\n   \"organisation\": \"P\",\n   \"method\": \"B_deployed_boundary\",\n   \"model_identity\": \"sum C_i + deployed rule on AB and C\",\n   \"predicted_ms_per_record\": 33.54887644518254,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.15, \\\"total_bytes_per_batch\\\": 5492870.050000001, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 12.46279288431085, \\\"fit_total_ms_per_record\\\": 13.793286679610977}, {\\\"in_bytes_per_record\\\": 714850.15, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5718801.25, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 12.975409007771443, \\\"fit_total_ms_per_record\\\": 14.30590280307157}], \\\"deployed\\\": {\\\"fixed_ms\\\": 5.321975181200505, \\\"throughput_bytes_per_sec\\\": 110185375.40078317, \\\"r_squared\\\": 0.998127814730275}}\"\n  },\n  {\n   \"organisation\": \"F\",\n   \"method\": \"B_deployed_boundary\",\n   \"model_identity\": \"sum C_i + deployed rule on ABC\",\n   \"predicted_ms_per_record\": 19.242973755556157,\n   \"terms\": \"{\\\"compute\\\": {\\\"to_float\\\": 0.80702233125, \\\"crop\\\": 4.2303317625, \\\"flip\\\": 0.41233286874999997}, \\\"boundaries\\\": [{\\\"in_bytes_per_record\\\": 658367.3625, \\\"out_bytes_per_record\\\": 714850.1625, \\\"total_bytes_per_batch\\\": 5492870.1, \\\"fixed_ms_per_record\\\": 1.3304937953001263, \\\"bytes_ms_per_record\\\": 12.46279299775603, \\\"fit_total_ms_per_record\\\": 13.793286793056156}], \\\"deployed\\\": {\\\"fixed_ms\\\": 5.321975181200505, \\\"throughput_bytes_per_sec\\\": 110185375.40078317, \\\"r_squared\\\": 0.998127814730275}}\"\n  }\n ],\n \"not_used\": \"measurements.csv (validation) is not read in this phase\"\n}",
+ "baseline_stages": {
+  "to_float": {
+   "T_ms_per_record": 42.43370923213661,
+   "C_ms_per_record": 0.80702233125,
+   "H_ms_per_record": 41.62668690088661,
+   "in_bytes_per_record": 658367.3625,
+   "out_bytes_per_record": 2632215.16875
+  },
+  "crop": {
+   "T_ms_per_record": 45.128491055220366,
+   "C_ms_per_record": 4.2303317625,
+   "H_ms_per_record": 40.898159292720365,
+   "in_bytes_per_record": 2632215.16875,
+   "out_bytes_per_record": 714850.15
+  },
+  "flip": {
+   "T_ms_per_record": 22.059368679765612,
+   "C_ms_per_record": 0.41233286874999997,
+   "H_ms_per_record": 21.647035811015613,
+   "in_bytes_per_record": 714850.15,
+   "out_bytes_per_record": 714850.1625
+  },
+  "_whole_block_U_ms_per_record": {
+   "value": 116.42093623231631
+  }
+ },
+ "byte_volumes": {
+  "in_bytes": {
+   "to_float": 658367.3625,
+   "crop": 2632215.16875,
+   "flip": 714850.15
+  },
+  "out_bytes": {
+   "to_float": 2632215.16875,
+   "crop": 714850.15,
+   "flip": 714850.1625
+  },
+  "io_base_per_record": 8067348.1625,
+  "io_ab_fused": 1373217.5125000002,
+  "io_abc_fused": 1373217.525,
+  "rho_AB": 0.20688315251614323,
+  "rho_ABC": 0.17021919685866788
+ },
+ "boundary_fits": {
+  "F_ABC_fused": {
+   "slope_ms_per_byte": 1.4142632654028811e-05,
+   "throughput_bytes_per_sec": 70708193.0545039,
+   "fixed_ms": 14.987735988795539,
+   "r2": 0.7671712952200835,
+   "mae_ms": 8.774615683478393,
+   "mape": 0.09768407687649976,
+   "rows": 60,
+   "validation_mae_ms": 9.742547631125872,
+   "validation_mape": 0.10855872739768961,
+   "validation_rows": 60
+  },
+  "P_AB_fused": {
+   "slope_ms_per_byte": 1.5839870380983055e-05,
+   "throughput_bytes_per_sec": 63131829.7402594,
+   "fixed_ms": 7.642537210848466,
+   "r2": 0.7827205034999722,
+   "mae_ms": 9.622340036467227,
+   "mape": 0.10672519175913137,
+   "rows": 60,
+   "validation_mae_ms": 10.333108124072286,
+   "validation_mape": 0.10984921500900933,
+   "validation_rows": 60
+  },
+  "U_A_mapper": {
+   "slope_ms_per_byte": 2.8338682445362118e-06,
+   "throughput_bytes_per_sec": 352874556.5105336,
+   "fixed_ms": 152.35480249568414,
+   "r2": 0.6263259525940506,
+   "mae_ms": 12.813821730850641,
+   "mape": 0.0723256629693926,
+   "rows": 60,
+   "validation_mae_ms": 11.906012982230356,
+   "validation_mape": 0.06292736431107208,
+   "validation_rows": 60
+  },
+  "U_B_mapper": {
+   "slope_ms_per_byte": 1.2916138102303205e-05,
+   "throughput_bytes_per_sec": 77422523.05444768,
+   "fixed_ms": 29.01994231735922,
+   "r2": 0.8091316642638902,
+   "mae_ms": 25.576290810757943,
+   "mape": 0.13777705210251984,
+   "rows": 60,
+   "validation_mae_ms": 27.94725986262014,
+   "validation_mape": 0.13656045116177382,
+   "validation_rows": 60
+  },
+  "U_C_mapper": {
+   "slope_ms_per_byte": 1.6168283024271894e-05,
+   "throughput_bytes_per_sec": 61849486.33684825,
+   "fixed_ms": 0.0,
+   "r2": 0.0,
+   "mae_ms": 9.17660896355908,
+   "mape": 0.09687829242711876,
+   "rows": 60,
+   "validation_mae_ms": 9.251371095888324,
+   "validation_mape": 0.09594741308446623,
+   "validation_rows": 60
+  }
+ },
+ "member_compute": [
+  {
+   "organisation": "U",
+   "repeat": "0",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.41408756249999995"
+  },
+  {
+   "organisation": "U",
+   "repeat": "0",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.846195375000001"
+  },
+  {
+   "organisation": "U",
+   "repeat": "0",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.2968538250000001"
+  },
+  {
+   "organisation": "P",
+   "repeat": "0",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.7182878750000001"
+  },
+  {
+   "organisation": "P",
+   "repeat": "0",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.805365212500002"
+  },
+  {
+   "organisation": "P",
+   "repeat": "0",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.29077584999999995"
+  },
+  {
+   "organisation": "F",
+   "repeat": "0",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.6447754874999999"
+  },
+  {
+   "organisation": "F",
+   "repeat": "0",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.833950462500001"
+  },
+  {
+   "organisation": "F",
+   "repeat": "0",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.2755845625000001"
+  },
+  {
+   "organisation": "F",
+   "repeat": "1",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.3789916874999999"
+  },
+  {
+   "organisation": "F",
+   "repeat": "1",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.577169950000001"
+  },
+  {
+   "organisation": "F",
+   "repeat": "1",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.264705325"
+  },
+  {
+   "organisation": "P",
+   "repeat": "1",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.5075863249999999"
+  },
+  {
+   "organisation": "P",
+   "repeat": "1",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.703584637500001"
+  },
+  {
+   "organisation": "P",
+   "repeat": "1",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.28842029999999996"
+  },
+  {
+   "organisation": "U",
+   "repeat": "1",
+   "operator": "to_float",
+   "batches": "20",
+   "ms_per_record": "0.41113127499999996"
+  },
+  {
+   "organisation": "U",
+   "repeat": "1",
+   "operator": "crop",
+   "batches": "20",
+   "ms_per_record": "4.492215775000002"
+  },
+  {
+   "organisation": "U",
+   "repeat": "1",
+   "operator": "flip",
+   "batches": "20",
+   "ms_per_record": "0.28717422500000006"
+  }
+ ],
+ "instrumentation_check": [
+  {
+   "organisation": "F",
+   "instrument_off_ms": "27.797247094955917",
+   "instrument_on_ms": "39.10837523678007",
+   "instrument_effect_pct": "40.691540796054824"
+  },
+  {
+   "organisation": "P",
+   "instrument_off_ms": "51.44398074092654",
+   "instrument_on_ms": "74.42740733289004",
+   "instrument_effect_pct": "44.67660989865605"
+  },
+  {
+   "organisation": "U",
+   "instrument_off_ms": "120.37731378610867",
+   "instrument_on_ms": "150.01896193037587",
+   "instrument_effect_pct": "24.623948825553363"
+  }
+ ]
+}

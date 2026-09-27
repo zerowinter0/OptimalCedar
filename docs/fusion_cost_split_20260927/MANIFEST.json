@@ -1,0 +1,105 @@
+{
+ "result_dir": "outputs/fusion_cost_split_20260927",
+ "small_files": {
+  "README.md": {
+   "sha256": "eba2bfb1b06c960b2a7244ac6fd1e58f6c06fb0f5af9d330073581d35323e2ef",
+   "bytes": 6094,
+   "rows": 84
+  },
+  "baseline_stage_profile.csv": {
+   "sha256": "b461979eb9917a4b681fbf164e9bbe0108f599bc26014cb9dc834b8089c96aff",
+   "bytes": 20825,
+   "rows": 120
+  },
+  "boundary_profile.csv": {
+   "sha256": "fbf26ace7b6406b9e3a4a73fd645941d329789161165d9b1dcfd2c436cd7897c",
+   "bytes": 54554,
+   "rows": 600
+  },
+  "boundary_params.json": {
+   "sha256": "515d930167407ea270cf41d768551001ce2485585e636f0f474f4769ce139ece",
+   "bytes": 2061,
+   "rows": 65
+  },
+  "predictions.csv": {
+   "sha256": "2474831b3150126fc332b08ab74b8563b156de0777ce1e0158819a26c0b3eb05",
+   "bytes": 10826,
+   "rows": 13
+  },
+  "frozen_predictions.json": {
+   "sha256": "c2c34ce0c5c8e96eb69425fd6f24c61b290cd87fd9c5e5d68a7a5be6bc3dc114",
+   "bytes": 14031,
+   "rows": 152
+  },
+  "measurements.csv": {
+   "sha256": "faaceb6b5147a5bf175040f45f1ed0c95006f4786ea24471bbf5de157b381c3b",
+   "bytes": 145311,
+   "rows": 720
+  },
+  "summary.csv": {
+   "sha256": "a9b5853e04d87ec7a4924165ad68fc3d6aca5bfe14abc6aba2b353bbf40d595e",
+   "bytes": 1125,
+   "rows": 6
+  },
+  "instrumentation_check.csv": {
+   "sha256": "1a2e5c1f425d24ba4a622f6cfe34df09ab2b9a7b02d82003fe171ad6a35cc95d",
+   "bytes": 247,
+   "rows": 3
+  },
+  "member_compute.csv": {
+   "sha256": "9bb8c5db30e34fdf8d9c34f5aa9bda09a5d0c70a5649677bf4a95fc7e8063c18",
+   "bytes": 644,
+   "rows": 18
+  },
+  "comparison.csv": {
+   "sha256": "c86d018f5f79e4ca356d4cc60fdcb91ac644869599b21cdcce6cf6ad6a8d5f4d",
+   "bytes": 12702,
+   "rows": 13
+  },
+  "figure_data.json": {
+   "sha256": "4f8faf8a6f62614b503339841578706c58725b507092d956bc2f26cd787fda2c",
+   "bytes": 38507,
+   "rows": 454
+  }
+ },
+ "large_files": {
+  "boundary_probe.log": {
+   "sha256": "e8fe4d4d11224d821f4f2f946776e8dd81f3b41da8bcf870a8191a227ddbeeb5",
+   "bytes": 15
+  },
+  "validate.log": {
+   "sha256": "5213814865237955f5d3ddb7e96aaf41bf6688a653b54f41f953aac871a7ee6a",
+   "bytes": 14976
+  },
+  "stage_profile40.log": {
+   "sha256": "f0d11b7da00c73ffa74e77ffa836d869b5245459bf92cdb96f7aa214594da1b7",
+   "bytes": 6628
+  },
+  "boundary_probe40.log": {
+   "sha256": "e8fe4d4d11224d821f4f2f946776e8dd81f3b41da8bcf870a8191a227ddbeeb5",
+   "bytes": 15
+  },
+  "baseline_stage_profile_120batches.csv": {
+   "sha256": "83d8eaa6dc39556ece0d634e884a47135edd144222bb3105efe7c2d94f27335f",
+   "bytes": 62619
+  },
+  "payload_samples_120batches.pt": {
+   "sha256": "47102ef0637212c3a93e737f56639896d59fb38d02e124c5a9505cc0e5da1d93",
+   "bytes": 893224657
+  },
+  "payload_samples.pt": {
+   "sha256": "d4e7ba23215fa72767f95562d055542e15afb29a3d83ce2c02cffc92fc792853",
+   "bytes": 755159633
+  }
+ },
+ "provenance": {
+  "fusion_cost_split_harness.py": {
+   "path": "scripts/fusion_cost_split_harness.py",
+   "sha256": "937e57f6d5411c12d0cffb2b605d02db3345a3a36f54a7eb72b915c47755c8d9"
+  },
+  "fusion_cost_split_analysis.py": {
+   "path": "tmp_analysis/fusion_cost_split_analysis.py",
+   "sha256": "4ad5bfdc07b74311844f253d317d24ac0133507b67f5e444cf4b809e92b568a5"
+  }
+ }
+}
