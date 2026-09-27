@@ -15,9 +15,10 @@
    "tolerance_round3_ms": 1.3570979387028113,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   },
   {
@@ -34,9 +35,10 @@
    "tolerance_round3_ms": 45.20478425261607,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   },
   {
@@ -53,9 +55,10 @@
    "tolerance_round3_ms": 0.08765678146543603,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   },
   {
@@ -72,9 +75,10 @@
    "tolerance_round3_ms": 0.03413088022110363,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   },
   {
@@ -129,9 +133,10 @@
    "tolerance_round3_ms": 0.36795330614630073,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   },
   {
@@ -148,9 +153,10 @@
    "tolerance_round3_ms": 0.07995593664236367,
    "round2_passed": true,
    "round3_passed": true,
-   "decision": "both batches consistent",
+   "decision": "round2 and recheck both kept",
    "batches_used_for_this_cell": [
-    "round2_20260927"
+    "round2_20260927",
+    "round3_20260927"
    ]
   }
  ],
@@ -165,5 +171,5 @@
    "batch": "round2_20260927"
   }
  ],
- "merged_rows": 804
+ "merged_rows": 822
 }

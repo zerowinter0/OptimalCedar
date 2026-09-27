@@ -586,31 +586,37 @@ def cmd_merge(args) -> int:
 
         round2_ok, tol2 = passes(new, old)
         round3_ok, tol3 = passes(third, old) if third else (None, None)
-        if round2_ok and (round3_ok in (None, True)):
-            decision, used = "both batches consistent", ["round2_20260927"]
+        used = []
+        if round2_ok:
+            used.append("round2_20260927")
+        if round3 is None:
+            decision = (
+                "round2 kept (no recheck)" if round2_ok
+                else "round2 failed, no recheck available"
+            )
+        elif round2_ok and round3_ok:
+            used.append("round3_20260927")
+            decision = "round2 and recheck both kept"
+        elif round2_ok and not round3_ok:
+            decision = "recheck dropped (round2 agrees with round1)"
         elif round3_ok and not round2_ok:
-            decision, used = "round2 dropped (recheck agrees with round1)", ["round3_20260927"]
-            excluded.append({"cell_id": cell_id, "batch": "round2_20260927"})
-        elif round2_ok and round3_ok is False:
-            decision, used = "recheck dropped (round2 agrees with round1)", ["round2_20260927"]
-            excluded.append({"cell_id": cell_id, "batch": "round3_20260927"})
-        elif third is not None:
+            used.append("round3_20260927")
+            decision = "round2 dropped (recheck agrees with round1)"
+        else:
             same_day_ok, _ = passes(third, new)
             if same_day_ok:
-                decision = "round1 level is the outlier; round2+recheck used"
                 used = ["round2_20260927", "round3_20260927"]
+                decision = "round1 level is the outlier; round2+recheck kept"
             else:
-                decision = "unresolved: only round1 kept, new batches excluded"
                 used = []
-                excluded.extend(
-                    [
-                        {"cell_id": cell_id, "batch": "round2_20260927"},
-                        {"cell_id": cell_id, "batch": "round3_20260927"},
-                    ]
-                )
-        else:
-            decision, used = "round2 failed, no recheck available", []
-            excluded.append({"cell_id": cell_id, "batch": "round2_20260927"})
+                decision = "unresolved: only round1 kept, new batches excluded"
+        available = {
+            "round2_20260927": True,
+            "round3_20260927": third is not None,
+        }
+        for batch in ("round2_20260927", "round3_20260927"):
+            if available[batch] and batch not in used:
+                excluded.append({"cell_id": cell_id, "batch": batch})
         checks.append(
             {
                 "cell_id": cell_id,
