@@ -3692,7 +3692,7 @@ class DataSet:
                         values_by_pipe[p_id]["input_pipe_id"]
                     )
                 }
-                candidates = [
+                pair_candidates = [
                     p_id
                     for p_id in ordered
                     if median_request.get(p_id, 0) >= 4096
@@ -3713,8 +3713,8 @@ class DataSet:
                     os.environ.get("CEDAR_PROFILE_HANDOFF_BATCHES", "10")
                 )
                 pairs: List[Tuple[int, int]] = []
-                for index, first_id in enumerate(candidates):
-                    for last_id in candidates[index:]:
+                for index, first_id in enumerate(pair_candidates):
+                    for last_id in pair_candidates[index:]:
                         if ordered.index(last_id) - ordered.index(first_id) > max_span:
                             continue
                         pairs.append((first_id, last_id))
