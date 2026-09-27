@@ -42,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from cedar.compose.my_optimizer import stage_handoff_ms  # noqa: E402
+from cedar.compose.my_optimizer import MyOptimizer, stage_handoff_ms  # noqa: E402
 from fusion_cost_split_harness import (  # noqa: E402
     BLOCK,
     ORGANISATIONS,
@@ -61,6 +61,28 @@ GROUP_OF_STAGE = {"U": [(name,) for name in OP_ORDER],
                   "F": [tuple(OP_ORDER)]}
 
 
+def _serialized_bytes(physical: Dict[str, Any], p_id: int) -> Tuple[float, float]:
+    entry = _profile_handoff_entry(physical, p_id)
+    return (
+        float(entry["input_serialized_bytes_per_sample"]),
+        float(entry["output_serialized_bytes_per_sample"]),
+    )
+
+
+def _deployed_submit_batches(physical: Dict[str, Any], organisation: str) -> List[int]:
+    """Per-stage submit batch the deployed plan materialisation would use."""
+    sizes = []
+    for group in GROUP_OF_STAGE[organisation]:
+        first = PIPE_IDS[group[0]]
+        last = PIPE_IDS[group[-1]]
+        in_bytes, _ = _serialized_bytes(physical, first)
+        _, out_bytes = _serialized_bytes(physical, last)
+        sizes.append(
+            int(MyOptimizer._dp_ray_submit_batch_size(in_bytes, out_bytes))
+        )
+    return sizes
+
+
 # ------------------------------------------------------------ stage profile --
 
 
@@ -72,9 +94,12 @@ def cmd_stage_profile(args) -> int:
         torch.load(Path(args.inputs) / "inputs" / "block_inputs.pt")["records"]
     )
     callables = dict(_block_callables(args.batch_size))
+    physical = yaml.safe_load(Path(args.profile).read_text())["physical_model"]
+    submit_batches = _deployed_submit_batches(physical, "U")
     runner = StageRunner(
         "U", callables, args.batch_size, options, actor_classes,
         args.remote_cpu, args.same_remote_cpu,
+        submit_batch_by_stage=submit_batches,
     )
     rows: List[Dict[str, Any]] = []
     try:
@@ -244,6 +269,9 @@ def cmd_predict(args) -> int:
                     ),
                     "handoff_ms_per_record": result["local_ms"]
                     + result["parallel_ms"],
+                    "deployed_submit_batch_size": (
+                        result["terms"].get("submit_batch_size")
+                    ),
                 }
             )
         handoff_term = sum(item["ms_per_record"] for item in handoffs)
@@ -326,6 +354,7 @@ def cmd_validate(args) -> int:
         torch.load(Path(args.inputs) / "inputs" / "block_inputs.pt")["records"]
     )
     callables = dict(_block_callables(args.batch_size))
+    physical = yaml.safe_load(Path(args.profile).read_text())["physical_model"]
     runners: Dict[str, StageRunner] = {}
     rows: List[Dict[str, Any]] = []
     try:
@@ -333,6 +362,7 @@ def cmd_validate(args) -> int:
             runners[organisation] = StageRunner(
                 organisation, callables, args.batch_size, options, actor_classes,
                 args.remote_cpu, args.same_remote_cpu,
+                submit_batch_by_stage=_deployed_submit_batches(physical, organisation),
             )
         for instrument in ("off", "on"):
             for runner in runners.values():
@@ -545,6 +575,10 @@ def _write_readme(run_dir, comparison, summary, frozen, check) -> None:
         "实验不复制任何边界公式；`implementation_parity.csv` 记录每个块的调用参数与返回的模型名。",
         "",
         f"本轮冻结 profile 的 handoff 模型：`{frozen['profile_handoff_model']}`。",
+        "",
+        "实验 harness 现在按部署规则提交：每个 stage 的 `submit_batch_size` 取自",
+        "`MyOptimizer._dp_ray_submit_batch_size(输入字节, 输出字节)`（本块三段均为 1），",
+        "与 profiler 的配对探针、以及计划物化时设置的批大小一致。",
         "",
         "边界模型的实现（相对上一版的变化）：",
         "",
@@ -770,6 +804,7 @@ def main() -> int:
 
     stage = sub.add_parser("stage-profile")
     common(stage)
+    stage.add_argument("--profile", required=True)
     stage.add_argument("--warmup", type=int, default=20)
     stage.add_argument("--batches", type=int, default=40)
     stage.set_defaults(func=cmd_stage_profile)
@@ -781,6 +816,7 @@ def main() -> int:
 
     validate = sub.add_parser("validate")
     common(validate)
+    validate.add_argument("--profile", required=True)
     validate.add_argument("--warmup", type=int, default=10)
     validate.add_argument("--batches", type=int, default=40)
     validate.add_argument("--rounds", type=int, default=5)

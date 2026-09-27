@@ -1,7 +1,7 @@
-organisation,group,first_pipe,last_pipe,model,submit_ms_per_sample,fetch_ms_per_sample,handoff_ms_per_record
-U,to_float,7,7,paired_probe_v1,,,54.96902605518699
-U,crop,6,6,paired_probe_v1,,,57.38385980948806
-U,flip,5,5,paired_probe_v1,,,30.842554941773415
-P,to_float+crop,7,6,paired_probe_v1,,,26.505168993026018
-P,flip,5,5,paired_probe_v1,,,30.842554941773415
-F,to_float+crop+flip,7,5,paired_probe_v1,,,31.849238742142916
+organisation,group,first_pipe,last_pipe,model,submit_ms_per_sample,fetch_ms_per_sample,handoff_ms_per_record,deployed_submit_batch_size
+U,to_float,7,7,paired_probe_v1,,,54.96902605518699,1
+U,crop,6,6,paired_probe_v1,,,57.38385980948806,1
+U,flip,5,5,paired_probe_v1,,,30.842554941773415,1
+P,to_float+crop,7,6,paired_probe_v1,,,26.505168993026018,1
+P,flip,5,5,paired_probe_v1,,,30.842554941773415,1
+F,to_float+crop+flip,7,5,paired_probe_v1,,,31.849238742142916,1

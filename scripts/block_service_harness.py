@@ -442,7 +442,8 @@ class _TimedRayMapperVariant:
 
     @staticmethod
     def create(op_name: str, fn: Any, batch_size: int, actor_cls, actor_options,
-               name: str, seed_args: Dict[str, Any]):
+               name: str, seed_args: Dict[str, Any],
+               submit_batch_size: Optional[int] = None):
         from cedar.pipes.map import RayMapperPipeVariant
 
         class TimedRayMapperPipeVariantImpl(RayMapperPipeVariant):
@@ -461,7 +462,7 @@ class _TimedRayMapperVariant:
             max_inflight=1,
             max_prefetch=1,
             use_threads=True,
-            submit_batch_size=batch_size,
+            submit_batch_size=int(submit_batch_size or batch_size),
         )
         return TimedRayMapperPipeVariantImpl(name, None, fn, ctx)
 
@@ -469,7 +470,8 @@ class _TimedRayMapperVariant:
 class _TimedRayFusedVariant:
     @staticmethod
     def create(ops: List[Tuple[str, Any]], batch_size: int, actor_cls,
-               actor_options, name: str, seed_args: Dict[str, Any]):
+               actor_options, name: str, seed_args: Dict[str, Any],
+               submit_batch_size: Optional[int] = None):
         from cedar.pipes.optimize.fuse import RayFusedOptimizerPipeVariant
 
         class TimedRayFusedPipeVariantImpl(RayFusedOptimizerPipeVariant):
@@ -487,7 +489,7 @@ class _TimedRayFusedVariant:
             max_inflight=1,
             max_prefetch=1,
             use_threads=True,
-            submit_batch_size=batch_size,
+            submit_batch_size=int(submit_batch_size or batch_size),
         )
         return TimedRayFusedPipeVariantImpl(
             name, None, Compose([fn for _name, fn in ops]), ctx

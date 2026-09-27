@@ -95,6 +95,7 @@ class StageRunner:
         actor_classes,
         remote_cpu_base: int,
         same_remote_cpu: bool,
+        submit_batch_by_stage: Optional[List[int]] = None,
     ) -> None:
         import ray
 
@@ -104,7 +105,13 @@ class StageRunner:
         self.variants: List[Any] = []
         self.actors: List[Any] = []
         self.stage_actors: List[List[Any]] = []
-        for group in self.stages:
+        self.submit_batch_by_stage = list(submit_batch_by_stage or [])
+        for stage_index, group in enumerate(self.stages):
+            submit_batch = (
+                self.submit_batch_by_stage[stage_index]
+                if stage_index < len(self.submit_batch_by_stage)
+                else None
+            )
             if len(group) == 1:
                 name = group[0]
                 variant = bsh._TimedRayMapperVariant.create(
@@ -119,6 +126,7 @@ class StageRunner:
                         "seed_modulus": SEED_MODULUS,
                         "seed_offset": OP_SEED[name],
                     },
+                    submit_batch_size=submit_batch,
                 )
             else:
                 ops = [(name, callables[name]) for name in group]
@@ -133,6 +141,7 @@ class StageRunner:
                         "seed_modulus": SEED_MODULUS,
                         "seed_offsets": [OP_SEED[name] for name in group],
                     },
+                    submit_batch_size=submit_batch,
                 )
             self.variants.append(variant)
             actors = list(variant.variant_ctx.service._actors)

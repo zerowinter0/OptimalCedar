@@ -1,20 +1,20 @@
 {
- "commit": "1ec12a7f49c2492e3f8583f9f1592b539b121a12",
+ "commit": "abd4b8f48609cef6c01ffd1e648436ed63e51f8a",
  "result_dir": "outputs/fusion_handoff_20260927",
  "small_files": {
   "README.md": {
-   "sha256": "fe607e741194ecc4f99c03db14a90b604784734b9ab03c2a2275b31b96664a8f",
-   "bytes": 2570,
-   "rows": 46
+   "sha256": "510b343ec8c9ad38ac3cc5c347a90297827fa6d7142bf72838870e204a3e883c",
+   "bytes": 2837,
+   "rows": 50
   },
   "model_identity.json": {
-   "sha256": "8f9fa30423e020f96df9dd6ed0c4639b0be0f8bb0fd12434375797da7b3c8563",
+   "sha256": "bb4fd490221a350df5707838f2ba6de323a8d7e0495ed073d9bc9406557e936b",
    "bytes": 858,
    "rows": 18
   },
   "baseline_stage_profile.csv": {
-   "sha256": "c41853ffa9ecffa98c5c4bb7a0eea34834cd1cd8078fde7dbadb34e06068e118",
-   "bytes": 20691,
+   "sha256": "74f04a534b00244ba3f2caef1afcab8daf8fe1ffcdddcde2f61853dd5b1e3443",
+   "bytes": 20635,
    "rows": 120
   },
   "boundary_profile.csv": {
@@ -23,43 +23,43 @@
    "rows": 3
   },
   "predictions.csv": {
-   "sha256": "4ae0f773109760e610b08358624434b5f0f9ec1e65c905e8dc918be774edd148",
-   "bytes": 5936,
+   "sha256": "448b35d9886e346701ea12a1153764c434b076dc47831c131518e23c6eb79b02",
+   "bytes": 5925,
    "rows": 6
   },
   "frozen_predictions.json": {
-   "sha256": "7f6e7246075ac85c01dfc40327defb558747aede8644f937fdf0486a064aab94",
-   "bytes": 7907,
+   "sha256": "f7bd6346149379103c190820ac854378c4afe93353065829726c4752f83b6a3a",
+   "bytes": 7881,
    "rows": 90
   },
   "measurements.csv": {
-   "sha256": "2e5e97c41b790dc83feedfcaaf472e600dc4642aac7647c813f2b9fbf19b1ec1",
-   "bytes": 102555,
+   "sha256": "232647c7f1682e1f1f13dd12107c2187a60782e03fef7844a0a6aeed0ded89ce",
+   "bytes": 102497,
    "rows": 720
   },
   "summary.csv": {
-   "sha256": "34180ae8c9c12f70230939b37594e898ef5f7e3e949dda77f35ef12af1429f56",
-   "bytes": 1187,
+   "sha256": "a78be3ec5c4495dbac12322928d711f6f0f1ef3889da8e590d84119028c3daa7",
+   "bytes": 1188,
    "rows": 6
   },
   "instrumentation_check.csv": {
-   "sha256": "b19641d08d30c14d3d8201a4e81301ae4aeef130e40d3a84add32f8a95d5d8c1",
-   "bytes": 251,
+   "sha256": "5fbff0cb80a65185659f63e166c8d415ce9ef170d09d9414102a214c395dfc4c",
+   "bytes": 252,
    "rows": 3
   },
   "comparison.csv": {
-   "sha256": "6ddf07696045f8a12d248a87c8e78a34a89cdccfbcdfb3a26914164e69a00a9f",
-   "bytes": 6578,
+   "sha256": "9c232ef7e8812d8653c2222100fa53fc2f2484647e6e77e6c99fc2bf9ce3790d",
+   "bytes": 6569,
    "rows": 6
   },
   "implementation_parity.csv": {
-   "sha256": "8abcccaef3ed04e26250478373c9b3a9c7fe16faa226f7b0c6fc6a55a8efb99c",
-   "bytes": 429,
+   "sha256": "de8c9f21f35438f2832bd0d2c46df7aae0dd53868d46e72e5b372450a93f8421",
+   "bytes": 468,
    "rows": 6
   },
   "figure_data.json": {
-   "sha256": "9fa72c4f7fd7b5f59c387c1d72fa5f659e92e972431bbae616e3e9d47673befd",
-   "bytes": 11749,
+   "sha256": "0bc18d067e24447ae7a4ab61c51454dddee5304f0cd9b311882d2b38fc392c8b",
+   "bytes": 11725,
    "rows": 207
   }
  },
@@ -67,7 +67,7 @@
  "provenance": {
   "fusion_handoff_experiment.py": {
    "path": "scripts/fusion_handoff_experiment.py",
-   "sha256": "7e5bd3fe7e524010d56a2aebd07b3939b0c263d039d5ad13e095507333cabf7c"
+   "sha256": "031bfe7a89c309b86f3e516ba80a13df4e41662aec551fa05e2c4975d4100b91"
   },
   "cedar/compose/my_optimizer.py": {
    "path": "cedar/compose/my_optimizer.py",
