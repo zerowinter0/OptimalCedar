@@ -48,6 +48,7 @@
 | §4.9 第三章证据链原始产物 | `outputs/pico_ch3_20260924/`（README/protocol/audit/predictions/measurements/summary/figure_data，§4.9）；小文件快照 `docs/mechanism_20260923/pico_ch3/` |
 | §4.10 affine 重排诊断原始产物 | `outputs/affine_reorder_diagnosis_20260924/`（README/audit/protocol/input_metadata/operator_diagnostics/predictions/plan_summary/operator_matrix/plan_scoring/blur_geometry/figure_data，§4.10）；小文件快照 `docs/mechanism_20260923/affine_reorder/`（含 `MANIFEST.json`） |
 | §4.15 §3.2 计算规模/仿射响应受控测量 | `outputs/ch32_scale_affine_20260927/`（measurements/fits/predictions/figure_data/raw_calls/figures，§4.15）；小文件+草图快照 `docs/ch32_scale_affine_20260927/`（含 `MANIFEST.json`） |
+| §4.16 §3.2 补充轮：扩展范围与补齐表示类 | `outputs/ch32_scale_affine_ext_20260927/`（measurements/merged_measurements/fits/predictions/figure_data/coverage/consistency/verify/raw_calls/figures，§4.16）；快照 `docs/ch32_scale_affine_ext_20260927/`（含 `MANIFEST.json`） |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -2381,6 +2382,67 @@ crop float32:1ch，但该配对两边斜率都接近 0（7.4e-8 vs 1.8e-8）、�
 **⑦ 面板建议**：Blur 的 bytes/elements 双横轴（同 48 个点）、Jitter 的按类元素响应、
 Crop 的"锚定字节比例 vs 元素仿射 vs 独立验证点"、候选 Grayscale（同 Crop 结构）与 Flip（反例）。
 草图见 `docs/ch32_scale_affine_20260927/panel_*.png`；复现命令写在同目录 README 第 8 节。
+
+### 4.16 §3.2 补充轮：扩展横轴范围、补齐表示类（2026-09-27）
+
+只为论文 3.2 的仿射响应图补数据：**不改优化器、不跑融合/卸载/吞吐**。
+新目录 `outputs/ch32_scale_affine_ext_20260927/`，第一轮 `outputs/ch32_scale_affine_20260927/` 原样未动；
+快照 `docs/ch32_scale_affine_ext_20260927/`（含 `MANIFEST.json` 与 5 张草图）。
+
+**归一化定义冻结**（不因新数据改变）：`x = 原生字节数 / 参考输入原生字节数`，
+`y = 平均计算时间 / 参考输入平均计算时间`，参考点仍是第一轮的单一参考 cell
+（blur `float32:1ch:t4`、jitter/crop/grayscale/flip 各自的第一轮锚点），所有表示类共用同一参考点。
+
+**① 扩展测量（主批次 60 个 cell = 48 个扩展 + 8 个对照；另有一轮 8 cell 的复核批次，均 3 blocks）**
+
+| 目标 | 新增训练尺寸 | 新增验证尺寸 | 归一化 x 覆盖 |
+| --- | --- | --- | --- |
+| jitter uint8:1ch | 512, 736, 1024, 1098 | 640, 832, 960, 1088 | 0.435–2.002（与原范围合并后 0.007–2.002） |
+| crop uint8:1ch | 448, 672, 832, 960 | 576, 768, 896, 986 | 0.113–0.549（合并后 0.005–0.549） |
+| flip uint8:1ch（新类） | 64…1024（8 个） | 96, 192, 384, 704 | 0.007–1.741 |
+| grayscale uint8:1ch（新类） | 同上 | 同上 | 0.007–1.741 |
+| grayscale float32:1ch（新类） | 同上 | 同上 | 0.027–6.966 |
+
+尺寸按参考字节反推（uint8 单通道 1 字节/元素；float32 单通道 4 字节/元素），不是把归一化元素数当字节数。
+`coverage.csv` 现在覆盖五个算子 × 四种表示类 = **20/20 全部有测量**。
+
+**② 新旧一致性（三个批次，逐 cell 判定）**：8 个第一轮 cell 在第二轮与第三轮各重测一次，
+任一批次与冻结的第一轮值相差超过 `max(2×合并块间标准差, 5%)` 就把该批次从该 cell 剔除
+（`consistency.json` 记录全部决定）：
+
+| cell | 第一轮 | 第二轮 | Δ2 | 第三轮 | Δ3 | 处理 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| blur float32:1ch t4 | 6.970 | 7.090 | +1.7% | 6.991 | +0.3% | 两批都保留 |
+| blur uint8:3ch t7 | 49.528 | 48.484 | −2.1% | 50.949 | +2.9% | 两批都保留 |
+| crop float32:3ch t6 | 1.753 | 1.776 | +1.3% | 1.765 | +0.7% | 两批都保留 |
+| crop uint8:1ch t7 | 0.683 | 0.699 | +2.4% | 0.694 | +1.6% | 两批都保留 |
+| flip float32:3ch t4 | 0.0743 | 0.0735 | −1.1% | 0.0805 | +8.3% | 丢弃第三轮 |
+| grayscale float32:3ch t4 | 0.1674 | 0.1839 | +9.9% | 0.1740 | +4.0% | 丢弃第二轮 |
+| jitter float32:3ch t4 | 7.112 | 7.454 | +4.8% | 7.180 | +0.9% | 两批都保留 |
+| jitter uint8:1ch t7 | 1.599 | 1.635 | +2.3% | 1.561 | −2.4% | 两批都保留 |
+
+结论：**亚毫秒算子的跨批次绝对水平存在 ≤10% 漂移**（两个批次因此被判超差并剔除），
+而本图要展示的类间差异是 4–17×，所以批次漂移不影响类间结论，但**不能**用它比较 10% 量级的差异。
+
+**③ ColorJitter float32:3ch 的窗口偏差已定位（不是噪声）**：全范围 M5 拟合 `k=6.259e-5, b=0`
+（截距被非负约束压住），x>2 的 2 个训练点贡献了**最小二乘目标的 47%**，
+使窗口内（x≤2）出现 −23%…−29% 的系统性负残差。改用预先声明的局部窗口（x≤2）训练：
+`k=4.485e-5, b=0.675 ms`，窗口内独立验证 MAPE 从 **22.7% → 5.6%**（M3 比例模型仍 17.5%）。
+同一现象在 grayscale float32:1ch（22.3% → 7.8%）与 blur 3ch（8.3% → 0.5%）上同样成立。
+
+**④ 负结果：jitter uint8:1ch 扩展段不可用仿射描述**。扩展点在 x≥1.5 处不单调
+（x=1.53 → y=1.12、x=1.74 → 1.46、x=1.97 → 1.38、x=2.00 → 1.18），
+且大 cell 的块间中位数摆动很大（x=1.74 的三个 block 中位数 7.35/13.01/7.53 ms）。
+局部 x≤2 模型没有改善（34.7% vs 全范围 30.0%），因为问题不是截距而是该区间的测量分布。
+该范围明确标记为**未覆盖**：不删点、不重测调参、不用外推补齐。
+
+**⑤ 执行路径（如实记录）**：ColorJitter 在 1ch 上 `adjust_saturation`/`adjust_hue` 直接
+`return img`（只有 brightness/contrast 生效）；Grayscale 在 1ch 上 `rgb_to_grayscale` 走
+`img.clone()`（恒等但有一次拷贝），因此新增的 grayscale 单通道曲线本质是拷贝成本曲线，
+已在该类曲线的说明里注明（`coverage.csv` 的 reason 列）。
+
+**⑥ 交付自检**：`verify.json` 从 `predictions.csv` 重新推导 132 个拟合 × 792 个指标并与 `fits.csv` 对账，
+**最大差异 0**；`figure_data.json` 的 208 个 cell 的 x/y 归一化与冻结参考点逐点核对通过。
 
 **产物与复现**
 

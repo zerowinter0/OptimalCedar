@@ -1,0 +1,169 @@
+{
+ "protocol": "control cells are re-measured in round 2 and again in a round-3 recheck; a batch passes against the frozen round-1 value if |\u0394| \u2264 max(2\u00b7combined block std, 5% of round-1 mean). A failing batch is dropped for that cell only (batches still average together inside one cell when both pass).",
+ "checks": [
+  {
+   "cell_id": "blur:float32:1ch:t4",
+   "round1_mean_ms": 6.9700696238084605,
+   "round2_mean_ms": 7.089501523253934,
+   "round3_mean_ms": 6.990781242275948,
+   "delta_round2_pct": 1.7134965056520546,
+   "delta_round3_pct": 0.2971508117614828,
+   "round1_block_std_ms": 0.4509285987801827,
+   "round2_block_std_ms": 0.4529405907312617,
+   "round3_block_std_ms": 0.5070425057231355,
+   "tolerance_round2_ms": 1.2782672332964549,
+   "tolerance_round3_ms": 1.3570979387028113,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "blur:uint8:3ch:t7",
+   "round1_mean_ms": 49.52812702974018,
+   "round2_mean_ms": 48.48435345979245,
+   "round3_mean_ms": 50.94924221677821,
+   "delta_round2_pct": -2.1074359814191563,
+   "delta_round3_pct": 2.8693093647266097,
+   "round1_block_std_ms": 15.805998270763508,
+   "round2_block_std_ms": 13.962859947544231,
+   "round3_block_std_ms": 16.15668742335546,
+   "tolerance_round2_ms": 42.18013936677374,
+   "tolerance_round3_ms": 45.20478425261607,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "crop:float32:3ch:t6",
+   "round1_mean_ms": 1.7531356293087204,
+   "round2_mean_ms": 1.776317002562185,
+   "round3_mean_ms": 1.7652498938453693,
+   "delta_round2_pct": 1.3222806533573992,
+   "delta_round3_pct": 0.6910055522301928,
+   "round1_block_std_ms": 0.008693159929903455,
+   "round2_block_std_ms": 0.007617482485371068,
+   "round3_block_std_ms": 0.004883194958080057,
+   "tolerance_round2_ms": 0.08765678146543603,
+   "tolerance_round3_ms": 0.08765678146543603,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "crop:uint8:1ch:t7",
+   "round1_mean_ms": 0.6826176044220725,
+   "round2_mean_ms": 0.6993001761535803,
+   "round3_mean_ms": 0.6936278403736651,
+   "delta_round2_pct": 2.4439117338076586,
+   "delta_round3_pct": 1.6129434518340917,
+   "round1_block_std_ms": 0.00431874851368681,
+   "round2_block_std_ms": 0.004920315090146833,
+   "round3_block_std_ms": 0.008630625810067984,
+   "tolerance_round2_ms": 0.03413088022110363,
+   "tolerance_round3_ms": 0.03413088022110363,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "flip:float32:3ch:t4",
+   "round1_mean_ms": 0.07433396376048525,
+   "round2_mean_ms": 0.07347919900591175,
+   "round3_mean_ms": 0.08048437690983216,
+   "delta_round2_pct": -1.1498979891986794,
+   "delta_round3_pct": 8.274028234474937,
+   "round1_block_std_ms": 0.0023247314315022216,
+   "round2_block_std_ms": 0.0042496444561646585,
+   "round3_block_std_ms": 0.000776154217572708,
+   "tolerance_round2_ms": 0.009687900542929905,
+   "tolerance_round3_ms": 0.004901751359695949,
+   "round2_passed": true,
+   "round3_passed": false,
+   "decision": "recheck dropped (round2 agrees with round1)",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "grayscale:float32:3ch:t4",
+   "round1_mean_ms": 0.16739138246824345,
+   "round2_mean_ms": 0.18388967728242278,
+   "round3_mean_ms": 0.17403954407200217,
+   "delta_round2_pct": 9.856119574918557,
+   "delta_round3_pct": 3.971627156505488,
+   "round1_block_std_ms": 0.004575378286812917,
+   "round2_block_std_ms": 0.003431343394207679,
+   "round3_block_std_ms": 0.00612937883771141,
+   "tolerance_round2_ms": 0.01143821733600333,
+   "tolerance_round3_ms": 0.015297499325526846,
+   "round2_passed": false,
+   "round3_passed": true,
+   "decision": "round2 dropped (recheck agrees with round1)",
+   "batches_used_for_this_cell": [
+    "round3_20260927"
+   ]
+  },
+  {
+   "cell_id": "jitter:float32:3ch:t4",
+   "round1_mean_ms": 7.112025030723282,
+   "round2_mean_ms": 7.454336455076778,
+   "round3_mean_ms": 7.179461636298292,
+   "delta_round2_pct": 4.813135821017821,
+   "delta_round3_pct": 0.9482054025919565,
+   "round1_block_std_ms": 0.16355573093213846,
+   "round2_block_std_ms": 0.17009557463257838,
+   "round3_block_std_ms": 0.08424328908139957,
+   "tolerance_round2_ms": 0.4719448341928667,
+   "tolerance_round3_ms": 0.36795330614630073,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  },
+  {
+   "cell_id": "jitter:uint8:1ch:t7",
+   "round1_mean_ms": 1.5991187328472733,
+   "round2_mean_ms": 1.635277197541048,
+   "round3_mean_ms": 1.5607206942513585,
+   "delta_round2_pct": 2.261149466330971,
+   "delta_round3_pct": -2.401199973909762,
+   "round1_block_std_ms": 0.02184739337306784,
+   "round2_block_std_ms": 0.019385957675964276,
+   "round3_block_std_ms": 0.006151850793779752,
+   "tolerance_round2_ms": 0.07995593664236367,
+   "tolerance_round3_ms": 0.07995593664236367,
+   "round2_passed": true,
+   "round3_passed": true,
+   "decision": "both batches consistent",
+   "batches_used_for_this_cell": [
+    "round2_20260927"
+   ]
+  }
+ ],
+ "cells_with_a_failed_batch": 2,
+ "excluded_rows": [
+  {
+   "cell_id": "flip:float32:3ch:t4",
+   "batch": "round3_20260927"
+  },
+  {
+   "cell_id": "grayscale:float32:3ch:t4",
+   "batch": "round2_20260927"
+  }
+ ],
+ "merged_rows": 804
+}

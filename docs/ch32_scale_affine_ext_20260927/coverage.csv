@@ -1,0 +1,21 @@
+operator,representation_class,supported,measured,status,cells,sizes,reason
+blur,float32:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+blur,float32:1ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured across rounds
+blur,uint8:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured across rounds
+blur,uint8:1ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+jitter,float32:3ch,True,True,measured,14,64 80 96 128 144 160 192 224 256 288 384 448 512,measured across rounds
+jitter,float32:1ch,True,True,measured,14,64 80 96 128 144 160 192 224 256 288 384 448 512,measured in round 1
+jitter,uint8:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+jitter,uint8:1ch,True,True,measured,20,64 80 96 144 160 192 224 256 288 384 448 512 640 736 832 960 1024 1088 1098,measured across rounds
+crop,float32:3ch,True,True,measured,12,96 112 128 160 192 224 256 288 320 384 416 448,measured across rounds
+crop,float32:1ch,True,True,measured,12,96 112 128 160 192 224 256 288 320 384 416 448,measured in round 1
+crop,uint8:3ch,True,True,measured,12,96 112 128 160 192 224 256 288 320 384 416 448,measured in round 1
+crop,uint8:1ch,True,True,measured,20,96 112 128 160 192 224 256 288 320 384 416 448 576 672 768 832 896 960 986,measured across rounds
+grayscale,float32:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured across rounds
+grayscale,float32:1ch,True,True,measured,12,64 96 144 192 224 320 384 448 640 704 832 1024,"measured in round 2; torchvision rgb_to_grayscale clones a 1-channel input (identity path), so the curve is a memory copy"
+grayscale,uint8:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+grayscale,uint8:1ch,True,True,measured,12,64 96 144 192 224 320 384 448 640 704 832 1024,measured in round 2; same clone path as float32:1ch
+flip,float32:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured across rounds
+flip,float32:1ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+flip,uint8:3ch,True,True,measured,12,64 80 96 144 160 192 224 256 288 384 448 512,measured in round 1
+flip,uint8:1ch,True,True,measured,12,64 96 144 192 224 320 384 448 640 704 832 1024,measured in round 2
