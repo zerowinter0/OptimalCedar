@@ -1,0 +1,4 @@
+operator,pipe_id,submit_batch_size,input_records_measured,output_records_measured,input_identity_ms_per_sample,input_submit_ms_per_sample,output_identity_ms_per_sample,output_fetch_ms_per_sample,method
+to_float,7,1,48,35,14.590550505090505,1.1905920208333332,51.26426668305482,1.7354343714285714,cedar_identity_stage_real_objects
+crop,6,1,35,38,51.26426668305482,2.0302597714285713,17.742161884119636,0.8516548157894737,cedar_identity_stage_real_objects
+flip,5,1,38,38,17.742161884119636,1.305610105263158,17.802386765221232,1.0756377105263157,cedar_identity_stage_real_objects

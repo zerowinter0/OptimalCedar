@@ -1,0 +1,19 @@
+{
+ "commit": "1ec12a7f49c2492e3f8583f9f1592b539b121a12",
+ "final_pico": {
+  "class": "cedar.compose.simple_dp_ablation_optimizer.SimpleDpWorkersBoundaryAffineReprOptimizer",
+  "selector": 39,
+  "boundary_entry": "MyOptimizer._dp_stage_boundary_components",
+  "boundary_function": "cedar.compose.my_optimizer.stage_handoff_ms",
+  "handoff_model_used": [
+   "paired_probe_v1"
+  ]
+ },
+ "profile": {
+  "path": "outputs/fusion_handoff_profile_20260927/simclrv2/shared.yaml",
+  "sha256": "7a275363e5d73f89d7ae927925fdb884602c6fa3b902070b2b8aff100db747f0",
+  "frozen_copy": "outputs/fusion_handoff_20260927/frozen_profile/shared.yaml"
+ },
+ "experiment_parity": "predictions call stage_handoff_ms directly with the profile's real submit batch size; implementation_parity.csv lists every call",
+ "units": "ms per source record, serial service (one batch in flight)"
+}

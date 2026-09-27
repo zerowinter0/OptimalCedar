@@ -1,0 +1,4696 @@
+baseline:
+  input_sizes:
+    0: 238144.0
+    1: 238144.0
+    2: 238144.0
+    3: 714432.0
+    4: 714432.0
+    5: 714432.0
+    6: 2014982.0
+    7: 503745.5
+    8: 157.77777777777777
+    9: 0.0
+  latencies:
+    0: 49526.430555555555
+    1: 212945.5
+    2: 9895944.666666666
+    3: 325552.44444444444
+    4: 7641636.166666667
+    5: 118662.16666666667
+    6: 1696025.0555555555
+    7: 203360.83333333334
+    8: 1690395.4444444445
+    9: 34940.666666666664
+  output_sizes:
+    0: 238144.0
+    1: 238144.0
+    2: 238144.0
+    3: 238144.0
+    4: 714432.0
+    5: 714432.0
+    6: 714432.0
+    7: 2014982.0
+    8: 503745.5
+    9: 157.77777777777777
+  throughput: 45.2904470061057
+  wall_latencies:
+    0: 43406.48611111111
+    1: 176240.83333333334
+    2: 9819844.222222222
+    3: 282722.55555555556
+    4: 7603978.277777778
+    5: 74010.27777777778
+    6: 1650958.611111111
+    7: 158966.33333333334
+    8: 1608783.1666666667
+    9: 76180.5
+disk_info:
+  read_latency: 5.390575097408146e-10
+  write_latency: 1.757689460646361e-09
+layered_profile:
+  compatibility_throughput: legacy_whole_pipeline_measurement
+  component_layers:
+    contention_and_fusion: deferred_to_selected_plan_validation
+    object_marshalling: physical_model.object_boundary
+    operator_compute: isolated_replay
+    parallel_scaling: physical_model.scaling
+    stage_boundary: physical_model.boundary
+  input_pool:
+    bytes_per_pipe:
+      0: 60992192
+      1: 15267968
+      2: 15267968
+      3: 15267968
+      4: 45750528
+      5: 45750528
+      6: 45750528
+      7: 67031624
+      8: 34441904
+      9: 7934
+    max_bytes_per_pipe: 67108864
+    max_bytes_total: 536870912
+    max_samples_per_pipe: 64
+    samples_per_pipe:
+      0: 64
+      1: 64
+      2: 64
+      3: 64
+      4: 64
+      5: 64
+      6: 64
+      7: 33
+      8: 64
+      9: 64
+    serialization_errors: {}
+    snapshot_format: pickle
+    total_bytes: 345529142
+  isolated_operator_costs:
+    RAY:1: &id001
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.160395752172917
+        epoch_records: 25
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.027373513389242942
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.38695988804101944
+        width: 1
+      count: 51
+      end_to_end_ms_per_input_sample: 7.436225299230394
+      mean_ms_per_sample: 0.24869929215686282
+      measured_input_records: 425
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.048617226520626215
+      stderr_ms_per_sample: 0.006807773403751127
+      trial_label: single
+    RAY:2: &id002
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.658888631965965
+        epoch_records: 34
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.09623011270052813
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.28989680064842105
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 13.451796441051343
+      mean_ms_per_sample: 9.923501065624999
+      measured_input_records: 272
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 5.401954280944588
+      stderr_ms_per_sample: 0.9549396259289046
+      trial_label: single
+    RAY:3: &id003
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.1788601600565016
+        epoch_records: 34
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.0262599025499022
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.2861482002772391
+        width: 1
+      count: 32
+      end_to_end_ms_per_input_sample: 11.686985882560668
+      mean_ms_per_sample: 0.613801725
+      measured_input_records: 272
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.09117928953482655
+      stderr_ms_per_sample: 0.016118373483461866
+      trial_label: single
+    RAY:4: &id004
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 7.510609401855618
+        epoch_records: 20
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.021879631453952702
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.4956366028636694
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 25.035364672852058
+      mean_ms_per_sample: 9.921495703333331
+      measured_input_records: 300
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 1.1889888401694741
+      stderr_ms_per_sample: 0.21707866946090854
+      trial_label: single
+    RAY:5: &id005
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 4.4414759571664035
+        epoch_records: 23
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.03947528502645657
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.4236320909112692
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 19.310765031158276
+      mean_ms_per_sample: 0.14628179444444447
+      measured_input_records: 230
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.0316283241437697
+      stderr_ms_per_sample: 0.005774515529875977
+      trial_label: single
+    RAY:6: &id006
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 9.88487774785608
+        epoch_records: 20
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.03408738511634418
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 33
+        warmup_records: 20
+        warmup_sec: 0.7234998317435384
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 32.949592492853604
+      mean_ms_per_sample: 3.8531248233333333
+      measured_input_records: 300
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.7193949634970264
+      stderr_ms_per_sample: 0.13134294975430896
+      trial_label: single
+    RAY:7: &id007
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 10.63486503297463
+        epoch_records: 20
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 20
+        observed_rse: 0.0534222651339372
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 20
+        warmup_sec: 0.7179130660369992
+        width: 1
+      count: 30
+      end_to_end_ms_per_input_sample: 35.449550109915435
+      mean_ms_per_sample: 0.43489317999999993
+      measured_input_records: 300
+      method: worker_wall_clock
+      observation_unit: actor_batch_mean
+      stddev_ms_per_sample: 0.12725226548670276
+      stderr_ms_per_sample: 0.023232978766901072
+      trial_label: single
+    SMP:1: &id008
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.000309966970235
+        epoch_records: 53
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.004439496213479542
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.037284933030605316
+        width: 1
+      count: 1484
+      end_to_end_ms_per_input_sample: 2.0217722149395114
+      mean_ms_per_sample: 0.48880733423180595
+      measured_input_records: 1484
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.08359654987206495
+      stderr_ms_per_sample: 0.002170058309443131
+      trial_label: single
+    SMP:2: &id009
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.1464851866476238
+        epoch_records: 42
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.09593737559948047
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.04728634189814329
+        width: 1
+      count: 294
+      end_to_end_ms_per_input_sample: 10.702330566828651
+      mean_ms_per_sample: 9.410377517006804
+      measured_input_records: 294
+      method: worker_wall_clock
+      stddev_ms_per_sample: 15.479914072618302
+      stderr_ms_per_sample: 0.9028069223819881
+      trial_label: single
+    SMP:3: &id010
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.1598749859258533
+        epoch_records: 63
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.0054319336133104934
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.031295330729335546
+        width: 1
+      count: 1134
+      end_to_end_ms_per_input_sample: 2.786485878241493
+      mean_ms_per_sample: 0.9561913201058201
+      measured_input_records: 1134
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.17490643094169403
+      stderr_ms_per_sample: 0.005193967772438538
+      trial_label: single
+    SMP:4: &id011
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.1001182636246085
+        epoch_records: 23
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.0037175450198420968
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.08405752433463931
+        width: 1
+      count: 299
+      end_to_end_ms_per_input_sample: 10.368288507105714
+      mean_ms_per_sample: 8.613391341137124
+      measured_input_records: 299
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.5536891460735203
+      stderr_ms_per_sample: 0.03202067008419535
+      trial_label: single
+    SMP:5: &id012
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.1499703540466726
+        epoch_records: 67
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.02110546203042535
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.02960930811241269
+        width: 1
+      count: 1340
+      end_to_end_ms_per_input_sample: 2.3507241448109495
+      mean_ms_per_sample: 0.42199163432835823
+      measured_input_records: 1340
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.3260251509183638
+      stderr_ms_per_sample: 0.008906328415474304
+      trial_label: single
+    SMP:6: &id013
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.2373329238034785
+        epoch_records: 48
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.010581801744645025
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 33
+        warmup_records: 4
+        warmup_sec: 0.04108326695859432
+        width: 1
+      count: 672
+      end_to_end_ms_per_input_sample: 4.81745970804089
+      mean_ms_per_sample: 2.647206101190476
+      measured_input_records: 672
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.7261594812269252
+      stderr_ms_per_sample: 0.028012210140012334
+      trial_label: single
+    SMP:7: &id014
+      adaptive_profile:
+        converged: true
+        elapsed_sec: 3.076533113140613
+        epoch_records: 52
+        max_duration_sec: 30.0
+        min_duration_sec: 3.0
+        min_observations: 30
+        minimum_parallel_epoch_records: 4
+        observed_rse: 0.017752284461362473
+        stop_reason: confidence
+        target_rse: 0.1
+        unique_input_records: 64
+        warmup_records: 4
+        warmup_sec: 0.03801159467548132
+        width: 1
+      count: 1300
+      end_to_end_ms_per_input_sample: 2.3665639331850867
+      mean_ms_per_sample: 0.7201337007692308
+      measured_input_records: 1300
+      method: worker_wall_clock
+      stddev_ms_per_sample: 0.4609343350972342
+      stderr_ms_per_sample: 0.012784018306269067
+      trial_label: single
+  method: fixed_legal_input_adaptive_microbenchmark
+  modeled_offloads:
+    RAY:
+      1:
+        backend_compute: *id001
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 45.1423045890256
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.24869929215686282
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 176240.83333333334
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      2:
+        backend_compute: *id002
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 45.07881707159327
+        throughput_provenance:
+          measured_backend_ms_per_sample: 9.923501065624999
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 9819844.222222222
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      3:
+        backend_compute: *id003
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 44.62136201696297
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.613801725
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 282722.55555555556
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      4:
+        backend_compute: *id004
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 40.98826167144443
+        throughput_provenance:
+          measured_backend_ms_per_sample: 9.921495703333331
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 7603978.277777778
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      5:
+        backend_compute: *id005
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 45.14268554813926
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.14628179444444447
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 74010.27777777778
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      6:
+        backend_compute: *id006
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 41.18297666786031
+        throughput_provenance:
+          measured_backend_ms_per_sample: 3.8531248233333333
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 1650958.611111111
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      7:
+        backend_compute: *id007
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 44.73144483953031
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.43489317999999993
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 158966.33333333334
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+    SMP:
+      1:
+        backend_compute: *id008
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 44.65825243463239
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.48880733423180595
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 176240.83333333334
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      2:
+        backend_compute: *id009
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 46.14622553362036
+        throughput_provenance:
+          measured_backend_ms_per_sample: 9.410377517006804
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 9819844.222222222
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      3:
+        backend_compute: *id010
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 43.94990027184392
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.9561913201058201
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 282722.55555555556
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      4:
+        backend_compute: *id011
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 43.310433910099505
+        throughput_provenance:
+          measured_backend_ms_per_sample: 8.613391341137124
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 7603978.277777778
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      5:
+        backend_compute: *id012
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 44.587734009961146
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.42199163432835823
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 74010.27777777778
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      6:
+        backend_compute: *id013
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 43.33514389912492
+        throughput_provenance:
+          measured_backend_ms_per_sample: 2.647206101190476
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 1650958.611111111
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+      7:
+        backend_compute: *id014
+        input_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 714432.0
+          4: 714432.0
+          5: 714432.0
+          6: 2014982.0
+          7: 503745.5
+          8: 157.77777777777777
+          9: 0.0
+        latencies:
+          0: 49526.430555555555
+          1: 212945.5
+          2: 9895944.666666666
+          3: 325552.44444444444
+          4: 7641636.166666667
+          5: 118662.16666666667
+          6: 1696025.0555555555
+          7: 203360.83333333334
+          8: 1690395.4444444445
+          9: 34940.666666666664
+        output_sizes:
+          0: 238144.0
+          1: 238144.0
+          2: 238144.0
+          3: 238144.0
+          4: 714432.0
+          5: 714432.0
+          6: 714432.0
+          7: 2014982.0
+          8: 503745.5
+          9: 157.77777777777777
+        throughput: 44.1678968986443
+        throughput_provenance:
+          measured_backend_ms_per_sample: 0.7201337007692308
+          measured_baseline_throughput: 45.2904470061057
+          method: component_substitution
+          replaced_local_wall_ns_per_sample: 158966.33333333334
+        wall_latencies:
+          0: 43406.48611111111
+          1: 176240.83333333334
+          2: 9819844.222222222
+          3: 282722.55555555556
+          4: 7603978.277777778
+          5: 74010.27777777778
+          6: 1650958.611111111
+          7: 158966.33333333334
+          8: 1608783.1666666667
+          9: 76180.5
+    TF_RAY: {}
+  schema_version: 1
+offloads:
+  RAY:
+    1:
+      backend_compute: *id001
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2325319.2
+        7: 581329.8
+        8: 160.0
+        9: 0.0
+      latencies:
+        0: 189346.4
+        1: 276903958.2
+        2: 4777647.6
+        3: 369449.0
+        4: 8583682.533333333
+        5: 135874.46666666667
+        6: 1843014.2666666666
+        7: 257059.06666666668
+        8: 1829083.4
+        9: 31444.466666666667
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2325319.2
+        8: 581329.8
+        9: 160.0
+      throughput: 44.36822483843073
+      wall_latencies:
+        0: 84268.16666666667
+        1: 259610381.93333334
+        2: 4637278.133333334
+        3: 287777.86666666664
+        4: 8140327.133333334
+        5: 104460.53333333334
+        6: 1788776.3333333333
+        7: 211195.8
+        8: 1715562.0666666667
+        9: 73249.73333333334
+    2:
+      backend_compute: *id002
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2577914.8571428573
+        7: 644478.7142857143
+        8: 157.71428571428572
+        9: 0.0
+      latencies:
+        0: 210534.7857142857
+        1: 568332.8571428572
+        2: 588227235.5238096
+        3: 482745.1904761905
+        4: 9583617.38095238
+        5: 166102.2857142857
+        6: 1872823.0476190476
+        7: 349598.04761904763
+        8: 2504822.9523809524
+        9: 31751.285714285714
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2577914.8571428573
+        8: 644478.7142857143
+        9: 157.71428571428572
+      throughput: 73.98001961265878
+      wall_latencies:
+        0: 79960.21428571429
+        1: 294507.28571428574
+        2: 539784496.0952381
+        3: 394204.95238095237
+        4: 8287495.476190476
+        5: 84906.85714285714
+        6: 1796252.619047619
+        7: 266014.3333333333
+        8: 2182110.9523809524
+        9: 68766.38095238095
+    3:
+      backend_compute: *id003
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2335399.8620689656
+        7: 583849.9655172414
+        8: 155.58620689655172
+        9: 0.0
+      latencies:
+        0: 109320.16379310345
+        1: 647402.3793103448
+        2: 24383279.379310343
+        3: 499123053.6551724
+        4: 14418395.27586207
+        5: 298603.0689655172
+        6: 2990779.0689655175
+        7: 372393.3103448276
+        8: 3379871.793103448
+        9: 64251.0
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2335399.8620689656
+        8: 583849.9655172414
+        9: 155.58620689655172
+      throughput: 69.65823015550554
+      wall_latencies:
+        0: 54869.870689655174
+        1: 238872.89655172414
+        2: 11946452.413793104
+        3: 265654622.75862068
+        4: 8667473.24137931
+        5: 129333.6551724138
+        6: 1767173.2068965517
+        7: 235783.55172413794
+        8: 1925360.3103448276
+        9: 74974.06896551725
+    4:
+      backend_compute: *id004
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2980394.4
+        7: 745098.6
+        8: 156.4
+        9: 0.0
+      latencies:
+        0: 117454.45
+        1: 764923.45
+        2: 28763225.0
+        3: 817326.9
+        4: 1952569161.1
+        5: 464407.75
+        6: 5786873.1
+        7: 1323034.65
+        8: 6273078.15
+        9: 103732.5
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2980394.4
+        8: 745098.6
+        9: 156.4
+      throughput: 69.59512836225339
+      wall_latencies:
+        0: 54002.1875
+        1: 188368.85
+        2: 15761655.15
+        3: 439221.9
+        4: 1439361191.25
+        5: 149797.8
+        6: 3083665.45
+        7: 460654.55
+        8: 3150003.85
+        9: 88179.05
+    5:
+      backend_compute: *id005
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2627871.8181818184
+        7: 656967.9545454546
+        8: 157.8181818181818
+        9: 0.0
+      latencies:
+        0: 68092.81818181818
+        1: 330639.7272727273
+        2: 14353322.090909092
+        3: 396445.7272727273
+        4: 13978237.636363637
+        5: 4912237517.318182
+        6: 6129562.681818182
+        7: 985533.5454545454
+        8: 7107872.454545454
+        9: 45895.045454545456
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2627871.8181818184
+        8: 656967.9545454546
+        9: 157.8181818181818
+      throughput: 54.314943834758886
+      wall_latencies:
+        0: 49220.01136363636
+        1: 195155.95454545456
+        2: 10877119.545454545
+        3: 297397.3181818182
+        4: 9330227.0
+        5: 3128637164.2272725
+        6: 3092711.909090909
+        7: 398662.5
+        8: 3469421.3636363638
+        9: 107159.68181818182
+    6:
+      backend_compute: *id006
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2112582.8571428573
+        7: 528145.7142857143
+        8: 158.85714285714286
+        9: 0.0
+      latencies:
+        0: 84099.42857142857
+        1: 384186.5714285714
+        2: 24921817.14285714
+        3: 654036.8571428572
+        4: 11737150.285714285
+        5: 536689.5714285715
+        6: 3320686710.285714
+        7: 734869.7142857143
+        8: 7018699.428571428
+        9: 57544.0
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2112582.8571428573
+        8: 528145.7142857143
+        9: 158.85714285714286
+      throughput: 27.87981308072206
+      wall_latencies:
+        0: 47401.107142857145
+        1: 213563.42857142858
+        2: 13316560.285714285
+        3: 316519.28571428574
+        4: 8616725.57142857
+        5: 182403.2857142857
+        6: 3556104673.428571
+        7: 369764.4285714286
+        8: 3233649.8571428573
+        9: 103637.57142857143
+    7:
+      backend_compute: *id007
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 1591239.0
+        7: 397809.75
+        8: 159.0
+        9: 0.0
+      latencies:
+        0: 53518.84375
+        1: 232218.5
+        2: 8522496.75
+        3: 501133.75
+        4: 16183929.75
+        5: 405065.0
+        6: 4074077.25
+        7: 3081201322.75
+        8: 7588192.25
+        9: 55931.0
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 1591239.0
+        8: 397809.75
+        9: 159.0
+      throughput: 26.170086188101234
+      wall_latencies:
+        0: 46796.40625
+        1: 189934.875
+        2: 6798679.875
+        3: 317878.625
+        4: 10029934.25
+        5: 105728.875
+        6: 2566116.875
+        7: 3532908308.625
+        8: 3354135.0
+        9: 119117.25
+  SMP:
+    1:
+      backend_compute: *id008
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2027420.0
+        7: 506855.0
+        8: 160.66666666666666
+        9: 0.0
+      latencies:
+        0: 469338.6041666667
+        1: 5442601.0
+        2: 5482005.75
+        3: 333432.0833333333
+        4: 8284180.25
+        5: 162720.25
+        6: 2214433.25
+        7: 294962.4166666667
+        8: 2673507.8333333335
+        9: 34428.583333333336
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2027420.0
+        8: 506855.0
+        9: 160.66666666666666
+      throughput: 44.61513292724869
+      wall_latencies:
+        0: 222126.72916666666
+        1: 4087443.3333333335
+        2: 5433943.5
+        3: 287506.6666666667
+        4: 8051142.416666667
+        5: 100265.58333333333
+        6: 1785414.75
+        7: 205139.91666666666
+        8: 1772939.6666666667
+        9: 74118.41666666667
+    2:
+      backend_compute: *id009
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2395408.0
+        7: 598852.0
+        8: 159.23809523809524
+        9: 0.0
+      latencies:
+        0: 189963.5357142857
+        1: 1239770.0476190476
+        2: 113455644.38095239
+        3: 366928.8095238095
+        4: 8736465.57142857
+        5: 121199.33333333333
+        6: 1966667.142857143
+        7: 290618.71428571426
+        8: 2738395.238095238
+        9: 31120.0
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2395408.0
+        8: 598852.0
+        9: 159.23809523809524
+      throughput: 74.59077683180075
+      wall_latencies:
+        0: 97312.57142857143
+        1: 543271.7142857143
+        2: 98145671.42857143
+        3: 289775.0
+        4: 7904320.095238095
+        5: 90277.57142857143
+        6: 1722058.0952380951
+        7: 226966.57142857142
+        8: 2061945.3333333333
+        9: 66392.85714285714
+    3:
+      backend_compute: *id010
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2154691.8
+        7: 538672.95
+        8: 154.8
+        9: 0.0
+      latencies:
+        0: 146162.4375
+        1: 607140.7
+        2: 25169514.9
+        3: 67862670.25
+        4: 15250341.8
+        5: 290550.85
+        6: 3384018.05
+        7: 552836.0
+        8: 4435719.85
+        9: 83747.3
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2154691.8
+        8: 538672.95
+        9: 154.8
+      throughput: 73.31187584575913
+      wall_latencies:
+        0: 61206.275
+        1: 261958.6
+        2: 11729744.7
+        3: 31835368.3
+        4: 8134770.55
+        5: 126351.3
+        6: 1758673.2
+        7: 215324.5
+        8: 1926368.3
+        9: 71262.55
+    4:
+      backend_compute: *id011
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2042478.6666666667
+        7: 510619.6666666667
+        8: 155.11111111111111
+        9: 0.0
+      latencies:
+        0: 129546.70833333333
+        1: 673397.4444444445
+        2: 9257596.388888888
+        3: 1039359.0555555555
+        4: 2559420112.888889
+        5: 410754.94444444444
+        6: 5976928.555555556
+        7: 519283.1666666667
+        8: 6376976.888888889
+        9: 93799.44444444444
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2042478.6666666667
+        8: 510619.6666666667
+        9: 155.11111111111111
+      throughput: 97.24745368189461
+      wall_latencies:
+        0: 56864.47222222222
+        1: 242174.33333333334
+        2: 5112041.222222222
+        3: 594194.8333333334
+        4: 1309207123.2777777
+        5: 185563.05555555556
+        6: 2722905.8333333335
+        7: 256269.55555555556
+        8: 3014700.0555555555
+        9: 69695.66666666667
+    5:
+      backend_compute: *id012
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 1978416.923076923
+        7: 494604.23076923075
+        8: 157.53846153846155
+        9: 0.0
+      latencies:
+        0: 118154.76923076923
+        1: 224709.6923076923
+        2: 16310591.76923077
+        3: 666468.2307692308
+        4: 18947200.46153846
+        5: 5022797673.692307
+        6: 7219122.384615385
+        7: 897261.5384615385
+        8: 9206595.153846154
+        9: 40288.07692307692
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 1978416.923076923
+        8: 494604.23076923075
+        9: 157.53846153846155
+      throughput: 53.82143971968
+      wall_latencies:
+        0: 53091.61538461538
+        1: 182407.46153846153
+        2: 11202287.538461538
+        3: 292345.23076923075
+        4: 9204893.0
+        5: 3044374776.923077
+        6: 3515625.5384615385
+        7: 326464.07692307694
+        8: 4165023.4615384615
+        9: 87414.07692307692
+    6:
+      backend_compute: *id013
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2780884.6153846155
+        7: 695221.1538461539
+        8: 157.53846153846155
+        9: 0.0
+      latencies:
+        0: 60150.403846153844
+        1: 222011.07692307694
+        2: 11609092.923076924
+        3: 401450.8461538461
+        4: 16598755.0
+        5: 501646.1538461539
+        6: 5679448262.230769
+        7: 1269627.6153846155
+        8: 13013576.923076924
+        9: 109924.92307692308
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2780884.6153846155
+        8: 695221.1538461539
+        9: 157.53846153846155
+      throughput: 50.524116067682925
+      wall_latencies:
+        0: 53055.36538461538
+        1: 181059.23076923078
+        2: 11206939.076923076
+        3: 301032.1538461539
+        4: 8839741.846153846
+        5: 377864.3076923077
+        6: 3611036426.923077
+        7: 472613.0
+        8: 5304324.846153846
+        9: 102609.30769230769
+    7:
+      backend_compute: *id014
+      input_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 714432.0
+        4: 714432.0
+        5: 714432.0
+        6: 2212683.0
+        7: 553170.75
+        8: 156.5
+        9: 0.0
+      latencies:
+        0: 57116.6875
+        1: 240513.8125
+        2: 15905191.75
+        3: 376581.5625
+        4: 11686320.875
+        5: 534011.5625
+        6: 5019005.0625
+        7: 5730639194.4375
+        8: 11173495.1875
+        9: 45965.9375
+      output_sizes:
+        0: 238144.0
+        1: 238144.0
+        2: 238144.0
+        3: 238144.0
+        4: 714432.0
+        5: 714432.0
+        6: 714432.0
+        7: 2212683.0
+        8: 553170.75
+        9: 156.5
+      throughput: 47.99827758412447
+      wall_latencies:
+        0: 49668.78125
+        1: 200348.9375
+        2: 15820319.875
+        3: 324977.0625
+        4: 8508938.1875
+        5: 156350.6875
+        6: 2605344.8125
+        7: 4022503217.875
+        8: 4860127.875
+        9: 103767.9375
+  TF_RAY: {}
+physical_model:
+  boundary:
+    RAY:
+      actor_locations:
+      - ip: 172.23.166.105
+        node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+      calibration_schema_version: 3
+      calibration_source: measured
+      driver_ip: 172.23.166.103
+      fixed_latency_ms: 7.402184470808814
+      measurements:
+      - boundary_sec_per_sample: 0.0021777287338409224
+        payload_bytes: 512.0
+      - boundary_sec_per_sample: 0.0022547463895534747
+        payload_bytes: 4096.0
+      - boundary_sec_per_sample: 0.003987690276517242
+        payload_bytes: 65536.0
+      - boundary_sec_per_sample: 0.034468896279577166
+        payload_bytes: 1048576.0
+      - boundary_sec_per_sample: 0.10976002145616803
+        payload_bytes: 4194304.0
+      - boundary_sec_per_sample: 0.3567114819525159
+        payload_bytes: 16777216.0
+      method: synchronous_round_trip_linear_fit
+      payload_bytes:
+      - 512
+      - 4096
+      - 65536
+      - 1048576
+      - 4194304
+      - 16777216
+      placement_resource: cedar_remote
+      r_squared: 0.9967566844143081
+      repetitions: 2
+      runs:
+      - boundary_sec_per_sample: 0.002221089121121622
+        payload_bytes: 512
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.0021343683465602226
+        payload_bytes: 512
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0022837921324025956
+        payload_bytes: 4096
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.002225700646704354
+        payload_bytes: 4096
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.004001706629424007
+        payload_bytes: 65536
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.003973673923610477
+        payload_bytes: 65536
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.03462802017384092
+        payload_bytes: 1048576
+        repeat: 1
+        samples: 128
+      - boundary_sec_per_sample: 0.03430977238531341
+        payload_bytes: 1048576
+        repeat: 2
+        samples: 128
+      - boundary_sec_per_sample: 0.10983662890794221
+        payload_bytes: 4194304
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.10968341400439385
+        payload_bytes: 4194304
+        repeat: 2
+        samples: 32
+      - boundary_sec_per_sample: 0.3552209731278708
+        payload_bytes: 16777216
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.358201990777161
+        payload_bytes: 16777216
+        repeat: 2
+        samples: 32
+      stage_width: 1
+      throughput_bytes_per_sec: 95022521.82434489
+      variant: RAY
+      warmup_samples: 20
+    SMP:
+      actor_locations: []
+      aggregate_transport:
+        boundary_pipe_ids:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        cpu_budget: 64
+        duration_per_repeat_sec: 1.0
+        max_inflight: 10
+        measured_repeats: 3
+        method: independent_Cedar_SMPActor_real_legal_boundary_objects
+        object_samples: 8
+        points:
+        - runs:
+          - elapsed_sec: 1.0004447689279914
+            samples: 1590
+            serialized_bytes: 1128494571
+            throughput_bytes_per_sec: 1127992874.8182852
+          - elapsed_sec: 1.0055962670594454
+            samples: 1560
+            serialized_bytes: 1107213315
+            throughput_bytes_per_sec: 1101051536.5552242
+          - elapsed_sec: 1.0064462288282812
+            samples: 1260
+            serialized_bytes: 895693932
+            throughput_bytes_per_sec: 889957065.1109493
+          throughput_bytes_per_sec: 1101051536.5552242
+          workers: 1
+        - runs:
+          - elapsed_sec: 1.0061430791392922
+            samples: 2700
+            serialized_bytes: 1916784412
+            throughput_bytes_per_sec: 1905081346.5215287
+          - elapsed_sec: 1.0018565519712865
+            samples: 2500
+            serialized_bytes: 1775310277
+            throughput_bytes_per_sec: 1772020428.9794183
+          - elapsed_sec: 1.0029410920105875
+            samples: 2390
+            serialized_bytes: 1696772561
+            throughput_bytes_per_sec: 1691796830.8572285
+          throughput_bytes_per_sec: 1772020428.9794183
+          workers: 2
+        - runs:
+          - elapsed_sec: 1.0064825522713363
+            samples: 5030
+            serialized_bytes: 3571901810
+            throughput_bytes_per_sec: 3548895906.778775
+          - elapsed_sec: 1.0088309878483415
+            samples: 4760
+            serialized_bytes: 3377943825
+            throughput_bytes_per_sec: 3348374371.6125913
+          - elapsed_sec: 1.007710108999163
+            samples: 4800
+            serialized_bytes: 3405857620
+            throughput_bytes_per_sec: 3379799001.304679
+          throughput_bytes_per_sec: 3379799001.304679
+          workers: 4
+        - runs:
+          - elapsed_sec: 1.0085659911856055
+            samples: 10190
+            serialized_bytes: 7234653834
+            throughput_bytes_per_sec: 7173208195.822075
+          - elapsed_sec: 1.0063695888966322
+            samples: 9280
+            serialized_bytes: 6588359649
+            throughput_bytes_per_sec: 6546660115.418803
+          - elapsed_sec: 1.0063038249500096
+            samples: 9000
+            serialized_bytes: 6384049267
+            throughput_bytes_per_sec: 6344057439.429033
+          throughput_bytes_per_sec: 6546660115.418803
+          workers: 8
+        - runs:
+          - elapsed_sec: 1.0037940279580653
+            samples: 30480
+            serialized_bytes: 21645697521
+            throughput_bytes_per_sec: 21563883543.94979
+          - elapsed_sec: 1.0038862670771778
+            samples: 36030
+            serialized_bytes: 25573355567
+            throughput_bytes_per_sec: 25474355418.225822
+          - elapsed_sec: 1.0047069881111383
+            samples: 36180
+            serialized_bytes: 25672276900
+            throughput_bytes_per_sec: 25552003921.326557
+          throughput_bytes_per_sec: 25474355418.225822
+          workers: 16
+        - runs:
+          - elapsed_sec: 1.0059098531492054
+            samples: 53190
+            serialized_bytes: 37764066510
+            throughput_bytes_per_sec: 37542197635.07824
+          - elapsed_sec: 1.0054513649083674
+            samples: 53850
+            serialized_bytes: 38220639529
+            throughput_bytes_per_sec: 38013414534.95691
+          - elapsed_sec: 1.0046923258341849
+            samples: 54180
+            serialized_bytes: 38453394937
+            throughput_bytes_per_sec: 38273801788.09724
+          throughput_bytes_per_sec: 38013414534.95691
+          workers: 32
+        schema_version: 1
+        snapshot_bytes:
+        - 238562
+        - 238562
+        - 238562
+        - 714852
+        - 714852
+        - 714852
+        - 2250422
+        - 562921
+        snapshot_sha256:
+        - ad32673326c2f615e722a68a6b5fcef6b28431de1299be23cc457c21c42a6d6b
+        - 31ce614318f648b1d1305ec9cdd58a541024e97fb529b5502241bd2b07bb00a9
+        - da175415729ebc5f1984cf5fec9b631e1ff2f38db41f80753fbe5ccbc4aac191
+        - 5379e1331a879f2b6300839b2ff58f2693c250e2a1e0455dc562880fe42fcef3
+        - 398b03d54c002a3340847cf288c0a668ade561cd3138c169d46a0e8795c2108f
+        - 398b03d54c002a3340847cf288c0a668ade561cd3138c169d46a0e8795c2108f
+        - a82df6691b1223bd16525d38d653666610354c875536448dee1c73b5c4f6b2c5
+        - e4274a519f4381e8c8531666c6bf06f420e3f35765ebf2d238f219e143af9d0b
+        timing_excludes_startup: true
+      calibration_schema_version: 3
+      calibration_source: measured
+      fixed_latency_ms: 0.0
+      measurements:
+      - boundary_sec_per_sample: 0.00022610073665418895
+        payload_bytes: 512.0
+      - boundary_sec_per_sample: 0.00024276013755297754
+        payload_bytes: 4096.0
+      - boundary_sec_per_sample: 0.0004278554629308928
+        payload_bytes: 65536.0
+      - boundary_sec_per_sample: 0.00419064732886909
+        payload_bytes: 1048576.0
+      - boundary_sec_per_sample: 0.015963131409080233
+        payload_bytes: 4194304.0
+      - boundary_sec_per_sample: 0.07590135138889309
+        payload_bytes: 16777216.0
+      method: synchronous_round_trip_linear_fit
+      payload_bytes:
+      - 512
+      - 4096
+      - 65536
+      - 1048576
+      - 4194304
+      - 16777216
+      r_squared: 0.9979268673698768
+      repetitions: 2
+      runs:
+      - boundary_sec_per_sample: 0.00022002110017638188
+        payload_bytes: 512
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.00023218037313199602
+        payload_bytes: 512
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0002425545626465464
+        payload_bytes: 4096
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.00024296571245940868
+        payload_bytes: 4096
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0004304419162508566
+        payload_bytes: 65536
+        repeat: 1
+        samples: 512
+      - boundary_sec_per_sample: 0.00042526900961092906
+        payload_bytes: 65536
+        repeat: 2
+        samples: 512
+      - boundary_sec_per_sample: 0.0040478172595612705
+        payload_bytes: 1048576
+        repeat: 1
+        samples: 128
+      - boundary_sec_per_sample: 0.00433347739817691
+        payload_bytes: 1048576
+        repeat: 2
+        samples: 128
+      - boundary_sec_per_sample: 0.016084810442407615
+        payload_bytes: 4194304
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.01584145237575285
+        payload_bytes: 4194304
+        repeat: 2
+        samples: 32
+      - boundary_sec_per_sample: 0.08170958419214003
+        payload_bytes: 16777216
+        repeat: 1
+        samples: 32
+      - boundary_sec_per_sample: 0.07009311858564615
+        payload_bytes: 16777216
+        repeat: 2
+        samples: 32
+      stage_width: 1
+      throughput_bytes_per_sec: 443068928.84192693
+      variant: SMP
+      warmup_samples: 20
+  compute_model:
+    class_transition:
+      '0':
+        list: list
+        path: list
+      '1':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+      '2':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+        uint8:1ch: uint8:1ch
+        uint8:3ch: uint8:3ch
+      '3':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:1ch
+        uint8:1ch: uint8:1ch
+        uint8:3ch: uint8:1ch
+      '4':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+        uint8:1ch: uint8:1ch
+        uint8:3ch: uint8:3ch
+      '5':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+        uint8:1ch: uint8:1ch
+        uint8:3ch: uint8:3ch
+      '6':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+        uint8:1ch: uint8:1ch
+        uint8:3ch: uint8:3ch
+      '7':
+        float32:1ch: float32:1ch
+        float32:3ch: float32:3ch
+        uint8:1ch: float32:1ch
+        uint8:3ch: float32:3ch
+      '8':
+        path: uint8:3ch
+    element_ratio:
+      '0': 1.0
+      '1': 1.0
+      '2': 1.0
+      '3': 0.3333333333333333
+      '4': 1.0
+      '5': 1.0
+      '6': 0.3175253333333333
+      '7': 1.0
+      '8': 5022.321428571428
+    measured_classes:
+      '0':
+      - float32:1ch
+      - float32:3ch
+      - list
+      - path
+      - uint8:1ch
+      - uint8:3ch
+      '1':
+      - float32:1ch
+      - float32:3ch
+      '2':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '3':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '4':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '5':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '6':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '7':
+      - float32:1ch
+      - float32:3ch
+      - uint8:1ch
+      - uint8:3ch
+      '8':
+      - path
+    method: per_representation_two_stratum_element_fit
+    note: cost = k_(operator, representation_class) * elements + b; the class comes
+      from payload dtype/channels/container, which a planner sees without running
+      the plan. Byte volumes remain the unit for boundaries and transport.
+    operators:
+      '0':
+        by_class:
+          float32:1ch:
+            b_ms: 0.0
+            k_ms_per_element: 5.976131773264986e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.027437972312327474
+            - - 750000.0
+              - 0.447560035972856
+            samples: 2
+          float32:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 1.988471781404626e-06
+            points_ms_per_element:
+            - - 141000.0
+              - 0.05306491977535188
+            - - 2250000.0
+              - 4.246751906757709
+            samples: 2
+          list:
+            b_ms: 0.01361736940452829
+            k_ms_per_element: 0.0
+            points_ms_per_element:
+            - - 224.0
+              - 0.01361736940452829
+            - - 896.0
+              - 0.0027314238832332194
+            samples: 1
+          path:
+            b_ms: 0.002638005535118282
+            k_ms_per_element: 0.0
+            points_ms_per_element:
+            - - 56.0
+              - 0.002638005535118282
+            - - 224.0
+              - 0.0023652499658055604
+            samples: 1
+          uint8:1ch:
+            b_ms: 0.030199588893049637
+            k_ms_per_element: 1.533142087986404e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.037405356706585735
+            - - 750000.0
+              - 0.14518524549202994
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.0009954687069497412
+            k_ms_per_element: 2.0373581178687714e-07
+            points_ms_per_element:
+            - - 141000.0
+              - 0.029722218168899417
+            - - 2250000.0
+              - 0.4594010452274233
+            samples: 2
+        own_class: float32:1ch
+        own_elements: 59536.0
+      '1':
+        by_class:
+          float32:1ch:
+            b_ms: 0.05864845759700321
+            k_ms_per_element: 1.0805891245169034e-06
+            points_ms_per_element:
+            - - 47000.0
+              - 0.10943614644929767
+            - - 750000.0
+              - 0.8690903009846807
+            samples: 2
+          float32:3ch:
+            b_ms: 0.009606253641563478
+            k_ms_per_element: 1.107147995152035e-06
+            points_ms_per_element:
+            - - 141000.0
+              - 0.16571412095800042
+            - - 2250000.0
+              - 2.5006892427336425
+            samples: 2
+        own_class: float32:1ch
+        own_elements: 59536.0
+      '2':
+        by_class:
+          float32:1ch:
+            b_ms: 0.0
+            k_ms_per_element: 0.00020059192972622048
+            points_ms_per_element:
+            - - 47000.0
+              - 6.927102513145655
+            - - 750000.0
+              - 147.94322911067866
+            samples: 2
+          float32:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 7.996049219503515e-05
+            points_ms_per_element:
+            - - 141000.0
+              - 7.919644210487605
+            - - 2250000.0
+              - 176.55632224981673
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.35256413475128134
+            k_ms_per_element: 0.00015055981086458412
+            points_ms_per_element:
+            - - 47000.0
+              - 7.428875245386735
+            - - 750000.0
+              - 113.27242228318937
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 8.431662290148179e-05
+            points_ms_per_element:
+            - - 141000.0
+              - 9.83466378878802
+            - - 2250000.0
+              - 187.65842148801312
+            samples: 2
+        own_class: float32:1ch
+        own_elements: 59536.0
+      '3':
+        by_class:
+          float32:1ch:
+            b_ms: 0.020817542835476557
+            k_ms_per_element: 5.204387798714604e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.045278165489435196
+            - - 750000.0
+              - 0.41114662773907185
+            samples: 2
+          float32:3ch:
+            b_ms: 0.021655984541830486
+            k_ms_per_element: 1.0359114366718213e-06
+            points_ms_per_element:
+            - - 141000.0
+              - 0.1677194971125573
+            - - 2250000.0
+              - 2.3524567170534283
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.027954239448914
+            k_ms_per_element: 7.727902096459062e-08
+            points_ms_per_element:
+            - - 47000.0
+              - 0.03158635343424976
+            - - 750000.0
+              - 0.08591350517235696
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.006739039985518669
+            k_ms_per_element: 1.3921582464600356e-06
+            points_ms_per_element:
+            - - 141000.0
+              - 0.20303335273638368
+            - - 2250000.0
+              - 3.1390950945205986
+            samples: 2
+        own_class: float32:3ch
+        own_elements: 178608.0
+      '4':
+        by_class:
+          float32:1ch:
+            b_ms: 0.34957861361540277
+            k_ms_per_element: 4.4005314251845156e-06
+            points_ms_per_element:
+            - - 47000.0
+              - 0.556403590599075
+            - - 750000.0
+              - 3.6499771825037897
+            samples: 2
+          float32:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 6.246422240824115e-05
+            points_ms_per_element:
+            - - 141000.0
+              - 7.54442865261808
+            - - 2250000.0
+              - 139.28147371159866
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.35894371827654964
+            k_ms_per_element: 5.6244826949814895e-06
+            points_ms_per_element:
+            - - 47000.0
+              - 0.6232944049406797
+            - - 750000.0
+              - 4.577305739512667
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 6.77146620040732e-05
+            points_ms_per_element:
+            - - 141000.0
+              - 8.254719682736322
+            - - 2250000.0
+              - 151.06494184932671
+            samples: 2
+        own_class: float32:3ch
+        own_elements: 178608.0
+      '5':
+        by_class:
+          float32:1ch:
+            b_ms: 0.028549258052046868
+            k_ms_per_element: 3.294350021647271e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.04403270315378904
+            - - 750000.0
+              - 0.2756255096755922
+            samples: 2
+          float32:3ch:
+            b_ms: 0.012812316492213142
+            k_ms_per_element: 3.387169834516056e-07
+            points_ms_per_element:
+            - - 141000.0
+              - 0.06057141115888953
+            - - 2250000.0
+              - 0.7749255292583257
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.036220916462095076
+            k_ms_per_element: 4.2713417474228155e-08
+            points_ms_per_element:
+            - - 47000.0
+              - 0.0382284470833838
+            - - 750000.0
+              - 0.06825597956776619
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.03114359687144734
+            k_ms_per_element: 8.624781854009108e-08
+            points_ms_per_element:
+            - - 141000.0
+              - 0.043304539285600185
+            - - 2250000.0
+              - 0.22520118858665228
+            samples: 2
+        own_class: float32:3ch
+        own_elements: 178608.0
+      '6':
+        by_class:
+          float32:1ch:
+            b_ms: 0.556607063030718
+            k_ms_per_element: 7.09037304422679e-08
+            points_ms_per_element:
+            - - 47000.0
+              - 0.5599395383615047
+            - - 750000.0
+              - 0.609784860862419
+            samples: 2
+          float32:3ch:
+            b_ms: 1.5150920755397475
+            k_ms_per_element: 4.18649362413422e-07
+            points_ms_per_element:
+            - - 141000.0
+              - 1.57412163564004
+            - - 2250000.0
+              - 2.457053140969947
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.6223102583043849
+            k_ms_per_element: 2.3689810888759611e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.633444469422102
+            - - 750000.0
+              - 0.799983839970082
+            samples: 2
+          uint8:3ch:
+            b_ms: 1.6924345401625094
+            k_ms_per_element: 5.812301035951019e-07
+            points_ms_per_element:
+            - - 141000.0
+              - 1.7743879847694188
+            - - 2250000.0
+              - 3.000202273251489
+            samples: 2
+        own_class: float32:3ch
+        own_elements: 562500.0
+      '7':
+        by_class:
+          float32:1ch:
+            b_ms: 0.0020740809850394726
+            k_ms_per_element: 0.0
+            points_ms_per_element:
+            - - 47000.0
+              - 0.0020740809850394726
+            - - 750000.0
+              - 0.00196383916772902
+            samples: 2
+          float32:3ch:
+            b_ms: 0.0017304606103122361
+            k_ms_per_element: 1.140511358459734e-10
+            points_ms_per_element:
+            - - 141000.0
+              - 0.0017465418204665184
+            - - 2250000.0
+              - 0.0019870756659656763
+            samples: 2
+          uint8:1ch:
+            b_ms: 0.0016121763141844318
+            k_ms_per_element: 3.6995821025694165e-07
+            points_ms_per_element:
+            - - 47000.0
+              - 0.01900021219626069
+            - - 750000.0
+              - 0.27908083400689065
+            samples: 2
+          uint8:3ch:
+            b_ms: 0.0
+            k_ms_per_element: 4.844091215068028e-07
+            points_ms_per_element:
+            - - 141000.0
+              - 0.038011017022654414
+            - - 2250000.0
+              - 1.0596298542805016
+            samples: 2
+        own_class: uint8:3ch
+        own_elements: 562500.0
+      '8':
+        by_class:
+          path:
+            b_ms: 2.8696697438135743
+            k_ms_per_element: 0.0
+            points_ms_per_element:
+            - - 112.0
+              - 2.8696697438135743
+            - - 112.0
+              - 2.8696697438135743
+            samples: 1
+        own_class: path
+        own_elements: 112.0
+    scale: payload elements (C*H*W for images, bytes for text)
+    schema_version: 1
+    source_class: path
+    source_elements: 112.0
+    statistic: mean_ms_per_callable_call
+  cuda_workload:
+    operators: {}
+    schema_version: 1
+  object_boundary:
+    RAY:
+      handoff_model: paired_probe_v1
+      method: cedar_identity_stage_real_legal_objects
+      operators:
+        0:
+          input_identity_stage: &id015
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4821092379279435
+              epoch_records: 49
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.08421535832277896
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.0800884049385786
+              width: 1
+            backend_compute_ms_per_sample: 0.002618076923076923
+            fetch_ms_per_sample: 0.6123168018018018
+            input_records: 147
+            mean_ms_per_sample: 10.082375768217302
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 4
+            submit_ms_per_sample: 0.7196621351351351
+          input_pipe_id: 1
+          input_serialize_ms_per_sample: 0.2417967189103365
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.44228555634617805
+          output_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.9227009606547654
+              epoch_records: 14
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.05000029278397362
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.06876795226708055
+              width: 1
+            backend_compute_ms_per_sample: 0.007349880952380952
+            fetch_ms_per_sample: 1.1197138095238095
+            input_records: 42
+            mean_ms_per_sample: 21.969070491780126
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 1.415540357142857
+          output_serialized_bytes_per_sample: 953003.0
+        1:
+          input_identity_stage: &id016
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1816277876496315
+              epoch_records: 39
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.03344603394587582
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.10030695097520947
+              width: 1
+            backend_compute_ms_per_sample: 0.002427908333333334
+            fetch_ms_per_sample: 0.5861895287356322
+            input_records: 117
+            mean_ms_per_sample: 10.0993828004242
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 4
+            submit_ms_per_sample: 0.7078602528735632
+          input_pipe_id: 2
+          input_serialize_ms_per_sample: 0.3330325707793236
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.22065662778913975
+          output_identity_stage: *id015
+          output_serialized_bytes_per_sample: 238562.0
+        2:
+          input_identity_stage: &id017
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.298311100807041
+              epoch_records: 33
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.092859584550064
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.1183898476883769
+              width: 1
+            backend_compute_ms_per_sample: 0.0033195208333333336
+            fetch_ms_per_sample: 0.5438900999999999
+            input_records: 132
+            mean_ms_per_sample: 9.835690157629099
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 4
+            submit_ms_per_sample: 0.72944761
+          input_pipe_id: 3
+          input_serialize_ms_per_sample: 0.332430936396122
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.29485300183296204
+          output_identity_stage: *id016
+          output_serialized_bytes_per_sample: 238562.0
+        3:
+          input_identity_stage: &id018
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.6344526531174779
+              epoch_records: 18
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.011674830791844159
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.05551727022975683
+              width: 1
+            backend_compute_ms_per_sample: 0.007469861111111111
+            fetch_ms_per_sample: 0.9946862777777777
+            input_records: 36
+            mean_ms_per_sample: 17.62368480881883
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 1.311107111111111
+          input_pipe_id: 4
+          input_serialize_ms_per_sample: 0.5348084960132837
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.2987300977110863
+          output_identity_stage: *id017
+          output_serialized_bytes_per_sample: 238562.0
+        4:
+          input_identity_stage: &id019
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.6764906970784068
+              epoch_records: 19
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.028270591894769197
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.050134269054979086
+              width: 1
+            backend_compute_ms_per_sample: 0.007642921052631579
+            fetch_ms_per_sample: 1.0756377105263157
+            input_records: 38
+            mean_ms_per_sample: 17.802386765221232
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 1.3035160526315788
+          input_pipe_id: 5
+          input_serialize_ms_per_sample: 0.5050364416092634
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.5019470117986202
+          output_identity_stage: *id018
+          output_serialized_bytes_per_sample: 714852.0
+        5:
+          input_identity_stage: &id020
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.6742021515965462
+              epoch_records: 19
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.04347934114777277
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.05219143070280552
+              width: 1
+            backend_compute_ms_per_sample: 0.007894105263157895
+            fetch_ms_per_sample: 0.8516548157894737
+            input_records: 38
+            mean_ms_per_sample: 17.742161884119636
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 1.305610105263158
+          input_pipe_id: 6
+          input_serialize_ms_per_sample: 0.5154679529368877
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.44129835441708565
+          output_identity_stage: *id019
+          output_serialized_bytes_per_sample: 714852.0
+        6:
+          input_identity_stage: &id021
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.7942493339069188
+              epoch_records: 7
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.04658444863168784
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 2
+              warmup_sec: 0.1392118907533586
+              width: 1
+            backend_compute_ms_per_sample: 0.008349371428571428
+            fetch_ms_per_sample: 1.7354343714285714
+            input_records: 35
+            mean_ms_per_sample: 51.26426668305482
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 2.0302597714285713
+          input_pipe_id: 7
+          input_serialize_ms_per_sample: 1.1049546301364899
+          input_serialized_bytes_per_sample: 2250422.0
+          output_deserialize_ms_per_sample: 0.4470136482268572
+          output_identity_stage: *id020
+          output_serialized_bytes_per_sample: 714852.0
+        7:
+          input_identity_stage: &id022
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.7003464242443442
+              epoch_records: 16
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 2
+              observed_rse: 0.059581056193086755
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 2
+              warmup_sec: 0.05972967389971018
+              width: 1
+            backend_compute_ms_per_sample: 0.008066041666666668
+            fetch_ms_per_sample: 0.9476039791666666
+            input_records: 48
+            mean_ms_per_sample: 14.590550505090505
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 1
+            submit_ms_per_sample: 1.1905920208333332
+          input_pipe_id: 8
+          input_serialize_ms_per_sample: 0.44215843081474304
+          input_serialized_bytes_per_sample: 562921.0
+          output_deserialize_ms_per_sample: 1.0501688811928034
+          output_identity_stage: *id021
+          output_serialized_bytes_per_sample: 2250422.0
+        8:
+          input_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.37550291698426
+              epoch_records: 4096
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 1000
+              observed_rse: 0.03764024163038001
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 1000
+              warmup_sec: 0.0648423358798027
+              width: 1
+            backend_compute_ms_per_sample: 0.0002744703657407406
+            fetch_ms_per_sample: 0.00047682383166136534
+            input_records: 16384
+            mean_ms_per_sample: 0.08395403546046509
+            method: cedar_identity_stage_real_objects
+            path_timing_method: client_perf_counter_around_submit_and_ray_get
+            submit_batch_size: 500
+            submit_ms_per_sample: 0.0008251041105945681
+          input_pipe_id: 9
+          input_serialize_ms_per_sample: 0.005858251824975014
+          input_serialized_bytes_per_sample: 127.0
+          output_deserialize_ms_per_sample: 0.399906188249588
+          output_identity_stage: *id022
+          output_serialized_bytes_per_sample: 562921.0
+      paired_pairs: 30
+      schema_version: 3
+    SMP:
+      handoff_model: full_round_trip_only
+      method: cedar_identity_stage_real_legal_objects
+      operators:
+        0:
+          input_identity_stage: &id023
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5408999710343778
+              epoch_records: 74
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.018729355552920452
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.026706032920628786
+              width: 1
+            backend_compute_ms_per_sample: 0.0019320405405405406
+            fetch_ms_per_sample: null
+            input_records: 370
+            mean_ms_per_sample: 1.4618918136064265
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 1
+          input_serialize_ms_per_sample: 0.2676681615412235
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.642433064058423
+          output_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.6102265170775354
+              epoch_records: 69
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.03516225186756869
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.028693410102277994
+              width: 1
+            backend_compute_ms_per_sample: 0.002482990338164251
+            fetch_ms_per_sample: null
+            input_records: 207
+            mean_ms_per_sample: 2.9479541887803644
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          output_serialized_bytes_per_sample: 953003.0
+        1:
+          input_identity_stage: &id024
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5619764658622444
+              epoch_records: 67
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.01830132327801866
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.02984190732240677
+              width: 1
+            backend_compute_ms_per_sample: 0.0031384216417910445
+            fetch_ms_per_sample: null
+            input_records: 268
+            mean_ms_per_sample: 2.096927111426285
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 2
+          input_serialize_ms_per_sample: 0.28342287987470627
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.29919552616775036
+          output_identity_stage: *id023
+          output_serialized_bytes_per_sample: 238562.0
+        2:
+          input_identity_stage: &id025
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5909423381090164
+              epoch_records: 62
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.0068212270042479085
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.03203594172373414
+              width: 1
+            backend_compute_ms_per_sample: 0.002873245161290322
+            fetch_ms_per_sample: null
+            input_records: 310
+            mean_ms_per_sample: 1.9062656068032788
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 3
+          input_serialize_ms_per_sample: 0.26788143441081047
+          input_serialized_bytes_per_sample: 238562.0
+          output_deserialize_ms_per_sample: 0.32592262141406536
+          output_identity_stage: *id024
+          output_serialized_bytes_per_sample: 238562.0
+        3:
+          input_identity_stage: &id026
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5390367219224572
+              epoch_records: 70
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.018904437521291607
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.028291242197155952
+              width: 1
+            backend_compute_ms_per_sample: 0.0029956666666666664
+            fetch_ms_per_sample: null
+            input_records: 210
+            mean_ms_per_sample: 2.566841532964082
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 4
+          input_serialize_ms_per_sample: 0.37822360172867775
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.29055308550596237
+          output_identity_stage: *id025
+          output_serialized_bytes_per_sample: 238562.0
+        4:
+          input_identity_stage: &id027
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5977007830515504
+              epoch_records: 67
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.006759464196932096
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.02976778196170926
+              width: 1
+            backend_compute_ms_per_sample: 0.0030272723880597012
+            fetch_ms_per_sample: null
+            input_records: 268
+            mean_ms_per_sample: 2.230226802431158
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 5
+          input_serialize_ms_per_sample: 0.3783868160098791
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.4095949698239565
+          output_identity_stage: *id026
+          output_serialized_bytes_per_sample: 714852.0
+        5:
+          input_identity_stage: &id028
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5555038871243596
+              epoch_records: 74
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.015848007495709453
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.026889503933489323
+              width: 1
+            backend_compute_ms_per_sample: 0.0013990337837837838
+            fetch_ms_per_sample: null
+            input_records: 296
+            mean_ms_per_sample: 1.8767023213660798
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 6
+          input_serialize_ms_per_sample: 0.41918898932635784
+          input_serialized_bytes_per_sample: 714852.0
+          output_deserialize_ms_per_sample: 0.3939010202884674
+          output_identity_stage: *id027
+          output_serialized_bytes_per_sample: 714852.0
+        6:
+          input_identity_stage: &id029
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.6133849290199578
+              epoch_records: 75
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.012652605327028143
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 4
+              warmup_sec: 0.026519323233515024
+              width: 1
+            backend_compute_ms_per_sample: 0.0027677466666666665
+            fetch_ms_per_sample: null
+            input_records: 150
+            mean_ms_per_sample: 4.089232860133052
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 7
+          input_serialize_ms_per_sample: 0.9971845429390669
+          input_serialized_bytes_per_sample: 2250422.0
+          output_deserialize_ms_per_sample: 0.43144170194864273
+          output_identity_stage: *id028
+          output_serialized_bytes_per_sample: 714852.0
+        7:
+          input_identity_stage: &id030
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5076376739889383
+              epoch_records: 75
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.018388918018622764
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.026375768706202507
+              width: 1
+            backend_compute_ms_per_sample: 0.0030242266666666664
+            fetch_ms_per_sample: null
+            input_records: 225
+            mean_ms_per_sample: 2.256167439950837
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 8
+          input_serialize_ms_per_sample: 0.36277039907872677
+          input_serialized_bytes_per_sample: 562921.0
+          output_deserialize_ms_per_sample: 1.0075005702674389
+          output_identity_stage: *id029
+          output_serialized_bytes_per_sample: 2250422.0
+        8:
+          input_identity_stage:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 0.5048384396359324
+              epoch_records: 87
+              max_duration_sec: 3.0
+              min_duration_sec: 0.5
+              min_observations: 30
+              minimum_parallel_epoch_records: 4
+              observed_rse: 0.007208649043553717
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 4
+              warmup_sec: 0.022815627977252007
+              width: 1
+            backend_compute_ms_per_sample: 0.0009721792058516196
+            fetch_ms_per_sample: null
+            input_records: 3828
+            mean_ms_per_sample: 0.13188047012432927
+            method: cedar_identity_stage_real_objects
+            path_timing_method: null
+            submit_batch_size: 1
+            submit_ms_per_sample: null
+          input_pipe_id: 9
+          input_serialize_ms_per_sample: 0.0016069971024990082
+          input_serialized_bytes_per_sample: 127.0
+          output_deserialize_ms_per_sample: 0.39317808113992214
+          output_identity_stage: *id030
+          output_serialized_bytes_per_sample: 562921.0
+      schema_version: 3
+  operator_affine:
+    method: two_stratum_operator_affine_fit
+    min_contrast: 1.1
+    note: cost(record) = k * input_bytes + b, fitted on the smallest and largest legal
+      inputs that reached the operator, or on rescaled versions of its own legal input
+      when those inputs have no size contrast. Operators whose cost is flat in the
+      payload keep k = 0 and are handled by the same equation. fixed_fraction = b
+      / (k * x_reference + b) is the share of the operator's reference cost that does
+      not shrink with the payload
+    operators:
+      '0':
+        b_ms: 0.026695171527535422
+        fixed_fraction: 1.0
+        k_ms_per_byte: 0.0
+        measurement: batcher
+        reason: no_legal_size_contrast
+        status: constant_measured
+        x_reference_bytes: 238144.0
+      '1':
+        b_ms: 0.05313777826979021
+        fixed_fraction: 0.455561
+        k_ms_per_byte: 2.666655063657721e-07
+        measurement: callable
+        points_ms_per_byte:
+        - - 59945.0
+          - 0.06912304204888642
+        - - 953001.0
+          - 0.3072702725018774
+        source: rescaled_legal_input
+        x_reference_bytes: 238144.0
+      '2':
+        b_ms: 1.7704001422693512
+        fixed_fraction: 0.470459
+        k_ms_per_byte: 8.367763913530477e-06
+        measurement: callable
+        points_ms_per_byte:
+        - - 59945.0
+          - 2.2720057500659356
+        - - 953001.0
+          - 9.74488751962781
+        source: rescaled_legal_input
+        x_reference_bytes: 238144.0
+      '3':
+        b_ms: 0.049598968695822115
+        fixed_fraction: 0.241282
+        k_ms_per_byte: 2.1830718740675066e-07
+        measurement: callable
+        points_ms_per_byte:
+        - - 179026.0
+          - 0.08868163122850306
+        - - 2858153.0
+          - 0.6735543113039887
+        source: rescaled_legal_input
+        x_reference_bytes: 714432.0
+      '4':
+        b_ms: 0.365721931056485
+        fixed_fraction: 0.041853
+        k_ms_per_byte: 1.1719110187201142e-05
+        measurement: callable
+        points_ms_per_byte:
+        - - 179026.0
+          - 2.4637473514303565
+        - - 2858153.0
+          - 33.86073186993599
+        source: rescaled_legal_input
+        x_reference_bytes: 714432.0
+      '5':
+        b_ms: 0.02548254766062786
+        fixed_fraction: 0.299704
+        k_ms_per_byte: 8.334339628358878e-08
+        measurement: callable
+        points_ms_per_byte:
+        - - 179026.0
+          - 0.040403182523693626
+        - - 2858153.0
+          - 0.26369072577875596
+        source: rescaled_legal_input
+        x_reference_bytes: 714432.0
+      '6':
+        b_ms: 1.3966029839659344
+        fixed_fraction: 0.803161
+        k_ms_per_byte: 1.698672938343328e-07
+        measurement: callable
+        points_ms_per_byte:
+        - - 1500421.0
+          - 1.6514754388481379
+        - - 2250422.0
+          - 1.7788760790911813
+        source: legal_inputs
+        x_reference_bytes: 2014982.0
+      '7':
+        b_ms: 0.0
+        fixed_fraction: 0.0
+        k_ms_per_byte: 3.9435005660217745e-07
+        measurement: callable
+        points_ms_per_byte:
+        - - 226058.5
+          - 0.07273752190586594
+        - - 562921.0
+          - 0.20557926784801694
+        source: legal_inputs
+        x_reference_bytes: 503745.5
+      '8':
+        b_ms: 1.9631879829103127
+        fixed_fraction: 1.0
+        k_ms_per_byte: 0.0
+        measurement: image_reader
+        reason: no_legal_size_contrast
+        status: constant_measured
+        x_reference_bytes: 157.77777777777777
+    schema_version: 1
+    unfitted_operators: []
+    unfitted_reasons:
+      '9': not_a_single_input_stage
+  scaling:
+    RAY:
+      2:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 9.923501065624999
+          - - 2
+            - 9.923501065624999
+          - - 4
+            - 9.923501065624999
+          - - 8
+            - 9.923501065624999
+          r_squared: 1.0
+          scale_ms: 9.923501065625
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id002
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4889195067808032
+              epoch_records: 31
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.0979421868936405
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.12707417225465178
+              width: 2
+            count: 186
+            end_to_end_ms_per_input_sample: 8.004943584843028
+            mean_ms_per_sample: 10.333020188172043
+            measured_input_records: 186
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 13.802366235412725
+            stderr_ms_per_sample: 1.0120385944457064
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.6889134109951556
+              epoch_records: 60
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.091202695379308
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.13131216587498784
+              width: 4
+            count: 300
+            end_to_end_ms_per_input_sample: 5.629711369983852
+            mean_ms_per_sample: 11.477737953333333
+            measured_input_records: 300
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 18.131118907603206
+            stderr_ms_per_sample: 1.0468006382013821
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1899348488077521
+              epoch_records: 89
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.09130040036827312
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.17899620532989502
+              width: 8
+            count: 267
+            end_to_end_ms_per_input_sample: 4.4566848269953265
+            mean_ms_per_sample: 11.566668344569289
+            measured_input_records: 267
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 17.2558594895443
+            stderr_ms_per_sample: 1.056041450786207
+            trial_label: single
+      3:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 0.613801725
+          - - 2
+            - 0.613801725
+          - - 4
+            - 0.613801725
+          - - 8
+            - 0.613801725
+          r_squared: 1.0
+          scale_ms: 0.613801725
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id003
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1480720238760114
+              epoch_records: 37
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.014382645453760447
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.10674328589811921
+              width: 2
+            count: 111
+            end_to_end_ms_per_input_sample: 10.342991206090193
+            mean_ms_per_sample: 0.6955256666666666
+            measured_input_records: 111
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.10539340249381975
+            stderr_ms_per_sample: 0.010003499067657037
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2995797749608755
+              epoch_records: 45
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.021372184922510817
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.17732519609853625
+              width: 4
+            count: 135
+            end_to_end_ms_per_input_sample: 9.626516851562041
+            mean_ms_per_sample: 0.8804516518518518
+            measured_input_records: 135
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.21863582221985273
+            stderr_ms_per_sample: 0.01881717551870789
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.3363001109100878
+              epoch_records: 48
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.014042515495414335
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.33293553488329053
+              width: 8
+            count: 144
+            end_to_end_ms_per_input_sample: 9.279861881320054
+            mean_ms_per_sample: 0.7713039861111112
+            measured_input_records: 144
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.1299725781196815
+            stderr_ms_per_sample: 0.010831048176640122
+            trial_label: single
+      4:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 9.921495703333331
+          - - 2
+            - 9.921495703333331
+          - - 4
+            - 9.921495703333331
+          - - 8
+            - 9.921495703333331
+          r_squared: 1.0
+          scale_ms: 9.92149570333333
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id004
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0527440193109214
+              epoch_records: 22
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.044060761713410626
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.1778604001738131
+              width: 2
+            count: 66
+            end_to_end_ms_per_input_sample: 15.950666959256385
+            mean_ms_per_sample: 14.622144439393939
+            measured_input_records: 66
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 5.234015907658323
+            stderr_ms_per_sample: 0.6442628218832085
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2586431768722832
+              epoch_records: 28
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.027685689939191103
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.2814040253870189
+              width: 4
+            count: 84
+            end_to_end_ms_per_input_sample: 14.983847343717658
+            mean_ms_per_sample: 17.985997964285712
+            measured_input_records: 84
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 4.563830787179016
+            stderr_ms_per_sample: 0.4979547628861366
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0103309000842273
+              epoch_records: 35
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.021684149805915355
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.455327482894063
+              width: 8
+            count: 70
+            end_to_end_ms_per_input_sample: 14.433298572631818
+            mean_ms_per_sample: 20.425119
+            measured_input_records: 70
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 3.7055784704341512
+            stderr_ms_per_sample: 0.442901340199648
+            trial_label: single
+      6:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 3.8531248233333333
+          - - 2
+            - 3.8531248233333333
+          - - 4
+            - 3.8531248233333333
+          - - 8
+            - 3.8531248233333333
+          r_squared: 1.0
+          scale_ms: 3.8531248233333333
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id006
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.197046410292387
+              epoch_records: 12
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.011256155546699459
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 8
+              warmup_sec: 0.3141916086897254
+              width: 2
+            count: 36
+            end_to_end_ms_per_input_sample: 33.251289174788525
+            mean_ms_per_sample: 4.757445277777778
+            measured_input_records: 36
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.3213032643094649
+            stderr_ms_per_sample: 0.053550544051577484
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0096489400602877
+              epoch_records: 16
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.021717093523759976
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 16
+              warmup_sec: 0.5357688660733402
+              width: 4
+            count: 32
+            end_to_end_ms_per_input_sample: 31.55152937688399
+            mean_ms_per_sample: 4.9068380625
+            measured_input_records: 32
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.602807179591421
+            stderr_ms_per_sample: 0.1065622611092577
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.7906950530596077
+              epoch_records: 32
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.01695666385833445
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 32
+              warmup_sec: 0.9181519621051848
+              width: 8
+            count: 64
+            end_to_end_ms_per_input_sample: 27.97961020405637
+            mean_ms_per_sample: 4.7054754375
+            measured_input_records: 64
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.6383133222986938
+            stderr_ms_per_sample: 0.07978916528733672
+            trial_label: single
+      7:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 0.43489317999999993
+          - - 2
+            - 0.43489317999999993
+          - - 4
+            - 0.43489317999999993
+          - - 8
+            - 0.43489317999999993
+          r_squared: 1.0
+          scale_ms: 0.43489317999999993
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id007
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 3.2424355088733137
+              epoch_records: 14
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.09884231040150931
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.2780113508924842
+              width: 2
+            count: 98
+            end_to_end_ms_per_input_sample: 33.08607662115626
+            mean_ms_per_sample: 0.7683357040816327
+            measured_input_records: 98
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.7518079973660226
+            stderr_ms_per_sample: 0.07594407615539894
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 2.952317639719695
+              epoch_records: 16
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.09207601296488756
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.5266923722811043
+              width: 4
+            count: 96
+            end_to_end_ms_per_input_sample: 30.753308747080155
+            mean_ms_per_sample: 0.8890362708333334
+            measured_input_records: 96
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.8020502925461848
+            stderr_ms_per_sample: 0.08185891519950529
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 2.656549422070384
+              epoch_records: 32
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.09940803248241435
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.9561194218695164
+              width: 8
+            count: 96
+            end_to_end_ms_per_input_sample: 27.672389813233167
+            mean_ms_per_sample: 0.9371731770833334
+            measured_input_records: 96
+            method: worker_wall_clock
+            observation_unit: actor_batch_mean
+            stddev_ms_per_sample: 0.91280276052883
+            stderr_ms_per_sample: 0.09316254162914746
+            trial_label: single
+    SMP:
+      2:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 9.410377517006804
+          - - 2
+            - 9.410377517006804
+          - - 4
+            - 9.410377517006804
+          - - 8
+            - 9.410377517006804
+          r_squared: 1.0
+          scale_ms: 9.410377517006804
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id009
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.847850820980966
+              epoch_records: 79
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.0895670110933781
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.05032080598175526
+              width: 2
+            count: 316
+            end_to_end_ms_per_input_sample: 5.847629180319513
+            mean_ms_per_sample: 9.843069012658228
+            measured_input_records: 316
+            method: worker_wall_clock
+            stddev_ms_per_sample: 15.671918091448982
+            stderr_ms_per_sample: 0.8816142714496457
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.507218019105494
+              epoch_records: 155
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.07243476903866648
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.051480380818247795
+              width: 4
+            count: 465
+            end_to_end_ms_per_input_sample: 3.2413290733451485
+            mean_ms_per_sample: 10.45516191827957
+            measured_input_records: 465
+            method: worker_wall_clock
+            stddev_ms_per_sample: 16.330681893116495
+            stderr_ms_per_sample: 0.7573172388124418
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4747564671561122
+              epoch_records: 235
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.06010886573321349
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.0678649889305234
+              width: 8
+            count: 705
+            end_to_end_ms_per_input_sample: 2.091853144902287
+            mean_ms_per_sample: 10.87228614184397
+            measured_input_records: 705
+            method: worker_wall_clock
+            stddev_ms_per_sample: 17.352176845152165
+            stderr_ms_per_sample: 0.6535207879131769
+            trial_label: single
+      3:
+        fit:
+          exponent: 0.0799082858947274
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 0.9561913201058201
+          - - 2
+            - 0.9561913201058201
+          - - 4
+            - 0.8325451969273744
+          - - 8
+            - 0.8325451969273744
+          r_squared: 0.4400000000000003
+          scale_ms: 0.9300737807376176
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id010
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2060572253540158
+              epoch_records: 138
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.00591607997091051
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.02898051170632243
+              width: 2
+            count: 552
+            end_to_end_ms_per_input_sample: 2.184886277815246
+            mean_ms_per_sample: 1.0966052155797101
+            measured_input_records: 552
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.15242418513029304
+            stderr_ms_per_sample: 0.006487604151887125
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.3884102031588554
+              epoch_records: 179
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.012798962391473231
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.044627455063164234
+              width: 4
+            count: 716
+            end_to_end_ms_per_input_sample: 1.9391203954732619
+            mean_ms_per_sample: 0.8325451969273744
+            measured_input_records: 716
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.2851274918185206
+            stderr_ms_per_sample: 0.01065571466467514
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2902051410637796
+              epoch_records: 198
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.008102270452702807
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.08072846289724112
+              width: 8
+            count: 594
+            end_to_end_ms_per_input_sample: 2.1720625270434
+            mean_ms_per_sample: 1.096336138047138
+            measured_input_records: 594
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.21649291499006387
+            stderr_ms_per_sample: 0.008882811897529631
+            trial_label: single
+      4:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 8.613391341137124
+          - - 2
+            - 8.613391341137124
+          - - 4
+            - 8.613391341137124
+          - - 8
+            - 8.613391341137124
+          r_squared: 1.0
+          scale_ms: 8.613391341137122
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id011
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1646191156469285
+              epoch_records: 47
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.008139779759638406
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.08496476197615266
+              width: 2
+            count: 188
+            end_to_end_ms_per_input_sample: 6.194782530036854
+            mean_ms_per_sample: 9.604969638297872
+            measured_input_records: 188
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.0719822028699317
+            stderr_ms_per_sample: 0.07818233745375844
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1677152561023831
+              epoch_records: 77
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.011092956242574796
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.10338207567110658
+              width: 4
+            count: 308
+            end_to_end_ms_per_input_sample: 3.7912832990337115
+            mean_ms_per_sample: 10.520144230519481
+            measured_input_records: 308
+            method: worker_wall_clock
+            stddev_ms_per_sample: 2.0480679062914433
+            stderr_ms_per_sample: 0.11669949961472831
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.256325467955321
+              epoch_records: 128
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.009338982648601677
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.12481376202777028
+              width: 8
+            count: 512
+            end_to_end_ms_per_input_sample: 2.4537606796002365
+            mean_ms_per_sample: 12.9379835546875
+            measured_input_records: 512
+            method: worker_wall_clock
+            stddev_ms_per_sample: 2.7340165788791984
+            stderr_ms_per_sample: 0.1208276039251204
+            trial_label: single
+      6:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 2.647206101190476
+          - - 2
+            - 2.647206101190476
+          - - 4
+            - 2.647206101190476
+          - - 8
+            - 2.647206101190476
+          r_squared: 1.0
+          scale_ms: 2.647206101190476
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id013
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.2122428552247584
+              epoch_records: 63
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.013264468482898044
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 8
+              warmup_sec: 0.06262589897960424
+              width: 2
+            count: 252
+            end_to_end_ms_per_input_sample: 4.810487520733168
+            mean_ms_per_sample: 4.634068218253968
+            measured_input_records: 252
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.9757814220882389
+            stderr_ms_per_sample: 0.06146845182862925
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.058131658937782
+              epoch_records: 85
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.012815317586727343
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 16
+              warmup_sec: 0.09392805397510529
+              width: 4
+            count: 340
+            end_to_end_ms_per_input_sample: 3.1121519380523
+            mean_ms_per_sample: 4.584164797058824
+            measured_input_records: 340
+            method: worker_wall_clock
+            stddev_ms_per_sample: 1.0832508875874782
+            stderr_ms_per_sample: 0.058747527744204324
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.1524853697046638
+              epoch_records: 96
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.00639272307491761
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 33
+              warmup_records: 32
+              warmup_sec: 0.1655632290057838
+              width: 8
+            count: 288
+            end_to_end_ms_per_input_sample: 4.001685311474527
+            mean_ms_per_sample: 5.323072461805556
+            measured_input_records: 288
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.577490060535546
+            stderr_ms_per_sample: 0.034028928156042866
+            trial_label: single
+      7:
+        fit:
+          exponent: 0.0
+          method: log_log_least_squares_non_increasing
+          monotone_adjusted: true
+          points:
+          - - 1
+            - 0.7201337007692308
+          - - 2
+            - 0.7201337007692308
+          - - 4
+            - 0.7201337007692308
+          - - 8
+            - 0.7201337007692308
+          r_squared: 1.0
+          scale_ms: 0.7201337007692308
+        method: legal_input_multiwidth_actor_curve
+        schema_version: 2
+        widths:
+          1: *id014
+          2:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.0041693793609738
+              epoch_records: 123
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 8
+              observed_rse: 0.042519366313297606
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 8
+              warmup_sec: 0.03246044600382447
+              width: 2
+            count: 492
+            end_to_end_ms_per_input_sample: 2.0409946734979143
+            mean_ms_per_sample: 0.7730783455284553
+            measured_input_records: 492
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.7291096450093137
+            stderr_ms_per_sample: 0.03287080136240245
+            trial_label: single
+          4:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.037835830822587
+              epoch_records: 187
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 16
+              observed_rse: 0.05108328320966615
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 16
+              warmup_sec: 0.042747142259031534
+              width: 4
+            count: 561
+            end_to_end_ms_per_input_sample: 1.849974742999264
+            mean_ms_per_sample: 0.7799202584670232
+            measured_input_records: 561
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.9436488919215338
+            stderr_ms_per_sample: 0.03984088744422697
+            trial_label: single
+          8:
+            adaptive_profile:
+              converged: true
+              elapsed_sec: 1.4338348829187453
+              epoch_records: 234
+              max_duration_sec: 10.0
+              min_duration_sec: 1.0
+              min_observations: 30
+              minimum_parallel_epoch_records: 32
+              observed_rse: 0.04364761030229175
+              stop_reason: confidence
+              target_rse: 0.1
+              unique_input_records: 64
+              warmup_records: 32
+              warmup_sec: 0.0683515933342278
+              width: 8
+            count: 702
+            end_to_end_ms_per_input_sample: 2.042499833217586
+            mean_ms_per_sample: 0.8143742478632479
+            measured_input_records: 702
+            method: worker_wall_clock
+            stddev_ms_per_sample: 0.9417877976605956
+            stderr_ms_per_sample: 0.035545489810956996
+            trial_label: single
+  schema_version: 1
+  staged_handoff:
+    RAY:
+      0->0:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 0
+        last_pipe_id: 0
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.408005744684488
+        paired_probe_ms_per_sample: 21.078511839732528
+        paired_probe_stdev_ms_per_sample: 2.418798497377878
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      1->0:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 1
+        last_pipe_id: 0
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 19.843334914185107
+        paired_probe_ms_per_sample: 20.3876317711547
+        paired_probe_stdev_ms_per_sample: 3.5411240363779446
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      1->1:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 1
+        last_pipe_id: 1
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 9.592063666786999
+        paired_probe_ms_per_sample: 10.144300141837448
+        paired_probe_stdev_ms_per_sample: 2.086947961559399
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      2->0:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 2
+        last_pipe_id: 0
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.046514982823282
+        paired_probe_ms_per_sample: 20.417557447217405
+        paired_probe_stdev_ms_per_sample: 2.6366490429372176
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      2->1:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 2
+        last_pipe_id: 1
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 9.594187198672444
+        paired_probe_ms_per_sample: 10.01493624644354
+        paired_probe_stdev_ms_per_sample: 2.0391664974914363
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      2->2:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 2
+        last_pipe_id: 2
+        measured_batches: 10
+        measured_input_records: 40
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 9.682138683274388
+        paired_probe_ms_per_sample: 10.138899320736527
+        paired_probe_stdev_ms_per_sample: 2.073261575602643
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 4
+      3->0:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 3
+        last_pipe_id: 0
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 31.365858390927315
+        paired_probe_ms_per_sample: 34.229302452877164
+        paired_probe_stdev_ms_per_sample: 7.926830231875669
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      3->1:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 3
+        last_pipe_id: 1
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.41609794832766
+        paired_probe_ms_per_sample: 20.058814296498895
+        paired_probe_stdev_ms_per_sample: 1.573944917681219
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      3->2:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 3
+        last_pipe_id: 2
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.000836811959743
+        paired_probe_ms_per_sample: 20.375796919688582
+        paired_probe_stdev_ms_per_sample: 1.6398195710546335
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      3->3:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 3
+        last_pipe_id: 3
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.51049144938588
+        paired_probe_ms_per_sample: 24.244207283481956
+        paired_probe_stdev_ms_per_sample: 8.19577528228244
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      4->0:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 4
+        last_pipe_id: 0
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 32.21214609220624
+        paired_probe_ms_per_sample: 32.015414675697684
+        paired_probe_stdev_ms_per_sample: 2.3791597151703883
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      4->1:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 4
+        last_pipe_id: 1
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 20.641561597585678
+        paired_probe_ms_per_sample: 26.048192102462053
+        paired_probe_stdev_ms_per_sample: 11.087894809088214
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      4->2:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 4
+        last_pipe_id: 2
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 32.91130228899419
+        paired_probe_ms_per_sample: 40.85846170783043
+        paired_probe_stdev_ms_per_sample: 24.56537877863328
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      4->3:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 4
+        last_pipe_id: 3
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 23.0106886010617
+        paired_probe_ms_per_sample: 22.97784392721951
+        paired_probe_stdev_ms_per_sample: 0.5195400040206464
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      4->4:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 4
+        last_pipe_id: 4
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 25.76046111062169
+        paired_probe_ms_per_sample: 26.170137617737055
+        paired_probe_stdev_ms_per_sample: 1.4296849558461195
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      5->1:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 5
+        last_pipe_id: 1
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 21.086387801915407
+        paired_probe_ms_per_sample: 21.431843331083655
+        paired_probe_stdev_ms_per_sample: 0.9464077531502191
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      5->2:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 5
+        last_pipe_id: 2
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 19.153507659211755
+        paired_probe_ms_per_sample: 19.070422742515802
+        paired_probe_stdev_ms_per_sample: 0.6837293552395066
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      5->3:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 5
+        last_pipe_id: 3
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 21.18128607980907
+        paired_probe_ms_per_sample: 24.70914381556213
+        paired_probe_stdev_ms_per_sample: 8.965616748110776
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      5->4:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 5
+        last_pipe_id: 4
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 27.322823647409678
+        paired_probe_ms_per_sample: 30.572738777846098
+        paired_probe_stdev_ms_per_sample: 8.377624658972323
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      5->5:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 5
+        last_pipe_id: 5
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 28.267880901694298
+        paired_probe_ms_per_sample: 30.842554941773415
+        paired_probe_stdev_ms_per_sample: 9.203883369569754
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      6->2:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 6
+        last_pipe_id: 2
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 45.66450300626457
+        paired_probe_ms_per_sample: 48.85076712816954
+        paired_probe_stdev_ms_per_sample: 14.08852773437239
+        request_records_unique: 33
+        response_records_unique: 64
+        submit_batch_size: 1
+      6->3:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 6
+        last_pipe_id: 3
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 45.77444330789149
+        paired_probe_ms_per_sample: 46.97982459329069
+        paired_probe_stdev_ms_per_sample: 10.704565648440617
+        request_records_unique: 33
+        response_records_unique: 64
+        submit_batch_size: 1
+      6->4:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 6
+        last_pipe_id: 4
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 55.81093789078295
+        paired_probe_ms_per_sample: 55.376128712669015
+        paired_probe_stdev_ms_per_sample: 9.952940053378857
+        request_records_unique: 33
+        response_records_unique: 64
+        submit_batch_size: 1
+      6->5:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 6
+        last_pipe_id: 5
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 53.71962767094374
+        paired_probe_ms_per_sample: 55.40988398715854
+        paired_probe_stdev_ms_per_sample: 8.4119363373129
+        request_records_unique: 33
+        response_records_unique: 64
+        submit_batch_size: 1
+      6->6:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 6
+        last_pipe_id: 6
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 51.81787791661918
+        paired_probe_ms_per_sample: 57.38385980948806
+        paired_probe_stdev_ms_per_sample: 14.312088348679932
+        request_records_unique: 33
+        response_records_unique: 64
+        submit_batch_size: 1
+      7->3:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 7
+        last_pipe_id: 3
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 21.36820717714727
+        paired_probe_ms_per_sample: 21.417532954365015
+        paired_probe_stdev_ms_per_sample: 1.008319006510572
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      7->4:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 7
+        last_pipe_id: 4
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 27.967935660853982
+        paired_probe_ms_per_sample: 31.200509378686547
+        paired_probe_stdev_ms_per_sample: 10.935341647871057
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      7->5:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 7
+        last_pipe_id: 5
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 29.189398977905512
+        paired_probe_ms_per_sample: 31.849238742142916
+        paired_probe_stdev_ms_per_sample: 9.741705399231872
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      7->6:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 7
+        last_pipe_id: 6
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 26.70984691940248
+        paired_probe_ms_per_sample: 26.505168993026018
+        paired_probe_stdev_ms_per_sample: 1.2390473925253618
+        request_records_unique: 64
+        response_records_unique: 64
+        submit_batch_size: 1
+      7->7:
+        actor_location:
+          ip: 172.23.166.105
+          node_id: 8223331efe2eb632e669f2959bc3bd7f44888acb0b4cfe5eb6bfb213
+        first_pipe_id: 7
+        last_pipe_id: 7
+        measured_batches: 10
+        measured_input_records: 10
+        method: paired_real_payload_handoff_serial
+        paired_probe_median_ms_per_sample: 53.15434327349067
+        paired_probe_ms_per_sample: 54.96902605518699
+        paired_probe_stdev_ms_per_sample: 8.420638157171027
+        request_records_unique: 64
+        response_records_unique: 33
+        submit_batch_size: 1
+profile_metadata:
+  input_reservoir_capture: post_legacy_separate_discarded_pipeline_pass
+  optimizer_profile_consumers:
+    legacy: baseline.latencies/throughput, offloads.*.throughput, tf_fuse
+    simple_dp_and_pico: baseline.wall_latencies, physical_model.operator_affine, offloads.*.backend_compute,
+      physical_model.scaling/boundary
+  profile_protocol: dual_legacy_whole_pipeline_plus_adaptive_layered
+  stage_duration_sec: 10.0
+resource_config:
+  actors_per_stage: 1
+  profile_local_workers: 1
+  profile_scope: single_local_worker
+  ray_actors_per_stage: 1
+  schema_version: 1
+  smp_procs_per_stage: 1

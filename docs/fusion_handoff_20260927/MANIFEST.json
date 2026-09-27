@@ -1,0 +1,85 @@
+{
+ "commit": "1ec12a7f49c2492e3f8583f9f1592b539b121a12",
+ "result_dir": "outputs/fusion_handoff_20260927",
+ "small_files": {
+  "README.md": {
+   "sha256": "fe607e741194ecc4f99c03db14a90b604784734b9ab03c2a2275b31b96664a8f",
+   "bytes": 2570,
+   "rows": 46
+  },
+  "model_identity.json": {
+   "sha256": "8f9fa30423e020f96df9dd6ed0c4639b0be0f8bb0fd12434375797da7b3c8563",
+   "bytes": 858,
+   "rows": 18
+  },
+  "baseline_stage_profile.csv": {
+   "sha256": "c41853ffa9ecffa98c5c4bb7a0eea34834cd1cd8078fde7dbadb34e06068e118",
+   "bytes": 20691,
+   "rows": 120
+  },
+  "boundary_profile.csv": {
+   "sha256": "ad3b160d35013e2899de49c266b35d3b9c357547ff82920ce7fb5f21ca0c9da5",
+   "bytes": 582,
+   "rows": 3
+  },
+  "predictions.csv": {
+   "sha256": "4ae0f773109760e610b08358624434b5f0f9ec1e65c905e8dc918be774edd148",
+   "bytes": 5936,
+   "rows": 6
+  },
+  "frozen_predictions.json": {
+   "sha256": "7f6e7246075ac85c01dfc40327defb558747aede8644f937fdf0486a064aab94",
+   "bytes": 7907,
+   "rows": 90
+  },
+  "measurements.csv": {
+   "sha256": "2e5e97c41b790dc83feedfcaaf472e600dc4642aac7647c813f2b9fbf19b1ec1",
+   "bytes": 102555,
+   "rows": 720
+  },
+  "summary.csv": {
+   "sha256": "34180ae8c9c12f70230939b37594e898ef5f7e3e949dda77f35ef12af1429f56",
+   "bytes": 1187,
+   "rows": 6
+  },
+  "instrumentation_check.csv": {
+   "sha256": "b19641d08d30c14d3d8201a4e81301ae4aeef130e40d3a84add32f8a95d5d8c1",
+   "bytes": 251,
+   "rows": 3
+  },
+  "comparison.csv": {
+   "sha256": "6ddf07696045f8a12d248a87c8e78a34a89cdccfbcdfb3a26914164e69a00a9f",
+   "bytes": 6578,
+   "rows": 6
+  },
+  "implementation_parity.csv": {
+   "sha256": "8abcccaef3ed04e26250478373c9b3a9c7fe16faa226f7b0c6fc6a55a8efb99c",
+   "bytes": 429,
+   "rows": 6
+  },
+  "figure_data.json": {
+   "sha256": "9fa72c4f7fd7b5f59c387c1d72fa5f659e92e972431bbae616e3e9d47673befd",
+   "bytes": 11749,
+   "rows": 207
+  }
+ },
+ "large_files": {},
+ "provenance": {
+  "fusion_handoff_experiment.py": {
+   "path": "scripts/fusion_handoff_experiment.py",
+   "sha256": "7e5bd3fe7e524010d56a2aebd07b3939b0c263d039d5ad13e095507333cabf7c"
+  },
+  "cedar/compose/my_optimizer.py": {
+   "path": "cedar/compose/my_optimizer.py",
+   "sha256": "927bd55a55dcf4c0ce6aee28175ce72510749d8f65a142c80e3532307fcf840b"
+  },
+  "cedar/client/dataset.py": {
+   "path": "cedar/client/dataset.py",
+   "sha256": "f9100fb4b49f329d053690bde8e9c85f0d0861fd6acff4c8ec89501be9d52b4e"
+  },
+  "cedar/service/ray_service.py": {
+   "path": "cedar/service/ray_service.py",
+   "sha256": "1a81ed80469a16cd0117a905eca658f5f5985c42a87c1a55d1f7f76228c85666"
+  }
+ }
+}

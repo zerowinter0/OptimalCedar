@@ -50,6 +50,7 @@
 | §4.15 §3.2 计算规模/仿射响应受控测量 | `outputs/ch32_scale_affine_20260927/`（measurements/fits/predictions/figure_data/raw_calls/figures，§4.15）；小文件+草图快照 `docs/ch32_scale_affine_20260927/`（含 `MANIFEST.json`） |
 | §4.16 §3.2 补充轮：扩展范围与补齐表示类 | `outputs/ch32_scale_affine_ext_20260927/`（measurements/merged_measurements/fits/predictions/figure_data/coverage/consistency/verify/raw_calls/figures，§4.16）；快照 `docs/ch32_scale_affine_ext_20260927/`（含 `MANIFEST.json`） |
 | §4.17 §3.3 融合代价：整体折扣 vs 计算＋边界分项 | `outputs/fusion_cost_split_20260927/`（baseline_stage_profile/boundary_profile/boundary_params/predictions/frozen_predictions/measurements/summary/instrumentation_check/member_compute/comparison/figure_data，§4.17）；快照 `docs/fusion_cost_split_20260927/`（含 `MANIFEST.json`） |
+| §4.18 §3.3 融合成本迁移：部署 PICO 边界模型统一版 | `outputs/fusion_handoff_20260927/`（baseline_stage_profile/boundary_profile/predictions/frozen_predictions/measurements/summary/instrumentation_check/comparison/implementation_parity/figure_data/model_identity/frozen_profile，§4.18）；快照 `docs/fusion_handoff_20260927/` |
 | 专题的原始产物 | 见对应小节里标注的 `outputs/...` 路径 |
 
 2026-09-19 ~ 2026-09-21 的 10 份分散 md（campaign 结果、图件数据、affine 迁移、RAY↔local、
@@ -2515,6 +2516,56 @@ P 保留 1,373,218 B → **ρ_AB = 0.2069**；F 保留 1,373,218 B → **ρ_ABC 
 - 插桩影响：成员计时开启使 U/P/F 分别 +24.6%/+44.7%/+40.7%，因此主结果一律用无插桩数值。
 - 记录（对齐前，不隐藏）：A：U +7.0%、P −9.0%、F −21.7%；B：U +35.0%、P +20.8%、F +5.1%；
   B_fit：U +30.7%、P +18.1%、F −3.3%；B_deployed：U −29.8%、P −33.9%、F −29.1%。
+
+### 4.18 §3.3 融合成本迁移：部署 PICO 边界模型统一版（2026-09-27）
+
+结果目录 `outputs/fusion_handoff_20260927/`，快照 `docs/fusion_handoff_20260927/`；
+冻结 profile `outputs/fusion_handoff_profile_20260927/simclrv2/shared.yaml`。
+
+**本轮实现（提交 `2d4efd1`、`891a888`、`1ec12a7`、`3c98f91`）**
+
+1. `cedar/compose/my_optimizer.py::stage_handoff_ms()`：DP 转移、计划回放与离线实验**共用的唯一边界计价入口**，
+   返回值带模型身份；`CEDAR_REQUIRE_VALIDATED_BOUNDARY=1` 时缺验证过的模型直接报错。
+2. profiler 新增**按块配对的无计算探针**（`profile_paired_handoff`）：真实首算子输入批 submit +
+   真实末算子输出对象 receive，串行单批在飞、无算子计算；结果写入
+   `physical_model.staged_handoff.RAY["{first}->{last}"]`（schema 3，30 个候选对，含 7→7/6→6/5→5/7→6/7→5）。
+3. 恒等探针改为 **serial_inflight**（单批在飞）：此前流水线口径的低估由 25–28% 降到 13–20%。
+4. 证伪一条设想：Ray 客户端 `submit_ns` 只测得**序列化**（0.99 ms vs 半程 6.93 ms），
+   `get_ns` 吸收传输与 actor，时间 → **submit+fetch 相加不是单向分解**，已撤下该组合、仅留诊断字段。
+
+**测量（5 轮 U/P/F 交错，无成员插桩；同批 40 个批次）**
+
+| 组织 | 实测 (ms/记录) | 轮间 stdev | 95% CI |
+| --- | ---: | ---: | ---: |
+| U | 133.18 | 2.52 | ±2.21 |
+| P | 55.71 | 1.22 | ±1.07 |
+| F | 31.42 | 4.10 | ±3.59 |
+
+插桩影响 U +1.2%、P +2.4%、F −3.7%（主结果取无插桩）。逐阶段实测 T−C：48.43 / 49.26 / 24.45 ms/记录
+（整块 U 比 ΣT_i 高约 4% 的客户端胶水）。
+
+**冻结预测 vs 实测（`implementation_parity.csv` 的 `model` 列全为 `paired_probe_v1`）**
+
+| 组织 | 实测 | 整体折扣（ρ 作用于整块） | 误差 | PICO 分项（部署函数） | 误差 | 误差/轮间 stdev |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| U | 133.18 | 148.84 | +11.8% | 148.84 | **+11.8%** | 5.9σ |
+| P | 55.71 | 13.03 | −76.6% | 62.99 | **+13.1%** | 5.8σ |
+| F | 31.42 | 6.38 | −79.7% | 37.50 | **+19.3%** | 1.5σ |
+
+U 的两种方法共享同一基准（ρ=1），预测严格相同 ✓。
+
+**结论与未解决问题**
+
+- **整体 I/O 折扣公式在 P/F 上彻底失效**（−77% / −80%）：它把 ρ 同时乘到计算与交接上，
+  而实测 F 块的交接（31.85 ms/记录）与 U 的总交接（143.2 ms/记录）之比远高于 ρ_ABC=0.170。
+- **部署分项模型（paired_probe_v1）是唯一落在量级内的预测**：P +13.1%、F +19.3%，
+  比整体折扣好一个数量级；但 **U 的 +11.8% 仍超过 ≤10% 的验收线**，因此本轮判定为"方向正确、尚未达标"。
+- **已知的口径错配（下一步要修的）**：探针的 `submit_batch_size` 由载荷大小推导（本轮 = 1），
+  而验证 harness 按 `batch_size=4` 提交；固定开销的摊销方式不同，方向上正好解释
+  探针每记录偏高 13–26%。修法是把探针与运行时的提交批对齐（`_dp_ray_submit_batch_size`
+  或同时测 batch=1/4 两个口径），再复验 U ≤10%。
+- F 的轮间 stdev 达 4.10 ms（13%），因此 F 的 +19.3% 只有约 1.5σ，不能单独作为定性证据；
+  U/P 的误差则显著超出波动（≈6σ）。
 
 **产物与复现**
 

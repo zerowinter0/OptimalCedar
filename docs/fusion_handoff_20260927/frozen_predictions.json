@@ -1,0 +1,91 @@
+{
+ "profile": "/workspace/OptimalCedar/outputs/fusion_handoff_profile_20260927/simclrv2/shared.yaml",
+ "profile_handoff_model": "paired_probe_v1",
+ "boundary_function": "cedar.compose.my_optimizer.stage_handoff_ms",
+ "compute_source": "measured member compute from baseline_stage_profile.csv",
+ "baseline_stages": {
+  "to_float": {
+   "T_ms_per_record": 49.29480591963511,
+   "C_ms_per_record": 0.8605881249999999,
+   "in_bytes_per_record": 658367.3625,
+   "out_bytes_per_record": 2632215.20625
+  },
+  "crop": {
+   "T_ms_per_record": 53.761852520983666,
+   "C_ms_per_record": 4.5005264875,
+   "in_bytes_per_record": 2632215.20625,
+   "out_bytes_per_record": 714850.4125
+  },
+  "flip": {
+   "T_ms_per_record": 24.735528096789494,
+   "C_ms_per_record": 0.28478112499999997,
+   "in_bytes_per_record": 714850.4125,
+   "out_bytes_per_record": 714850.4375
+  },
+  "_whole_block_U_ms_per_record": {
+   "value": 134.44301088165957
+  }
+ },
+ "measured_handoff_ms_per_record": {
+  "to_float": 48.43421779463511,
+  "crop": 49.26132603348367,
+  "flip": 24.450746971789496
+ },
+ "measured_handoff_sum_ms_per_record": 122.14629079990829,
+ "predictions": [
+  {
+   "organisation": "U",
+   "method": "A_overall_discount",
+   "rho": 1.0,
+   "compute_ms_per_record": 5.6458957375,
+   "handoff_ms_per_record": 143.19544080644846,
+   "total_ms_per_record": 148.84133654394847,
+   "terms": "{\"rho\": 1.0, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 54.96902605518699, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 7, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 54.96902605518699}}, {\"group\": [\"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 57.38385980948806, \"terms\": {\"first_p_id\": 6, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 57.38385980948806}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}]}"
+  },
+  {
+   "organisation": "U",
+   "method": "B_pico_decomposition",
+   "rho": 1.0,
+   "compute_ms_per_record": 5.6458957375,
+   "handoff_ms_per_record": 143.19544080644846,
+   "total_ms_per_record": 148.84133654394847,
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 54.96902605518699, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 7, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 54.96902605518699}}, {\"group\": [\"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 57.38385980948806, \"terms\": {\"first_p_id\": 6, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 57.38385980948806}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}], \"boundary_model\": \"paired_probe_v1\"}"
+  },
+  {
+   "organisation": "P",
+   "method": "A_overall_discount",
+   "rho": 0.20688318154403537,
+   "compute_ms_per_record": 1.168040872839908,
+   "handoff_ms_per_record": 11.864279581940334,
+   "total_ms_per_record": 13.03232045478024,
+   "terms": "{\"rho\": 0.20688318154403537, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 26.505168993026018, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 26.505168993026018}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}]}"
+  },
+  {
+   "organisation": "P",
+   "method": "B_pico_decomposition",
+   "rho": 1.0,
+   "compute_ms_per_record": 5.6458957375,
+   "handoff_ms_per_record": 57.34772393479943,
+   "total_ms_per_record": 62.99361967229943,
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 26.505168993026018, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 26.505168993026018}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}], \"boundary_model\": \"paired_probe_v1\"}"
+  },
+  {
+   "organisation": "F",
+   "method": "A_overall_discount",
+   "rho": 0.170219212484396,
+   "compute_ms_per_record": 0.9610399262062582,
+   "handoff_ms_per_record": 5.421352336915082,
+   "total_ms_per_record": 6.38239226312134,
+   "terms": "{\"rho\": 0.170219212484396, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\", \"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 31.849238742142916, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 31.849238742142916}}]}"
+  },
+  {
+   "organisation": "F",
+   "method": "B_pico_decomposition",
+   "rho": 1.0,
+   "compute_ms_per_record": 5.6458957375,
+   "handoff_ms_per_record": 31.849238742142916,
+   "total_ms_per_record": 37.495134479642914,
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\", \"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 31.849238742142916, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 31.849238742142916}}], \"boundary_model\": \"paired_probe_v1\"}"
+  }
+ ]
+}

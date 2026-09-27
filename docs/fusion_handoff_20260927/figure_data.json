@@ -1,0 +1,208 @@
+{
+ "measured_ms_per_record": {
+  "U": 133.17770074820146,
+  "P": 55.70561266154982,
+  "F": 31.418816483346745
+ },
+ "measured_instrument_on_ms_per_record": {
+  "U": 134.81578489590902,
+  "P": 57.068985819933005,
+  "F": 30.254183048964478
+ },
+ "summary": [
+  {
+   "instrument": "off",
+   "organisation": "U",
+   "batches": 200,
+   "rounds": 5,
+   "mean_ms_per_record": 133.17770074820146,
+   "median_ms_per_record": 115.32845575129613,
+   "p10_ms_per_record": 86.7100088042207,
+   "p90_ms_per_record": 176.77008480532092,
+   "repeat_means": "[136.85084667813499, 132.7971978840651, 129.06258067523595, 132.8930001880508, 134.28487831552047]",
+   "repeat_mean_stdev_ms": 2.524990821434859,
+   "repeat_mean_ci95_ms": 2.21325203876222
+  },
+  {
+   "instrument": "off",
+   "organisation": "P",
+   "batches": 200,
+   "rounds": 5,
+   "mean_ms_per_record": 55.70561266154982,
+   "median_ms_per_record": 54.074498650152236,
+   "p10_ms_per_record": 47.00533929280937,
+   "p90_ms_per_record": 62.41849142825231,
+   "repeat_means": "[57.37205944315065, 55.28247230395209, 53.75596124213189, 55.62524957640562, 56.49232074210886]",
+   "repeat_mean_stdev_ms": 1.215121485683207,
+   "repeat_mean_ci95_ms": 1.0651009432200098
+  },
+  {
+   "instrument": "off",
+   "organisation": "F",
+   "batches": 200,
+   "rounds": 5,
+   "mean_ms_per_record": 31.418816483346745,
+   "median_ms_per_record": 28.145426884293556,
+   "p10_ms_per_record": 22.940392896998674,
+   "p90_ms_per_record": 46.856705890968435,
+   "repeat_means": "[30.385284338262863, 29.436262702802196, 39.341300280648284, 27.54202212090604, 30.389212974114344]",
+   "repeat_mean_stdev_ms": 4.0952185685517275,
+   "repeat_mean_ci95_ms": 3.589617343984409
+  },
+  {
+   "instrument": "on",
+   "organisation": "U",
+   "batches": 40,
+   "rounds": 1,
+   "mean_ms_per_record": 134.81578489590902,
+   "median_ms_per_record": 117.60819819755852,
+   "p10_ms_per_record": 88.89967212453485,
+   "p90_ms_per_record": 177.29775157058614,
+   "repeat_means": "[134.81578489590902]",
+   "repeat_mean_stdev_ms": 0.0,
+   "repeat_mean_ci95_ms": 0.0
+  },
+  {
+   "instrument": "on",
+   "organisation": "P",
+   "batches": 40,
+   "rounds": 1,
+   "mean_ms_per_record": 57.068985819933005,
+   "median_ms_per_record": 54.118690779432654,
+   "p10_ms_per_record": 49.204232648480684,
+   "p90_ms_per_record": 64.69518730882555,
+   "repeat_means": "[57.068985819933005]",
+   "repeat_mean_stdev_ms": 0.0,
+   "repeat_mean_ci95_ms": 0.0
+  },
+  {
+   "instrument": "on",
+   "organisation": "F",
+   "batches": 40,
+   "rounds": 1,
+   "mean_ms_per_record": 30.254183048964478,
+   "median_ms_per_record": 28.264868014957756,
+   "p10_ms_per_record": 22.75393637828529,
+   "p90_ms_per_record": 35.892042180057615,
+   "repeat_means": "[30.254183048964478]",
+   "repeat_mean_stdev_ms": 0.0,
+   "repeat_mean_ci95_ms": 0.0
+  }
+ ],
+ "predictions": [
+  {
+   "organisation": "U",
+   "method": "A_overall_discount",
+   "predicted_compute_ms": "5.6458957375",
+   "predicted_handoff_ms": "143.19544080644846",
+   "predicted_total_ms": 148.84133654394847,
+   "measured_ms": 133.17770074820146,
+   "abs_error_ms": 15.663635795747012,
+   "rel_error": 0.11761455339555821,
+   "measured_repeat_stdev_ms": 2.524990821434859,
+   "error_over_stdev": 6.203442667108765,
+   "rho": "1.0",
+   "terms": "{\"rho\": 1.0, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 54.96902605518699, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 7, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 54.96902605518699}}, {\"group\": [\"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 57.38385980948806, \"terms\": {\"first_p_id\": 6, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 57.38385980948806}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}]}"
+  },
+  {
+   "organisation": "U",
+   "method": "B_pico_decomposition",
+   "predicted_compute_ms": "5.6458957375",
+   "predicted_handoff_ms": "143.19544080644846",
+   "predicted_total_ms": 148.84133654394847,
+   "measured_ms": 133.17770074820146,
+   "abs_error_ms": 15.663635795747012,
+   "rel_error": 0.11761455339555821,
+   "measured_repeat_stdev_ms": 2.524990821434859,
+   "error_over_stdev": 6.203442667108765,
+   "rho": "1.0",
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 54.96902605518699, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 7, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 54.96902605518699}}, {\"group\": [\"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 57.38385980948806, \"terms\": {\"first_p_id\": 6, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 57.38385980948806}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}], \"boundary_model\": \"paired_probe_v1\"}"
+  },
+  {
+   "organisation": "P",
+   "method": "A_overall_discount",
+   "predicted_compute_ms": "1.168040872839908",
+   "predicted_handoff_ms": "11.864279581940334",
+   "predicted_total_ms": 13.03232045478024,
+   "measured_ms": 55.70561266154982,
+   "abs_error_ms": -42.67329220676958,
+   "rel_error": -0.7660501369231748,
+   "measured_repeat_stdev_ms": 1.215121485683207,
+   "error_over_stdev": -35.118539758826124,
+   "rho": "0.20688318154403537",
+   "terms": "{\"rho\": 0.20688318154403537, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 26.505168993026018, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 26.505168993026018}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}]}"
+  },
+  {
+   "organisation": "P",
+   "method": "B_pico_decomposition",
+   "predicted_compute_ms": "5.6458957375",
+   "predicted_handoff_ms": "57.34772393479943",
+   "predicted_total_ms": 62.99361967229943,
+   "measured_ms": 55.70561266154982,
+   "abs_error_ms": 7.2880070107496095,
+   "rel_error": 0.13083074869007005,
+   "measured_repeat_stdev_ms": 1.215121485683207,
+   "error_over_stdev": 5.997759974305694,
+   "rho": "1.0",
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 26.505168993026018, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 6, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 26.505168993026018}}, {\"group\": [\"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 30.842554941773415, \"terms\": {\"first_p_id\": 5, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 30.842554941773415}}], \"boundary_model\": \"paired_probe_v1\"}"
+  },
+  {
+   "organisation": "F",
+   "method": "A_overall_discount",
+   "predicted_compute_ms": "0.9610399262062582",
+   "predicted_handoff_ms": "5.421352336915082",
+   "predicted_total_ms": 6.38239226312134,
+   "measured_ms": 31.418816483346745,
+   "abs_error_ms": -25.036424220225406,
+   "rel_error": -0.7968608312631933,
+   "measured_repeat_stdev_ms": 4.0952185685517275,
+   "error_over_stdev": -6.113574599530967,
+   "rho": "0.170219212484396",
+   "terms": "{\"rho\": 0.170219212484396, \"io_base_per_record\": 8067349.0375, \"io_ab_base\": 6637648.1875, \"io_ab_fused\": 1373217.775, \"io_abc_fused\": 1373217.8, \"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\", \"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 31.849238742142916, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 31.849238742142916}}]}"
+  },
+  {
+   "organisation": "F",
+   "method": "B_pico_decomposition",
+   "predicted_compute_ms": "5.6458957375",
+   "predicted_handoff_ms": "31.849238742142916",
+   "predicted_total_ms": 37.495134479642914,
+   "measured_ms": 31.418816483346745,
+   "abs_error_ms": 6.076317996296169,
+   "rel_error": 0.19339741837560512,
+   "measured_repeat_stdev_ms": 4.0952185685517275,
+   "error_over_stdev": 1.4837591436407889,
+   "rho": "1.0",
+   "terms": "{\"compute_per_stage\": {\"to_float\": 0.8605881249999999, \"crop\": 4.5005264875, \"flip\": 0.28478112499999997}, \"handoff_groups\": [{\"group\": [\"to_float\", \"crop\", \"flip\"], \"model\": \"paired_probe_v1\", \"ms_per_record\": 31.849238742142916, \"terms\": {\"first_p_id\": 7, \"last_p_id\": 5, \"input_records\": 1.0, \"output_records\": 1.0, \"submit_batch_size\": 1, \"profile_handoff_model\": \"paired_probe_v1\", \"paired_probe_ms_per_sample\": 31.849238742142916}}], \"boundary_model\": \"paired_probe_v1\"}"
+  }
+ ],
+ "baseline_stages": {
+  "to_float": {
+   "T_ms_per_record": 49.29480591963511,
+   "C_ms_per_record": 0.8605881249999999,
+   "in_bytes_per_record": 658367.3625,
+   "out_bytes_per_record": 2632215.20625
+  },
+  "crop": {
+   "T_ms_per_record": 53.761852520983666,
+   "C_ms_per_record": 4.5005264875,
+   "in_bytes_per_record": 2632215.20625,
+   "out_bytes_per_record": 714850.4125
+  },
+  "flip": {
+   "T_ms_per_record": 24.735528096789494,
+   "C_ms_per_record": 0.28478112499999997,
+   "in_bytes_per_record": 714850.4125,
+   "out_bytes_per_record": 714850.4375
+  },
+  "_whole_block_U_ms_per_record": {
+   "value": 134.44301088165957
+  }
+ },
+ "measured_handoff_ms_per_record": {
+  "to_float": 48.43421779463511,
+  "crop": 49.26132603348367,
+  "flip": 24.450746971789496
+ },
+ "profile_handoff_model": "paired_probe_v1",
+ "boundary_function": "cedar.compose.my_optimizer.stage_handoff_ms"
+}
