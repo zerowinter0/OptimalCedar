@@ -3035,3 +3035,26 @@ flip 吃 crop 的输出），交替测四种模式：
 - 也不是**客户端可观测的 submit/get**（只占 12%）；
 - 只有**链上端到端阶段服务**（本实验 harness 测的 T_i）与其成员计算 C_i 之差是可复现的，
   但它依赖该阶段的上下游上下文，无法从孤立测量组合。
+
+#### 4.18.4 边界项在**计划选择**层面的价值（历史正式 campaign，2026-09-27 复核）
+
+前面的 §4.18.1–.3 讨论的是"融合边界成本的**定量精度**"；边界项还有一条更强的证据：
+**它决定了 DP 选出的计划好不好**。同一计算模型下只切换 boundary 项
+（`simple_dp` = 无 boundary，`simple_dp_boundary` = 有 boundary，其余完全相同），
+以及对照 Cedar 旧 profile 的 DP（`old_dp_legacy_optimizer` = 无 boundary vs `old_dp_boundary` = 有 boundary）：
+
+| 负载 | 无 boundary | 有 boundary | 倍数 | 备注 |
+| --- | ---: | ---: | ---: | --- |
+| coco | 15.1（simple_dp） | **241.1**（simple_dp_boundary） | **16.0×** | 无 boundary 时 DP 选择"全部卸载"，吞吐塌到 15 rec/s |
+| coco | 25.8（old_dp_legacy） | 230.8（old_dp_boundary） | 8.9× | 换旧 profile 同样成立 |
+| commonvoice | 79.9（old_dp_legacy） | 661.8（old_dp_boundary） | 8.3× | 同上 |
+| commonvoice | 692.3（simple_dp） | 734.4（simple_dp_boundary） | 1.06× | 分层 profile 下两者都已接近最优 |
+| simclrv2 | 1975.8 → 1964.5 | | 0.99× | 两个计划都接近最优，边界项中性 |
+| simclrv2_cache | 5478.3 → 5502.4 | | 1.00× | 同上 |
+
+**结论**：在卸载经济性不平凡的负载上（coco、commonvoice），**边界项直接把错误计划（全卸载）纠正为正确计划**，
+吞吐差一个数量级；在 simclrv2 这种"两种计划都接近最优"的负载上它自然是中性的。
+因此第三章的正确表述是：
+1. 整体 IO 折扣**不成立**（§4.15–4.18）；
+2. **引入边界项的分项模型在选择层面成立且价值巨大**（本表，最极端 coco 16×）；
+3. 折戟的只是"融合块边界成本的定量精度"（§4.18.1–.3 的 ±15–23%），属于精度上限而非"方法无用"。
