@@ -466,7 +466,29 @@ def cmd_predict(args) -> int:
 # ----------------------------------------------------------------- validate --
 
 
+BLOCK_KEYS = {
+    "U": ["U:jitter", "U:grayscale", "U:blur"],
+    "P": ["P:jitter+grayscale", "P:blur"],
+    "F": ["F:jitter+grayscale+blur"],
+}
+
+
 def _submit_batches(frozen, organisation: str) -> List[int]:
+    stored = (frozen or {}).get("submit_batches") or {}
+    if organisation in stored:
+        return [int(value) for value in stored[organisation]]
+    blocks = (frozen or {}).get("blocks") or {}
+    keys = BLOCK_KEYS.get(organisation) or []
+    if blocks and keys and all(key in blocks for key in keys):
+        return [
+            int(
+                MyOptimizer._dp_ray_submit_batch_size(
+                    blocks[key]["in_bytes_per_record"],
+                    blocks[key]["out_bytes_per_record"],
+                )
+            )
+            for key in keys
+        ]
     in_of = {r["operator"]: float(r["native_bytes_in"]) for r in frozen["member_compute"]}
     out_of = {r["operator"]: float(r["native_bytes_out"]) for r in frozen["member_compute"]}
     sizes = []
@@ -834,6 +856,235 @@ def cmd_manifest(args) -> int:
     return 0
 
 
+# --------------------------------------------------- chain-consistent profile --
+
+
+def cmd_chain(args) -> int:
+    """Chain-consistent profiling: blocks J, G, B, JG, JGB in one session.
+
+    The profiling run is independent of the U/P/F validation (different
+    session), but uses the *same* execution context as the validation: real
+    actors, the deployed submit batch per stage, one batch in flight,
+    continuous submission.  Member compute comes from actor-side per-item
+    events; the block service comes from the client clock around the stage.
+    """
+    _install_block()
+    out = Path(args.out)
+    frozen_old = _load_frozen(out)
+    ray, actor_classes, options = fcs._setup(args)
+    pool = list(torch.load(out / "inputs" / "block_inputs.pt")["records"])
+    callables = _block_callables(BATCH_SIZE)
+    runners: Dict[str, Any] = {}
+    rows: List[Dict[str, Any]] = []
+    sizes_by_org = {
+        organisation: _submit_batches(frozen_old, organisation)
+        for organisation in ORGANISATIONS
+    }
+    try:
+        for organisation in ORGANISATIONS:
+            runners[organisation] = fcs.StageRunner(
+                organisation, callables, BATCH_SIZE, options, actor_classes,
+                args.remote_cpu, True,
+                submit_batch_by_stage=sizes_by_org[organisation],
+            )
+            runners[organisation].set_instrument(True)
+        for runner in runners.values():
+            for index in range(args.warmup):
+                runner.run_batch(fcs._batch_records(pool, index, BATCH_SIZE))
+        for index in range(args.batches):
+            records = fcs._batch_records(pool, index, BATCH_SIZE)
+            for organisation, runner in runners.items():
+                runner.reset_events()
+                result = runner.run_batch(records)
+                events = runner.member_events()
+                for stage_index, group in enumerate(runner.stages):
+                    stage_compute = sum(
+                        event["wall_ms"]
+                        for event in events
+                        if event["stage_index"] == stage_index
+                    )
+                    stage_service = result["stage_times"][stage_index] * 1000.0
+                    in_bytes, out_bytes = result["stage_bytes"][stage_index]
+                    rows.append(
+                        {
+                            "organisation": organisation,
+                            "stage_index": stage_index,
+                            "block": "+".join(group),
+                            "batch_id": index,
+                            "members": len(group),
+                            "C_ms_per_record": stage_compute / BATCH_SIZE,
+                            "T_ms_per_record": stage_service / BATCH_SIZE,
+                            "H_ms_per_record": (stage_service - stage_compute)
+                            / BATCH_SIZE,
+                            "in_bytes_per_record": in_bytes / BATCH_SIZE,
+                            "out_bytes_per_record": out_bytes / BATCH_SIZE,
+                        }
+                    )
+    finally:
+        for runner in runners.values():
+            runner.shutdown()
+    _write_csv(out / "chain_profile_raw.csv", rows)
+
+    def block_stats(organisation: str, stage_index: int) -> Dict[str, float]:
+        subset = [
+            row
+            for row in rows
+            if row["organisation"] == organisation
+            and row["stage_index"] == stage_index
+        ]
+        return {
+            "block": subset[0]["block"],
+            "members": subset[0]["members"],
+            "C_ms_per_record": statistics.fmean(row["C_ms_per_record"] for row in subset),
+            "T_ms_per_record": statistics.fmean(row["T_ms_per_record"] for row in subset),
+            "H_ms_per_record": statistics.fmean(row["H_ms_per_record"] for row in subset),
+            "C_stdev": statistics.pstdev([row["C_ms_per_record"] for row in subset]),
+            "H_stdev": statistics.pstdev([row["H_ms_per_record"] for row in subset]),
+            "in_bytes_per_record": statistics.fmean(row["in_bytes_per_record"] for row in subset),
+            "out_bytes_per_record": statistics.fmean(row["out_bytes_per_record"] for row in subset),
+            "batches": len(subset),
+        }
+
+    blocks = {
+        "U:jitter": block_stats("U", 0),
+        "U:grayscale": block_stats("U", 1),
+        "U:blur": block_stats("U", 2),
+        "P:jitter+grayscale": block_stats("P", 0),
+        "P:blur": block_stats("P", 1),
+        "F:jitter+grayscale+blur": block_stats("F", 0),
+    }
+    frozen = {
+        "frozen_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "commit": _git_commit(),
+        "session": "chain_consistent_profiling (independent of validation)",
+        "submit_batches": sizes_by_org,
+        "batch_size": BATCH_SIZE,
+        "backend": "RAY",
+        "workers": 1,
+        "stage_width": 1,
+        "units": "ms per source record",
+        "byte_basis": "native tensor bytes (numel * element_size)",
+        "blocks": blocks,
+        "boundary_source": "H_block = client stage service - actor-side member compute, same session",
+        "previous_isolated_profile": frozen_old.get("boundary"),
+    }
+    (out / "profile_frozen.json").write_text(json.dumps(frozen, indent=1))
+
+    def rho_for(block_key: str, member_keys: List[str]) -> Dict[str, float]:
+        block = blocks[block_key]
+        fused_bytes = block["in_bytes_per_record"] + block["out_bytes_per_record"]
+        member_bytes = sum(
+            blocks[key]["in_bytes_per_record"] + blocks[key]["out_bytes_per_record"]
+            for key in member_keys
+        )
+        return {"fused_bytes": fused_bytes, "member_bytes": member_bytes,
+                "rho": fused_bytes / member_bytes}
+
+    rho = {
+        "jitter+grayscale": rho_for(
+            "P:jitter+grayscale", ["U:jitter", "U:grayscale"]
+        ),
+        "jitter+grayscale+blur": rho_for(
+            "F:jitter+grayscale+blur",
+            ["U:jitter", "U:grayscale", "U:blur"],
+        ),
+    }
+    (out / "rho_breakdown.json").write_text(
+        json.dumps({"blocks": blocks, "rho": rho}, indent=1)
+    )
+    order = ["U:jitter", "U:grayscale", "U:blur"]
+    u_compute = sum(blocks[key]["C_ms_per_record"] for key in order)
+    u_handoff = sum(blocks[key]["H_ms_per_record"] for key in order)
+    predictions: List[Dict[str, Any]] = [
+        {
+            "organisation": "U",
+            "method": "both",
+            "rho": 1.0,
+            "compute_ms_per_record": u_compute,
+            "handoff_ms_per_record": u_handoff,
+            "total_ms_per_record": u_compute + u_handoff,
+            "terms": json.dumps({"blocks": order}),
+        }
+    ]
+    jg = blocks["P:jitter+grayscale"]
+    blur = blocks["U:blur"]
+    rho_jg = rho["jitter+grayscale"]["rho"]
+    disc_p = (
+        rho_jg * (blocks["U:jitter"]["C_ms_per_record"] + blocks["U:jitter"]["H_ms_per_record"])
+        + rho_jg
+        * (blocks["U:grayscale"]["C_ms_per_record"] + blocks["U:grayscale"]["H_ms_per_record"])
+        + blur["C_ms_per_record"]
+        + blur["H_ms_per_record"]
+    )
+    predictions.append(
+        {
+            "organisation": "P",
+            "method": "discount",
+            "rho": rho_jg,
+            "compute_ms_per_record": rho_jg
+            * (blocks["U:jitter"]["C_ms_per_record"] + blocks["U:grayscale"]["C_ms_per_record"]),
+            "handoff_ms_per_record": rho_jg
+            * (blocks["U:jitter"]["H_ms_per_record"] + blocks["U:grayscale"]["H_ms_per_record"]),
+            "total_ms_per_record": disc_p,
+            "terms": json.dumps(rho["jitter+grayscale"]),
+        }
+    )
+    predictions.append(
+        {
+            "organisation": "P",
+            "method": "split",
+            "rho": "",
+            "compute_ms_per_record": jg["C_ms_per_record"] + blur["C_ms_per_record"],
+            "handoff_ms_per_record": jg["H_ms_per_record"] + blur["H_ms_per_record"],
+            "total_ms_per_record": jg["C_ms_per_record"] + jg["H_ms_per_record"]
+            + blur["C_ms_per_record"] + blur["H_ms_per_record"],
+            "terms": json.dumps({"fused": jg["block"], "independent": blur["block"]}),
+        }
+    )
+    fabc = blocks["F:jitter+grayscale+blur"]
+    rho_f = rho["jitter+grayscale+blur"]["rho"]
+    total = u_compute + u_handoff
+    predictions.append(
+        {
+            "organisation": "F",
+            "method": "discount",
+            "rho": rho_f,
+            "compute_ms_per_record": rho_f * u_compute,
+            "handoff_ms_per_record": rho_f * u_handoff,
+            "total_ms_per_record": rho_f * total,
+            "terms": json.dumps(rho["jitter+grayscale+blur"]),
+        }
+    )
+    predictions.append(
+        {
+            "organisation": "F",
+            "method": "split",
+            "rho": "",
+            "compute_ms_per_record": fabc["C_ms_per_record"],
+            "handoff_ms_per_record": fabc["H_ms_per_record"],
+            "total_ms_per_record": fabc["C_ms_per_record"] + fabc["H_ms_per_record"],
+            "terms": json.dumps({"fused": fabc["block"]}),
+        }
+    )
+    fields = [
+        "organisation", "method", "rho", "compute_ms_per_record",
+        "handoff_ms_per_record", "total_ms_per_record", "terms",
+    ]
+    with (out / "predictions.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for row in predictions:
+            writer.writerow(row)
+    _write_csv(out / "operator_timing_summary.csv", list(blocks.values()))
+    print(
+        "chain profile: "
+        + ", ".join(
+            f"{key.split(':',1)[1]} C={value['C_ms_per_record']:.2f} H={value['H_ms_per_record']:.2f}"
+            for key, value in blocks.items()
+        )
+    )
+    return 0
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -865,6 +1116,14 @@ if __name__ == "__main__":
     summarise = sub.add_parser("summarise")
     summarise.add_argument("--out", default=str(OUT))
     summarise.set_defaults(func=cmd_summarise)
+    chain = sub.add_parser("chain")
+    chain.add_argument("--out", default=str(OUT))
+    chain.add_argument("--batches", type=int, default=60)
+    chain.add_argument("--warmup", type=int, default=10)
+    chain.add_argument("--local-cpu", type=int, default=12)
+    chain.add_argument("--remote-cpu", type=int, default=8)
+    chain.add_argument("--ray-ip", default="172.23.166.105:6379")
+    chain.set_defaults(func=cmd_chain)
     manifest = sub.add_parser("manifest")
     manifest.add_argument("--out", default=str(OUT))
     manifest.set_defaults(func=cmd_manifest)
