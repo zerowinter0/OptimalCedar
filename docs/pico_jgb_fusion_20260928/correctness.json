@@ -1,0 +1,15 @@
+{
+ "P": {
+  "records": 32,
+  "max_abs_diff": 0.0,
+  "allclose_1e-6": true
+ },
+ "F": {
+  "records": 32,
+  "max_abs_diff": 0.0,
+  "allclose_1e-6": true
+ },
+ "records_checked": 32,
+ "comparison": "U as reference; elementwise max abs difference",
+ "random_state": "per (record key, operator) seeds, identical across U/P/F; bitwise equality expected for deterministic members"
+}

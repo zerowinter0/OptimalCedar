@@ -1,0 +1,154 @@
+{
+ "measured_ms_per_record": {
+  "U": 62.28879960323684,
+  "P": 49.67616666853428,
+  "F": 32.596038969932124
+ },
+ "measured_round_stdev_ms": {
+  "U": 0.7795058864670462,
+  "P": 0.447318185222364,
+  "F": 0.9542858231471759
+ },
+ "predictions": [
+  {
+   "organisation": "U",
+   "method": "both",
+   "rho": "1.0",
+   "predicted_compute_ms": "37.207933734375",
+   "predicted_handoff_ms": "48.63425821143512",
+   "predicted_total_ms": 85.84219194581011,
+   "measured_ms": 62.28879960323684,
+   "abs_error_ms": 23.553392342573275,
+   "rel_error": 0.3781320637514633,
+   "measured_round_stdev_ms": 0.7795058864670462,
+   "error_over_stdev": 30.21579791953117
+  },
+  {
+   "organisation": "P",
+   "method": "discount",
+   "rho": "{\"jitter+grayscale\": 0.4, \"blur+blur\": 1.0}",
+   "predicted_compute_ms": "24.0350847",
+   "predicted_handoff_ms": "24.83721304452046",
+   "predicted_total_ms": 48.87229774452046,
+   "measured_ms": 49.67616666853428,
+   "abs_error_ms": -0.8038689240138197,
+   "rel_error": -0.016182185098493194,
+   "measured_round_stdev_ms": 0.447318185222364,
+   "error_over_stdev": -1.797085275248116
+  },
+  {
+   "organisation": "P",
+   "method": "split",
+   "rho": "",
+   "predicted_compute_ms": "37.207933734375",
+   "predicted_handoff_ms": "25.183935670389065",
+   "predicted_total_ms": 62.391869404764066,
+   "measured_ms": 49.67616666853428,
+   "abs_error_ms": 12.715702736229787,
+   "rel_error": 0.2559718993833743,
+   "measured_round_stdev_ms": 0.447318185222364,
+   "error_over_stdev": 28.426527595583334
+  },
+  {
+   "organisation": "F",
+   "method": "discount",
+   "rho": "{\"jitter+blur\": 0.3333333333333333}",
+   "predicted_compute_ms": "12.402644578124999",
+   "predicted_handoff_ms": "16.211419403811703",
+   "predicted_total_ms": 28.614063981936702,
+   "measured_ms": 32.596038969932124,
+   "abs_error_ms": -3.9819749879954216,
+   "rel_error": -0.12216131511158619,
+   "measured_round_stdev_ms": 0.9542858231471759,
+   "error_over_stdev": -4.172727804823835
+  },
+  {
+   "organisation": "F",
+   "method": "split",
+   "rho": "",
+   "predicted_compute_ms": "37.207933734375",
+   "predicted_handoff_ms": "16.211419403811707",
+   "predicted_total_ms": 53.41935313818671,
+   "measured_ms": 32.596038969932124,
+   "abs_error_ms": 20.823314168254583,
+   "rel_error": 0.6388295886952041,
+   "measured_round_stdev_ms": 0.9542858231471759,
+   "error_over_stdev": 21.82083571102479
+  }
+ ],
+ "summary": [
+  {
+   "instrument": "off",
+   "organisation": "U",
+   "batches": 500,
+   "rounds": 5,
+   "mean_ms_per_record": 62.28879960323684,
+   "median_ms_per_record": 61.89415615517646,
+   "p10_ms_per_record": 59.161953639704734,
+   "p90_ms_per_record": 66.27241438254714,
+   "round_means": "[63.54024831671268, 62.77505460311659, 61.36598997283727, 62.04255977412686, 61.720145349390805]",
+   "round_stdev_ms": 0.7795058864670462
+  },
+  {
+   "instrument": "off",
+   "organisation": "P",
+   "batches": 500,
+   "rounds": 5,
+   "mean_ms_per_record": 49.67616666853428,
+   "median_ms_per_record": 49.6051887748763,
+   "p10_ms_per_record": 45.79042452387512,
+   "p90_ms_per_record": 54.17260807007551,
+   "round_means": "[50.30628775944933, 49.25427146488801, 49.45559749729, 49.24834942561574, 50.11632719542831]",
+   "round_stdev_ms": 0.447318185222364
+  },
+  {
+   "instrument": "off",
+   "organisation": "F",
+   "batches": 500,
+   "rounds": 5,
+   "mean_ms_per_record": 32.596038969932124,
+   "median_ms_per_record": 31.63833898724988,
+   "p10_ms_per_record": 28.37430778890848,
+   "p90_ms_per_record": 37.61498872190714,
+   "round_means": "[32.326908769318834, 32.26584043237381, 31.552844463149086, 34.40082713961601, 32.43377404520288]",
+   "round_stdev_ms": 0.9542858231471759
+  },
+  {
+   "instrument": "on",
+   "organisation": "U",
+   "batches": 100,
+   "rounds": 1,
+   "mean_ms_per_record": 64.51370196300559,
+   "median_ms_per_record": 63.36558889597654,
+   "p10_ms_per_record": 60.06176812807098,
+   "p90_ms_per_record": 70.38361934246495,
+   "round_means": "[64.51370196300559]",
+   "round_stdev_ms": 0.0
+  },
+  {
+   "instrument": "on",
+   "organisation": "P",
+   "batches": 100,
+   "rounds": 1,
+   "mean_ms_per_record": 50.69990729680285,
+   "median_ms_per_record": 50.272005319129676,
+   "p10_ms_per_record": 46.660794934723526,
+   "p90_ms_per_record": 55.201851995661855,
+   "round_means": "[50.69990729680285]",
+   "round_stdev_ms": 0.0
+  },
+  {
+   "instrument": "on",
+   "organisation": "F",
+   "batches": 100,
+   "rounds": 1,
+   "mean_ms_per_record": 33.5585502453614,
+   "median_ms_per_record": 33.18935801507905,
+   "p10_ms_per_record": 31.12478016410023,
+   "p90_ms_per_record": 37.118113425094634,
+   "round_means": "[33.5585502453614]",
+   "round_stdev_ms": 0.0
+  }
+ ],
+ "window_note": "measured bars = uninstrumented serial service (whole block, one batch in flight); instrumented run only used for the member-compute split"
+}

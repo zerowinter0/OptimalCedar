@@ -1,0 +1,91 @@
+{
+ "frozen_at": "2026-09-28T01:53:57+0000",
+ "commit": "a28662e04f2e9634a33bfc62ebea7c23e3238921",
+ "batch_size": 4,
+ "records_per_batch": 4,
+ "backend": "RAY",
+ "workers": 1,
+ "stage_width": 1,
+ "member_compute": [
+  {
+   "operator": "jitter",
+   "pipe_id": 4,
+   "records": 128,
+   "compute_ms_per_record": 21.20085725,
+   "compute_stdev_ms_per_record": 3.7489407022488885,
+   "round_trip_ms_per_record": 53.86602973255018,
+   "native_bytes_in": 714432.0,
+   "native_bytes_out": 714432.0
+  },
+  {
+   "operator": "grayscale",
+   "pipe_id": 3,
+   "records": 128,
+   "compute_ms_per_record": 0.753891140625,
+   "compute_stdev_ms_per_record": 0.1433580900020739,
+   "round_trip_ms_per_record": 25.116046754798543,
+   "native_bytes_in": 714432.0,
+   "native_bytes_out": 238144.0
+  },
+  {
+   "operator": "blur",
+   "pipe_id": 2,
+   "records": 128,
+   "compute_ms_per_record": 15.25318534375,
+   "compute_stdev_ms_per_record": 22.438777605215392,
+   "round_trip_ms_per_record": 33.277079466885574,
+   "native_bytes_in": 238144.0,
+   "native_bytes_out": 238144.0
+  }
+ ],
+ "boundary": {
+  "fixed_ms_per_batch": 6.934452517372038,
+  "throughput_bytes_per_sec": 65795603.41816754,
+  "slope_ms_per_byte": 1.5198583918205682e-05,
+  "r_squared": 0.9988663858722548,
+  "ladder": [
+   {
+    "total_bytes_per_batch": 476288.0,
+    "round_trip_ms_per_batch": 14.314151896784702,
+    "round_trip_stdev_ms": 5.070288427672645
+   },
+   {
+    "total_bytes_per_batch": 952576.0,
+    "round_trip_ms_per_batch": 21.13066630748411,
+    "round_trip_stdev_ms": 4.218928566750198
+   },
+   {
+    "total_bytes_per_batch": 1428864.0,
+    "round_trip_ms_per_batch": 28.791958171253402,
+    "round_trip_stdev_ms": 7.104287223713965
+   }
+  ],
+  "method": "serial_ping_pong_real_byte_range",
+  "actor_location": {
+   "ip": "172.23.166.105"
+  },
+  "submit_batch_size": 4
+ },
+ "units": "ms per source record unless noted",
+ "byte_basis": "native tensor bytes (numel * element_size); serialization not used",
+ "representations": {
+  "jitter_in": {
+   "dtype": "float32",
+   "channels": 3,
+   "shape": [
+    3,
+    244,
+    244
+   ]
+  },
+  "grayscale_out": {
+   "dtype": "float32",
+   "channels": 1,
+   "shape": [
+    1,
+    244,
+    244
+   ]
+  }
+ }
+}

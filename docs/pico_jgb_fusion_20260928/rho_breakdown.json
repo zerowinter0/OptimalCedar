@@ -1,0 +1,23 @@
+{
+ "member_bytes": {
+  "jitter": 1428864.0,
+  "grayscale": 952576.0,
+  "blur": 476288.0
+ },
+ "member_in_bytes": {
+  "jitter": 714432.0,
+  "grayscale": 714432.0,
+  "blur": 238144.0
+ },
+ "member_out_bytes": {
+  "jitter": 714432.0,
+  "grayscale": 238144.0,
+  "blur": 238144.0
+ },
+ "rho": {
+  "jitter+grayscale": 0.4,
+  "blur": 1.0,
+  "jitter+grayscale+blur": 0.3333333333333333
+ },
+ "note": "I_i = native in+out of member i; I_q = fused group external in+out"
+}

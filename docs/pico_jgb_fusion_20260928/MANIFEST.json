@@ -1,0 +1,77 @@
+{
+ "result_dir": "outputs/pico_jgb_fusion_20260928",
+ "small_files": {
+  "README.md": {
+   "sha256": "930599d37bc17fc06525f89934065c35a79c95d48f5546f878e23dd4fa21aca3",
+   "bytes": 1667,
+   "rows": 29
+  },
+  "protocol.json": {
+   "sha256": "4f2f08cd291645c4668e613567750bd703809b7df4bd03212cc60af18b63040d",
+   "bytes": 1088,
+   "rows": 29
+  },
+  "profile_frozen.json": {
+   "sha256": "5916fbd6b6bebe39bffe900ed10dfa25adb1bd210c2a3b7b06a112fb31bc24e1",
+   "bytes": 2213,
+   "rows": 90
+  },
+  "rho_breakdown.json": {
+   "sha256": "033e19c1dd14d69a19074afc46df15403fd2a694595c983bb8a9f020364a4692",
+   "bytes": 458,
+   "rows": 22
+  },
+  "predictions.csv": {
+   "sha256": "68fba3fa4e4d86a9cbbc153468d968997fa31405240e12c2e0aa763e9c031c49",
+   "bytes": 1942,
+   "rows": 5
+  },
+  "measurements.csv": {
+   "sha256": "403e63b1db61f7dc7239b171122105988f14541e4acbbfde433c10d980dff55a",
+   "bytes": 262947,
+   "rows": 1800
+  },
+  "instrumentation_comparison.csv": {
+   "sha256": "deb4660ce82fb586d3b8db1bddbe7fb851d576b6a7d258c8e90f7f65fbe787de",
+   "bytes": 243,
+   "rows": 3
+  },
+  "operator_timing_summary.csv": {
+   "sha256": "d90748a2db743eec51aabc68e3260f35c53883e12c6fd9b43cc4447c2e7c088d",
+   "bytes": 386,
+   "rows": 3
+  },
+  "correctness.json": {
+   "sha256": "27eb1759fb8d80df9d34a4da4766036c7cd85ca343ec9508e431f56c9d2824b3",
+   "bytes": 373,
+   "rows": 14
+  },
+  "figure_data.json": {
+   "sha256": "a63e8dfb0a1ea7e50abad973ccc62e786985a136da510c74ed902e5546b58c74",
+   "bytes": 4852,
+   "rows": 153
+  },
+  "comparison.csv": {
+   "sha256": "4a85b6678e90913fe236f09121486bf2b280c0c07de21056e59b5c8e78ddfaab",
+   "bytes": 1046,
+   "rows": 5
+  },
+  "summary.csv": {
+   "sha256": "e6d138f0e7f7aae691e1a86668046715800a2c2c429b08a3ded118fffe52706c",
+   "bytes": 1075,
+   "rows": 6
+  }
+ },
+ "provenance": {
+  "fusion_jgb_experiment.py": {
+   "path": "scripts/fusion_jgb_experiment.py",
+   "sha256": "ba02291c6eca878842bc1c1c9a49bc92d0df1c03521cd23c8ebe2acb26cb1810"
+  }
+ },
+ "large_files": {
+  "inputs/block_inputs.pt": {
+   "sha256": "f231131425f7dd12db3834c0df3695d367ad10c60b4798c0313e1e2c36c8c356",
+   "bytes": 85779059
+  }
+ }
+}

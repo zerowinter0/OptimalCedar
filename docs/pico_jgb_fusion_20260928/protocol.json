@@ -1,0 +1,30 @@
+{
+ "commit": "a28662e04f2e9634a33bfc62ebea7c23e3238921",
+ "workload": "SimCLRv2 J-G-B block (jitter -> grayscale -> blur)",
+ "declared_order": "Reader -> to_float -> Crop -> Flip -> J -> G -> B -> Normalize -> Batch",
+ "backend": "RAY (remote host pinned)",
+ "workers": 1,
+ "stage_width": 1,
+ "batch_size": 4,
+ "records_per_batch": 4,
+ "host": "172.23.166.105",
+ "ray_ip": "172.23.166.105:6379",
+ "threads": 1,
+ "timing_boundary": "client submit of block input -> last output available",
+ "byte_basis": "native tensor bytes (numel * element_size)",
+ "units": "ms per source record",
+ "input": "outputs/pico_jgb_fusion_20260928/inputs/block_inputs.pt",
+ "input_meta": {
+  "workload": "simclrv2 J-G-B block input (records entering Jitter)",
+  "records": 120,
+  "shape": [
+   3,
+   244,
+   244
+  ],
+  "dtype": "torch.float32",
+  "declared_order": "Reader -> to_float -> Crop -> Flip -> [J -> G -> B] -> Normalize -> Batch",
+  "capture_chain": "read_image(RGB) -> to_float -> RandomResizedCrop((244,244)) -> RandomHorizontalFlip()",
+  "commit": "a28662e04f2e9634a33bfc62ebea7c23e3238921"
+ }
+}
